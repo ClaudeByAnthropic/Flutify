@@ -1,0 +1,85 @@
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import '../../core/theme/md3e_shapes.dart';
+import '../../models/category.dart';
+import 'cover_image.dart';
+
+class CategoryCard extends StatelessWidget {
+  final SpotifyCategory category;
+  final VoidCallback onTap;
+
+  const CategoryCard({
+    super.key,
+    required this.category,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: MD3EShapes.roundedLarge,
+      child: Container(
+        height: 100,
+        decoration: BoxDecoration(
+          color: category.color,
+          borderRadius: MD3EShapes.roundedLarge,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              category.color.withAlpha(240),
+              category.color,
+            ],
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // Title
+            Positioned(
+              top: 14,
+              left: 14,
+              right: 60,
+              child: Text(
+                category.name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+
+            // Tilted cover in bottom-right corner
+            Positioned(
+              bottom: -10,
+              right: -14,
+              child: Transform.rotate(
+                angle: 25 * math.pi / 180,
+                child: Container(
+                  width: 74,
+                  height: 74,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(90),
+                        blurRadius: 10,
+                        offset: const Offset(2, 4),
+                      ),
+                    ],
+                  ),
+                  child: CoverImage(url: category.iconUrl, size: 74, borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

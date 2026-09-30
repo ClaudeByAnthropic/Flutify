@@ -1,0 +1,220 @@
+{
+  "@@locale": "zh",
+
+  "appTitle": "Flutify",
+
+  "commonCancel": "取消",
+  "commonCreate": "创建",
+  "commonDone": "完成",
+  "commonClose": "关闭",
+  "commonClear": "清除",
+  "commonRemove": "移除",
+  "commonRetry": "重试",
+  "commonMoreOptions": "更多选项",
+  "commonShowAll": "显示全部",
+  "commonSeeMore": "查看更多",
+  "commonShowLess": "收起",
+  "commonSettings": "设置",
+  "commonShare": "分享",
+  "subtitleJoin": "{first} · {second}",
+  "@subtitleJoin": {
+    "description": "副标题中两段信息的连接，如「歌单 · Spotify」",
+    "placeholders": { "first": { "type": "String" }, "second": { "type": "String" } }
+  },
+
+  "navHome": "主页",
+  "navSearch": "搜索",
+  "navLibrary": "音乐库",
+
+  "typeArtist": "艺人",
+  "typePlaylist": "歌单",
+  "typeAlbum": "专辑",
+  "typeSingle": "单曲",
+  "typeCompilation": "合辑",
+  "filterAll": "全部",
+  "filterMusic": "音乐",
+  "filterPodcasts": "播客",
+  "filterSongs": "歌曲",
+  "filterArtists": "艺人",
+  "filterPlaylists": "歌单",
+  "filterAlbums": "专辑",
+
+  "songCount": "{count, plural, other{{count} 首歌曲}}",
+  "@songCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "followerCount": "{count} 位粉丝",
+  "@followerCount": {
+    "description": "粉丝数，count 为已格式化的紧凑数字（如 1.2 万）",
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "durationHoursMinutes": "{hours} 小时 {minutes} 分钟",
+  "@durationHoursMinutes": {
+    "placeholders": { "hours": { "type": "int" }, "minutes": { "type": "int" } }
+  },
+  "durationMinutesSeconds": "{minutes} 分 {seconds} 秒",
+  "@durationMinutesSeconds": {
+    "placeholders": { "minutes": { "type": "int" }, "seconds": { "type": "int" } }
+  },
+  "countAndDuration": "{count}，{duration}",
+  "@countAndDuration": {
+    "description": "歌曲数与总时长的连接，如「12 首歌曲，45 分 12 秒」",
+    "placeholders": { "count": { "type": "String" }, "duration": { "type": "String" } }
+  },
+  "greetingMorning": "早上好",
+  "greetingAfternoon": "下午好",
+  "greetingEvening": "晚上好",
+
+  "likedSongs": "已点赞的歌曲",
+  "likedSongsDescription": "你喜欢的所有歌曲都在这里。",
+  "likeAdd": "添加到已点赞的歌曲",
+  "likeRemove": "从已点赞的歌曲中移除",
+  "libraryAdd": "保存到音乐库",
+  "libraryRemove": "从音乐库中移除",
+
+  "homeLoadFailedTitle": "无法加载推荐内容",
+  "homeLoadFailedMessage": "请检查网络连接或 API 设置。",
+  "homeMadeForYou": "为你打造",
+  "homeMadeForYouSubtitle": "每日更新的新鲜音乐与推荐。",
+  "homePopularReleases": "热门新发行",
+  "homePopularReleasesSubtitle": "当下最受欢迎的专辑。",
+  "homePopularArtists": "热门艺人",
+  "homeNoPodcastsTitle": "暂无播客",
+  "homeNoPodcastsMessage": "播客节目和单集会显示在这里。",
+
+  "searchHint": "你想听什么？",
+  "searchRecent": "最近搜索",
+  "searchClearAll": "全部清除",
+  "searchBrowseAll": "浏览全部",
+  "searchCategoriesFailedTitle": "无法加载分类",
+  "searchCategoriesFailedMessage": "请检查网络连接或 API 设置后重试。",
+  "searchNoResultsTitle": "未找到与“{query}”相关的结果",
+  "@searchNoResultsTitle": {
+    "placeholders": { "query": { "type": "String" } }
+  },
+  "searchNoResultsMessage": "请检查拼写，或换个关键词试试。",
+  "searchFilterEmptyTitle": "该分类下暂无结果",
+  "searchFilterEmptyMessage": "换个筛选条件，查看更多结果。",
+  "searchCategoryMix": "{name} 精选",
+  "@searchCategoryMix": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "searchCategoryMixDescription": "精选 {name} 好歌，新鲜好听。",
+  "@searchCategoryMixDescription": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+
+  "librarySearchHint": "在音乐库中搜索",
+  "libraryCloseSearch": "关闭搜索",
+  "libraryCreatePlaylist": "创建歌单",
+  "libraryClearFilter": "清除筛选",
+  "librarySortRecent": "最近添加",
+  "librarySortAlphabetical": "按字母顺序",
+  "libraryListView": "列表视图",
+  "libraryGridView": "网格视图",
+  "libraryEmptyTitle": "这里还没有内容",
+  "libraryEmptyMessage": "收藏的歌单、艺人和专辑会显示在这里。",
+  "libraryNewPlaylistName": "我的歌单 #{number}",
+  "@libraryNewPlaylistName": {
+    "placeholders": { "number": { "type": "int" } }
+  },
+
+  "playlistDelete": "删除歌单",
+  "playlistLikedEmpty": "你点赞的歌曲会显示在这里。\n点按爱心图标即可收藏歌曲。",
+  "playlistOwnEmpty": "来为你的歌单找些歌曲吧。\n在任意歌曲的菜单中选择“添加到歌单”。",
+  "playlistEmpty": "这个歌单还没有歌曲。",
+
+  "albumNoTracks": "这张专辑暂无可播放的曲目。",
+  "albumMoreBy": "{name} 的更多作品",
+  "@albumMoreBy": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+
+  "artistPopular": "热门歌曲",
+  "artistNoPopular": "暂无热门歌曲。",
+  "artistDiscography": "作品",
+  "artistFollow": "关注",
+  "artistFollowing": "已关注",
+
+  "playingFromPlaylist": "正在播放歌单",
+  "playingFromAlbum": "正在播放专辑",
+  "playingFromArtist": "正在播放艺人",
+  "playingFromSearch": "正在播放搜索结果",
+  "playingFromLibrary": "正在播放音乐库",
+  "nowPlaying": "正在播放",
+  "openNowPlaying": "打开正在播放",
+  "playerNothingPlayingTitle": "当前没有播放内容",
+  "playerNothingPlayingMessage": "选择一首歌曲、专辑或歌单，开始收听吧。",
+  "playerIdleHint": "暂无播放 — 挑点音乐来听吧",
+  "playerThisDevice": "正在本设备上收听",
+  "playerShuffleOn": "开启随机播放",
+  "playerShuffleOff": "关闭随机播放",
+  "playerRepeatOn": "开启列表循环",
+  "playerRepeatOneOn": "开启单曲循环",
+  "playerRepeatOff": "关闭循环",
+  "playerNext": "下一首",
+  "playerPrevious": "上一首",
+  "playerMute": "静音",
+  "playerUnmute": "取消静音",
+
+  "queueTitle": "播放队列",
+  "queueNextInQueue": "队列中的下一首",
+  "queueClear": "清空队列",
+  "queueNextUp": "接下来播放",
+  "queueNextFrom": "接下来播放：{name}",
+  "@queueNextFrom": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "queueEmpty": "队列中暂无待播歌曲",
+
+  "lyricsTitle": "歌词",
+  "lyricsNotPlaying": "未在播放",
+  "lyricsNothingPlayingMessage": "播放一首歌曲，即可在这里查看歌词。",
+  "lyricsUnavailableTitle": "暂无歌词",
+  "lyricsUnavailableMessage": "这首歌还没有歌词。\n尽情享受音乐吧！",
+  "lyricsUnsynced": "这些歌词尚未与歌曲同步。",
+
+  "deviceConnectTitle": "连接到设备",
+  "deviceConnectDescription": "通过 Spotify Connect，可在电脑、手机或智能音箱上无缝播放。",
+  "deviceCurrent": "当前收听设备",
+  "deviceSpotifyConnect": "Spotify Connect",
+
+  "trackAddToPlaylist": "添加到歌单",
+  "trackAddToQueue": "添加到播放队列",
+  "trackGoToAlbum": "前往专辑",
+  "trackGoToArtist": "{count, plural, other{前往艺人}}",
+  "@trackGoToArtist": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "trackNewPlaylist": "新建歌单",
+  "toastLikeAdded": "已添加到已点赞的歌曲",
+  "toastLikeRemoved": "已从已点赞的歌曲中移除",
+  "toastAddedToQueue": "已添加到播放队列",
+  "toastLinkCopied": "链接已复制到剪贴板",
+  "toastAddedTo": "已添加到「{name}」",
+  "@toastAddedTo": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "toastAlreadyIn": "「{name}」中已有这首歌",
+  "@toastAlreadyIn": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+
+  "createPlaylistTitle": "为歌单命名",
+  "createPlaylistHint": "歌单名称",
+  "createPlaylistDefaultName": "我的歌单",
+
+  "settingsSave": "保存设置",
+  "settingsSaved": "Spotify API 配置已保存",
+  "settingsBannerTitle": "Spotify 逆向工程已就绪",
+  "settingsBannerMessage": "配置逆向获取的 SpClient 令牌、OAuth 密钥或本地 MITM 代理地址。",
+  "settingsCredentialsSection": "API 凭据与代理",
+  "settingsBaseUrlLabel": "API 基础地址",
+  "settingsBaseUrlHint": "https://api.spotify.com/v1 或 http://localhost:8080/v1",
+  "settingsTokenLabel": "Spotify 访问令牌（Bearer）",
+  "settingsTokenHint": "BQ…（OAuth 访问令牌）",
+  "settingsTokenManaged": "已登录：令牌由 Login5 自动获取与续期",
+  "settingsPasteToken": "粘贴令牌",
+  "settingsSpClientLabel": "SpClient Cookie（sp_dc / 内部令牌）",
+  "settingsSpClientHint": "从 Spotify 桌面端 / Android 客户端的 Cookie 中提取"
+}
