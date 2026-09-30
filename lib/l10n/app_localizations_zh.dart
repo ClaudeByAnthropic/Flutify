@@ -12,6 +12,62 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appTitle => 'Flutify';
 
   @override
+  String get shellBack => '后退';
+
+  @override
+  String get shellForward => '前进';
+
+  @override
+  String get shellHome => '主页';
+
+  @override
+  String get shellSearchShortcut => 'Ctrl K';
+
+  @override
+  String get shellAccountMenu => '账号';
+
+  @override
+  String get shellCollapseLibrary => '收起音乐库';
+
+  @override
+  String get shellExpandLibrary => '展开音乐库';
+
+  @override
+  String get shellNowPlayingView => '正在播放视图';
+
+  @override
+  String get shellHidePanel => '隐藏';
+
+  @override
+  String get shellAboutArtist => '关于艺人';
+
+  @override
+  String shellMonthlyFollowers(String count) {
+    return '$count 位粉丝';
+  }
+
+  @override
+  String get shellSignInTitle => '登录后查看你的音乐库';
+
+  @override
+  String get shellSignInMessage => '收藏的歌单、专辑和艺人会显示在这里。';
+
+  @override
+  String get shellSignIn => '登录';
+
+  @override
+  String get windowMinimize => '最小化';
+
+  @override
+  String get windowMaximize => '最大化';
+
+  @override
+  String get windowRestore => '向下还原';
+
+  @override
+  String get windowClose => '关闭';
+
+  @override
   String get commonCancel => '取消';
 
   @override
@@ -355,6 +411,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playerUnmute => '取消静音';
+
+  @override
+  String get playerLyricsFullscreen => '全屏歌词';
+
+  @override
+  String get playerSwipeHint => '左右滑动封面切换歌曲';
+
+  @override
+  String get playbackErrorSignIn => '登录后才能播放';
+
+  @override
+  String playbackErrorUnavailable(String track) {
+    return '「$track」暂时无法播放';
+  }
+
+  @override
+  String playbackErrorSkipped(String track) {
+    return '「$track」暂时无法播放，已跳过';
+  }
+
+  @override
+  String playbackErrorNetwork(String track) {
+    return '「$track」加载失败，请检查网络';
+  }
+
+  @override
+  String get detailSignInRequired => '登录后即可查看这里的内容';
+
+  @override
+  String get detailLoadFailed => '暂时无法加载，请检查网络后重试';
 
   @override
   String get queueTitle => '播放队列';

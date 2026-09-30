@@ -7,11 +7,20 @@ import 'md3e_typography.dart';
 class MD3ETheme {
   MD3ETheme._();
 
-  static ThemeData darkTheme({Color primary = MD3EColors.spotifyGreen}) {
-    final colorScheme = MD3EColors.createColorScheme(
-      primary: primary,
-      brightness: Brightness.dark,
-    );
+  /// 默认品牌色的深 / 浅色主题（含 MiSans TextTheme，只构建一次）。
+  /// 全屏播放器等深色沉浸页面在浅色模式下也用 [dark] 包裹，保证白色系控件与深色背景匹配。
+  static final ThemeData dark = darkTheme();
+  static final ThemeData light = lightTheme();
+
+  static ThemeData darkTheme({Color primary = MD3EColors.spotifyGreen}) =>
+      _build(MD3EColors.createColorScheme(primary: primary, brightness: Brightness.dark));
+
+  /// 浅色主题：组件规则与深色完全一致，只替换色板（跟随系统深浅色）。
+  static ThemeData lightTheme({Color primary = MD3EColors.spotifyGreen}) =>
+      _build(MD3EColors.createColorScheme(primary: primary, brightness: Brightness.light));
+
+  static ThemeData _build(ColorScheme colorScheme) {
+    final isDark = colorScheme.brightness == Brightness.dark;
     // englishLike 的样式 inherit=false，ThemeData 合并时不会补颜色；
     // FlexibleSpaceBar 等组件会对 titleLarge.color 做非空断言，必须显式着色。
     final textTheme = MD3ETypography.createTextTheme().apply(
@@ -21,7 +30,7 @@ class MD3ETheme {
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: colorScheme.brightness,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colorScheme.surface,
       // 全局默认字族：未显式指定字族的 TextStyle（按钮、导航标签等）同样使用 MiSans
@@ -144,7 +153,7 @@ class MD3ETheme {
       sliderTheme: SliderThemeData(
         activeTrackColor: colorScheme.primary,
         inactiveTrackColor: colorScheme.onSurfaceVariant.withAlpha(50),
-        thumbColor: Colors.white,
+        thumbColor: isDark ? Colors.white : colorScheme.onSurface,
         overlayColor: colorScheme.primary.withAlpha(40),
         trackHeight: 4.0,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),

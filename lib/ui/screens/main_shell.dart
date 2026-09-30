@@ -2,18 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../l10n/l10n.dart';
 import '../../providers/playback_provider.dart';
+import '../../providers/spotify_provider.dart';
 import '../navigation/app_routes.dart';
+import '../navigation/content_history.dart';
 import '../navigation/tab_navigator.dart';
-import '../widgets/desktop_player_bar.dart';
-import '../widgets/mini_player.dart';
+import '../shell/desktop/desktop_shell.dart';
+import '../shell/desktop/desktop_top_bar.dart';
+import '../shell/shell_breakpoints.dart';
+import '../shell/mobile/mobile_bottom_bar.dart';
+import '../shell/shell_layout_controller.dart';
+import '../widgets/playback_error_listener.dart';
 import 'home/home_screen.dart';
 import 'library/library_screen.dart';
 import 'search/search_screen.dart';
 import 'settings/settings_screen.dart';
 
-/// 响应式主框架：移动端底部导航 + 悬浮迷你播放器；桌面端侧边导航 + 底部播放栏。
+/// 响应式主框架：持有三个 Tab 的嵌套 Navigator、导航历史、全局搜索词与桌面布局状态，
+/// 按窗口宽度交给桌面三栏框架（[DesktopShell]）或移动端底部导航布局。
+///
+/// 两种布局共用同一组 Navigator 与根页面，窗口跨越断点时浏览位置不丢失。
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -22,14 +30,24 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _currentIndex = 0;
+  static const int _home = 0;
+  static const int _search = 1;
+
+  int _currentIndex = _home;
 
   final List<GlobalKey<NavigatorState>> _navigatorKeys = List.generate(3, (_) => GlobalKey<NavigatorState>());
+  final List<ContentHistory> _histories = List.generate(3, (_) => ContentHistory());
+
+  /// 搜索词在桌面顶栏与搜索页之间共享。
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode(debugLabel: 'desktop-search');
+
+  final ShellLayoutController _layout = ShellLayoutController();
 
   // 各 Tab 根页面只创建一次，切换 Tab 与窗口尺寸变化时不再重新构造
   late final List<Widget> _roots = [
     HomeScreen(onOpenSettings: _openSettings),
-    const SearchScreen(),
+    SearchScreen(controller: _searchController),
     LibraryScreen(onOpenSettings: _openSettings),
   ];
 
@@ -42,6 +60,12 @@ class _MainShellState extends State<MainShell> {
   @override
   void dispose() {
     AppRoutes.contentNavigator = null;
+    _searchController.dispose();
+    _searchFocus.dispose();
+    _layout.dispose();
+    for (final h in _histories) {
+      h.dispose();
+    }
     super.dispose();
   }
 
@@ -52,11 +76,24 @@ class _MainShellState extends State<MainShell> {
   /// 再次点击当前 Tab：回到该 Tab 根页面（Spotify 行为）。
   void _select(int index) {
     if (index == _currentIndex) {
-      _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+      _histories[index].popToRoot();
       return;
     }
     setState(() => _currentIndex = index);
   }
+
+  /// 桌面顶栏搜索：聚焦或输入即切到搜索页，并回到搜索根页（显示浏览 / 结果）。
+  void _activateSearch() {
+    if (_currentIndex != _search) setState(() => _currentIndex = _search);
+    _histories[_search].popToRoot();
+  }
+
+  void _onSearchChanged(String query) {
+    _activateSearch();
+    context.read<SpotifyProvider>().performSearch(query);
+  }
+
+  void _onSearchSubmitted(String query) => context.read<SpotifyProvider>().commitRecentSearch(query);
 
   /// 桌面快捷键（与 Spotify 桌面端一致）。输入框聚焦时空格会被 TextField 拦截，不会误触。
   Map<ShortcutActivator, VoidCallback> _shortcuts(PlaybackProvider playback) => {
@@ -69,112 +106,66 @@ class _MainShellState extends State<MainShell> {
             playback.setVolume(playback.volume - 0.1, persist: true),
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): playback.toggleShuffle,
         const SingleActivator(LogicalKeyboardKey.keyR, control: true): playback.cycleRepeatMode,
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _searchFocus.requestFocus,
+        const SingleActivator(LogicalKeyboardKey.keyL, control: true): _searchFocus.requestFocus,
+        const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () => _histories[_currentIndex].back(),
+        const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () => _histories[_currentIndex].forward(),
       };
 
+  Widget _pages() => IndexedStack(
+        index: _currentIndex,
+        children: [
+          for (var i = 0; i < _roots.length; i++)
+            TabNavigator(
+              navigatorKey: _navigatorKeys[i],
+              root: _roots[i],
+              active: i == _currentIndex,
+              observers: [_histories[i]],
+            ),
+        ],
+      );
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PlaybackErrorListener(child: _buildLayout(context));
+
+  Widget _buildLayout(BuildContext context) {
     // sizeOf 只在尺寸变化时触发重建（MediaQuery.of 会随键盘动画每帧重建）
-    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
-    final l10n = context.l10n;
-    final pages = IndexedStack(
-      index: _currentIndex,
-      children: [
-        for (var i = 0; i < _roots.length; i++)
-          TabNavigator(navigatorKey: _navigatorKeys[i], root: _roots[i], active: i == _currentIndex),
-      ],
-    );
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = ShellBreakpoints.isDesktop(width);
 
     if (isDesktop) {
-      return CallbackShortcuts(
-        bindings: _shortcuts(context.read<PlaybackProvider>()),
-        child: Focus(
-          autofocus: true,
-          child: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      NavigationRail(
-                        selectedIndex: _currentIndex,
-                        onDestinationSelected: _select,
-                        labelType: NavigationRailLabelType.all,
-                        leading: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20.0),
-                          child: Icon(Icons.music_note_rounded, color: Color(0xFF1ED760), size: 36),
-                        ),
-                        trailing: Expanded(
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 20.0),
-                              child: IconButton(
-                                icon: const Icon(Icons.tune_rounded),
-                                tooltip: l10n.commonSettings,
-                                onPressed: _openSettings,
-                              ),
-                            ),
-                          ),
-                        ),
-                        destinations: [
-                          NavigationRailDestination(
-                            icon: const Icon(Icons.home_outlined),
-                            selectedIcon: const Icon(Icons.home_filled),
-                            label: Text(l10n.navHome),
-                          ),
-                          NavigationRailDestination(
-                            icon: const Icon(Icons.search_rounded),
-                            selectedIcon: const Icon(Icons.search_rounded),
-                            label: Text(l10n.navSearch),
-                          ),
-                          NavigationRailDestination(
-                            icon: const Icon(Icons.library_music_outlined),
-                            selectedIcon: const Icon(Icons.library_music_rounded),
-                            label: Text(l10n.navLibrary),
-                          ),
-                        ],
-                      ),
-                      const VerticalDivider(width: 1, thickness: 1),
-                      Expanded(child: pages),
-                    ],
-                  ),
-                ),
-                const DesktopPlayerBar(),
-              ],
+      // 先同步右栏形态，播放栏与三栏框架在同一帧里读到一致的可见状态
+      _layout.docked = width >= ShellBreakpoints.threeColumn;
+      return ChangeNotifierProvider<ShellLayoutController>.value(
+        value: _layout,
+        child: CallbackShortcuts(
+          bindings: _shortcuts(context.read<PlaybackProvider>()),
+          child: Focus(
+            autofocus: true,
+            child: DesktopShell(
+              pages: _pages(),
+              topBar: DesktopTopBar(
+                history: _histories[_currentIndex],
+                homeSelected: _currentIndex == _home,
+                onHome: () => _select(_home),
+                searchController: _searchController,
+                searchFocus: _searchFocus,
+                onSearchChanged: _onSearchChanged,
+                onSearchSubmitted: _onSearchSubmitted,
+                onSearchActivated: _activateSearch,
+                onOpenSettings: _openSettings,
+              ),
             ),
           ),
         ),
       );
     }
 
+    // 移动端：内容铺到底部导航之下（毛玻璃透出内容），导航与迷你播放器高度经 MediaQuery 传给页面
     return Scaffold(
-      body: Stack(
-        children: [
-          pages,
-          const Positioned(left: 0, right: 0, bottom: 0, child: MiniPlayer()),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: _select,
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.home_outlined),
-            selectedIcon: const Icon(Icons.home_filled),
-            label: l10n.navHome,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.search_rounded),
-            selectedIcon: const Icon(Icons.search_rounded),
-            label: l10n.navSearch,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.library_music_outlined),
-            selectedIcon: const Icon(Icons.library_music_rounded),
-            label: l10n.navLibrary,
-          ),
-        ],
-      ),
+      extendBody: true,
+      body: _pages(),
+      bottomNavigationBar: MobileBottomBar(selectedIndex: _currentIndex, onSelected: _select),
     );
   }
 }

@@ -49,6 +49,7 @@ dependencies:
   media_kit_libs_windows_audio: ^1.0.9
   crypto: ^3.0.7
   url_launcher: ^6.3.2
+  window_manager: ^0.5.2
 
 dev_dependencies:
   flutter_test:

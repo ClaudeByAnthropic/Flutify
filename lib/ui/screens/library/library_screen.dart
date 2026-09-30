@@ -303,7 +303,7 @@ class _LibraryList extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 120),
+      padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 32),
       itemCount: items.length,
       itemBuilder: (context, i) {
         final item = items[i];
@@ -350,7 +350,7 @@ class _LibraryGrid extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.paddingOf(context).bottom + 32),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 180,
         mainAxisSpacing: 16,

@@ -11,11 +11,15 @@ class TabNavigator extends StatelessWidget {
   /// 仅当前 Tab 响应系统返回键。
   final bool active;
 
+  /// 桌面端挂载 ContentHistory，用于顶栏的后退 / 前进。
+  final List<NavigatorObserver> observers;
+
   const TabNavigator({
     super.key,
     required this.navigatorKey,
     required this.root,
     required this.active,
+    this.observers = const [],
   });
 
   @override
@@ -25,6 +29,7 @@ class TabNavigator extends StatelessWidget {
       onPopWithResult: (_) => navigatorKey.currentState?.maybePop(),
       child: Navigator(
         key: navigatorKey,
+        observers: observers,
         onGenerateRoute: (settings) => MaterialPageRoute(settings: settings, builder: (_) => root),
       ),
     );

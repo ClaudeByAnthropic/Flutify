@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/md3e_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/playback_context.dart';
@@ -8,7 +9,9 @@ import '../../../models/playlist.dart';
 import '../../../models/track.dart';
 import '../../../providers/library_provider.dart';
 import '../../../services/spotify_api_service.dart';
+import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/track_tile.dart';
+import 'widgets/collection_hero.dart';
 import 'widgets/collection_widgets.dart';
 
 /// 歌单详情页（含 Liked Songs 与自建歌单）。
@@ -27,28 +30,34 @@ class PlaylistDetailScreen extends StatefulWidget {
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   SpotifyPlaylist? _fetched;
   bool _loading = false;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
     final p = widget.playlist;
     final isLibraryOwned = p.id == LibraryProvider.likedSongsId || context.read<LibraryProvider>().isOwnPlaylist(p.id);
-    if (!isLibraryOwned && p.tracks.isEmpty && p.totalTracks > 0) {
+    if (!isLibraryOwned && p.tracks.isEmpty && p.totalTracks > 0) _fetch();
+  }
+
+  /// 拉取完整歌单；失败时记录错误，由占位提供登录 / 重试。
+  Future<void> _fetch() async {
+    setState(() {
       _loading = true;
-      context.read<SpotifyApiService>().getPlaylist(p.id).then((full) {
-        if (!mounted) return;
-        setState(() {
-          _fetched = full;
-          _loading = false;
-        });
-      });
+      _error = null;
+    });
+    try {
+      final full = await context.read<SpotifyApiService>().getPlaylist(widget.playlist.id);
+      if (mounted) setState(() => _fetched = full);
+    } catch (e) {
+      if (mounted) setState(() => _error = e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final library = context.read<LibraryProvider>();
 
     final libraryVersion = context.select<LibraryProvider, SpotifyPlaylist?>((l) => l.findPlaylist(widget.playlist.id));
@@ -71,78 +80,62 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final summary = totalMs > 0 ? l10n.countAndDuration(songs, Formatters.formatLongDuration(l10n, totalMs)) : songs;
 
     return Scaffold(
-      body: CustomScrollView(
+      body: CollectionTintScope(
+        imageUrl: isLikedSongs ? '' : playlist.coverUrl,
+        fallback: isLikedSongs ? const Color(0xFF4A2FB8) : const Color(0xFF3A3A48),
+        child: CustomScrollView(
         slivers: [
-          CollectionAppBar(
+          CollectionHero(
+            typeLabel: l10n.typePlaylist,
             title: title,
-            coverUrl: playlist.coverUrl,
+            imageUrl: playlist.coverUrl,
             coverOverride: isLikedSongs ? const _LikedSongsCover() : null,
+            meta: _PlaylistMeta(description: description, ownerName: playlist.ownerName, summary: summary),
+            collapsedAction: ContextPlayButton(
+              tracks: tracks,
+              playbackContext: playbackContext,
+              size: 44,
+              elevated: false,
+            ),
           ),
 
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (description.isNotEmpty) ...[
-                    Text(
-                      description,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 10),
+            child: CollectionHeroFade(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: CollectionActionRow(
+                  tracks: tracks,
+                  playbackContext: playbackContext,
+                  leading: [
+                    if (!isLikedSongs && !isOwn)
+                      SaveToggleButton(saved: isSaved, onPressed: () => library.togglePlaylistSaved(playlist)),
+                    if (isOwn)
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_horiz_rounded, size: 28),
+                        tooltip: l10n.commonMoreOptions,
+                        onSelected: (value) {
+                          if (value == 'delete') {
+                            library.deletePlaylist(playlist.id);
+                            Navigator.pop(context);
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          PopupMenuItem(value: 'delete', child: Text(l10n.playlistDelete)),
+                        ],
+                      ),
                   ],
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 12,
-                        backgroundColor: Color(0xFF1ED760),
-                        child: Icon(Icons.music_note_rounded, color: Colors.black, size: 14),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          playlist.ownerName,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '· $summary',
-                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  CollectionActionRow(
-                    tracks: tracks,
-                    playbackContext: playbackContext,
-                    leading: [
-                      if (!isLikedSongs && !isOwn)
-                        SaveToggleButton(saved: isSaved, onPressed: () => library.togglePlaylistSaved(playlist)),
-                      if (isOwn)
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert_rounded, size: 28),
-                          onSelected: (value) {
-                            if (value == 'delete') {
-                              library.deletePlaylist(playlist.id);
-                              Navigator.pop(context);
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(value: 'delete', child: Text(l10n.playlistDelete)),
-                          ],
-                        ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
           ),
 
           if (_loading)
             const CollectionPlaceholder(loading: true)
+          else if (_error != null)
+            CollectionErrorPlaceholder(
+              signedOut: identical(_error, SpotifyDataException.notSignedIn),
+              onRetry: _fetch,
+            )
           else if (tracks.isEmpty)
             CollectionPlaceholder(
               message: isLikedSongs
@@ -160,8 +153,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               ),
             ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+          const ContentBottomSpacer(),
         ],
+        ),
       ),
     );
   }
@@ -190,6 +184,61 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       ),
       onDismissed: (_) => context.read<LibraryProvider>().removeTrackFromPlaylist(ownPlaylistId, track.id),
       child: tile,
+    );
+  }
+}
+
+/// 头部元信息：简介（一行）+ 作者 · 歌曲数与总时长。
+class _PlaylistMeta extends StatelessWidget {
+  final String description;
+  final String ownerName;
+  final String summary;
+
+  const _PlaylistMeta({required this.description, required this.ownerName, required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (description.isNotEmpty) ...[
+          Text(
+            description,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 6),
+        ],
+        Row(
+          children: [
+            const CircleAvatar(
+              radius: 12,
+              backgroundColor: MD3EColors.spotifyGreen,
+              child: Icon(Icons.music_note_rounded, color: Colors.black, size: 14),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                ownerName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            Flexible(
+              child: Text(
+                ' · $summary',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

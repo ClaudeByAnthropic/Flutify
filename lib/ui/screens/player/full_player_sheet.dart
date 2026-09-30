@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/constants/mock_spotify_data.dart';
 import '../../../core/theme/md3e_shapes.dart';
+import '../../../core/theme/md3e_theme.dart';
+import '../../../core/theme/system_bars.dart';
 import '../../../core/utils/artwork_palette.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/model_labels.dart';
@@ -11,20 +13,29 @@ import '../../../models/track.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../providers/spotify_provider.dart';
 import '../../navigation/app_routes.dart';
-import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/playback_scrubber.dart';
 import '../../widgets/player_controls.dart';
-import '../../widgets/track_options_sheet.dart';
+import '../../widgets/track_menu.dart';
 import 'device_picker_sheet.dart';
+import 'lyrics/lyrics_view.dart';
 import 'lyrics_sheet.dart';
-import 'queue_sheet.dart';
+import 'queue_list.dart';
+import 'widgets/swipeable_artwork.dart';
+
+/// 全屏播放器中间区域的内容。
+enum _PlayerView { artwork, lyrics, queue }
 
 /// 全屏播放器（移动端底部全屏面板 / 桌面端居中对话框）。
 ///
+/// - 中间区域在「封面 / 歌词 / 播放队列」之间切换（底部两个按钮，再点一次回到封面），
+///   标题、进度条与播放控件始终保留在下方；
+/// - 封面可左右拖动切歌（[SwipeableArtwork]）；
+/// - 背景为封面主色 → 近黑的渐变，深浅色主题下都按深色主题绘制（白色系控件）。
+///
 /// 本组件只在切歌或播放上下文变化时重建；进度条、播放按钮、随机/循环、
 /// 点赞按钮均为独立订阅的子组件。
-class FullPlayerSheet extends StatelessWidget {
+class FullPlayerSheet extends StatefulWidget {
   const FullPlayerSheet({super.key});
 
   /// 根据窗口宽度选择以底部面板或对话框形式打开。
@@ -55,7 +66,26 @@ class FullPlayerSheet extends StatelessWidget {
   }
 
   @override
+  State<FullPlayerSheet> createState() => _FullPlayerSheetState();
+}
+
+class _FullPlayerSheetState extends State<FullPlayerSheet> {
+  _PlayerView _view = _PlayerView.artwork;
+
+  void _toggle(_PlayerView view) => setState(() => _view = _view == view ? _PlayerView.artwork : view);
+
+  @override
   Widget build(BuildContext context) {
+    return Theme(
+      data: MD3ETheme.dark,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: systemBarsStyle(Brightness.dark),
+        child: Builder(builder: _buildContent),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
     final playbackContext = context.select<PlaybackProvider, PlaybackContext>((p) => p.playbackContext);
     final colorScheme = Theme.of(context).colorScheme;
@@ -72,72 +102,129 @@ class FullPlayerSheet extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [artColor, colorScheme.surfaceContainerLowest],
-            stops: const [0.0, 0.8],
+            // 终点固定为近黑（而非主题底色），浅色模式下白色控件同样清晰
+            colors: [artColor, Color.lerp(artColor, Colors.black, 0.82)!],
+            stops: const [0.0, 0.85],
           ),
         ),
         clipBehavior: Clip.antiAlias,
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final availableHeight = constraints.maxHeight;
-              final isVeryCompact = availableHeight < 560;
-
-              // 封面尺寸随可用高度自适应，保证控件不会被挤出屏幕
-              final artSize = (availableHeight * (isVeryCompact ? 0.28 : 0.4))
-                  .clamp(140.0, 380.0)
-                  .clamp(140.0, constraints.maxWidth * 0.86);
+              // 横屏手机等极矮空间：中间区域固定高度，整体可滚动，控件不会被挤出屏幕
+              final compact = constraints.maxHeight < 520;
+              final middle = _Middle(view: _view, track: track);
+              final column = Column(
+                children: [
+                  _TopBar(track: track, playbackContext: playbackContext),
+                  if (compact) SizedBox(height: 200, child: middle) else Expanded(child: middle),
+                  _TitleRow(track: track),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: PlaybackScrubber(
+                      activeColor: Colors.white,
+                      inactiveColor: Colors.white24,
+                      labelColor: Colors.white60,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        ShuffleButton(),
+                        SkipButton(next: false),
+                        PlayPauseButton(),
+                        SkipButton(next: true),
+                        RepeatButton(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _BottomBar(view: _view, onToggle: _toggle),
+                ],
+              );
 
               return Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 480),
-                  child: SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: availableHeight),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          children: [
-                            _TopBar(track: track, playbackContext: playbackContext),
-                            const Spacer(),
-                            _Artwork(url: track.coverUrl, size: artSize),
-                            const Spacer(),
-                            _TitleRow(track: track),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.0),
-                              child: PlaybackScrubber(
-                                activeColor: Colors.white,
-                                inactiveColor: Colors.white24,
-                                labelColor: Colors.white60,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 20.0),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  ShuffleButton(),
-                                  SkipButton(next: false),
-                                  PlayPauseButton(),
-                                  SkipButton(next: true),
-                                  RepeatButton(),
-                                ],
-                              ),
-                            ),
-                            const Spacer(),
-                            const _BottomBar(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: compact
+                      ? SingleChildScrollView(physics: const ClampingScrollPhysics(), child: column)
+                      : column,
                 ),
               );
             },
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 中间区域：封面 / 内嵌歌词 / 播放队列，切换时交叉淡入。
+class _Middle extends StatelessWidget {
+  final _PlayerView view;
+  final SpotifyTrack track;
+
+  const _Middle({required this.view, required this.track});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      switchInCurve: Curves.easeOutCubic,
+      child: KeyedSubtree(
+        key: ValueKey(view),
+        child: switch (view) {
+          _PlayerView.artwork => LayoutBuilder(
+              builder: (context, box) {
+                final size = (box.maxWidth * 0.86).clamp(140.0, 400.0).clamp(0.0, box.maxHeight * 0.9);
+                return Center(child: SwipeableArtwork(url: track.coverUrl, size: size));
+              },
+            ),
+          _PlayerView.lyrics => _InlineLyrics(track: track),
+          _PlayerView.queue => const QueueList(horizontalPadding: 16),
+        },
+      ),
+    );
+  }
+}
+
+/// 内嵌歌词：上下边缘渐隐；右上角可展开为全屏歌词页（液态玻璃版）。
+class _InlineLyrics extends StatelessWidget {
+  final SpotifyTrack track;
+
+  const _InlineLyrics({required this.track});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: ShaderMask(
+            shaderCallback: (rect) => const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.transparent, Colors.black, Colors.black, Colors.transparent],
+              stops: [0, 0.08, 0.92, 1],
+            ).createShader(rect),
+            blendMode: BlendMode.dstIn,
+            child: LyricsView(trackId: track.id, topInset: 24, bottomInset: 24),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          right: 8,
+          child: IconButton(
+            icon: const Icon(Icons.open_in_full_rounded, size: 18),
+            color: Colors.white70,
+            tooltip: context.l10n.playerLyricsFullscreen,
+            style: IconButton.styleFrom(backgroundColor: Colors.black.withAlpha(60)),
+            onPressed: () => LyricsSheet.show(context),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -184,43 +271,16 @@ class _TopBar extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert_rounded, size: 22),
-            color: Colors.white,
-            tooltip: context.l10n.commonMoreOptions,
-            onPressed: () => TrackOptionsSheet.show(context, track),
+          Builder(
+            // 独立 context：桌面对话框中菜单锚定在按钮下方
+            builder: (buttonContext) => IconButton(
+              icon: const Icon(Icons.more_vert_rounded, size: 22),
+              color: Colors.white,
+              tooltip: context.l10n.commonMoreOptions,
+              onPressed: () => TrackMenu.show(buttonContext, track),
+            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Artwork extends StatelessWidget {
-  final String url;
-  final double size;
-
-  const _Artwork({required this.url, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: MD3EShapes.roundedExtraLarge,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 28, offset: const Offset(0, 10)),
-        ],
-      ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: CoverImage(
-          key: ValueKey(url),
-          url: url,
-          size: size,
-          borderRadius: MD3EShapes.roundedExtraLarge,
-        ),
       ),
     );
   }
@@ -242,20 +302,19 @@ class _TitleRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  track.name,
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: Colors.white),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: Text(
+                    track.name,
+                    key: ValueKey(track.id),
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: Colors.white),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 GestureDetector(
-                  onTap: track.artists.isEmpty
-                      ? null
-                      : () {
-                          final a = track.artists.first;
-                          AppRoutes.openArtist(context, MockSpotifyData.findArtist(a.id) ?? a);
-                        },
+                  onTap: track.artists.isEmpty ? null : () => AppRoutes.openArtist(context, track.artists.first),
                   child: Text(
                     track.artistNames,
                     style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70, fontWeight: FontWeight.w500),
@@ -308,8 +367,12 @@ class _NothingPlaying extends StatelessWidget {
   }
 }
 
+/// 底栏：Connect 设备 + 歌词 / 队列视图切换（当前视图高亮并带小圆点）。
 class _BottomBar extends StatelessWidget {
-  const _BottomBar();
+  final _PlayerView view;
+  final ValueChanged<_PlayerView> onToggle;
+
+  const _BottomBar({required this.view, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
@@ -317,8 +380,33 @@ class _BottomBar extends StatelessWidget {
     final primary = Theme.of(context).colorScheme.primary;
     final deviceColor = deviceName != null ? primary : Colors.white70;
 
+    Widget toggle(_PlayerView target, IconData icon, String tooltip) {
+      final active = view == target;
+      return IconButton(
+        tooltip: tooltip,
+        isSelected: active,
+        onPressed: () => onToggle(target),
+        icon: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Icon(icon, color: active ? primary : Colors.white70, size: 22),
+            if (active)
+              Positioned(
+                bottom: -7,
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(color: primary, shape: BoxShape.circle),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
       child: Row(
         children: [
           Expanded(
@@ -344,16 +432,8 @@ class _BottomBar extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.lyrics_outlined, color: Colors.white70, size: 20),
-            tooltip: context.l10n.lyricsTitle,
-            onPressed: () => LyricsSheet.show(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.queue_music_rounded, color: Colors.white70, size: 22),
-            tooltip: context.l10n.queueTitle,
-            onPressed: () => QueueSheet.show(context),
-          ),
+          toggle(_PlayerView.lyrics, Icons.lyrics_outlined, context.l10n.lyricsTitle),
+          toggle(_PlayerView.queue, Icons.queue_music_rounded, context.l10n.queueTitle),
         ],
       ),
     );

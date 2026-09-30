@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/md3e_shapes.dart';
-import 'cover_image.dart';
 
+import '../../core/theme/md3e_colors.dart';
+import '../../core/theme/md3e_shapes.dart';
+import '../shell/shell_breakpoints.dart';
+import 'cover_image.dart';
+import 'hover_builder.dart';
+
+/// 专辑 / 歌单 / 艺人卡片（横向卡架与网格共用）。
+///
+/// 桌面端交互（Spotify 新版桌面端 + MD3E 形变）：
+/// - 悬停：卡片底色提亮，播放键从封面右下角上浮淡入；
+/// - 按下播放键：圆形收缩为圆角方形（MD3E expressive shape morph），松开回弹。
+/// 触屏没有悬停，播放键常驻显示。
 class ExpressiveCard extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -26,105 +36,145 @@ class ExpressiveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final hoverCapable = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
 
     return Container(
       width: width,
       margin: const EdgeInsets.only(right: 14.0),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: MD3EShapes.roundedLarge,
-        child: Padding(
-          padding: const EdgeInsets.all(6.0),
-          child: Column(
-            crossAxisAlignment: isCircular ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Artwork Container
-              Stack(
+      child: HoverBuilder(
+        builder: (context, hovered) => Material(
+          color: hovered ? colorScheme.surfaceContainerHigh : Colors.transparent,
+          borderRadius: MD3EShapes.roundedLarge,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: MD3EShapes.roundedLarge,
+            // 悬停底色由 Material 负责（带动画的 InkWell 悬停色会与之叠加变脏）
+            hoverColor: Colors.transparent,
+            child: Padding(
+              padding: const EdgeInsets.all(6.0),
+              child: Column(
+                crossAxisAlignment: isCircular ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  AspectRatio(
-                    aspectRatio: 1.0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHigh,
-                        shape: isCircular ? BoxShape.circle : BoxShape.rectangle,
-                        borderRadius: isCircular ? null : MD3EShapes.roundedMedium,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(60),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: CoverImage(
-                        url: imageUrl,
-                        size: width - 12,
-                        placeholderIcon: isCircular ? Icons.person_rounded : Icons.music_note_rounded,
-                      ),
-                    ),
-                  ),
-
-                  // Floating Play Button
-                  if (onPlayTap != null)
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: onPlayTap,
+                  Stack(
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 1.0,
                         child: Container(
-                          width: 42,
-                          height: 42,
                           decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            shape: BoxShape.circle,
+                            color: colorScheme.surfaceContainerHigh,
+                            shape: isCircular ? BoxShape.circle : BoxShape.rectangle,
+                            borderRadius: isCircular ? null : MD3EShapes.roundedMedium,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withAlpha(120),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
+                                color: Colors.black.withAlpha(60),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.play_arrow_rounded,
-                            color: Colors.black,
-                            size: 26,
+                          clipBehavior: Clip.antiAlias,
+                          child: CoverImage(
+                            url: imageUrl,
+                            size: width - 12,
+                            placeholderIcon: isCircular ? Icons.person_rounded : Icons.music_note_rounded,
                           ),
                         ),
                       ),
+                      if (onPlayTap != null)
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: _HoverPlayButton(visible: hovered || !hoverCapable, onPressed: onPlayTap!),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: isCircular ? TextAlign.center : TextAlign.start,
+                  ),
+                  if (subtitle != null && subtitle!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: isCircular ? TextAlign.center : TextAlign.start,
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 10),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-              // Title
-              Text(
-                title,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: isCircular ? TextAlign.center : TextAlign.start,
-              ),
+/// 封面右下角的播放键：出现时上浮 8px + 淡入 + 放大；按下时圆形 → 圆角方形。
+class _HoverPlayButton extends StatefulWidget {
+  final bool visible;
+  final VoidCallback onPressed;
 
-              // Subtitle
-              if (subtitle != null && subtitle!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitle!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+  const _HoverPlayButton({required this.visible, required this.onPressed});
+
+  @override
+  State<_HoverPlayButton> createState() => _HoverPlayButtonState();
+}
+
+class _HoverPlayButtonState extends State<_HoverPlayButton> {
+  static const double _size = 46;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const curve = Curves.easeOutBack;
+    const duration = Duration(milliseconds: 220);
+    return IgnorePointer(
+      ignoring: !widget.visible,
+      child: AnimatedSlide(
+        offset: widget.visible ? Offset.zero : const Offset(0, 0.2),
+        duration: duration,
+        curve: curve,
+        child: AnimatedOpacity(
+          opacity: widget.visible ? 1 : 0,
+          duration: const Duration(milliseconds: 160),
+          child: AnimatedScale(
+            scale: widget.visible ? (_pressed ? 0.92 : 1) : 0.8,
+            duration: duration,
+            curve: curve,
+            child: GestureDetector(
+              onTapDown: (_) => setState(() => _pressed = true),
+              onTapCancel: () => setState(() => _pressed = false),
+              onTapUp: (_) => setState(() => _pressed = false),
+              onTap: widget.onPressed,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  width: _size,
+                  height: _size,
+                  decoration: BoxDecoration(
+                    color: MD3EColors.spotifyGreen,
+                    borderRadius: BorderRadius.circular(_pressed ? 14 : _size / 2),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withAlpha(110), blurRadius: 10, offset: const Offset(0, 4)),
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: isCircular ? TextAlign.center : TextAlign.start,
+                  child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 28),
                 ),
-              ],
-            ],
+              ),
+            ),
           ),
         ),
       ),

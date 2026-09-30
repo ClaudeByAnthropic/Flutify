@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/constants/mock_spotify_data.dart';
 import '../../l10n/l10n.dart';
 import '../../models/artist.dart';
 import '../../models/track.dart';
@@ -114,8 +113,8 @@ class TrackOptionsSheet extends StatelessWidget {
 
   String get _shareUrl => 'https://open.spotify.com/track/${track.id}';
 
-  /// 曲目 JSON 中的 artist 是 simplified 对象（无头像），Mock 模式下补全。
-  SpotifyArtist _resolveArtist(SpotifyArtist a) => MockSpotifyData.findArtist(a.id) ?? a;
+  /// 曲目里的 artist 是 simplified 对象（无头像）；艺人详情页会按 id 再补全完整信息。
+  SpotifyArtist _resolveArtist(SpotifyArtist a) => a;
 
   void _goToArtist(BuildContext sheetContext) {
     if (track.artists.length == 1) {

@@ -104,6 +104,114 @@ abstract class AppLocalizations {
   /// **'Flutify'**
   String get appTitle;
 
+  /// No description provided for @shellBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'后退'**
+  String get shellBack;
+
+  /// No description provided for @shellForward.
+  ///
+  /// In zh, this message translates to:
+  /// **'前进'**
+  String get shellForward;
+
+  /// No description provided for @shellHome.
+  ///
+  /// In zh, this message translates to:
+  /// **'主页'**
+  String get shellHome;
+
+  /// No description provided for @shellSearchShortcut.
+  ///
+  /// In zh, this message translates to:
+  /// **'Ctrl K'**
+  String get shellSearchShortcut;
+
+  /// No description provided for @shellAccountMenu.
+  ///
+  /// In zh, this message translates to:
+  /// **'账号'**
+  String get shellAccountMenu;
+
+  /// No description provided for @shellCollapseLibrary.
+  ///
+  /// In zh, this message translates to:
+  /// **'收起音乐库'**
+  String get shellCollapseLibrary;
+
+  /// No description provided for @shellExpandLibrary.
+  ///
+  /// In zh, this message translates to:
+  /// **'展开音乐库'**
+  String get shellExpandLibrary;
+
+  /// No description provided for @shellNowPlayingView.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在播放视图'**
+  String get shellNowPlayingView;
+
+  /// No description provided for @shellHidePanel.
+  ///
+  /// In zh, this message translates to:
+  /// **'隐藏'**
+  String get shellHidePanel;
+
+  /// No description provided for @shellAboutArtist.
+  ///
+  /// In zh, this message translates to:
+  /// **'关于艺人'**
+  String get shellAboutArtist;
+
+  /// No description provided for @shellMonthlyFollowers.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 位粉丝'**
+  String shellMonthlyFollowers(String count);
+
+  /// No description provided for @shellSignInTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录后查看你的音乐库'**
+  String get shellSignInTitle;
+
+  /// No description provided for @shellSignInMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'收藏的歌单、专辑和艺人会显示在这里。'**
+  String get shellSignInMessage;
+
+  /// No description provided for @shellSignIn.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录'**
+  String get shellSignIn;
+
+  /// No description provided for @windowMinimize.
+  ///
+  /// In zh, this message translates to:
+  /// **'最小化'**
+  String get windowMinimize;
+
+  /// No description provided for @windowMaximize.
+  ///
+  /// In zh, this message translates to:
+  /// **'最大化'**
+  String get windowMaximize;
+
+  /// No description provided for @windowRestore.
+  ///
+  /// In zh, this message translates to:
+  /// **'向下还原'**
+  String get windowRestore;
+
+  /// No description provided for @windowClose.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭'**
+  String get windowClose;
+
   /// No description provided for @commonCancel.
   ///
   /// In zh, this message translates to:
@@ -739,6 +847,54 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'取消静音'**
   String get playerUnmute;
+
+  /// No description provided for @playerLyricsFullscreen.
+  ///
+  /// In zh, this message translates to:
+  /// **'全屏歌词'**
+  String get playerLyricsFullscreen;
+
+  /// No description provided for @playerSwipeHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'左右滑动封面切换歌曲'**
+  String get playerSwipeHint;
+
+  /// No description provided for @playbackErrorSignIn.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录后才能播放'**
+  String get playbackErrorSignIn;
+
+  /// No description provided for @playbackErrorUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'「{track}」暂时无法播放'**
+  String playbackErrorUnavailable(String track);
+
+  /// No description provided for @playbackErrorSkipped.
+  ///
+  /// In zh, this message translates to:
+  /// **'「{track}」暂时无法播放，已跳过'**
+  String playbackErrorSkipped(String track);
+
+  /// No description provided for @playbackErrorNetwork.
+  ///
+  /// In zh, this message translates to:
+  /// **'「{track}」加载失败，请检查网络'**
+  String playbackErrorNetwork(String track);
+
+  /// No description provided for @detailSignInRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录后即可查看这里的内容'**
+  String get detailSignInRequired;
+
+  /// No description provided for @detailLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂时无法加载，请检查网络后重试'**
+  String get detailLoadFailed;
 
   /// No description provided for @queueTitle.
   ///

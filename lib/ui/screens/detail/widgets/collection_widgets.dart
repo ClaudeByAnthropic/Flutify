@@ -1,82 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/theme/md3e_shapes.dart';
-import '../../../../core/utils/artwork_palette.dart';
+import '../../../../core/theme/md3e_colors.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../models/playback_context.dart';
 import '../../../../models/track.dart';
 import '../../../../providers/playback_provider.dart';
-import '../../../widgets/cover_image.dart';
+import '../../auth/login_screen.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/player_controls.dart';
 import '../../../widgets/skeleton.dart';
 
-// 歌单 / 专辑详情页共用的头部与操作行组件。
-
-/// 可折叠头部：封面主色渐变背景 + 居中大封面，收起后显示标题。
-class CollectionAppBar extends StatelessWidget {
-  final String title;
-  final String coverUrl;
-  final Widget? coverOverride;
-
-  const CollectionAppBar({super.key, required this.title, required this.coverUrl, this.coverOverride});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return ArtworkColorBuilder(
-      imageUrl: coverUrl,
-      fallback: const Color(0xFF381B5E),
-      builder: (context, artColor) => SliverAppBar(
-        expandedHeight: 320.0,
-        pinned: true,
-        backgroundColor: Color.lerp(artColor, Colors.black, 0.45),
-        flexibleSpace: FlexibleSpaceBar(
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          background: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [artColor, colorScheme.surface],
-              ),
-            ),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 30),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: MD3EShapes.roundedLarge,
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 24, offset: const Offset(0, 10)),
-                    ],
-                  ),
-                  child: coverOverride ??
-                      CoverImage(url: coverUrl, size: 180, borderRadius: MD3EShapes.roundedLarge),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// 歌单 / 专辑 / 艺人详情页共用的操作行组件（头部见 collection_hero.dart）。
 
 /// 详情页大号播放按钮：
 /// 正在播放该上下文 → 暂停；该上下文已暂停 → 继续；否则从头播放整个上下文。
+///
+/// 与 Spotify 一致，深浅色主题下都是亮绿底 + 黑色图标（浅色主题的 primary 是加深绿，不用它）。
 class ContextPlayButton extends StatelessWidget {
   final List<SpotifyTrack> tracks;
   final PlaybackContext playbackContext;
   final double size;
 
-  const ContextPlayButton({super.key, required this.tracks, required this.playbackContext, this.size = 56});
+  /// 吸顶标题栏里的小号按钮不需要投影。
+  final bool elevated;
+
+  const ContextPlayButton({
+    super.key,
+    required this.tracks,
+    required this.playbackContext,
+    this.size = 56,
+    this.elevated = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final uri = playbackContext.uri;
     final (isPlayingThis, isThisContext) = context.select<PlaybackProvider, (bool, bool)>(
       (p) => (p.isPlayingContext(uri), p.playbackContext.uri == uri),
@@ -88,11 +46,12 @@ class ContextPlayButton extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(color: colorScheme.primary.withAlpha(90), blurRadius: 16, offset: const Offset(0, 4)),
+          if (elevated)
+            BoxShadow(color: Colors.black.withAlpha(70), blurRadius: 16, offset: const Offset(0, 6)),
         ],
       ),
       child: Material(
-        color: colorScheme.primary,
+        color: MD3EColors.spotifyGreen,
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -117,7 +76,9 @@ class ContextPlayButton extends StatelessWidget {
   }
 }
 
-/// 操作行：左侧自定义按钮（收藏 / 更多等），右侧 随机 + 大播放按钮。
+/// 操作行。
+/// - 宽（≥ 600，桌面端）：大播放键 → 随机 → 自定义按钮（收藏 / 更多），全部靠左；
+/// - 窄（手机）：自定义按钮靠左，随机 + 大播放键靠右。
 class CollectionActionRow extends StatelessWidget {
   final List<Widget> leading;
   final List<SpotifyTrack> tracks;
@@ -133,14 +94,32 @@ class CollectionActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        ...leading,
-        const Spacer(),
-        ShuffleButton(size: 26, inactiveColor: colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        ContextPlayButton(tracks: tracks, playbackContext: playbackContext),
-      ],
+    final shuffle = ShuffleButton(size: 26, inactiveColor: colorScheme.onSurfaceVariant);
+    final play = ContextPlayButton(tracks: tracks, playbackContext: playbackContext);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 600) {
+          return Row(
+            children: [
+              play,
+              const SizedBox(width: 20),
+              shuffle,
+              const SizedBox(width: 4),
+              ...leading,
+            ],
+          );
+        }
+        return Row(
+          children: [
+            ...leading,
+            const Spacer(),
+            shuffle,
+            const SizedBox(width: 8),
+            play,
+          ],
+        );
+      },
     );
   }
 }
@@ -179,12 +158,16 @@ class CollectionPlaceholder extends StatelessWidget {
   final bool loading;
   final String message;
   final IconData icon;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   const CollectionPlaceholder({
     super.key,
     this.loading = false,
     this.message = '',
     this.icon = Icons.queue_music_rounded,
+    this.actionLabel,
+    this.onAction,
   });
 
   @override
@@ -200,8 +183,39 @@ class CollectionPlaceholder extends StatelessWidget {
     }
     return SliverToBoxAdapter(
       child: Center(
-        child: EmptyState(icon: icon, title: message, compact: true),
+        child: EmptyState(icon: icon, title: message, compact: true, actionLabel: actionLabel, onAction: onAction),
       ),
+    );
+  }
+}
+
+/// 详情页拿不到数据时的占位（Sliver）：
+/// - 未登录：说明需要登录，按钮打开登录页，登录成功后调用 [onRetry] 重新加载；
+/// - 其他失败：说明检查网络，按钮直接 [onRetry]。
+class CollectionErrorPlaceholder extends StatelessWidget {
+  final bool signedOut;
+  final VoidCallback onRetry;
+
+  const CollectionErrorPlaceholder({super.key, required this.signedOut, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    if (signedOut) {
+      return CollectionPlaceholder(
+        message: l10n.detailSignInRequired,
+        icon: Icons.lock_outline_rounded,
+        actionLabel: l10n.shellSignIn,
+        onAction: () async {
+          if (await LoginScreen.open(context)) onRetry();
+        },
+      );
+    }
+    return CollectionPlaceholder(
+      message: l10n.detailLoadFailed,
+      icon: Icons.cloud_off_rounded,
+      actionLabel: l10n.commonRetry,
+      onAction: onRetry,
     );
   }
 }

@@ -1,0 +1,67 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
+
+/// 桌面窗口外观：隐藏系统标题栏，由顶栏自绘（拖动区 + 最小化 / 最大化 / 关闭）。
+///
+/// 只在 Windows / macOS / Linux 的真实运行中启用；Widget 测试和移动端
+/// [enabled] 为 false，顶栏不渲染窗口按钮、不调用任何原生通道。
+class DesktopWindow {
+  DesktopWindow._();
+
+  static bool _enabled = false;
+
+  /// 自绘标题栏是否生效。
+  static bool get enabled => _enabled;
+
+  /// 窗口最小尺寸：保证「72px 音乐库 + 内容」布局不被挤坏。
+  static const Size minimumSize = Size(960, 640);
+
+  /// 在 runApp 之前调用。
+  static Future<void> init() async {
+    if (kIsWeb || !(Platform.isWindows || Platform.isMacOS || Platform.isLinux)) return;
+    await windowManager.ensureInitialized();
+    const options = WindowOptions(
+      size: Size(1360, 860),
+      minimumSize: minimumSize,
+      center: true,
+      title: 'Flutify',
+      titleBarStyle: TitleBarStyle.hidden,
+      windowButtonVisibility: false,
+    );
+    await windowManager.waitUntilReadyToShow(options, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+    _enabled = true;
+  }
+
+  static Future<void> toggleMaximize() async {
+    if (await windowManager.isMaximized()) {
+      await windowManager.unmaximize();
+    } else {
+      await windowManager.maximize();
+    }
+  }
+}
+
+/// 窗口拖动区：按住拖动移动窗口，双击最大化 / 还原（Windows 标题栏行为）。
+/// 未启用自绘标题栏时原样返回子组件。
+class WindowDragArea extends StatelessWidget {
+  final Widget child;
+
+  const WindowDragArea({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!DesktopWindow.enabled) return child;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (_) => windowManager.startDragging(),
+      onDoubleTap: DesktopWindow.toggleMaximize,
+      child: child,
+    );
+  }
+}

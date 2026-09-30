@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme/md3e_theme.dart';
+import 'core/theme/system_bars.dart';
 import 'core/utils/error_placeholder.dart';
 import 'l10n/app_locale.dart';
 import 'providers/auth_provider.dart';
@@ -18,6 +19,7 @@ import 'services/protocol/track_audio_loader.dart';
 import 'services/spotify_api_service.dart';
 import 'services/storage_service.dart';
 import 'ui/screens/main_shell.dart';
+import 'ui/shell/desktop/desktop_window.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,15 +29,8 @@ Future<void> main() async {
   // 注册 media_kit 后端；Android / iOS 仍使用 just_audio 原生实现。
   JustAudioMediaKit.ensureInitialized();
 
-  // Edge-to-edge transparent system bars
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
+  // 系统栏透明、内容铺满（edge-to-edge）；图标深浅由 FlutifyApp 按当前主题设置
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   // Initialize Core Services
   final storageService = await StorageService.init();
@@ -58,6 +53,9 @@ Future<void> main() async {
     clientToken: () => authService.ensureClientToken(),
   );
 
+  // 桌面端：隐藏系统标题栏（由顶栏自绘）、设置最小窗口尺寸
+  await DesktopWindow.init();
+
   runApp(
     FlutifyApp(
       storageService: storageService,
@@ -77,8 +75,8 @@ class FlutifyApp extends StatelessWidget {
   /// Login5 鉴权服务；为空时按 [storageService] 默认创建（测试可注入假实现）。
   final SpotifyAuthService? authService;
 
-  /// 完整曲目协议加载器；为空时不走协议链路（回退预览 / Mock）。
-  final TrackAudioLoader? trackAudioLoader;
+  /// 完整曲目音频来源（协议链路）；为空时任何曲目都无法播放（PlaybackProvider 报「请先登录」）。
+  final TrackAudioSource? trackAudioLoader;
 
   const FlutifyApp({
     super.key,
@@ -88,9 +86,6 @@ class FlutifyApp extends StatelessWidget {
     this.authService,
     this.trackAudioLoader,
   });
-
-  // ThemeData 构建（含 MiSans TextTheme）只做一次
-  static final ThemeData _theme = MD3ETheme.darkTheme();
 
   @override
   Widget build(BuildContext context) {
@@ -116,19 +111,20 @@ class FlutifyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => LibraryProvider(storageService),
+          create: (_) => LibraryProvider(storageService, source: spotifyApiService.library),
         ),
         ChangeNotifierProvider(
           create: (_) => SpotifyProvider(spotifyApiService, storageService),
         ),
         ChangeNotifierProvider(
-          create: (_) => SettingsProvider(storageService, spotifyApiService),
+          create: (_) => SettingsProvider(storageService),
         ),
-        // 登录态变化后：重新拉取主页数据（Mock ↔ 真实）并同步设置页缓存
+        // 登录态变化后：重新拉取主页数据与媒体库（未登录时清空）并同步设置页缓存
         ChangeNotifierProvider(
           create: (ctx) => AuthProvider(ctx.read<SpotifyAuthService>())
             ..onSessionChanged = () {
               ctx.read<SpotifyProvider>().loadInitialData();
+              ctx.read<LibraryProvider>().refresh();
               ctx.read<SettingsProvider>().reloadFromStorage();
             },
         ),
@@ -140,9 +136,15 @@ class FlutifyApp extends StatelessWidget {
         locale: AppLocale.locale,
         supportedLocales: AppLocale.supportedLocales,
         localizationsDelegates: AppLocale.delegates,
-        themeMode: ThemeMode.dark,
-        darkTheme: _theme,
-        theme: _theme,
+        // 跟随系统深浅色
+        themeMode: ThemeMode.system,
+        darkTheme: MD3ETheme.dark,
+        theme: MD3ETheme.light,
+        // 状态栏 / 导航栏图标随深浅色切换；全屏播放器等深色沉浸页面自行覆盖为浅色图标
+        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: systemBarsStyle(Theme.of(context).brightness),
+          child: child!,
+        ),
         home: const MainShell(),
       ),
     );

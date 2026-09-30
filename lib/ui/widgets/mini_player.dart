@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/theme/md3e_shapes.dart';
 import '../../core/utils/artwork_palette.dart';
 import '../../l10n/l10n.dart';
 import '../../models/track.dart';
@@ -13,10 +12,11 @@ import 'cover_image.dart';
 import 'playback_scrubber.dart';
 import 'player_controls.dart';
 
-/// 移动端底部悬浮迷你播放器。
+/// 移动端悬浮胶囊迷你播放器（位于毛玻璃底部导航上方）。
 ///
-/// - 背景色取自专辑封面（与 Spotify 一致），切歌时平滑过渡。
-/// - 左右滑动切换上一首 / 下一首。
+/// - 胶囊形、背景色取自专辑封面并压暗（与 Spotify 一致），切歌时平滑过渡；
+/// - 底部内缩的 2px 细进度线；
+/// - 左右滑动切换上一首 / 下一首，点击展开全屏播放器；
 /// - 只在切歌时重建；进度线与播放按钮各自局部订阅。
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
@@ -27,27 +27,29 @@ class MiniPlayer extends StatelessWidget {
     if (track == null) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
+    const shape = StadiumBorder();
 
     return ArtworkColorBuilder(
       imageUrl: track.coverUrl,
-      fallback: colorScheme.surfaceContainerHigh,
+      fallback: colorScheme.inverseSurface,
       builder: (context, artColor) {
         final background = Color.lerp(artColor, Colors.black, 0.35)!;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOut,
-          margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
-          decoration: BoxDecoration(
+          margin: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+          decoration: ShapeDecoration(
             color: background,
-            borderRadius: MD3EShapes.roundedMedium,
-            boxShadow: [
-              BoxShadow(color: Colors.black.withAlpha(90), blurRadius: 16, offset: const Offset(0, 4)),
+            shape: shape,
+            shadows: [
+              BoxShadow(color: Colors.black.withAlpha(90), blurRadius: 20, offset: const Offset(0, 6)),
             ],
           ),
           clipBehavior: Clip.antiAlias,
           child: Material(
             type: MaterialType.transparency,
             child: InkWell(
+              customBorder: shape,
               onTap: () => FullPlayerSheet.show(context),
               child: GestureDetector(
                 onHorizontalDragEnd: (details) {
@@ -56,14 +58,22 @@ class MiniPlayer extends StatelessWidget {
                   final playback = context.read<PlaybackProvider>();
                   v < 0 ? playback.nextTrack() : playback.previousTrack();
                 },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: Stack(
                   children: [
                     _MiniPlayerRow(track: track),
-                    PlaybackProgressLine(
-                      height: 2,
-                      color: Colors.white,
-                      backgroundColor: Colors.white.withAlpha(40),
+                    // 细进度线：左右内缩到胶囊直线段内，避开两端圆弧
+                    Positioned(
+                      left: 28,
+                      right: 28,
+                      bottom: 3,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(1),
+                        child: PlaybackProgressLine(
+                          height: 2,
+                          color: Colors.white,
+                          backgroundColor: Colors.white.withAlpha(40),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -94,11 +104,11 @@ class _MiniPlayerRow extends StatelessWidget {
         final showLike = width >= 260;
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 6, 8),
+          padding: const EdgeInsets.fromLTRB(7, 7, 8, 9),
           child: Row(
             children: [
-              CoverImage(url: track.coverUrl, size: 42, borderRadius: BorderRadius.circular(6.0)),
-              const SizedBox(width: 10),
+              CoverImage(url: track.coverUrl, size: 44, circular: true),
+              const SizedBox(width: 12),
 
               // 歌名 / 艺人（或当前 Connect 设备）
               Expanded(

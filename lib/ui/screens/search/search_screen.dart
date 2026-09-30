@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/constants/mock_spotify_data.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/artist.dart';
 import '../../../models/category.dart';
@@ -12,6 +11,7 @@ import '../../../providers/playback_provider.dart';
 import '../../../providers/spotify_provider.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/category_card.dart';
+import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/filter_pill.dart';
@@ -22,24 +22,41 @@ import '../../widgets/track_tile.dart';
 ///
 /// 输入经 SpotifyProvider 300ms 防抖并丢弃过期结果；
 /// 点击结果或回车时写入最近搜索。
+///
+/// 桌面端（宽度 ≥ 800）搜索框在顶栏：由 MainShell 传入同一个 [controller]，
+/// 本页隐藏自己的标题与输入框，只显示分类浏览 / 结果。
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final TextEditingController? controller;
+
+  const SearchScreen({super.key, this.controller});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final TextEditingController _searchController = TextEditingController();
+  late final TextEditingController _searchController = widget.controller ?? TextEditingController();
   final FocusNode _focusNode = FocusNode();
   /// 结果过滤：0 全部 / 1 歌曲 / 2 艺人 / 3 歌单。
   int _searchFilterIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // 顶栏输入时本页也要切换「浏览 / 结果」
+    _searchController.addListener(_onQueryChanged);
+  }
+
+  @override
   void dispose() {
-    _searchController.dispose();
+    _searchController.removeListener(_onQueryChanged);
+    if (widget.controller == null) _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onQueryChanged() {
+    if (mounted) setState(() {});
   }
 
   void _setQuery(String query) {
@@ -59,6 +76,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final l10n = context.l10n;
     final searchFilters = [l10n.filterAll, l10n.filterSongs, l10n.filterArtists, l10n.filterPlaylists];
     final isQueryEmpty = _searchController.text.trim().isEmpty;
+    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
 
     return Scaffold(
       body: SafeArea(
@@ -66,6 +84,8 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (isDesktop) const SizedBox(height: 16),
+            if (!isDesktop)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Column(
@@ -224,7 +244,8 @@ class _BrowseView extends StatelessWidget {
                       category: category,
                       onTap: () => AppRoutes.openPlaylist(
                         context,
-                        MockSpotifyData.playlistTodaysTopHits.copyWith(
+                        // 分类浏览（browsePage）尚未接入：先打开一个空的分类页，不再塞示例曲目
+                        SpotifyPlaylist(
                           id: 'category_${category.id}',
                           uri: 'spotify:playlist:category_${category.id}',
                           name: l10n.searchCategoryMix(category.name),
@@ -239,7 +260,7 @@ class _BrowseView extends StatelessWidget {
             },
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        const ContentBottomSpacer(),
       ],
     );
   }

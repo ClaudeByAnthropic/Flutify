@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/constants/mock_spotify_data.dart';
 import '../../l10n/l10n.dart';
 import '../../models/track.dart';
 import '../../providers/playback_provider.dart';
@@ -11,6 +10,7 @@ import '../screens/player/device_picker_sheet.dart';
 import '../screens/player/full_player_sheet.dart';
 import '../screens/player/lyrics_sheet.dart';
 import '../screens/player/queue_sheet.dart';
+import '../shell/shell_layout_controller.dart';
 import 'cover_image.dart';
 import 'playback_scrubber.dart';
 import 'player_controls.dart';
@@ -25,10 +25,8 @@ class DesktopPlayerBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
-    final decoration = BoxDecoration(
-      color: colorScheme.surfaceContainerLowest,
-      border: Border(top: BorderSide(color: colorScheme.outlineVariant.withAlpha(80), width: 1)),
-    );
+    // 与窗口底色相同、无分隔线：播放栏与三栏面板靠色阶区分（Spotify 新版桌面端）
+    final decoration = BoxDecoration(color: colorScheme.surfaceContainerLowest);
 
     // 无曲目时保留 90dp 通栏高度并显示占位，避免内容区高度跳变
     if (track == null) {
@@ -66,7 +64,13 @@ class DesktopPlayerBar extends StatelessWidget {
                             const SizedBox(width: 8),
                             SkipButton(next: false, size: 22, color: colorScheme.onSurface, constraints: _small),
                             const SizedBox(width: 10),
-                            const PlayPauseButton(size: 36, iconSize: 22),
+                            // 深色：白底黑图标；浅色：黑底白图标
+                            PlayPauseButton(
+                              size: 36,
+                              iconSize: 22,
+                              background: colorScheme.onSurface,
+                              foreground: colorScheme.surface,
+                            ),
                             const SizedBox(width: 10),
                             SkipButton(next: true, size: 22, color: colorScheme.onSurface, constraints: _small),
                             const SizedBox(width: 8),
@@ -79,10 +83,7 @@ class DesktopPlayerBar extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(
-                width: sideWidth,
-                child: _RightControls(showVolume: totalWidth >= 700, showVolumeSlider: totalWidth >= 900),
-              ),
+              SizedBox(width: sideWidth, child: const _RightControls()),
             ],
           );
         },
@@ -166,7 +167,7 @@ class _NowPlayingInfo extends StatelessWidget {
                     ? null
                     : () {
                         final a = track.artists.first;
-                        AppRoutes.openArtist(context, MockSpotifyData.findArtist(a.id) ?? a);
+                        AppRoutes.openArtist(context, a);
                       },
               ),
             ],
@@ -214,51 +215,78 @@ class _HoverLinkState extends State<_HoverLink> {
   }
 }
 
+/// 播放栏右侧的 32px 小图标按钮样式。
+///
+/// M3 的 IconButton 默认把点击区域补到 48px，`constraints` 无法缩小它，
+/// 这里显式收紧，否则 5 个按钮 + 音量条在 300px 内放不下。
+final ButtonStyle _barIconStyle = IconButton.styleFrom(
+  fixedSize: const Size.square(_RightControls.buttonSize),
+  minimumSize: const Size.square(_RightControls.buttonSize),
+  padding: EdgeInsets.zero,
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+);
+
 class _RightControls extends StatelessWidget {
-  final bool showVolume;
-  final bool showVolumeSlider;
+  const _RightControls();
 
-  const _RightControls({required this.showVolume, required this.showVolumeSlider});
-
-  static const BoxConstraints _small = BoxConstraints(minWidth: 32, minHeight: 32);
+  static const double buttonSize = 32;
+  static const double _sliderWidth = 92;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final hasDevice = context.select<SpotifyProvider, bool>((s) => s.activeDevice != null);
+    // 三栏框架下：歌词 / 队列 / 正在播放视图切换右栏标签（当前标签高亮）；
+    // 没有框架（单独使用播放栏）时回退为底部面板
+    final layout = context.watch<ShellLayoutController?>();
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.lyrics_outlined, size: 20),
-          color: colorScheme.onSurfaceVariant,
-          tooltip: context.l10n.lyricsTitle,
-          padding: EdgeInsets.zero,
-          constraints: _small,
-          onPressed: () => LyricsSheet.show(context),
+    Widget panelButton(NowPlayingTab tab, IconData icon, String tooltip, VoidCallback fallback) {
+      final active = layout != null && layout.rightPanelVisible && layout.tab == tab;
+      return IconButton(
+        icon: Icon(icon, size: 20),
+        color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
+        tooltip: tooltip,
+        style: _barIconStyle,
+        onPressed: layout == null ? fallback : () => layout.showTab(tab),
+      );
+    }
+
+    final buttons = <Widget>[
+      if (layout != null)
+        panelButton(
+          NowPlayingTab.details,
+          Icons.picture_in_picture_alt_rounded,
+          context.l10n.shellNowPlayingView,
+          () {},
         ),
-        IconButton(
-          icon: const Icon(Icons.queue_music_rounded, size: 20),
-          color: colorScheme.onSurfaceVariant,
-          tooltip: context.l10n.queueTitle,
-          padding: EdgeInsets.zero,
-          constraints: _small,
-          onPressed: () => QueueSheet.show(context),
+      panelButton(NowPlayingTab.lyrics, Icons.lyrics_outlined, context.l10n.lyricsTitle, () => LyricsSheet.show(context)),
+      panelButton(NowPlayingTab.queue, Icons.queue_music_rounded, context.l10n.queueTitle, () => QueueSheet.show(context)),
+      IconButton(
+        icon: Icon(
+          Icons.devices_rounded,
+          size: 20,
+          color: hasDevice ? colorScheme.primary : colorScheme.onSurfaceVariant,
         ),
-        IconButton(
-          icon: Icon(
-            Icons.devices_rounded,
-            size: 20,
-            color: hasDevice ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          ),
-          tooltip: context.l10n.deviceConnectTitle,
-          padding: EdgeInsets.zero,
-          constraints: _small,
-          onPressed: () => DevicePickerSheet.show(context),
-        ),
-        if (showVolume) _VolumeControl(showSlider: showVolumeSlider),
-      ],
+        tooltip: context.l10n.deviceConnectTitle,
+        style: _barIconStyle,
+        onPressed: () => DevicePickerSheet.show(context),
+      ),
+    ];
+
+    // 按实际可用宽度逐级隐藏：先去掉音量滑块，再去掉音量键
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final base = buttons.length * (buttonSize + 4);
+        final showVolume = constraints.maxWidth >= base + buttonSize;
+        final showSlider = constraints.maxWidth >= base + buttonSize + _sliderWidth + 8;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            for (final b in buttons) Padding(padding: const EdgeInsets.only(left: 4), child: b),
+            if (showVolume) _VolumeControl(showSlider: showSlider, sliderWidth: _sliderWidth),
+          ],
+        );
+      },
     );
   }
 }
@@ -266,8 +294,9 @@ class _RightControls extends StatelessWidget {
 /// 音量：点击图标静音 / 恢复；拖动时实时生效，松手后持久化。
 class _VolumeControl extends StatelessWidget {
   final bool showSlider;
+  final double sliderWidth;
 
-  const _VolumeControl({required this.showSlider});
+  const _VolumeControl({required this.showSlider, required this.sliderWidth});
 
   @override
   Widget build(BuildContext context) {
@@ -288,13 +317,12 @@ class _VolumeControl extends StatelessWidget {
           icon: Icon(icon, size: 18),
           color: colorScheme.onSurfaceVariant,
           tooltip: volume == 0 ? context.l10n.playerUnmute : context.l10n.playerMute,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          style: _barIconStyle,
           onPressed: playback.toggleMute,
         ),
         if (showSlider)
           SizedBox(
-            width: 92,
+            width: sliderWidth,
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 3.0,

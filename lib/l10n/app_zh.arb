@@ -3,6 +3,28 @@
 
   "appTitle": "Flutify",
 
+  "shellBack": "后退",
+  "shellForward": "前进",
+  "shellHome": "主页",
+  "shellSearchShortcut": "Ctrl K",
+  "shellAccountMenu": "账号",
+  "shellCollapseLibrary": "收起音乐库",
+  "shellExpandLibrary": "展开音乐库",
+  "shellNowPlayingView": "正在播放视图",
+  "shellHidePanel": "隐藏",
+  "shellAboutArtist": "关于艺人",
+  "shellMonthlyFollowers": "{count} 位粉丝",
+  "@shellMonthlyFollowers": {
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "shellSignInTitle": "登录后查看你的音乐库",
+  "shellSignInMessage": "收藏的歌单、专辑和艺人会显示在这里。",
+  "shellSignIn": "登录",
+  "windowMinimize": "最小化",
+  "windowMaximize": "最大化",
+  "windowRestore": "向下还原",
+  "windowClose": "关闭",
+
   "commonCancel": "取消",
   "commonCreate": "创建",
   "commonDone": "完成",
@@ -156,6 +178,23 @@
   "playerPrevious": "上一首",
   "playerMute": "静音",
   "playerUnmute": "取消静音",
+  "playerLyricsFullscreen": "全屏歌词",
+  "playerSwipeHint": "左右滑动封面切换歌曲",
+  "playbackErrorSignIn": "登录后才能播放",
+  "playbackErrorUnavailable": "「{track}」暂时无法播放",
+  "@playbackErrorUnavailable": {
+    "placeholders": { "track": { "type": "String" } }
+  },
+  "playbackErrorSkipped": "「{track}」暂时无法播放，已跳过",
+  "@playbackErrorSkipped": {
+    "placeholders": { "track": { "type": "String" } }
+  },
+  "playbackErrorNetwork": "「{track}」加载失败，请检查网络",
+  "@playbackErrorNetwork": {
+    "placeholders": { "track": { "type": "String" } }
+  },
+  "detailSignInRequired": "登录后即可查看这里的内容",
+  "detailLoadFailed": "暂时无法加载，请检查网络后重试",
 
   "queueTitle": "播放队列",
   "queueNextInQueue": "队列中的下一首",

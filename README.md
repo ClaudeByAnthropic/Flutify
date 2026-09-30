@@ -1,6 +1,6 @@
 # Flutify 🎵 - Spotify-Style Music Player (Google Material 3 Expressive)
 
-Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打造的高保真 Spotify 风格在线音乐播放器。专为**逆向 Spotify 移动端/桌面端协议与 API** 而设计，提供完整解耦的 API 数据层、设备控制、歌词同步、播放队列管理及内置逆向工程测试调试器。
+Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打造的高保真 Spotify 风格在线音乐播放器。专为**逆向 Spotify 移动端/桌面端协议与 API** 而设计，提供完整解耦的 API 数据层、真实曲目播放、账号媒体库、歌词同步与播放队列管理。
 
 ---
 
@@ -19,7 +19,8 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 * **主页 (Home)**：
   - 动态问候语（早上好 / 下午好 / 晚上好）与个人头像。
   - 顶部快速过滤（全部 / 音乐 / 播客）。
-  - Spotify 经典 2列x3行 近期播放快捷卡片（含 "Liked Songs" 渐变爱心卡片）。
+  - Spotify 经典快捷卡片网格（手机 2 列 × 4 行，平板 3 列、宽屏 4 列；首格为 "Liked Songs" 渐变爱心卡片）。
+  - 未登录时主页提示登录，而不是显示「加载失败」。
   - 横向滚动专辑与歌单卡架（"Made For You"、"Popular Releases"、圆形艺人头像卡架）。
 * **搜索与浏览 (Search & Browse)**：
   - 实时歌曲、艺人、歌单多类型搜索。
@@ -30,16 +31,29 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 排序及列表/网格视图切换。
   - 新建歌单快捷弹窗。
 * **播放器系统 (Player Experience)**：
-  - **Mini Player (常驻底部悬浮条)**：悬浮在底部导航栏上方，实时展示专辑封面、歌名、艺人、设备状态、爱心收藏与播放/暂停控制，底部自带精确进度线。
-  - **Full Screen Player (全屏播放器)**：下拉手势抽屉、动态氛围背景渐变、高清圆角大封面、高灵敏度滑动进度条（Scrubber）、随机/单曲/列表循环三态切换。
+  - **Mini Player (悬浮胶囊)**：悬浮在毛玻璃底部导航之上，底色取封面主色，圆形封面 + 歌名 / 艺人 + 收藏与播放键，胶囊底边一条细进度线。
+  - **Full Screen Player (全屏播放器)**：下拉手势抽屉、封面主色渐变（始终深色，状态栏浅色图标）、高灵敏度滑动进度条（Scrubber）、随机/单曲/列表循环三态切换。
+    中间区域可在「封面 / 歌词 / 播放队列」间切换（底部按钮，再点一次回到封面）；**左右滑动封面切歌**，小幅拖动松手回弹；内嵌歌词右上角可进入全屏歌词。
+  - **播放失败提示**：未登录（带「登录」按钮）、曲目不可播放（说明已自动跳过）、网络错误（带「重试」按钮）均以浮动提示条告知，连续失败只保留最新一条。
   - **Spotify Connect 设备切换**：支持检测并切换播放设备（PC / 手机 / 音箱）。
   - **实时同步歌词 (Synced Lyrics)**：Apple Music iOS 风格——流动封面背景（`LiquidArtworkBackground`）、顶部信息胶囊与底部控制台采用液态玻璃（`LiquidGlass`），当前行清晰、上下句按行距逐级模糊变暗；手动滚动时全部变清晰，停手 3 秒后自动回到当前行；点击任意行跳转。
   - **播放队列管理器 (Queue)**：与 Spotify 一致的双层队列——"Next in queue"（用户手动添加，优先播放）+ "Next from: 上下文"，两段均支持拖拽排序、滑动删除、点击跳播、一键清空。
   - **播放上下文 (Playback Context)**：记录"正在从哪个歌单 / 专辑 / 艺人 / 搜索播放"，全屏播放器顶部显示「正在播放歌单」等，详情页播放键可在"播放整个上下文 / 暂停 / 继续"间切换。
   - **真随机与循环**：随机模式基于打乱的播放顺序表，切换时以当前曲目为起点重建；列表循环在末尾回绕，单曲循环重播。
-* **详情页**：歌单（本地歌单可删除 / 滑动移除曲目）、专辑（发行信息、"More by"）、艺人（关注、热门曲目、唱片目录），均以封面主色生成渐变头部。
-* **曲目菜单**：长按任意曲目 → 收藏、加入歌单、加入队列、前往专辑 / 艺人、复制分享链接。
-* **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环。
+* **详情页**：歌单（本地歌单可删除 / 滑动移除曲目）、专辑（发行信息、"More by"）、艺人（关注、热门曲目、唱片目录）。
+  - 大头图（`CollectionHero`）：封面主色铺满头部并一直渐隐到操作行，没有硬边；宽屏为 232px 封面 + 自适应字号大标题（放不下时逐档缩小），手机为居中封面。
+  - 向上滚动后收起为吸顶标题栏，带小号播放键。
+  - 拿不到数据时显示「登录后即可查看」或「暂时无法加载」，带登录 / 重试按钮，不会一直转圈。
+* **悬停与右键（桌面端）**：卡片悬停浮出绿色播放键（按下时由圆变圆角方形）；曲目行悬停时序号变 ▶、露出收藏与「⋯」；右键曲目弹出上下文菜单（加入歌单[二级菜单] / 收藏 / 加入队列 / 前往艺人 / 前往专辑 / 复制链接）。移动端长按曲目打开底部菜单。
+* **深浅色**：跟随系统；浅色模式下药丸、播放键、详情页头部与状态栏图标都单独调过对比度。
+* **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环、Ctrl+K / Ctrl+L 聚焦搜索、Alt+←/→ 后退 / 前进、Esc 关闭浮层右栏。
+
+### 3. 响应式外壳（桌面三栏 / 移动端）
+* **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：自绘标题栏（拖动 / 双击最大化 / Win11 风格窗口按钮）+ 顶栏（后退前进、主页、居中搜索、头像）；
+  左栏音乐库（筛选、库内搜索、排序，可拖宽，窄于 280px 或手动收起时变为 72px 图标栏；未登录显示登录引导）；
+  右栏「正在播放 / 播放队列 / 歌词」；底部播放栏（窗口变窄时依次隐藏音量条、音量键，不溢出）。
+* **右栏形态**：≥ 1280px 停靠在内容右侧（开关状态持久化）；1100 – 1280px 为浮层，默认关闭，点空白处或 Esc 关闭，不遮挡内容。
+* **< 800px 移动端**（`ui/shell/mobile/`）：内容铺到底部之下，毛玻璃底部导航 + 悬浮胶囊迷你播放器；页面底部留白按实际遮挡高度计算（`ContentBottomSpacer`）。
 
 ---
 
@@ -63,10 +77,13 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 | :--- | :--- | :--- |
 | **API 路由注册表** | `lib/core/constants/spotify_endpoints.dart` | 包含所有 Spotify Web API 及 SpClient 内部端点（`/me`, `/me/player`, `/browse/*`, `/color-lyrics/*`） |
 | **数据模型层** | `lib/models/` | `SpotifyTrack`, `SpotifyAlbum`, `SpotifyArtist`, `SpotifyPlaylist`, `SpotifyLyrics`, `SpotifyDevice` 均严格遵循 Spotify JSON 字段结构 |
-| **API 服务层** | `lib/services/spotify_api_service.dart` | 支持带 `Bearer Token` 的网络请求，支持配置自定义代理或逆向服务，在未连接 Token 时无缝降级至全功能本地 Mock 数据 |
+| **API 服务层** | `lib/services/spotify_api_service.dart` | 支持带 `Bearer Token` 的网络请求，支持配置自定义代理或逆向服务。**不含任何示例 / Mock 数据**：未登录时搜索、媒体库等返回空结果，实体详情（歌单 / 专辑 / 艺人）失败时抛 `SpotifyDataException`，由界面展示错误与重试 |
+| **完整曲目播放** | `lib/services/protocol/` + `audio_player_service.dart` | 纯逆向协议链路：extended-metadata（TRACK_V4）→ storage-resolve → AP 音频密钥（DH + Shannon 握手，`0xab` 令牌登录、`0x0c` 取密钥）→ CDN 下载 + AES-128-CTR 解密 → 去掉 Spotify 头部后写入本地文件 → just_audio 播放。仅支持 OGG Vorbis / MP3；FLAC / AAC 属 Widevine DRM，会抛 `TrackPlaybackException`。`PlaybackProvider.playbackError` / `playbackErrors` 暴露错误，「不可播放」类自动跳下一首（有上限）；AP 连接会记住上次可用的接入点并重试多个候选 |
+| **媒体库** | `lib/services/library/` | `LibrarySource` 抽象：桌面会话走 spclient `collection/v2/paging`（protobuf，已点赞歌曲 / 专辑 / 艺人）+ `playlist/v2/user/{u}/rootlist`（歌单）+ Pathfinder 补全曲目与实体；其他登录方式走 Web API。点赞 / 收藏 / 关注乐观更新并尽力同步到账号（失败记入 `syncError`）；自建歌单仅保存在本机。未登录时媒体库为空 |
+| **歌词** | `lib/services/lyrics_service.dart` | spclient `GET /color-lyrics/v2/track/{id}`，请求头沿用会话身份（桌面会话即桌面端头）；404 = 无歌词（可缓存），其他错误不缓存 |
 | **协议登录** | `lib/services/auth/` | **桌面版 OAuth（默认）**：与官方桌面版相同的 client_id，系统浏览器打开 accounts.spotify.com 登录，本机回环 `127.0.0.1:8898/login` 接收授权码，PKCE 换令牌、refresh_token 续期，并以 Windows 桌面身份申请 `client-token`；**Login5**：密码（自动 Hashcash + 短信验证码，可重新发送）、手机号短信、登录链接 / 一次性令牌、导入 StoredCredential；**开发者应用 OAuth**：自己的 Client ID。会话的 client_id、client-token 平台数据、User-Agent 与 `app-platform` 请求头始终来自同一种客户端身份（`client_profile.dart`）；登出调用 `/api/logout/v1` |
 | **桌面端数据层** | `lib/services/pathfinder/` | 桌面版 OAuth 会话下，公开 Web API（api.spotify.com）会因共享 client_id 频繁 429，因此改走官方桌面端自己的内部接口：Pathfinder GraphQL（`api-partner.spotify.com/pathfinder/v2/query`，持久化查询 hash 取自本机 `xpui.spa` 1.3.1.234）负责主页、分类、搜索、专辑、艺人、唱片目录与曲目补全；spclient `playlist/v2` 负责歌单、`user-profile-view/v3` 负责昵称头像。其余登录方式仍走 Web API |
-| **逆向调试中心** | `lib/ui/screens/settings/settings_screen.dart` | **内置 API 调试控制台**：可在 App 内直接输入并测试任何逆向提取的 API 路径（如 `/me`, `/me/player`），实时查看 HTTP 状态码、延迟及响应 JSON |
+| **探测脚本** | `tool/` | 纯 Dart 命令行探针（不属于 App）：`protocol_probe.dart`（播放链路端到端）、`live_probe.dart`（用本机已保存会话实测播放 / 媒体库 / 歌词）、`pathfinder_probe.dart`（Pathfinder 入参探测）、`ap_ports_probe.dart`（AP 网络可达性）。输出只写入 `tool/probe_out/`（已 gitignore，含账号数据，不得进入测试或文档） |
 
 ---
 
@@ -77,13 +94,13 @@ d:/Flutify/app/
 ├── lib/
 │   ├── core/
 │   │   ├── constants/
-│   │   │   ├── mock_spotify_data.dart    # 真实可播放音频测试流、样本歌单与歌词
 │   │   │   └── spotify_endpoints.dart    # Spotify 官方/SpClient 端点表
 │   │   ├── theme/
-│   │   │   ├── md3e_colors.dart          # MD3E 表面色阶与 Spotify 调色盘
+│   │   │   ├── md3e_colors.dart          # MD3E 表面色阶与 Spotify 调色盘（深 / 浅两套）
 │   │   │   ├── md3e_shapes.dart          # MD3E 胶囊与多级圆角规范
 │   │   │   ├── md3e_typography.dart      # MiSans 字体规范（字重、中文行高与字距）
-│   │   │   └── md3e_theme.dart           # ThemeData (useMaterial3: true)
+│   │   │   ├── md3e_theme.dart           # ThemeData（深 / 浅，缓存为 MD3ETheme.dark / light）
+│   │   │   └── system_bars.dart          # 状态栏 / 导航栏透明 + 图标深浅随背景
 │   │   └── utils/
 │   │       ├── formatters.dart           # 时长、万/亿紧凑数字、发行日期、问候语（经 l10n 本地化）
 │   │       └── artwork_palette.dart      # 封面主色提取（带缓存）
@@ -118,33 +135,51 @@ d:/Flutify/app/
 │   │   │   ├── pathfinder_client.dart    # GraphQL v2 请求与错误处理
 │   │   │   ├── pathfinder_parsers.dart   # 响应 → App 数据模型（宽松解析、解包 Wrapper）
 │   │   │   └── desktop_data_source.dart  # 页面级数据：主页/分类/搜索/专辑/艺人/歌单，5 分钟查询缓存
-│   │   ├── audio_player_service.dart     # 基于 just_audio 的实时音频流控制
-│   │   ├── spotify_api_service.dart      # HTTP API 请求与 Mock 降级
+│   │   ├── protocol/                     # 完整曲目播放链路（AP 握手、音频密钥、CDN 解密、TrackAudioSource）
+│   │   ├── library/                      # 媒体库来源：collection 编解码、rootlist 解析、桌面 / Web API 实现
+│   │   ├── lyrics_service.dart           # spclient color-lyrics 取词与解析
+│   │   ├── audio_player_service.dart     # 基于 just_audio 播放本地已解密文件
+│   │   ├── spotify_api_service.dart      # 主页 / 搜索 / 实体详情（无 Mock；失败抛 SpotifyDataException）
 │   │   └── storage_service.dart          # SharedPreferences 本地凭证持久化
 │   ├── providers/
 │   │   ├── auth_provider.dart            # 登录态：表单 → 验证码 → 已登录，错误中文化
 │   │   ├── playback_provider.dart        # 播放状态、上下文、双层队列、随机/循环、音量
 │   │   ├── library_provider.dart         # 收藏歌曲、歌单、关注艺人、收藏专辑（持久化）
 │   │   ├── spotify_provider.dart         # 主页数据、防抖搜索、搜索历史、歌词缓存、设备
-│   │   └── settings_provider.dart        # 逆向凭据与 API 测试调试器
+│   │   └── settings_provider.dart        # 手动凭据（令牌 / 自定义 API 基址 / SpClient 令牌）
 │   ├── ui/
-│   │   ├── navigation/                   # Tab 内嵌 Navigator 与统一跳转 AppRoutes
+│   │   ├── navigation/                   # Tab 内嵌 Navigator、统一跳转 AppRoutes、后退 / 前进历史 content_history
+│   │   ├── shell/
+│   │   │   ├── shell_breakpoints.dart    # 800 / 1100 / 1280 分档
+│   │   │   ├── shell_layout_controller.dart # 左栏宽度 / 收起、右栏停靠与浮层开关、当前标签
+│   │   │   ├── panel_surface.dart        # 三栏共用的圆角面板
+│   │   │   ├── desktop/                  # 三栏总布局、顶栏、自绘标题栏与窗口按钮、音乐库左栏、右栏、拖宽手柄
+│   │   │   └── mobile/mobile_bottom_bar.dart # 毛玻璃底部导航 + 悬浮迷你播放器
 │   │   ├── screens/
-│   │   │   ├── main_shell.dart           # 响应式主框架 (移动端底部栏 / 桌面端侧边栏)
+│   │   │   ├── main_shell.dart           # 响应式主框架：持有导航 / 历史 / 搜索词 / 布局状态，分发到桌面或移动布局
 │   │   │   ├── home/home_screen.dart     # Spotify 风格主页
 │   │   │   ├── search/search_screen.dart # 搜索与倾斜封面流派卡片
 │   │   │   ├── library/library_screen.dart# 媒体库与已点赞歌曲
 │   │   │   ├── detail/                   # 歌单、专辑、艺人详情页
-│   │   │   ├── player/                   # 全屏播放器、歌词抽屉、队列与设备列表
+│   │   │   │   └── widgets/              # collection_hero（大头图 + 吸顶栏 + 主色）、collection_widgets（操作行 / 占位）
+│   │   │   ├── player/                   # 全屏播放器、歌词、队列列表 queue_list 与设备列表
+│   │   │   │   └── widgets/swipeable_artwork.dart # 左右滑动切歌的封面
 │   │   │   ├── auth/                     # 登录页外壳 login_screen.dart + stages/（浏览器登录[默认]、密码、手机号、
 │   │   │   │                             #   链接、导入凭据、开发者应用授权、验证码）+ widgets/（品牌标、授权等待页等）
-│   │   │   └── settings/settings_screen.dart # 账号卡片（登录/刷新令牌/退出）+ 逆向工程 API 调试中心
+│   │   │   └── settings/settings_screen.dart # 账号卡片（登录/刷新令牌/退出）+ 手动凭据
 │   │   └── widgets/                      # MiniPlayer、TrackTile、CoverImage、PlaybackScrubber、
-│   │                                     # PlayerControls、TrackOptionsSheet、CreatePlaylistDialog 等
+│   │                                     # PlayerControls、TrackOptionsSheet、CreatePlaylistDialog 等；
+│   │                                     # track_menu（桌面右键菜单 / 移动端底部菜单）、hover_builder、
+│   │                                     # playback_error_listener（播放失败提示）、content_bottom_spacer
 │   └── main.dart
 ├── assets/fonts/MiSans/                  # MiSans Regular / Medium / Demibold / Bold（TTF）
 ├── l10n.yaml                             # gen-l10n 配置（模板 app_zh.arb）
-└── test/                                 # Provider 单元测试 + 移动/桌面 UI 流程测试
+└── test/
+    ├── fixtures/sample_catalog.dart      # 合成曲库（虚构数据，不含任何账号内容）
+    ├── fakes/                            # 音频 / 音频源 / 媒体库 / 数据服务的内存替身
+    ├── ui/                               # 大头图、三种宽度（1440 / 1024 / 390）、移动端播放器、错误状态
+    ├── ui_flow_test.dart, widget_test.dart # 移动 / 桌面关键流程冒烟
+    └── ...                               # Provider、协议、媒体库编解码等单元测试
 ```
 
 ---

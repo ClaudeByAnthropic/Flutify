@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/constants/mock_spotify_data.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/model_labels.dart';
@@ -12,8 +11,10 @@ import '../../../providers/library_provider.dart';
 import '../../../services/spotify_api_service.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/cover_image.dart';
+import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/expressive_card.dart';
 import '../../widgets/track_tile.dart';
+import 'widgets/collection_hero.dart';
 import 'widgets/collection_widgets.dart';
 
 /// 专辑详情页：曲目列表、收藏、发行信息与「More by 艺人」。
@@ -27,12 +28,17 @@ class AlbumDetailScreen extends StatefulWidget {
 }
 
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
-  late final Future<List<SpotifyTrack>> _tracksFuture;
-  late final Future<List<SpotifyAlbum>> _moreByArtistFuture;
+  late Future<List<SpotifyTrack>> _tracksFuture;
+  late Future<List<SpotifyAlbum>> _moreByArtistFuture;
 
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  /// 曲目与「More by」失败时由数据层返回空列表；登录后调用本方法重新加载。
+  void _load() {
     final api = context.read<SpotifyApiService>();
     _tracksFuture = api.getAlbumTracks(widget.album);
     _moreByArtistFuture = widget.album.artists.isEmpty
@@ -41,6 +47,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               (albums) => albums.where((a) => a.id != widget.album.id).toList(),
             );
   }
+
+  void _reload() => setState(_load);
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +59,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final isSaved = context.select<LibraryProvider, bool>((l) => l.isAlbumSaved(album.id));
     final playbackContext = PlaybackContext.album(album.name, uri: album.contextUri);
     final mainArtist = album.artists.isNotEmpty ? album.artists.first : null;
-    final resolvedArtist = mainArtist == null ? null : (MockSpotifyData.findArtist(mainArtist.id) ?? mainArtist);
+    final resolvedArtist = mainArtist;
 
     return Scaffold(
       body: FutureBuilder<List<SpotifyTrack>>(
@@ -61,62 +69,92 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           final loading = snapshot.connectionState != ConnectionState.done;
           final totalMs = tracks.fold<int>(0, (sum, t) => sum + t.durationMs);
 
-          return CustomScrollView(
-            slivers: [
-              CollectionAppBar(title: album.name, coverUrl: album.coverUrl),
+          // 年份 · 12 首歌曲，45 分钟（曲目加载完成后才有数量与时长）
+          final facts = [
+            if (album.releaseYear.isNotEmpty) album.releaseYear,
+            if (tracks.isNotEmpty)
+              l10n.countAndDuration(l10n.songCount(tracks.length), Formatters.formatLongDuration(l10n, totalMs)),
+          ];
 
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (resolvedArtist != null)
-                        InkWell(
+          return CollectionTintScope(
+            imageUrl: album.coverUrl,
+            fallback: const Color(0xFF3A3A48),
+            child: CustomScrollView(
+            slivers: [
+              CollectionHero(
+                typeLabel: l10n.albumType(album),
+                title: album.name,
+                imageUrl: album.coverUrl,
+                meta: Row(
+                  children: [
+                    if (resolvedArtist != null)
+                      Flexible(
+                        child: InkWell(
                           borderRadius: BorderRadius.circular(20),
                           onTap: () => AppRoutes.openArtist(context, resolvedArtist),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4.0),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                CoverImage(
-                                  url: resolvedArtist.avatarUrl,
-                                  size: 24,
-                                  circular: true,
-                                  placeholderIcon: Icons.person_rounded,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CoverImage(
+                                url: resolvedArtist.avatarUrl,
+                                size: 24,
+                                circular: true,
+                                placeholderIcon: Icons.person_rounded,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  album.artistNames,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(album.artistNames, style: const TextStyle(fontWeight: FontWeight.w700)),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      const SizedBox(height: 4),
-                      Text(
-                        album.releaseYear.isEmpty
-                            ? l10n.albumType(album)
-                            : l10n.subtitleJoin(l10n.albumType(album), album.releaseYear),
-                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
                       ),
-                      const SizedBox(height: 12),
-                      CollectionActionRow(
-                        tracks: tracks,
-                        playbackContext: playbackContext,
-                        leading: [
-                          SaveToggleButton(
-                            saved: isSaved,
-                            onPressed: () => context.read<LibraryProvider>().toggleAlbumSaved(album),
-                          ),
-                        ],
+                    if (facts.isNotEmpty)
+                      Flexible(
+                        child: Text(
+                          ' · ${facts.join(' · ')}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        ),
                       ),
-                    ],
+                  ],
+                ),
+                collapsedAction: ContextPlayButton(
+                  tracks: tracks,
+                  playbackContext: playbackContext,
+                  size: 44,
+                  elevated: false,
+                ),
+              ),
+
+              SliverToBoxAdapter(
+                child: CollectionHeroFade(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                    child: CollectionActionRow(
+                      tracks: tracks,
+                      playbackContext: playbackContext,
+                      leading: [
+                        SaveToggleButton(
+                          saved: isSaved,
+                          onPressed: () => context.read<LibraryProvider>().toggleAlbumSaved(album),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
 
               if (loading)
                 const CollectionPlaceholder(loading: true)
+              else if (tracks.isEmpty && !context.read<SpotifyApiService>().isConfigured)
+                CollectionErrorPlaceholder(signedOut: true, onRetry: _reload)
               else if (tracks.isEmpty)
                 CollectionPlaceholder(message: l10n.albumNoTracks)
               else
@@ -189,8 +227,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              const ContentBottomSpacer(),
             ],
+            ),
           );
         },
       ),

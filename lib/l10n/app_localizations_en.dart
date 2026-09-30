@@ -12,6 +12,63 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Flutify';
 
   @override
+  String get shellBack => 'Go back';
+
+  @override
+  String get shellForward => 'Go forward';
+
+  @override
+  String get shellHome => 'Home';
+
+  @override
+  String get shellSearchShortcut => 'Ctrl K';
+
+  @override
+  String get shellAccountMenu => 'Account';
+
+  @override
+  String get shellCollapseLibrary => 'Collapse Your Library';
+
+  @override
+  String get shellExpandLibrary => 'Expand Your Library';
+
+  @override
+  String get shellNowPlayingView => 'Now Playing view';
+
+  @override
+  String get shellHidePanel => 'Hide';
+
+  @override
+  String get shellAboutArtist => 'About the artist';
+
+  @override
+  String shellMonthlyFollowers(String count) {
+    return '$count followers';
+  }
+
+  @override
+  String get shellSignInTitle => 'Sign in to see your library';
+
+  @override
+  String get shellSignInMessage =>
+      'Saved playlists, albums and artists will show up here.';
+
+  @override
+  String get shellSignIn => 'Sign in';
+
+  @override
+  String get windowMinimize => 'Minimize';
+
+  @override
+  String get windowMaximize => 'Maximize';
+
+  @override
+  String get windowRestore => 'Restore';
+
+  @override
+  String get windowClose => 'Close';
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override
@@ -365,6 +422,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playerUnmute => 'Unmute';
+
+  @override
+  String get playerLyricsFullscreen => 'Full-screen lyrics';
+
+  @override
+  String get playerSwipeHint => 'Swipe the artwork to change songs';
+
+  @override
+  String get playbackErrorSignIn => 'Sign in to play music';
+
+  @override
+  String playbackErrorUnavailable(String track) {
+    return '\"$track\" isn\'t available right now';
+  }
+
+  @override
+  String playbackErrorSkipped(String track) {
+    return '\"$track\" isn\'t available right now, skipped';
+  }
+
+  @override
+  String playbackErrorNetwork(String track) {
+    return 'Couldn\'t load \"$track\". Check your connection.';
+  }
+
+  @override
+  String get detailSignInRequired => 'Sign in to see what\'s here';
+
+  @override
+  String get detailLoadFailed =>
+      'Couldn\'t load this. Check your connection and try again.';
 
   @override
   String get queueTitle => 'Queue';

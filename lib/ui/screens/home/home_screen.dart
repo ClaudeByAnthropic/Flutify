@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/constants/mock_spotify_data.dart';
 import '../../../core/theme/md3e_shapes.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/album.dart';
+import '../../../models/artist.dart';
 import '../../../models/playback_context.dart';
 import '../../../models/playlist.dart';
 import '../../../providers/library_provider.dart';
@@ -13,6 +13,8 @@ import '../../../providers/playback_provider.dart';
 import '../../../providers/spotify_provider.dart';
 import '../../../services/spotify_api_service.dart';
 import '../../navigation/app_routes.dart';
+import '../auth/login_screen.dart';
+import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/expressive_card.dart';
@@ -37,9 +39,15 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 过滤药丸：0 全部 / 1 音乐 / 2 播客。
   int _selectedFilter = 0;
 
+  /// 卡片上的播放键：取不到曲目（未登录 / 网络失败时数据层返回空列表）就打开专辑页，由详情页说明原因。
   Future<void> _playAlbum(SpotifyAlbum album) async {
     final playback = context.read<PlaybackProvider>();
     final tracks = await context.read<SpotifyApiService>().getAlbumTracks(album);
+    if (!mounted) return;
+    if (tracks.isEmpty) {
+      AppRoutes.openAlbum(context, album);
+      return;
+    }
     await playback.playContext(tracks, PlaybackContext.album(album.name, uri: album.contextUri));
   }
 
@@ -58,6 +66,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final avatarUrl = context.select<SpotifyProvider, String>((s) => s.user.avatarUrl);
     final featured = context.select<SpotifyProvider, List<SpotifyPlaylist>>((s) => s.featuredPlaylists);
     final libraryPlaylists = context.select<LibraryProvider, List<SpotifyPlaylist>>((l) => l.playlists);
+    final libraryAlbums = context.select<LibraryProvider, List<SpotifyAlbum>>((l) => l.albums);
+    final libraryArtists = context.select<LibraryProvider, List<SpotifyArtist>>((l) => l.artists);
     final isLoading = context.select<SpotifyProvider, bool>((s) => s.isLoadingHome);
     final showMusic = _selectedFilter != 2;
 
@@ -133,6 +143,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 SliverToBoxAdapter(
                   child: isLoading
                       ? const SkeletonShelf()
+                      : !context.read<SpotifyApiService>().isConfigured
+                      ? EmptyState(
+                          icon: Icons.lock_outline_rounded,
+                          title: l10n.detailSignInRequired,
+                          actionLabel: l10n.shellSignIn,
+                          compact: true,
+                          onAction: () => LoginScreen.open(context),
+                        )
                       : EmptyState(
                           icon: Icons.wifi_off_rounded,
                           title: l10n.homeLoadFailedTitle,
@@ -160,40 +178,43 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-              SliverToBoxAdapter(
-                child: ShelfSection(
-                  title: l10n.homePopularReleases,
-                  subtitle: l10n.homePopularReleasesSubtitle,
-                  children: [
-                    for (final album in MockSpotifyData.allAlbums)
-                      ExpressiveCard(
-                        title: album.name,
-                        subtitle: album.artistNames,
-                        imageUrl: album.coverUrl,
-                        onTap: () => AppRoutes.openAlbum(context, album),
-                        onPlayTap: () => _playAlbum(album),
-                      ),
-                  ],
+              // 示例数据已移除：这两个货架暂以用户媒体库中的专辑 / 艺人填充（为空时不显示）
+              if (libraryAlbums.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: ShelfSection(
+                    title: l10n.homePopularReleases,
+                    subtitle: l10n.homePopularReleasesSubtitle,
+                    children: [
+                      for (final album in libraryAlbums)
+                        ExpressiveCard(
+                          title: album.name,
+                          subtitle: album.artistNames,
+                          imageUrl: album.coverUrl,
+                          onTap: () => AppRoutes.openAlbum(context, album),
+                          onPlayTap: () => _playAlbum(album),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
 
-              SliverToBoxAdapter(
-                child: ShelfSection(
-                  title: l10n.homePopularArtists,
-                  children: [
-                    for (final artist in MockSpotifyData.allArtists)
-                      ExpressiveCard(
-                        title: artist.name,
-                        subtitle: l10n.typeArtist,
-                        imageUrl: artist.avatarUrl,
-                        isCircular: true,
-                        onTap: () => AppRoutes.openArtist(context, artist),
-                      ),
-                  ],
+              if (libraryArtists.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: ShelfSection(
+                    title: l10n.homePopularArtists,
+                    children: [
+                      for (final artist in libraryArtists)
+                        ExpressiveCard(
+                          title: artist.name,
+                          subtitle: l10n.typeArtist,
+                          imageUrl: artist.avatarUrl,
+                          isCircular: true,
+                          onTap: () => AppRoutes.openArtist(context, artist),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              const ContentBottomSpacer(),
             ],
           ],
         ),

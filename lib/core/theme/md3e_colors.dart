@@ -26,6 +26,24 @@ class MD3EColors {
   static const Color outline = Color(0xFF494A57);
   static const Color outlineVariant = Color(0xFF32333E);
 
+  // 浅色表面层级：语义与深色一致——Lowest 是窗口最底层（面板之间的缝隙、播放栏），
+  // surface 是内容面板本身，Container 系列逐级加深用于卡片 / 输入框 / 悬停。
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightSurfaceDim = Color(0xFFDCDDE3);
+  static const Color lightSurfaceBright = Color(0xFFFFFFFF);
+  static const Color lightSurfaceContainerLowest = Color(0xFFEBECF0);
+  static const Color lightSurfaceContainerLow = Color(0xFFF6F6F9);
+  static const Color lightSurfaceContainer = Color(0xFFF0F0F4);
+  static const Color lightSurfaceContainerHigh = Color(0xFFE9E9EF);
+  static const Color lightSurfaceContainerHighest = Color(0xFFE1E2E9);
+  static const Color lightOnSurface = Color(0xFF15161B);
+  static const Color lightOnSurfaceVariant = Color(0xFF5C5D69);
+  static const Color lightOutline = Color(0xFF8D8E9A);
+  static const Color lightOutlineVariant = Color(0xFFD5D6DE);
+
+  /// 浅色背景上的品牌绿：原色 #1ED760 在白底上对比度不足 2:1，文字 / 图标改用加深版。
+  static const Color spotifyGreenOnLight = Color(0xFF12A04A);
+
   // Expressive Accent Accents (For Genres, Moods, Playlists)
   static const Color accentViolet = Color(0xFF9E54FF);
   static const Color accentCyan = Color(0xFF00E5FF);
@@ -76,9 +94,41 @@ class MD3EColors {
         shadow: Colors.black,
       );
     } else {
-      return ColorScheme.fromSeed(
-        seedColor: primary,
+      final lightPrimary = primary == spotifyGreen ? spotifyGreenOnLight : primary;
+      return ColorScheme(
         brightness: Brightness.light,
+        primary: lightPrimary,
+        onPrimary: Colors.white,
+        primaryContainer: lightPrimary.withAlpha(40),
+        onPrimaryContainer: const Color(0xFF00391A),
+        secondary: const Color(0xFF2E7D32),
+        onSecondary: Colors.white,
+        secondaryContainer: const Color(0xFFD7F5D9),
+        onSecondaryContainer: const Color(0xFF0B3D10),
+        tertiary: const Color(0xFF7A3FE0),
+        onTertiary: Colors.white,
+        tertiaryContainer: const Color(0xFFEBDDFF),
+        onTertiaryContainer: const Color(0xFF2A0A5E),
+        error: const Color(0xFFBA1A1A),
+        onError: Colors.white,
+        errorContainer: const Color(0xFFFFDAD6),
+        onErrorContainer: const Color(0xFF410002),
+        surface: lightSurface,
+        onSurface: lightOnSurface,
+        onSurfaceVariant: lightOnSurfaceVariant,
+        outline: lightOutline,
+        outlineVariant: lightOutlineVariant,
+        surfaceDim: lightSurfaceDim,
+        surfaceBright: lightSurfaceBright,
+        surfaceContainerLowest: lightSurfaceContainerLowest,
+        surfaceContainerLow: lightSurfaceContainerLow,
+        surfaceContainer: lightSurfaceContainer,
+        surfaceContainerHigh: lightSurfaceContainerHigh,
+        surfaceContainerHighest: lightSurfaceContainerHighest,
+        inverseSurface: const Color(0xFF2F3036),
+        onInverseSurface: const Color(0xFFF2F0F7),
+        inversePrimary: spotifyGreen,
+        shadow: Colors.black,
       );
     }
   }

@@ -1,0 +1,327 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../l10n/l10n.dart';
+import '../../../providers/auth_provider.dart';
+import '../../navigation/content_history.dart';
+import '../../widgets/cover_image.dart';
+import 'desktop_window.dart';
+import 'window_caption_buttons.dart';
+
+/// 桌面端顶栏（与窗口标题栏合一，高 64）。
+///
+/// 布局：`‹ ›` 后退 / 前进 ─── [⌂] [ 🔍 你想听什么？  Ctrl K ] ─── 头像 · 窗口按钮
+/// - 空白处可拖动窗口、双击最大化（[WindowDragArea]）；
+/// - 搜索框居中，输入即切到搜索页；`Ctrl K` 聚焦；
+/// - 头像打开设置（账号卡片在设置页顶部）。
+class DesktopTopBar extends StatelessWidget {
+  final ContentHistory history;
+  final bool homeSelected;
+  final VoidCallback onHome;
+  final TextEditingController searchController;
+  final FocusNode searchFocus;
+  final ValueChanged<String> onSearchChanged;
+  final ValueChanged<String> onSearchSubmitted;
+  final VoidCallback onSearchActivated;
+  final VoidCallback onOpenSettings;
+
+  const DesktopTopBar({
+    super.key,
+    required this.history,
+    required this.homeSelected,
+    required this.onHome,
+    required this.searchController,
+    required this.searchFocus,
+    required this.onSearchChanged,
+    required this.onSearchSubmitted,
+    required this.onSearchActivated,
+    required this.onOpenSettings,
+  });
+
+  static const double height = 64;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return WindowDragArea(
+      child: SizedBox(
+        height: height,
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            ListenableBuilder(
+              listenable: history,
+              builder: (context, _) => Row(
+                children: [
+                  _RoundIconButton(
+                    icon: Icons.chevron_left_rounded,
+                    tooltip: l10n.shellBack,
+                    onPressed: history.canGoBack ? history.back : null,
+                  ),
+                  const SizedBox(width: 8),
+                  _RoundIconButton(
+                    icon: Icons.chevron_right_rounded,
+                    tooltip: l10n.shellForward,
+                    onPressed: history.canGoForward ? history.forward : null,
+                  ),
+                ],
+              ),
+            ),
+            // 中间区域：主页按钮 + 搜索框整体居中，两侧留白都是拖动区
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        _HomeButton(selected: homeSelected, onPressed: onHome),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _SearchField(
+                            controller: searchController,
+                            focusNode: searchFocus,
+                            onChanged: onSearchChanged,
+                            onSubmitted: onSearchSubmitted,
+                            onActivated: onSearchActivated,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            _AccountButton(onPressed: onOpenSettings),
+            SizedBox(width: DesktopWindow.enabled ? 8 : 16),
+            if (DesktopWindow.enabled)
+              const Align(alignment: Alignment.topCenter, child: WindowCaptionButtons()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 32px 圆形图标按钮（后退 / 前进）；禁用时降低不透明度。
+class _RoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  const _RoundIconButton({required this.icon, required this.tooltip, this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return IconButton(
+      icon: Icon(icon, size: 22),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        fixedSize: const Size(32, 32),
+        minimumSize: const Size(32, 32),
+        padding: EdgeInsets.zero,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        disabledBackgroundColor: colorScheme.surface.withAlpha(140),
+        disabledForegroundColor: colorScheme.onSurfaceVariant.withAlpha(110),
+      ),
+    );
+  }
+}
+
+/// 48px 主页按钮：选中时实心图标。
+class _HomeButton extends StatelessWidget {
+  final bool selected;
+  final VoidCallback onPressed;
+
+  const _HomeButton({required this.selected, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return IconButton(
+      icon: Icon(selected ? Icons.home_filled : Icons.home_outlined, size: 24),
+      tooltip: context.l10n.shellHome,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        fixedSize: const Size(48, 48),
+        backgroundColor: colorScheme.surfaceContainerHigh,
+        foregroundColor: selected ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+/// 胶囊搜索框：悬停 / 聚焦时底色提亮并出现描边；未输入且未聚焦时显示快捷键提示。
+class _SearchField extends StatefulWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String> onSubmitted;
+  final VoidCallback onActivated;
+
+  const _SearchField({
+    required this.controller,
+    required this.focusNode,
+    required this.onChanged,
+    required this.onSubmitted,
+    required this.onActivated,
+  });
+
+  @override
+  State<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<_SearchField> {
+  bool _hover = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocus);
+    widget.controller.addListener(_rebuild);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocus);
+    widget.controller.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  void _rebuild() => setState(() {});
+
+  void _onFocus() {
+    if (widget.focusNode.hasFocus) widget.onActivated();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final l10n = context.l10n;
+    final focused = widget.focusNode.hasFocus;
+    final hasText = widget.controller.text.isNotEmpty;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 48,
+        decoration: ShapeDecoration(
+          color: _hover || focused ? colorScheme.surfaceContainerHighest : colorScheme.surfaceContainerHigh,
+          shape: StadiumBorder(
+            side: BorderSide(
+              color: focused ? colorScheme.onSurface : (_hover ? colorScheme.outlineVariant : Colors.transparent),
+              width: focused ? 2 : 1,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 14),
+            Icon(Icons.search_rounded, size: 24, color: focused ? colorScheme.onSurface : colorScheme.onSurfaceVariant),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: widget.controller,
+                focusNode: widget.focusNode,
+                textInputAction: TextInputAction.search,
+                onChanged: widget.onChanged,
+                onSubmitted: widget.onSubmitted,
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: l10n.searchHint,
+                  filled: false,
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+            if (hasText)
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 20),
+                tooltip: l10n.commonClear,
+                color: colorScheme.onSurfaceVariant,
+                onPressed: () {
+                  widget.controller.clear();
+                  widget.onChanged('');
+                  widget.focusNode.requestFocus();
+                },
+              )
+            else if (!focused)
+              Container(
+                margin: const EdgeInsets.only(right: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  border: Border.all(color: colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  l10n.shellSearchShortcut,
+                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, letterSpacing: 0.4),
+                ),
+              ),
+            if (hasText) const SizedBox(width: 4),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 右上角头像：已登录显示账号头像（无头像时显示昵称首字），未登录显示人形图标。
+class _AccountButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _AccountButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final (signedIn, name, avatar) = context.select<AuthProvider, (bool, String, String)>(
+      (a) => (a.isSignedIn, a.displayName, a.avatarUrl),
+    );
+    final initial = name.trim().isEmpty ? '' : name.trim().characters.first.toUpperCase();
+
+    Widget face;
+    if (signedIn && avatar.isNotEmpty) {
+      face = CoverImage(url: avatar, size: 32, circular: true, placeholderIcon: Icons.person_rounded);
+    } else if (signedIn && initial.isNotEmpty) {
+      face = CircleAvatar(
+        radius: 16,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        child: Text(initial, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      );
+    } else {
+      face = CircleAvatar(
+        radius: 16,
+        backgroundColor: colorScheme.surfaceContainerHighest,
+        foregroundColor: colorScheme.onSurfaceVariant,
+        child: const Icon(Icons.person_rounded, size: 18),
+      );
+    }
+
+    return Tooltip(
+      message: signedIn && name.isNotEmpty ? name : context.l10n.shellAccountMenu,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: face,
+        style: IconButton.styleFrom(
+          fixedSize: const Size(48, 48),
+          backgroundColor: colorScheme.surfaceContainerHigh,
+          padding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+}
