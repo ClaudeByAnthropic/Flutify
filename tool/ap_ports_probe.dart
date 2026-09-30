@@ -1,6 +1,8 @@
-// AP 可达性探针：分别以「直连」与「HTTP CONNECT 代理隧道」向接入点发送 ClientHello，
-// 用于区分「协议问题」与「网络环境（代理 / TUN）吞掉 AP 长连接」。无需任何凭据。
-//   dart run tool/ap_ports_probe.dart [--proxy 127.0.0.1:7890]
+// 开发工具：AP 可达性探针（无需任何凭据，不读取本机登录状态）。
+//
+// 用途：分别以「直连」与「HTTP CONNECT 代理隧道」向接入点发送 ClientHello，
+// 用于区分「协议问题」与「网络环境（代理 / TUN）吞掉 AP 长连接」。
+// 用法（在 app 目录）：dart run tool/ap_ports_probe.dart [--proxy 127.0.0.1:7890]
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -24,7 +26,7 @@ Future<void> main(List<String> args) async {
   }
 
   for (final target in byPort.values) {
-    stdout.writeln('${await _probe(target, proxy)}');
+    stdout.writeln(await _probe(target, proxy));
   }
   exit(0);
 }

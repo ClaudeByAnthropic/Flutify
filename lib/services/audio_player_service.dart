@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:just_audio/just_audio.dart';
 
+import 'protocol/track_playback_exception.dart';
+
 /// just_audio 的薄封装。上层只依赖这里暴露的流与方法，
 /// 便于在测试中用 Fake 实现替换（不直接暴露 AudioPlayer 实例）。
 class AudioPlayerService {
@@ -16,28 +18,25 @@ class AudioPlayerService {
   Duration? get duration => _player.duration;
   bool get isPlaying => _player.playing;
 
-  /// 是否已加载过音源（首次点击播放时需要先 setUrl）。
+  /// 是否已加载过音源。
   bool get hasSource => _player.audioSource != null;
 
-  Future<void> playUrl(String url) async {
-    if (url.isEmpty) return;
-    try {
-      await _player.setUrl(url);
-      await _player.play();
-    } catch (_) {
-      // 连续切歌时 just_audio 会以 "Loading interrupted" 中断上一次加载，属预期行为。
-    }
-  }
-
-  /// 播放本地文件（协议链路下载解密后的完整曲目）。
+  /// 播放本地音频文件（协议链路下载、解密后的完整曲目）。
+  ///
+  /// 连续切歌时 just_audio 会以「加载被中断」结束上一次调用，属预期行为，静默返回；
+  /// 其余加载失败（文件损坏 / 解码器不支持）抛 [TrackPlaybackException]（unavailable），
+  /// 由 PlaybackProvider 提示并跳到下一首。
   Future<void> playFile(String path) async {
     if (path.isEmpty) return;
     try {
       await _player.setFilePath(path);
-      await _player.play();
-    } catch (_) {
-      // 同 playUrl：切歌中断属预期行为。
+    } on PlayerInterruptedException {
+      return;
+    } catch (e) {
+      throw TrackPlaybackException(TrackPlaybackFailure.unavailable, '音频文件无法解码，已跳过', e);
     }
+    // just_audio 的 play() 要到播放结束 / 暂停才完成，不能 await，否则会阻塞后续切歌逻辑
+    unawaited(_player.play().catchError((Object _) {}));
   }
 
   Future<void> play() => _player.play();

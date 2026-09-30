@@ -28,7 +28,7 @@ class SpotifyPlaylist {
 
   String get coverUrl => images.isNotEmpty ? images.first.url : '';
 
-  /// 播放上下文 URI（Mock 数据可能未填写 uri）。
+  /// 播放上下文 URI（uri 缺失时按 id 拼接）。
   String get contextUri => uri.isNotEmpty ? uri : 'spotify:playlist:$id';
 
   SpotifyPlaylist copyWith({

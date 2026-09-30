@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../services/spotify_api_service.dart';
 import '../services/storage_service.dart';
 
+/// 设置页的凭据与 API 基址配置（手动令牌、OAuth 密钥、自定义 Web API 地址、SpClient 令牌）。
+///
+/// 登录 / 登出会直接改写存储，之后调用 [reloadFromStorage] 同步本地缓存。
 class SettingsProvider extends ChangeNotifier {
   final StorageService _storage;
-  final SpotifyApiService _api;
 
   String _accessToken = '';
   String _refreshToken = '';
@@ -12,15 +13,8 @@ class SettingsProvider extends ChangeNotifier {
   String _clientSecret = '';
   String _apiBaseUrl = '';
   String _spClientToken = '';
-  bool _useMockData = true;
 
-  // Reverse Engineering Debugger
-  String _testEndpoint = '/me';
-  String _testMethod = 'GET';
-  Map<String, dynamic>? _lastApiResponse;
-  bool _isTestingApi = false;
-
-  SettingsProvider(this._storage, this._api) {
+  SettingsProvider(this._storage) {
     _readStorage();
   }
 
@@ -31,10 +25,9 @@ class SettingsProvider extends ChangeNotifier {
     _clientSecret = _storage.clientSecret;
     _apiBaseUrl = _storage.apiBaseUrl;
     _spClientToken = _storage.spClientToken;
-    _useMockData = _storage.useMockData;
   }
 
-  /// 登录 / 登出会直接改写存储（令牌、数据模式），之后调用以同步本地缓存。
+  /// 登录 / 登出会直接改写存储（令牌等），之后调用以同步本地缓存。
   void reloadFromStorage() {
     _readStorage();
     notifyListeners();
@@ -46,12 +39,6 @@ class SettingsProvider extends ChangeNotifier {
   String get clientSecret => _clientSecret;
   String get apiBaseUrl => _apiBaseUrl;
   String get spClientToken => _spClientToken;
-  bool get useMockData => _useMockData;
-
-  String get testEndpoint => _testEndpoint;
-  String get testMethod => _testMethod;
-  Map<String, dynamic>? get lastApiResponse => _lastApiResponse;
-  bool get isTestingApi => _isTestingApi;
 
   Future<void> updateConfig({
     String? accessToken,
@@ -60,7 +47,6 @@ class SettingsProvider extends ChangeNotifier {
     String? clientSecret,
     String? apiBaseUrl,
     String? spClientToken,
-    bool? useMockData,
   }) async {
     if (accessToken != null) {
       _accessToken = accessToken;
@@ -86,31 +72,6 @@ class SettingsProvider extends ChangeNotifier {
       _spClientToken = spClientToken;
       await _storage.setSpClientToken(spClientToken);
     }
-    if (useMockData != null) {
-      _useMockData = useMockData;
-      await _storage.setUseMockData(useMockData);
-    }
-    notifyListeners();
-  }
-
-  void setTestEndpoint(String path) {
-    _testEndpoint = path;
-    notifyListeners();
-  }
-
-  void setTestMethod(String method) {
-    _testMethod = method;
-    notifyListeners();
-  }
-
-  Future<void> executeTestApi() async {
-    _isTestingApi = true;
-    _lastApiResponse = null;
-    notifyListeners();
-
-    final res = await _api.testApiEndpoint(_testEndpoint, method: _testMethod);
-    _lastApiResponse = res;
-    _isTestingApi = false;
     notifyListeners();
   }
 }

@@ -1,31 +1,35 @@
 import 'dart:math';
 
-import 'package:flutify_app/core/constants/mock_spotify_data.dart';
 import 'package:flutify_app/models/playback_context.dart';
 import 'package:flutify_app/models/playback_state.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
+import 'package:flutify_app/services/protocol/track_playback_exception.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fakes/fake_audio_player_service.dart';
+import 'fakes/fake_track_audio_source.dart';
+import 'fixtures/sample_catalog.dart';
 
 void main() {
   late FakeAudioPlayerService audio;
+  late FakeTrackAudioSource loader;
   late PlaybackProvider playback;
 
-  const a = MockSpotifyData.trackBlindingLights;
-  const b = MockSpotifyData.trackCruelSummer;
-  const c = MockSpotifyData.trackBirdsOfAFeather;
-  const x = MockSpotifyData.trackLevitating;
+  const a = SampleCatalog.track1;
+  const b = SampleCatalog.track2;
+  const c = SampleCatalog.track3;
+  const x = SampleCatalog.track4;
   const ctx = PlaybackContext.playlist('Test', uri: 'spotify:playlist:test');
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     final storage = await StorageService.init();
     audio = FakeAudioPlayerService();
-    playback = PlaybackProvider(audio, storage, random: Random(42));
+    loader = FakeTrackAudioSource();
+    playback = PlaybackProvider(audio, storage, random: Random(42), audioLoader: loader);
   });
 
   tearDown(() => playback.dispose());
@@ -126,5 +130,127 @@ void main() {
 
     expect(playback.isPlayingContext(ctx.uri), isTrue);
     expect(playback.isPlayingContext('spotify:album:other'), isFalse);
+  });
+
+  group('播放错误', () {
+    const unavailable = TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌仅提供 DRM 加密格式');
+
+    test('成功加载后播放本地文件，无错误', () async {
+      await playback.playTrack(a, contextQueue: [a, b], context: ctx);
+
+      expect(loader.loaded, [a.id]);
+      expect(audio.playedFiles, hasLength(1));
+      expect(playback.playbackError, isNull);
+      expect(playback.isBuffering, isFalse);
+      expect(loader.prefetched, [b.id], reason: '开始播放后预取下一首');
+    });
+
+    test('不可播放的曲目：暴露错误并自动跳到下一首', () async {
+      loader.failures[a.id] = unavailable;
+      final events = <PlaybackError>[];
+      final sub = playback.playbackErrors.listen(events.add);
+
+      await playback.playTrack(a, contextQueue: [a, b, c], context: ctx);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(playback.currentTrack?.id, b.id);
+      expect(audio.playedFiles, hasLength(1));
+      // 自动跳过时保留错误，UI 能读到「哪首被跳过、为什么」
+      final error = playback.playbackError!;
+      expect(error.track.id, a.id);
+      expect(error.kind, TrackPlaybackFailure.unavailable);
+      expect(error.skipped, isTrue);
+      expect(error.messageWithTrack, contains(a.name));
+      expect(events.map((e) => e.track.id), [a.id]);
+      await sub.cancel();
+    });
+
+    test('最后一首不可播放时不再跳，错误保留', () async {
+      loader.failures[b.id] = unavailable;
+
+      await playback.playTrack(b, contextQueue: [a, b], context: ctx);
+
+      expect(playback.currentTrack?.id, b.id);
+      expect(playback.playbackError?.skipped, isFalse);
+      expect(audio.playedFiles, isEmpty);
+      expect(playback.isBuffering, isFalse);
+    });
+
+    test('连续多首都不可播放：跳过次数有上限，不会死循环', () async {
+      for (final t in [a, b, c]) {
+        loader.failures[t.id] = unavailable;
+      }
+      playback.cycleRepeatMode(); // 循环播放上下文：本可以无限绕圈
+
+      await playback.playTrack(a, contextQueue: [a, b, c], context: ctx);
+
+      expect(loader.loaded.length, lessThanOrEqualTo(4));
+      expect(playback.playbackError, isNotNull);
+      expect(playback.isBuffering, isFalse);
+    });
+
+    test('未登录（无加载器）：提示请先登录，不跳歌', () async {
+      SharedPreferences.setMockInitialValues({});
+      final bare = PlaybackProvider(audio, await StorageService.init());
+      addTearDown(bare.dispose);
+
+      await bare.playTrack(a, contextQueue: [a, b], context: ctx);
+
+      expect(bare.currentTrack?.id, a.id);
+      expect(bare.playbackError?.kind, TrackPlaybackFailure.notSignedIn);
+      expect(bare.playbackError?.skipped, isFalse);
+    });
+
+    test('网络错误不跳歌；再点播放会重试并清除错误', () async {
+      loader.failures[a.id] = const TrackPlaybackException(TrackPlaybackFailure.network, '网络异常');
+
+      await playback.playTrack(a, contextQueue: [a, b], context: ctx);
+      expect(playback.currentTrack?.id, a.id);
+      expect(playback.playbackError?.kind, TrackPlaybackFailure.network);
+
+      loader.failures.clear();
+      await playback.togglePlayPause();
+
+      expect(playback.playbackError, isNull);
+      expect(audio.playedFiles, hasLength(1));
+    });
+
+    test('非 TrackPlaybackException 的意外错误被归为网络类提示', () async {
+      loader.failures[a.id] = StateError('boom');
+
+      await playback.playTrack(a, contextQueue: [a], context: ctx);
+
+      expect(playback.playbackError?.kind, TrackPlaybackFailure.network);
+    });
+
+    test('clearPlaybackError 清除错误并通知', () async {
+      loader.failures[a.id] = unavailable;
+      await playback.playTrack(a, contextQueue: [a], context: ctx);
+      var notified = 0;
+      playback.addListener(() => notified++);
+
+      playback.clearPlaybackError();
+
+      expect(playback.playbackError, isNull);
+      expect(notified, 1);
+    });
+
+    test('用户主动换歌会清除上一首的错误', () async {
+      loader.failures[a.id] = unavailable;
+      await playback.playTrack(a, contextQueue: [a], context: ctx);
+      expect(playback.playbackError, isNotNull);
+
+      await playback.playTrack(b, contextQueue: [b], context: ctx);
+      expect(playback.playbackError, isNull);
+    });
+
+    test('不可用标记的曲目（isPlayable=false）直接判为不可播放', () async {
+      final blocked = a.copyWith(isPlayable: false);
+
+      await playback.playTrack(blocked, contextQueue: [blocked], context: ctx);
+
+      expect(loader.loaded, isEmpty, reason: '不应为不可播放曲目发起下载');
+      expect(playback.playbackError?.kind, TrackPlaybackFailure.unavailable);
+    });
   });
 }

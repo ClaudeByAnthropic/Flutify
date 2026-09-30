@@ -9,7 +9,6 @@ class FakeAudioPlayerService implements AudioPlayerService {
   final StreamController<Duration?> durationController = StreamController<Duration?>.broadcast(sync: true);
   final StreamController<PlayerState> stateController = StreamController<PlayerState>.broadcast(sync: true);
 
-  final List<String> playedUrls = [];
   final List<String> playedFiles = [];
   final List<Duration> seeks = [];
   double lastVolume = 1.0;
@@ -31,13 +30,6 @@ class FakeAudioPlayerService implements AudioPlayerService {
   bool get isPlaying => _playing;
   @override
   bool get hasSource => _hasSource;
-
-  @override
-  Future<void> playUrl(String url) async {
-    playedUrls.add(url);
-    _hasSource = true;
-    _playing = true;
-  }
 
   @override
   Future<void> playFile(String path) async {

@@ -21,7 +21,7 @@ class SpotifyArtist {
 
   String get avatarUrl => images.isNotEmpty ? images.first.url : '';
 
-  /// 播放上下文 URI（Mock 数据可能未填写 uri）。
+  /// 播放上下文 URI（uri 缺失时按 id 拼接）。
   String get contextUri => uri.isNotEmpty ? uri : 'spotify:artist:$id';
 
   factory SpotifyArtist.fromJson(Map<String, dynamic> json) {

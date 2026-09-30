@@ -203,7 +203,6 @@ void main() {
       expect(storage.username, 'tester');
       expect(storage.accessToken, 'fake-access-token');
       expect(base64Decode(storage.storedCredential), storedBlob);
-      expect(storage.useMockData, isFalse);
       expect(auth.displayName, 'Test User');
       expect(auth.avatarUrl, 'https://i.scdn.co/image/avatar');
     });

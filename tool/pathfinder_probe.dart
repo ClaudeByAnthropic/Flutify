@@ -1,5 +1,6 @@
 // 开发工具：用 App 已保存的桌面版会话探测 Pathfinder / spclient 接口，记录入参是否被接受与响应结构。
 //
+// 用途：逆向新的 persisted query 时确认入参与响应结构（需本机已登录桌面版会话）。
 // 用法（在 app 目录）：dart run tool/pathfinder_probe.dart [操作名 ...]
 // 响应完整写入 tool/probe_out/<操作名>.json（已 gitignore，含账号数据）；终端只打印状态码与字段结构，
 // 不打印任何令牌。

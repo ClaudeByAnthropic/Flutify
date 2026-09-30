@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../core/constants/mock_spotify_data.dart';
 import '../models/artist.dart';
 import '../models/category.dart';
 import '../models/device.dart';
@@ -20,12 +19,13 @@ class SpotifyProvider extends ChangeNotifier {
   final SpotifyApiService _api;
   final StorageService _storage;
 
-  SpotifyUser _user = MockSpotifyData.currentUser;
+  SpotifyUser _user = SpotifyUser.guest;
   List<SpotifyPlaylist> _featuredPlaylists = [];
   List<SpotifyCategory> _categories = [];
   List<SpotifyDevice> _devices = [];
   SpotifyDevice? _activeDevice;
   bool _isLoadingHome = false;
+  String? _homeError;
 
   // Search
   Timer? _searchTimer;
@@ -41,6 +41,9 @@ class SpotifyProvider extends ChangeNotifier {
   final Map<String, SpotifyLyrics> _lyricsCache = {};
   final Map<String, Future<SpotifyLyrics>> _lyricsInFlight = {};
 
+  /// dispose 之后异步回调不得再 notifyListeners。
+  bool _disposed = false;
+
   SpotifyProvider(this._api, this._storage) {
     _recentSearches = _storage.recentSearches;
     loadInitialData();
@@ -53,6 +56,10 @@ class SpotifyProvider extends ChangeNotifier {
   SpotifyDevice? get activeDevice => _activeDevice;
   bool get isLoadingHome => _isLoadingHome;
 
+  /// 主页数据加载失败的说明（简体中文）；成功或未登录为 null。
+  /// 未登录时各列表为空且不算错误，UI 应展示登录引导而不是错误。
+  String? get homeError => _homeError;
+
   String get searchQuery => _searchQuery;
   bool get isSearching => _isSearching;
   List<SpotifyTrack> get searchTracks => _searchTracks;
@@ -60,26 +67,36 @@ class SpotifyProvider extends ChangeNotifier {
   List<SpotifyPlaylist> get searchPlaylists => _searchPlaylists;
   List<String> get recentSearches => _recentSearches;
 
+  /// 加载主页数据（用户、推荐歌单、分类、设备）。登录 / 登出后应再次调用。
+  ///
+  /// 四个请求互不依赖，并行发出；任意一个失败只影响自己的那部分数据，
+  /// 失败原因记入 [homeError]（取第一条）。
   Future<void> loadInitialData() async {
     _isLoadingHome = true;
+    _homeError = null;
     notifyListeners();
 
-    try {
-      // 互不依赖的请求并行发出，缩短首屏等待
-      final results = await Future.wait([
-        _api.getCurrentUser(),
-        _api.getFeaturedPlaylists(),
-        _api.getCategories(),
-        _api.getDevices(),
-      ]);
-      _user = results[0] as SpotifyUser;
-      _featuredPlaylists = results[1] as List<SpotifyPlaylist>;
-      _categories = results[2] as List<SpotifyCategory>;
-      _devices = results[3] as List<SpotifyDevice>;
-      if (_devices.isNotEmpty) {
-        _activeDevice = _devices.firstWhere((d) => d.isActive, orElse: () => _devices.first);
+    Future<T> guard<T>(Future<T> request, T fallback) async {
+      try {
+        return await request;
+      } catch (e) {
+        _homeError ??= e is SpotifyDataException ? e.toString() : '加载失败：$e';
+        return fallback;
       }
-    } catch (_) {}
+    }
+
+    final results = await Future.wait<Object>([
+      guard<SpotifyUser>(_api.getCurrentUser(), SpotifyUser.guest),
+      guard<List<SpotifyPlaylist>>(_api.getFeaturedPlaylists(), const []),
+      guard<List<SpotifyCategory>>(_api.getCategories(), const []),
+      guard<List<SpotifyDevice>>(_api.getDevices(), const []),
+    ]);
+    if (_disposed) return; // 加载期间 provider 已被销毁（如测试 / 热重载）
+    _user = results[0] as SpotifyUser;
+    _featuredPlaylists = results[1] as List<SpotifyPlaylist>;
+    _categories = results[2] as List<SpotifyCategory>;
+    _devices = results[3] as List<SpotifyDevice>;
+    _activeDevice = _devices.isEmpty ? null : _devices.firstWhere((d) => d.isActive, orElse: () => _devices.first);
 
     _isLoadingHome = false;
     notifyListeners();
@@ -118,7 +135,7 @@ class SpotifyProvider extends ChangeNotifier {
       results = await _api.search(query);
     } catch (_) {}
 
-    if (generation != _searchGeneration) return;
+    if (_disposed || generation != _searchGeneration) return;
 
     _searchTracks = results['tracks']?.cast<SpotifyTrack>() ?? [];
     _searchArtists = results['artists']?.cast<SpotifyArtist>() ?? [];
@@ -160,10 +177,13 @@ class SpotifyProvider extends ChangeNotifier {
 
     // whenComplete 回调必须是块体：箭头函数会返回 remove() 取出的 Future 本身，
     // whenComplete 会等待该 Future，形成自我等待的死锁。
+    //
+    // 只缓存成功结果（含「这首歌没有歌词」）；网络 / 鉴权错误不缓存，下次打开歌词页会重试，
+    // 本次对 UI 返回空歌词（显示「暂无歌词」）。
     return _lyricsInFlight[trackId] ??= _api.getLyrics(trackId).then((lyrics) {
       _lyricsCache[trackId] = lyrics;
       return lyrics;
-    }).whenComplete(() {
+    }).catchError((Object _) => const SpotifyLyrics(lines: [])).whenComplete(() {
       _lyricsInFlight.remove(trackId);
     });
   }
@@ -178,6 +198,7 @@ class SpotifyProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _searchTimer?.cancel();
     super.dispose();
   }

@@ -10,7 +10,6 @@ class StorageService {
   static const String _keyClientSecret = 'sp_client_secret';
   static const String _keyApiBaseUrl = 'sp_api_base_url';
   static const String _keySpClientToken = 'sp_spclient_token';
-  static const String _keyUseMockData = 'sp_use_mock_data';
 
   // Login5 鉴权持久化
   static const String _keyDeviceId = 'sp_device_id';
@@ -26,7 +25,6 @@ class StorageService {
   static const String _keyDisplayName = 'sp_display_name';
   static const String _keyAvatarUrl = 'sp_avatar_url';
 
-  static const String _keyLikedTrackIds = 'sp_liked_tracks';
   static const String _keyRecentSearches = 'sp_recent_searches';
   static const String _keyVolume = 'sp_volume';
 
@@ -35,6 +33,11 @@ class StorageService {
   static const String keyLibraryPlaylists = 'lib_playlists';
   static const String keyLibraryArtists = 'lib_artists';
   static const String keyLibraryAlbums = 'lib_albums';
+
+  /// 用户在本机创建 / 保存的歌单（不随账号同步；远端 rootlist 歌单缓存在 [keyLibraryPlaylists]）。
+  static const String keyLibraryLocalPlaylists = 'lib_playlists_local';
+  static const String _keyLibraryAccount = 'lib_account'; // 媒体库缓存所属账号
+  static const String _keyLibrarySchema = 'lib_schema'; // 缓存结构版本（旧版含示例数据）
 
   final SharedPreferences _prefs;
 
@@ -65,9 +68,6 @@ class StorageService {
 
   String get spClientToken => _prefs.getString(_keySpClientToken) ?? '';
   Future<bool> setSpClientToken(String value) => _prefs.setString(_keySpClientToken, value);
-
-  bool get useMockData => _prefs.getBool(_keyUseMockData) ?? true;
-  Future<bool> setUseMockData(bool value) => _prefs.setBool(_keyUseMockData, value);
 
   // ---------------------------------------------------------------------------
   // Login5 鉴权
@@ -139,14 +139,19 @@ class StorageService {
   Future<bool> setVolume(double value) => _prefs.setDouble(_keyVolume, value);
 
   // ---------------------------------------------------------------------------
-  // Legacy liked track IDs (pre-LibraryProvider). Only read for migration.
-  // ---------------------------------------------------------------------------
-  Set<String> get legacyLikedTrackIds => (_prefs.getStringList(_keyLikedTrackIds) ?? []).toSet();
-
-  // ---------------------------------------------------------------------------
   // Generic JSON list persistence (used by LibraryProvider)
   // ---------------------------------------------------------------------------
   bool hasKey(String key) => _prefs.containsKey(key);
+
+  Future<bool> removeKey(String key) => _prefs.remove(key);
+
+  /// 媒体库缓存所属账号（canonical username）；账号变化时缓存作废。
+  String get libraryAccount => _prefs.getString(_keyLibraryAccount) ?? '';
+  Future<bool> setLibraryAccount(String value) => _prefs.setString(_keyLibraryAccount, value);
+
+  /// 媒体库缓存结构版本：低于当前版本说明缓存来自带示例数据的旧版，需要迁移。
+  int get librarySchema => _prefs.getInt(_keyLibrarySchema) ?? 0;
+  Future<bool> setLibrarySchema(int value) => _prefs.setInt(_keyLibrarySchema, value);
 
   /// 读取 JSON 对象列表；单条损坏的数据会被跳过而不是让整个列表失效。
   List<Map<String, dynamic>> readJsonList(String key) {

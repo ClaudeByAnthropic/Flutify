@@ -164,6 +164,53 @@ class DesktopDataSource {
     return playlist.copyWith(tracks: tracks, images: images);
   }
 
+  /// 按 URI 批量补全曲目（decorateContextTracks，每批 [_decorateBatch] 首、最多 [concurrency] 批并行）。
+  ///
+  /// 返回顺序与 [uris] 一致；服务端未返回（下架 / 无权限）的曲目被略过。
+  Future<List<SpotifyTrack>> tracksByUris(List<String> uris, {int concurrency = 3}) async {
+    final batches = <List<String>>[
+      for (var i = 0; i < uris.length; i += _decorateBatch)
+        uris.sublist(i, (i + _decorateBatch).clamp(0, uris.length)),
+    ];
+    final results = List<List<SpotifyTrack>>.filled(batches.length, const []);
+    var next = 0;
+    Object? lastError;
+    var failed = 0;
+    Future<void> worker() async {
+      while (next < batches.length) {
+        final index = next++;
+        try {
+          final data = await _pathfinder.query(PathfinderOperation.decorateContextTracks, {'uris': batches[index]});
+          results[index] = PathfinderParsers.decoratedTracks(data);
+        } catch (e) {
+          // 单批失败不拖垮整个列表
+          lastError = e;
+          failed++;
+        }
+      }
+    }
+
+    await Future.wait([for (var i = 0; i < concurrency && i < batches.length; i++) worker()]);
+    // 全部批次都失败说明是网络 / 鉴权问题而非个别曲目缺失：抛出，避免调用方把它当成「空列表」
+    if (batches.isNotEmpty && failed == batches.length) throw lastError!;
+    final byId = {for (final t in results.expand((r) => r)) t.id: t};
+    return [
+      for (final uri in uris)
+        ?byId[PathfinderParsers.idFromUri(uri)],
+    ];
+  }
+
+  /// 歌单概要（名称、封面、曲目数，不含曲目）：rootlist 缺元数据时补全。
+  Future<SpotifyPlaylist?> playlistSummary(String id) async {
+    final res = await _client.get(
+      Uri.parse('${SpotifyEndpoints.defaultSpClientBase}/playlist/v2/playlist/$id'
+          '?decorate=attributes,length,owner&from=0&length=0'),
+      headers: await _headers(),
+    );
+    if (res.statusCode != 200) return null;
+    return PathfinderParsers.playlistV2(id, jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>)?.playlist;
+  }
+
   /// home 查询需要 IANA 时区名；Dart 只能拿到 UTC 偏移，整点偏移用 `Etc/GMT∓N` 表示（符号与习惯相反）。
   static String _ianaTimeZone() {
     final offset = DateTime.now().timeZoneOffset;

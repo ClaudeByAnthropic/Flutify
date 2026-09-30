@@ -414,7 +414,7 @@ class SpotifyAuthService {
   // 登出
   // ---------------------------------------------------------------------------
 
-  /// 登出：尽力通知服务端（`/api/logout/v1`），然后清除全部登录态并切回 Mock 数据（保留 device_id）。
+  /// 登出：尽力通知服务端（`/api/logout/v1`），然后清除全部登录态（保留 device_id）。
   Future<void> logout() async {
     _pendingSession = null;
     await _loopback.close();
@@ -433,7 +433,6 @@ class SpotifyAuthService {
       } catch (_) {}
     }
     await _storage.clearLogin();
-    await _storage.setUseMockData(true);
   }
 
   // ---------------------------------------------------------------------------
@@ -453,7 +452,6 @@ class SpotifyAuthService {
     if (stored != null && stored.isNotEmpty) {
       await _storage.setStoredCredential(base64Encode(stored));
     }
-    await _storage.setUseMockData(false);
   }
 
   Future<void> _persistOAuth(OAuthTokens tokens, AuthMethod method) async {
@@ -463,7 +461,6 @@ class SpotifyAuthService {
       DateTime.now().add(Duration(seconds: tokens.expiresIn)).millisecondsSinceEpoch,
     );
     if (tokens.refreshToken.isNotEmpty) await _storage.setRefreshToken(tokens.refreshToken);
-    await _storage.setUseMockData(false);
   }
 }
 

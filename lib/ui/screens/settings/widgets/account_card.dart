@@ -80,7 +80,7 @@ class _SignedIn extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('退出登录？'),
-        content: const Text('将清除本机保存的凭据与令牌，App 切回示例数据。'),
+        content: const Text('将清除本机保存的凭据与令牌及本机媒体库缓存，退出后需重新登录才能播放和查看媒体库。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
           TextButton(

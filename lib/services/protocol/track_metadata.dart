@@ -109,6 +109,9 @@ class TrackMetadata {
     this.alternatives = const [],
   });
 
+  /// 本曲（含备选版本）是否带有任何音频文件（不论格式）。
+  bool get hasAnyFile => files.isNotEmpty || alternatives.any((a) => a.hasAnyFile);
+
   /// 按 [preference] 选最优文件；本曲没有时递归查 [alternatives]。
   TrackAudioFile? selectFile([List<AudioFileFormat> preference = kDefaultFormatPreference]) {
     for (final format in preference) {

@@ -39,11 +39,21 @@ class LoadedAudio {
 
 typedef AccessTokenGetter = Future<String> Function();
 
+/// 曲目音频来源抽象：PlaybackProvider 只依赖它，测试可用替身实现（不必真的联网）。
+abstract class TrackAudioSource {
+  /// 取得一首曲目的本地可播放文件；失败抛 [TrackPlaybackException]。
+  Future<LoadedAudio> load(String trackIdOrUri, {void Function(double progress)? progress});
+
+  /// 预取（失败静默，不影响当前播放）。
+  Future<void> prefetch(String trackIdOrUri);
+}
+
 /// 完整曲目音频加载器：metadata → storage-resolve → AP 音频密钥 → CDN 下载解密。
 ///
 /// 全程只走逆向协议（不依赖官方客户端/Web 播放器）。产物缓存在 [cacheDirectory]/audio，
 /// 同一 file_id 的曲目直接复用；下载中断只写临时文件，不会留下半截缓存。
-class TrackAudioLoader {
+/// 同一曲目的并发请求（预取 + 用户点播）合并为一次，缓存总量超过 [maxCacheBytes] 时淘汰最旧文件。
+class TrackAudioLoader implements TrackAudioSource {
   final AccessTokenGetter accessToken;
   final AccessTokenGetter? clientToken;
   final String cacheDirectory;
@@ -51,7 +61,13 @@ class TrackAudioLoader {
   final List<AudioFileFormat> formatPreference;
   final String? deviceId;
 
+  /// 音频缓存目录的容量上限（字节）。
+  final int maxCacheBytes;
+
   Future<SpotifyAccessPoint>? _apSession;
+
+  /// 进行中的加载（按曲目 id 合并，避免两路同时写同一个 .part 文件）。
+  final Map<String, Future<LoadedAudio>> _inFlight = {};
 
   TrackAudioLoader({
     required this.accessToken,
@@ -59,6 +75,7 @@ class TrackAudioLoader {
     required this.cacheDirectory,
     this.formatPreference = kPlayableFormatPreference,
     this.deviceId,
+    this.maxCacheBytes = 512 * 1024 * 1024,
     http.Client? client,
   }) : _client = client ?? http.Client();
 
@@ -77,17 +94,27 @@ class TrackAudioLoader {
   /// 加载一首完整曲目（base62 id 或 `spotify:track:` URI），返回本地已解密文件。
   ///
   /// [progress] 回调 0.0~1.0（下载/解密进度）。已缓存时立即返回。
+  @override
   Future<LoadedAudio> load(
     String trackIdOrUri, {
     void Function(double progress)? progress,
-  }) async {
+  }) {
     final SpotifyId id;
     try {
       id = SpotifyId.fromUri(trackIdOrUri);
     } on FormatException {
-      throw const TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌不是 Spotify 曲目，无法播放');
+      return Future.error(
+        const TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌不是 Spotify 曲目，无法播放'),
+      );
     }
+    final key = id.toBase62();
+    // 已在加载同一首：复用其结果（进度回调只属于第一个调用者）
+    return _inFlight[key] ??= _load(id, progress).whenComplete(() {
+      _inFlight.remove(key);
+    });
+  }
 
+  Future<LoadedAudio> _load(SpotifyId id, void Function(double progress)? progress) async {
     // 1) metadata：取各格式 file_id
     final TrackMetadata meta;
     try {
@@ -99,9 +126,10 @@ class TrackAudioLoader {
     }
     final candidates = meta.candidateFiles(formatPreference);
     if (candidates.isEmpty) {
-      throw const TrackPlaybackException(
+      // 有音频文件但都不是 OGG/MP3（FLAC / AAC 走 Widevine DRM，AP 不下发密钥）
+      throw TrackPlaybackException(
         TrackPlaybackFailure.unavailable,
-        '这首歌在你所在的地区或账号下暂不可播放',
+        meta.hasAnyFile ? '这首歌仅提供 DRM 加密格式，暂不支持播放' : '这首歌在你所在的地区或账号下暂不可播放',
       );
     }
     final durationMs = meta.durationMs > 0 ? meta.durationMs : null;
@@ -170,6 +198,7 @@ class TrackAudioLoader {
       if (tmp.existsSync()) tmp.deleteSync();
       throw TrackPlaybackException(TrackPlaybackFailure.network, '音频下载失败，请检查网络后重试', e);
     }
+    _trimCache(keep: cached);
 
     return LoadedAudio(file: cached, source: file, durationMs: durationMs, trackId: id.toBase62());
   }
@@ -194,7 +223,27 @@ class TrackAudioLoader {
     tmp.renameSync(destination.path);
   }
 
+  /// 缓存淘汰：目录总量超过 [maxCacheBytes] 时，按修改时间从旧到新删除（保留 [keep]）。
+  void _trimCache({required File keep}) {
+    try {
+      final dir = keep.parent;
+      final files = dir.listSync().whereType<File>().where((f) => !f.path.endsWith('.part')).toList();
+      var total = files.fold<int>(0, (sum, f) => sum + f.lengthSync());
+      if (total <= maxCacheBytes) return;
+      files.sort((a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()));
+      for (final f in files) {
+        if (total <= maxCacheBytes) break;
+        if (f.path == keep.path) continue;
+        total -= f.lengthSync();
+        f.deleteSync();
+      }
+    } catch (_) {
+      // 淘汰失败（文件被占用等）不影响播放
+    }
+  }
+
   /// 预取（失败静默，不影响播放流程）。
+  @override
   Future<void> prefetch(String trackIdOrUri) async {
     try {
       await load(trackIdOrUri);

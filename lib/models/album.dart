@@ -25,7 +25,7 @@ class SpotifyAlbum {
   String get coverUrl => images.isNotEmpty ? images.first.url : '';
   String get artistNames => artists.map((a) => a.name).join(', ');
 
-  /// 播放上下文 URI（Mock 数据可能未填写 uri）。
+  /// 播放上下文 URI（uri 缺失时按 id 拼接）。
   String get contextUri => uri.isNotEmpty ? uri : 'spotify:album:$id';
 
   /// 发行年份，如 "2020"。

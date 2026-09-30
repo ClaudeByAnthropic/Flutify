@@ -4,13 +4,15 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
-import '../core/constants/mock_spotify_data.dart';
 import '../models/playback_context.dart';
+import '../models/playback_error.dart';
 import '../models/playback_state.dart';
 import '../models/track.dart';
 import '../services/audio_player_service.dart';
 import '../services/protocol/track_audio_loader.dart';
 import '../services/storage_service.dart';
+
+export '../models/playback_error.dart';
 
 /// 队列条目：[uid] 在所属列表中唯一，用作拖拽排序时的稳定 Key
 /// （同一首歌可能被多次加入队列）。
@@ -36,12 +38,27 @@ class PlaybackProvider extends ChangeNotifier {
   final AudioPlayerService _audio;
   final StorageService _storage;
 
-  /// 协议链路完整曲目加载器；为空时回退预览 / Mock 音源。
-  final TrackAudioLoader? audioLoader;
+  /// 协议链路完整曲目加载器（AP 密钥 + CDN 解密）；为空（未接入）时任何曲目都无法播放，
+  /// 会报 [TrackPlaybackFailure.notSignedIn] 错误。
+  final TrackAudioSource? audioLoader;
   final Random _random;
 
   /// 协议加载代次号：连续切歌时丢弃过期的加载结果，避免串音。
   int _loadGeneration = 0;
+
+  /// 已经把音频交给播放器的曲目 id；与当前曲目不一致时，点播放需要（重新）加载。
+  String? _loadedTrackId;
+
+  /// 连续「不可播放 → 自动跳过」的次数；超过一轮上下文长度就停下，避免整个歌单都不可播时死循环。
+  int _consecutiveSkips = 0;
+
+  /// 最近一次播放失败（成功开始播放新曲目或调用 [clearPlaybackError] 后为 null）。
+  PlaybackError? _playbackError;
+  int _errorSerial = 0;
+  final StreamController<PlaybackError> _errorController = StreamController<PlaybackError>.broadcast();
+
+  /// 曲目下载 / 解密进度（0~1），仅在 [isBuffering] 且走完整加载时有意义。
+  final ValueNotifier<double> loadProgressNotifier = ValueNotifier(0);
 
   /// 高频进度通知器，独立于 ChangeNotifier。
   final ValueNotifier<Duration> positionNotifier = ValueNotifier(Duration.zero);
@@ -63,6 +80,9 @@ class PlaybackProvider extends ChangeNotifier {
 
   bool _isPlaying = false;
   bool _isBuffering = false;
+
+  /// 正在通过协议链路加载曲目（下载 + 解密），此时播放器还没有新音源。
+  bool _isLoadingTrack = false;
   Duration _duration = Duration.zero;
   bool _shuffle = false;
   SpotifyRepeatMode _repeatMode = SpotifyRepeatMode.off;
@@ -80,24 +100,24 @@ class PlaybackProvider extends ChangeNotifier {
         _volumeBeforeMute = _storage.volume > 0 ? _storage.volume : 0.8 {
     _initAudioListeners();
     _audio.setVolume(_volume);
-
-    // 默认上下文：Today's Top Hits，停在 Blinding Lights（未加载音源，点击播放后才开始缓冲）
-    final defaultPlaylist = MockSpotifyData.playlistTodaysTopHits;
-    final startIndex = defaultPlaylist.tracks.indexWhere((t) => t.id == MockSpotifyData.trackBlindingLights.id);
-    _contextTracks = List.of(defaultPlaylist.tracks);
-    _context = PlaybackContext.playlist(defaultPlaylist.name, uri: defaultPlaylist.uri);
-    _rebuildOrder(startIndex < 0 ? 0 : startIndex);
-    _currentTrack = _contextTracks[_order[_orderPos]];
-    _duration = Duration(milliseconds: _currentTrack!.durationMs);
+    // 初始没有当前曲目、没有上下文：播放器条隐藏，直到用户点播一首歌
   }
 
   // ---------------------------------------------------------------------------
   // Getters
   // ---------------------------------------------------------------------------
   SpotifyTrack? get currentTrack => _currentTrack;
+
+  /// 最近一次播放失败；UI 读取后提示用户，并可调用 [clearPlaybackError] 清除。
+  /// 对话框 / SnackBar 建议监听 [playbackErrors]（每次失败触发一次事件）。
+  PlaybackError? get playbackError => _playbackError;
+
+  /// 播放失败事件流（广播）：不可播放、未登录、网络错误等都会在这里发出一次。
+  Stream<PlaybackError> get playbackErrors => _errorController.stream;
   PlaybackContext get playbackContext => _context;
   bool get isPlaying => _isPlaying;
-  bool get isBuffering => _isBuffering;
+  /// 缓冲中：播放器自身缓冲，或正在下载 / 解密整首曲目。
+  bool get isBuffering => _isBuffering || _isLoadingTrack;
   Duration get position => positionNotifier.value;
   Duration get duration => _duration;
   bool get shuffle => _shuffle;
@@ -158,7 +178,7 @@ class PlaybackProvider extends ChangeNotifier {
   void _handleTrackEnded() {
     if (_repeatMode == SpotifyRepeatMode.track) {
       seekTo(Duration.zero);
-      _audio.play();
+      unawaited(_audio.play());
     } else {
       nextTrack();
     }
@@ -187,44 +207,104 @@ class PlaybackProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _startTrack(SpotifyTrack track) async {
+  Future<void> _startTrack(SpotifyTrack track, {bool isRetry = false}) async {
     _currentTrack = track;
     _duration = Duration(milliseconds: track.durationMs);
     positionNotifier.value = Duration.zero;
+    if (!isRetry) {
+      _consecutiveSkips = 0;
+      // 用户主动开始新曲目：旧错误作废。自动跳过时保留，让 UI 能读到「哪首被跳过、为什么」
+      _playbackError = null;
+    }
     notifyListeners();
     await _playAudio(track);
   }
 
-  /// 真实曲目（22 位 base62 ID）优先走协议链路拉完整版全曲；
-  /// 未登录 / 加载失败时回退预览或 Mock 音频。
+  /// 通过协议链路加载并播放完整曲目（metadata → AP 音频密钥 → CDN 解密 → 本地文件）。
+  ///
+  /// 失败规则：
+  /// - [TrackPlaybackFailure.unavailable]（无权限 / DRM / 地区限制 / 文件损坏）：记录错误并自动跳到下一首；
+  /// - [TrackPlaybackFailure.notSignedIn] / [TrackPlaybackFailure.network]：记录错误并停在当前曲目，
+  ///   用户再点播放即重试，不跳歌（跳过没有意义）。
   Future<void> _playAudio(SpotifyTrack track) async {
     final generation = ++_loadGeneration;
-    final loader = audioLoader;
-    if (loader != null && _isRealSpotifyId(track.id)) {
-      try {
-        final audio = await loader.load(track.id);
-        if (generation != _loadGeneration) return; // 已切歌，丢弃
-        await _audio.playFile(audio.path);
-        return;
-      } catch (_) {
-        // 回退到预览 / Mock 音源
+    _loadedTrackId = null;
+    loadProgressNotifier.value = 0;
+    // 新曲目加载期间先停掉上一首，避免「点了新歌还在放旧歌」
+    await _audio.pause();
+    _setLoading(true);
+
+    try {
+      final loader = audioLoader;
+      if (loader == null) {
+        throw const TrackPlaybackException(TrackPlaybackFailure.notSignedIn, '请先登录 Spotify 账号再播放');
       }
-    }
-    if (generation != _loadGeneration) return;
-    if (track.audioUrl.isNotEmpty) {
-      await _audio.playUrl(track.audioUrl);
+      if (!track.isPlayable) {
+        throw const TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌在你所在的地区暂不可播放');
+      }
+      final audio = await loader.load(
+        track.id.isNotEmpty ? track.id : track.uri,
+        progress: (p) {
+          if (generation == _loadGeneration) loadProgressNotifier.value = p;
+        },
+      );
+      if (generation != _loadGeneration) return; // 已切歌，丢弃
+      await _audio.playFile(audio.path);
+      if (generation != _loadGeneration) return;
+      _loadedTrackId = track.id;
+      _consecutiveSkips = 0;
+      _setLoading(false);
+      _prefetchNext();
+    } catch (e) {
+      if (generation != _loadGeneration) return;
+      final failure = e is TrackPlaybackException
+          ? e
+          : TrackPlaybackException(TrackPlaybackFailure.network, '播放失败，请稍后重试', e);
+      await _handleLoadFailure(track, failure);
     }
   }
 
-  static bool _isRealSpotifyId(String id) {
-    if (id.length != 22) return false;
-    for (final c in id.codeUnits) {
-      final isBase62 = (c >= 0x30 && c <= 0x39) ||
-          (c >= 0x61 && c <= 0x7a) ||
-          (c >= 0x41 && c <= 0x5a);
-      if (!isBase62) return false;
+  /// 处理加载失败：暴露错误状态；「不可播放」类自动跳到下一首（有上限）。
+  Future<void> _handleLoadFailure(SpotifyTrack track, TrackPlaybackException failure) async {
+    final canSkip = failure.shouldSkip && _consecutiveSkips < max(max(_order.length, _userQueue.length + 1), 1) &&
+        (_userQueue.isNotEmpty || _orderPos + 1 < _order.length || _repeatMode == SpotifyRepeatMode.context);
+    _playbackError = PlaybackError(serial: ++_errorSerial, track: track, exception: failure, skipped: canSkip);
+    _errorController.add(_playbackError!);
+    _setLoading(false);
+    if (canSkip) {
+      _consecutiveSkips++;
+      await nextTrack(isAutoSkip: true);
+    } else {
+      notifyListeners();
     }
-    return true;
+  }
+
+  void _setLoading(bool value) {
+    if (_isLoadingTrack == value) return;
+    _isLoadingTrack = value;
+    notifyListeners();
+  }
+
+  /// 预取下一首（用户队列优先，其次上下文顺序）；失败静默。
+  void _prefetchNext() {
+    final loader = audioLoader;
+    if (loader == null) return;
+    SpotifyTrack? next;
+    if (_userQueue.isNotEmpty) {
+      next = _userQueue.first.track;
+    } else if (_orderPos + 1 < _order.length) {
+      next = _contextTracks[_order[_orderPos + 1]];
+    }
+    if (next != null && next.isPlayable && next.id.isNotEmpty) {
+      unawaited(loader.prefetch(next.id));
+    }
+  }
+
+  /// 清除播放错误状态（UI 提示已读时调用）。
+  void clearPlaybackError() {
+    if (_playbackError == null) return;
+    _playbackError = null;
+    notifyListeners();
   }
 
   // ---------------------------------------------------------------------------
@@ -261,31 +341,35 @@ class PlaybackProvider extends ChangeNotifier {
     final track = _currentTrack;
     if (track == null) return;
 
+    if (_isLoadingTrack) return; // 正在加载，忽略重复点击
     if (_isPlaying) {
       await _audio.pause();
-    } else if (!_audio.hasSource) {
+    } else if (_loadedTrackId != track.id) {
+      // 还没加载过 / 上次加载失败（重试）
+      _playbackError = null;
       await _playAudio(track);
     } else {
-      await _audio.play();
+      unawaited(_audio.play()); // play() 到暂停 / 结束才完成，不能 await
     }
   }
 
-  Future<void> nextTrack() async {
+  /// 下一首。[isAutoSkip] 表示由「不可播放自动跳过」触发（不重置连续跳过计数）。
+  Future<void> nextTrack({bool isAutoSkip = false}) async {
     if (_userQueue.isNotEmpty) {
-      await _startTrack(_userQueue.removeAt(0).track);
+      await _startTrack(_userQueue.removeAt(0).track, isRetry: isAutoSkip);
       return;
     }
 
     if (_orderPos + 1 < _order.length) {
       _orderPos++;
-      await _startTrack(_contextTracks[_order[_orderPos]]);
+      await _startTrack(_contextTracks[_order[_orderPos]], isRetry: isAutoSkip);
       return;
     }
 
     if (_repeatMode == SpotifyRepeatMode.context && _order.isNotEmpty) {
       if (_shuffle) _order.shuffle(_random);
       _orderPos = 0;
-      await _startTrack(_contextTracks[_order[_orderPos]]);
+      await _startTrack(_contextTracks[_order[_orderPos]], isRetry: isAutoSkip);
       return;
     }
 
@@ -408,7 +492,9 @@ class PlaybackProvider extends ChangeNotifier {
     _posSub?.cancel();
     _durSub?.cancel();
     _stateSub?.cancel();
+    _errorController.close();
     positionNotifier.dispose();
+    loadProgressNotifier.dispose();
     _audio.dispose();
     super.dispose();
   }

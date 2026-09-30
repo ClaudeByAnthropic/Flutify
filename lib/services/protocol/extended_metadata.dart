@@ -36,8 +36,7 @@ class ExtendedMetadataClient {
   final http.Client _client;
   final Future<Map<String, String>> Function() _headers;
 
-  ExtendedMetadataClient(this._client, {required Future<Map<String, String>> Function() headers})
-      : _headers = headers;
+  ExtendedMetadataClient(this._client, {required this._headers});
 
   /// 取单个实体的某个扩展载荷（Any.value 原始字节）；实体不存在或无该扩展时返回 null。
   ///

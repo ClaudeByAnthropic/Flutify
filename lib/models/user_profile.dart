@@ -17,6 +17,9 @@ class SpotifyUser {
     this.images = const [],
   });
 
+  /// 未登录时的占位用户（无昵称、无头像）。
+  static const SpotifyUser guest = SpotifyUser(id: '', displayName: '', product: 'free', country: '');
+
   String get avatarUrl => images.isNotEmpty ? images.first.url : '';
   bool get isPremium => product.toLowerCase() == 'premium';
 

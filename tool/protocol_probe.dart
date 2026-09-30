@@ -1,6 +1,8 @@
-// 完整曲目协议链路端到端探测工具（纯 Dart，无需运行 App）。
+// 开发工具：完整曲目协议链路端到端探测（纯 Dart，无需运行 App；需要自行提供账号或令牌）。
 //
+// 用途：验证 Login5 → 音频密钥 → CDN 解密整条播放链路；`--ap-check` 只做 AP 握手自检（无需凭据）。
 // 用法（在 app/ 目录下）：
+//   dart run tool/protocol_probe.dart --ap-check
 //   dart run tool/protocol_probe.dart --user <邮箱> --password <密码> --track 0VjIjW4GlUZAMYd2vXMi3b
 //   dart run tool/protocol_probe.dart --token <access_token> --track spotify:track:0VjIjW4GlUZAMYd2vXMi3b --out D:\tmp
 //

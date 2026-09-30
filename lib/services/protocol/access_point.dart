@@ -97,10 +97,13 @@ class ApLoginException implements Exception {
 /// 取音频密钥失败。
 class ApKeyException implements Exception {
   final int code;
-  const ApKeyException(this.code);
+
+  /// 服务端原始错误负载（供诊断）。
+  final Uint8List raw;
+  ApKeyException(this.code, [Uint8List? raw]) : raw = raw ?? Uint8List(0);
 
   @override
-  String toString() => '获取音频密钥失败（错误码 $code）';
+  String toString() => '获取音频密钥失败（错误码 $code${raw.isEmpty ? '' : ' raw=${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}'}）';
 }
 
 /// Spotify Access Point 会话：握手（DH + Shannon）→ 登录 → 取音频密钥。
@@ -190,20 +193,35 @@ class SpotifyAccessPoint {
     if (host != null && port != null) {
       return _connectTo(host, port, timeout);
     }
-    // 依次尝试前 3 个候选：单个接入点不可达 / 超时不应让整条播放链路失败
-    final candidates = await resolveAccessPoints(client: client);
+    // 依次尝试候选：单个接入点不可达 / 被网络环境重置（部分地区只有个别接入点可达）
+    // 不应让整条播放链路失败。上次连通的接入点排在最前，其后最多再试 [_maxAttempts] 个。
+    final resolved = await resolveAccessPoints(client: client);
+    final last = _lastGood;
+    final candidates = <({String host, int port})>[
+      ?last,
+      ...resolved.where((c) => c != last),
+    ];
     Object? lastError;
-    for (final c in candidates.take(3)) {
+    for (final c in candidates.take(_maxAttempts)) {
       try {
-        return await _connectTo(c.host, c.port, timeout);
+        final ap = await _connectTo(c.host, c.port, timeout);
+        _lastGood = c;
+        return ap;
       } catch (e) {
         // 服务端明确拒绝（TryAnotherAP 除外），换接入点无意义
         if (e is ApLoginException && e.errorCode != 0x02) rethrow;
+        if (c == _lastGood) _lastGood = null; // 曾经连通的接入点也可能失效
         lastError = e;
       }
     }
     throw lastError ?? StateError('没有可用的接入点');
   }
+
+  /// 最近一次握手成功的接入点（进程内记忆，下次优先使用）。
+  static ({String host, int port})? _lastGood;
+
+  /// 单次 [connect] 最多尝试的接入点个数。
+  static const int _maxAttempts = 6;
 
   /// 对单个接入点完成握手。
   static Future<SpotifyAccessPoint> _connectTo(String host, int port, Duration timeout) async {
@@ -461,7 +479,7 @@ class SpotifyAccessPoint {
       case ApPacketType.aesKeyError:
         final seq = _u32beAt(packet.payload, 0);
         final code = packet.payload.length > 4 ? packet.payload[4] : -1;
-        _pendingKeys.remove(seq)?.completeError(ApKeyException(code));
+        _pendingKeys.remove(seq)?.completeError(ApKeyException(code, packet.payload));
         break;
       case ApPacketType.ping:
         // 对照 librespot：延迟 60s 回 4 字节零负载 Pong（服务端随后回 PongAck）
