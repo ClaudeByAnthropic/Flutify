@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'access_point.dart';
 import 'audio_cache_store.dart';
 import 'audio_normalization.dart';
+import 'decrypt/decrypt_backend.dart';
 import 'extended_metadata.dart';
 import 'progressive_download.dart';
 import 'spotify_id.dart';
@@ -15,6 +16,7 @@ import 'track_metadata.dart';
 import 'track_playback_exception.dart';
 
 export 'audio_normalization.dart';
+export 'decrypt/decrypt_backend.dart' show DecryptBackend, InlineDecryptBackend, IsolateDecryptBackend;
 export 'progressive_download.dart' show ProgressiveAudio;
 export 'track_playback_exception.dart';
 
@@ -123,6 +125,9 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   final List<AudioFileFormat> formatPreference;
   final String? deviceId;
 
+  /// 解密执行位置：App 中为常驻后台 Isolate（不占 UI 线程），默认在当前线程（探针脚本 / 测试）。
+  final DecryptBackend decryptBackend;
+
   int _maxCacheBytes;
 
   /// 最近加载的两个文件（正在播放的 + 预取的下一首）：清缓存 / 淘汰时保留。
@@ -141,6 +146,7 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
     required this.cacheDirectory,
     this.formatPreference = kPlayableFormatPreference,
     this.deviceId,
+    this.decryptBackend = const InlineDecryptBackend(),
     this._maxCacheBytes = 512 * 1024 * 1024,
     http.Client? client,
   }) : _client = client ?? http.Client();
@@ -363,8 +369,13 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
       throw TrackPlaybackException(TrackPlaybackFailure.network, '音频下载失败，请检查网络后重试', e);
     }
     final destination = _cacheFile(file);
-    final download = ProgressiveDownload(urls: cdnUrls, key: key, iv: kAudioAesIv, format: file.format, client: _client)
-      ..start();
+    final download = ProgressiveDownload(
+      urls: cdnUrls,
+      decrypt: AesCtrDecryptSpec(key: key, iv: kAudioAesIv),
+      backend: decryptBackend,
+      format: file.format,
+      client: _client,
+    )..start();
     final session = _AudioSession.downloading(
       id: id,
       file: file,

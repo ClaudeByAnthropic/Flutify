@@ -92,6 +92,11 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   窄于 800px 时切换为移动端布局，顶部多一条 32px 标题条（拖动 + 窗口按钮），可直接在桌面上调试手机界面；沉浸式全屏时隐藏。
   退出系统全屏后强制刷新一次窗口尺寸（`DesktopWindow._refreshFrame`），绕过 window_manager 在 Windows 上
   从普通窗口进入全屏时不刷新子视图、退出后留下大片黑边的问题。
+* **Win11 分屏布局**（`snap_layout_bridge.dart` + `windows/runner/snap_layout.cpp`）：自绘最大化按钮把自己的位置报给原生层，
+  原生在该区域对 `WM_NCHITTEST` 返回 `HTMAXBUTTON`，鼠标悬停时弹出系统分屏布局；悬停 / 按下 / 点击由原生转回 Dart。
+* **系统媒体控制**（`services/media_controls/`）：Windows 为自写 C++/WinRT SMTC（`windows/runner/media_controls.cpp`）——
+  任务栏 / 锁屏 / 音量浮层媒体卡片、键盘媒体键、拖动进度；Android / iOS 用 audio_service（通知栏、锁屏、耳机线控）。
+  runner 编译带 `/utf-8`，避免中文注释在 GBK 代码页下报 C4819。
 * **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：顶栏与标题栏合一（空白处拖动 / 双击最大化，右侧为窗口按钮留位）+ 后退前进、主页、居中搜索、头像；
   左栏音乐库（筛选、库内搜索、排序，可拖宽，窄于 280px 或手动收起时变为 72px 图标栏；未登录显示登录引导）；
   右栏「正在播放 / 播放队列 / 歌词」；底部播放栏（窗口变窄时依次隐藏音量条、音量键，不溢出）。
@@ -112,6 +117,9 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   （AES-CTR 从任意偏移解密，`AesCtr.atOffset`），并轮换 CDN 地址，最多 4 次；仍失败时已缓冲部分播完并提示网络错误。
   下载完成后才写入缓存（先写 `.part` 再改名）；预取的下一首若还没下完就被点播，直接接着这份下载边下边播。
   边下边播时等当前曲目下完再预取下一首，不抢起播带宽。AES 逐块加密改为原地运算，解密整首不再产生几十万个临时数组。
+* **后台解密**（`services/protocol/decrypt/`）：解密在启动时预热的常驻后台 Isolate 里进行（`IsolateDecryptBackend`），
+  数据块用 `TransferableTypedData` 零拷贝往返，界面线程不再参与解密。解密方法与执行位置分离：`DecryptSpec` 描述怎么解
+  （当前 `AesCtrDecryptSpec`），新增解密方法只需实现一个 `DecryptSpec` + `AudioDecryptor`，下载 / 续传 / 后台线程无需改动。
 * **音频缓存**：下载完成时把 Spotify 私有头里的响度数据另存为同名 `.norm` 旁路文件（私有头会被剥掉，标准解码器不认识）；
   缓存命中时刷新文件修改时间，淘汰按修改时间从旧到新。功能上线前下载的旧缓存没有 `.norm`，按原音量播放。
 * **图片解码降采样**：`CoverImage` 按显示尺寸 × DPR 设置 `memCacheWidth`，避免大图全尺寸解码。
@@ -190,7 +198,9 @@ d:/Flutify/app/
 │   │   │   ├── pathfinder_parsers.dart   # 响应 → App 数据模型（宽松解析、解包 Wrapper）
 │   │   │   └── desktop_data_source.dart  # 页面级数据：主页/分类/搜索/专辑/艺人/歌单，5 分钟查询缓存
 │   │   ├── protocol/                     # 完整曲目播放链路（AP 握手、音频密钥、CDN 解密、TrackAudioSource）
-│   │   │   └── progressive_download.dart # 边下边播：流式解密到内存、Range 续传、按区间读取
+│   │   │   ├── progressive_download.dart # 边下边播：流式解密到内存、Range 续传、按区间读取
+│   │   │   └── decrypt/                  # 可插拔解密：DecryptSpec（解法）+ DecryptBackend（内联 / 常驻后台 Isolate）
+│   │   ├── media_controls/               # 系统媒体控制：Windows SMTC（原生通道）/ audio_service（Android、iOS）+ 播放状态同步
 │   │   ├── downloading_audio_source.dart # 把下载中的音频接到 just_audio（StreamAudioSource）
 │   │   ├── playback_session_store.dart   # 上次播放会话（曲目 / 队列 / 进度）的文件存储
 │   │   ├── library/                      # 媒体库来源：collection 编解码、rootlist 解析、桌面 / Web API 实现

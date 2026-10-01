@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -20,6 +21,8 @@ import 'providers/preferences_provider.dart';
 import 'providers/spotify_provider.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
+import 'services/media_controls/media_controls_sync.dart';
+import 'services/media_controls/system_media_controls.dart';
 import 'services/playback_session_store.dart';
 import 'services/protocol/audio_cache_store.dart';
 import 'services/protocol/track_audio_loader.dart';
@@ -53,7 +56,11 @@ Future<void> main() async {
   // 完整曲目协议链路：metadata → storage-resolve → AP 音频密钥 → CDN 解密。
   // access_token 每次取用前自动续期（与 API 层同一套凭据）。
   final supportDir = await getApplicationSupportDirectory();
+  // 解密放在常驻后台 Isolate：启动时预热，第一次播放不必等它启动
+  final decryptBackend = IsolateDecryptBackend();
+  unawaited(decryptBackend.warmUp());
   final trackAudioLoader = TrackAudioLoader(
+    decryptBackend: decryptBackend,
     cacheDirectory: supportDir.path,
     maxCacheBytes: storageService.audioCacheLimitMb * 1024 * 1024,
     deviceId: storageService.deviceId,
@@ -74,6 +81,9 @@ Future<void> main() async {
   // 桌面端：隐藏系统标题栏（由顶栏自绘）、设置最小窗口尺寸、还原上次的窗口位置
   await DesktopWindow.init(storageService);
 
+  // 系统媒体控制：Windows SMTC（任务栏 / 锁屏媒体卡片、媒体键），Android / iOS 通知栏与锁屏
+  final mediaControls = await SystemMediaControls.create();
+
   runApp(
     FlutifyApp(
       storageService: storageService,
@@ -82,6 +92,7 @@ Future<void> main() async {
       authService: authService,
       trackAudioLoader: trackAudioLoader,
       playbackSessionStore: sessionStore,
+      mediaControls: mediaControls,
     ),
   );
 }
@@ -100,6 +111,9 @@ class FlutifyApp extends StatelessWidget {
   /// 上次播放会话的存储；为空时不还原、不保存（测试默认）。
   final PlaybackSessionStore? playbackSessionStore;
 
+  /// 系统媒体控制；为空时不接入（测试、不支持的平台）。
+  final SystemMediaControls? mediaControls;
+
   const FlutifyApp({
     super.key,
     required this.storageService,
@@ -108,6 +122,7 @@ class FlutifyApp extends StatelessWidget {
     this.authService,
     this.trackAudioLoader,
     this.playbackSessionStore,
+    this.mediaControls,
   });
 
   @override
@@ -136,6 +151,9 @@ class FlutifyApp extends StatelessWidget {
             );
             // 关窗前保存进度（进程退出时 Provider 不一定来得及 dispose）
             DesktopWindow.addBeforeCloseHook(playback.flushSession);
+            // 与 App 同生命周期，不需要单独释放
+            final controls = mediaControls;
+            if (controls != null) MediaControlsSync(playback, controls);
             return playback;
           },
         ),

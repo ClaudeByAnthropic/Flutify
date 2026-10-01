@@ -142,11 +142,34 @@ Spotify 新版桌面三栏布局 + MD3E 质感；跟随系统深浅色；自绘�
 - [ ] 关掉 App 再打开：播放栏是否显示上次的歌和进度，点播放是否从断点继续；Alt+F4 / 任务栏关闭后是否也能还原
 - [ ] 关窗是否仍然立即关闭（关窗前会等保存完成，最多 0.8 秒）
 
+## 已完成 ⑥：系统媒体控制 + 后台解密 + Win11 分屏布局（测试全部通过，Release 编译通过，**待用户实机复测**）
+
+- [x] 后台解密：`services/protocol/decrypt/`。`DecryptSpec` 描述「怎么解」（当前 `AesCtrDecryptSpec`，另有 `PassthroughDecryptSpec`），
+      `DecryptBackend` 决定「在哪解」：`IsolateDecryptBackend` 常驻一个后台 Isolate（启动时预热，崩溃后下次自动重建），
+      `InlineDecryptBackend` 在当前 Isolate（测试用）。数据用 `TransferableTypedData` 零拷贝往返。
+      **新解密方法接入**：实现 `DecryptSpec` + `AudioDecryptor`（字段只放可跨 Isolate 发送的数据），
+      在 `TrackAudioLoader` 里按格式 / 曲目选择对应 Spec 即可，下载、续传、后台线程都不用动
+- [x] 系统媒体控制：`services/media_controls/`。`SystemMediaControls` 抽象 + `MediaControlsSync`（把 `PlaybackProvider` 同步给系统、
+      系统按钮回传）。Windows 走自写 C++/WinRT SMTC（`windows/runner/media_controls.cpp`，通道 `flutify/media_controls`）：
+      任务栏 / 锁屏 / 音量浮层媒体卡片、键盘媒体键、进度条拖动；Android / iOS 走 audio_service（通知栏 / 锁屏控件，
+      `MainActivity` 改继承 `AudioServiceActivity`，Manifest 加前台服务与权限）
+- [x] Win11 分屏布局：`windows/runner/snap_layout.cpp` + `ui/shell/desktop/snap_layout_bridge.dart`。
+      Dart 报告最大化按钮位置，原生在 `WM_NCHITTEST` 返回 `HTMAXBUTTON`（Flutter 子窗口对该区域返回 `HTTRANSPARENT`），
+      系统据此弹出分屏布局；悬停 / 按下 / 点击由原生转回 Dart 驱动按钮外观与最大化
+- [x] runner 编译加 `/utf-8`（中文注释在 GBK 代码页下触发 C4819）；`test/media_controls_sync_test.dart`，
+      `progressive_download_test.dart` 同时跑内联与后台 Isolate 两种后端
+
+### 需要用户在实机上看的
+
+- [ ] Windows：播放时按音量键 / 媒体键，系统浮层是否出现 Flutify 卡片（封面、歌名、进度）；媒体键、卡片上的切歌 / 拖进度是否生效
+- [ ] Windows 11：鼠标悬停最大化按钮是否弹出分屏布局；按钮悬停 / 按下效果、单击最大化 / 还原是否正常；高 DPI 与副屏下位置是否准确
+- [ ] Android（本机无 SDK，**未编译验证**）：通知栏 / 锁屏播放控件、耳机线控；Android 13+ 首次是否请求通知权限
+- [ ] 下载 320k 曲目时界面是否不再掉帧
+
 ## 其他待办 / 优化
 
 - [ ] 分类页（browsePage）：需要从桌面端 `xpui.spa` 提取 `browsePage` 查询 hash（本轮未做）
-- [ ] 解密移到后台 Isolate（目前在主线程，320k 曲目下载时低端机可能有轻微掉帧）
-- [ ] 系统媒体控制：Windows SMTC（任务栏 / 锁屏媒体卡片、键盘媒体键）、Android 通知栏播放控件
+- [ ] 新的音频解密方法（研究中）：按上文「新解密方法接入」实现 `DecryptSpec`
 - [ ] 登出 / 切换账号时清除上次播放会话
 
 - [ ] 主页顶部渐变：随快捷入口悬停的封面取色变化（官方桌面端效果）

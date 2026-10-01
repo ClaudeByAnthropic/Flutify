@@ -27,6 +27,10 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  auto* messenger = flutter_controller_->engine()->messenger();
+  media_controls_ = std::make_unique<MediaControls>(GetHandle(), messenger);
+  snap_layout_ = std::make_unique<SnapLayout>(GetHandle(), flutter_controller_->view()->GetNativeWindow(), messenger);
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
@@ -40,6 +44,9 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  // 先于引擎释放：它们持有引擎的 MethodChannel
+  snap_layout_ = nullptr;
+  media_controls_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -51,6 +58,16 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // 分屏布局的命中测试须先于插件（window_manager）处理
+  if (snap_layout_) {
+    if (auto result = snap_layout_->HandleTopLevel(hwnd, message, wparam, lparam)) {
+      return *result;
+    }
+  }
+  if (media_controls_ && media_controls_->HandleMessage(message, wparam, lparam)) {
+    return 0;
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

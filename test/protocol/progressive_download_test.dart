@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutify_app/services/protocol/aes.dart';
 import 'package:flutify_app/services/protocol/audio_normalization.dart';
+import 'package:flutify_app/services/protocol/decrypt/decrypt_backend.dart';
 import 'package:flutify_app/services/protocol/progressive_download.dart';
 import 'package:flutify_app/services/protocol/track_metadata.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +25,7 @@ Uint8List _spotifyOgg(int bodyLength) {
 
 final _key = Uint8List.fromList(List.generate(16, (i) => i * 3));
 final _iv = Uint8List.fromList(List.generate(16, (i) => 0xf0 + i));
+final _spec = AesCtrDecryptSpec(key: _key, iv: _iv);
 
 Uint8List _encrypt(Uint8List plain) {
   final out = Uint8List.fromList(plain);
@@ -47,6 +49,19 @@ Stream<List<int>> _chunks(Uint8List data, {int size = 1000}) async* {
 }
 
 void main() {
+  final isolateBackend = IsolateDecryptBackend();
+  tearDownAll(isolateBackend.dispose);
+
+  // 同一组用例分别在当前线程和常驻后台 Isolate 里解密，结果必须一致
+  for (final (name, backend) in <(String, DecryptBackend)>[
+    ('当前线程解密', const InlineDecryptBackend()),
+    ('后台 Isolate 解密', isolateBackend),
+  ]) {
+    group(name, () => _suite(backend));
+  }
+}
+
+void _suite(DecryptBackend backend) {
   test('解密、去掉私有头、读出响度数据；任意区间读取正确', () async {
     final plain = _spotifyOgg(20000);
     final cipher = _encrypt(plain);
@@ -56,8 +71,8 @@ void main() {
 
     final download = ProgressiveDownload(
       urls: ['https://cdn.test/a'],
-      key: _key,
-      iv: _iv,
+      decrypt: _spec,
+      backend: backend,
       format: AudioFileFormat.oggVorbis160,
       client: client,
     )..start();
@@ -110,8 +125,8 @@ void main() {
 
     final download = ProgressiveDownload(
       urls: ['https://cdn1.test/a', 'https://cdn2.test/a'],
-      key: _key,
-      iv: _iv,
+      decrypt: _spec,
+      backend: backend,
       format: AudioFileFormat.oggVorbis160,
       client: client,
     )..start();
@@ -127,8 +142,8 @@ void main() {
     final client = MockClient((request) async => http.Response('nope', 403));
     final download = ProgressiveDownload(
       urls: ['https://cdn.test/a'],
-      key: _key,
-      iv: _iv,
+      decrypt: _spec,
+      backend: backend,
       format: AudioFileFormat.oggVorbis160,
       client: client,
       maxAttempts: 2,
@@ -145,8 +160,8 @@ void main() {
     });
     final download = ProgressiveDownload(
       urls: ['https://cdn.test/a'],
-      key: _key,
-      iv: _iv,
+      decrypt: _spec,
+      backend: backend,
       format: AudioFileFormat.mp3_160,
       client: client,
     )..start();

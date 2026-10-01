@@ -4,8 +4,8 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-import 'aes.dart';
 import 'audio_normalization.dart';
+import 'decrypt/decrypt_backend.dart';
 import 'track_metadata.dart';
 
 /// Spotify 音频文件头的处理规则（落盘与边下边播共用）。
@@ -66,8 +66,12 @@ abstract class ProgressiveAudio {
 /// - 服务器没给出总长度（无 Content-Length）时无法预分配缓冲区，退化为下载完成后才 [ready]。
 class ProgressiveDownload implements ProgressiveAudio {
   final List<String> urls;
-  final Uint8List key;
-  final Uint8List iv;
+
+  /// 解密方式（当前为 AES-128-CTR，见 [AesCtrDecryptSpec]）。
+  final DecryptSpec decrypt;
+
+  /// 解密在哪里执行：生产环境为常驻后台 Isolate，测试默认在当前线程。
+  final DecryptBackend backend;
   final AudioFileFormat format;
   final http.Client client;
 
@@ -76,10 +80,10 @@ class ProgressiveDownload implements ProgressiveAudio {
 
   ProgressiveDownload({
     required this.urls,
-    required this.key,
-    required this.iv,
+    required this.decrypt,
     required this.format,
     required this.client,
+    this.backend = const InlineDecryptBackend(),
     this.maxAttempts = 4,
   });
 
@@ -184,22 +188,26 @@ class ProgressiveDownload implements ProgressiveAudio {
       final total = _totalLength(response);
       if (total != null && total > 0) _buffer = Uint8List(total);
     }
-    final cipher = AesCtr.atOffset(key, iv, pos);
+    final decryptor = backend.open(decrypt, offset: pos);
     final buffer = _buffer;
     // 总长度未知：先收集，结束后再整体放入缓冲区
     final pending = buffer == null ? BytesBuilder(copy: false) : null;
 
-    await for (final chunk in response.stream) {
-      final data = chunk is Uint8List ? chunk : Uint8List.fromList(chunk);
-      cipher.process(data);
-      if (buffer != null) {
-        if (pos + data.length > buffer.length) throw StateError('CDN 返回的数据超出声明长度');
-        buffer.setRange(pos, pos + data.length, data);
-        pos += data.length;
-        if (pos > _received) _advance(pos);
-      } else {
-        pending!.add(data);
+    try {
+      // 逐块等解密结果再读下一块：顺序天然保证，网络读取也随之形成背压
+      await for (final chunk in response.stream) {
+        final data = await decryptor.process(chunk is Uint8List ? chunk : Uint8List.fromList(chunk));
+        if (buffer != null) {
+          if (pos + data.length > buffer.length) throw StateError('CDN 返回的数据超出声明长度');
+          buffer.setRange(pos, pos + data.length, data);
+          pos += data.length;
+          if (pos > _received) _advance(pos);
+        } else {
+          pending!.add(data);
+        }
       }
+    } finally {
+      decryptor.close();
     }
 
     if (pending != null) {

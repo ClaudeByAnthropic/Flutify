@@ -3,6 +3,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../l10n/l10n.dart';
 import 'desktop_window.dart';
+import 'snap_layout_bridge.dart';
 
 /// Windows 11 风格的窗口按钮组：最小化 / 最大化（还原）/ 关闭。
 ///
@@ -58,11 +59,15 @@ class _WindowCaptionButtonsState extends State<WindowCaptionButtons> with Window
           height: widget.height,
           onPressed: windowManager.minimize,
         ),
-        _CaptionButton(
-          tooltip: _maximized ? l10n.windowRestore : l10n.windowMaximize,
-          glyph: _maximized ? _Glyph.restore : _Glyph.maximize,
-          height: widget.height,
-          onPressed: DesktopWindow.toggleMaximize,
+        // Windows 11：悬停弹出分屏布局，悬停 / 按下 / 点击由原生端接管（见 SnapLayoutBridge）
+        SnapLayoutAnchor(
+          child: _CaptionButton(
+            tooltip: _maximized ? l10n.windowRestore : l10n.windowMaximize,
+            glyph: _maximized ? _Glyph.restore : _Glyph.maximize,
+            height: widget.height,
+            onPressed: DesktopWindow.toggleMaximize,
+            nativeState: true,
+          ),
         ),
         _CaptionButton(
           tooltip: l10n.windowClose,
@@ -85,12 +90,16 @@ class _CaptionButton extends StatefulWidget {
   final double height;
   final VoidCallback onPressed;
 
+  /// 悬停 / 按下状态同时取原生端报告的值（最大化按钮在分屏布局区域内收不到指针事件）。
+  final bool nativeState;
+
   const _CaptionButton({
     required this.tooltip,
     required this.glyph,
     required this.height,
     required this.onPressed,
     this.destructive = false,
+    this.nativeState = false,
   });
 
   static const double width = 46;
@@ -107,19 +116,31 @@ class _CaptionButtonState extends State<_CaptionButton> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.nativeState) return _build(context, _hover, _pressed);
+    return ListenableBuilder(
+      listenable: Listenable.merge([SnapLayoutBridge.hovered, SnapLayoutBridge.pressed]),
+      builder: (context, _) => _build(
+        context,
+        _hover || SnapLayoutBridge.hovered.value,
+        _pressed || SnapLayoutBridge.pressed.value,
+      ),
+    );
+  }
+
+  Widget _build(BuildContext context, bool hover, bool pressed) {
     final colorScheme = Theme.of(context).colorScheme;
     final Color background;
     final Color foreground;
-    if (widget.destructive && (_hover || _pressed)) {
-      background = _pressed ? _closeRed.withAlpha(230) : _closeRed;
+    if (widget.destructive && (hover || pressed)) {
+      background = pressed ? _closeRed.withAlpha(230) : _closeRed;
       foreground = Colors.white;
     } else {
-      background = _pressed
+      background = pressed
           ? colorScheme.onSurface.withAlpha(20)
-          : _hover
+          : hover
               ? colorScheme.onSurface.withAlpha(14)
               : Colors.transparent;
-      foreground = colorScheme.onSurface.withAlpha(_hover ? 255 : 210);
+      foreground = colorScheme.onSurface.withAlpha(hover ? 255 : 210);
     }
 
     return Tooltip(

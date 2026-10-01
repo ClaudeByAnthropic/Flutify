@@ -53,6 +53,7 @@ dependencies:
   # 记住窗口位置时校验显示器是否还在（window_manager 已间接依赖，版本与其一致）
   screen_retriever: ^0.2.2
   flutter_inappwebview: ^6.1.5
+  audio_service: ^0.18.19
 
 dev_dependencies:
   flutter_test:
