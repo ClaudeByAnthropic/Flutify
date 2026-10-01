@@ -133,18 +133,23 @@ class DesktopPlayerBar extends StatelessWidget {
 ///
 /// 三层观感：柔和投影（浮起）→ 背景模糊 + 提饱和（[LiquidGlass]）→
 /// 极淡的表面色填充（保证文字在繁杂内容上可读）。模糊与不透明度跟随设置页「液态玻璃」。
-/// [attachment]（如 Connect「正在 X 上播放」小条）附在胶囊正下方中央、宽度随内容，
-/// 衔接处的内凹倒圆角由 attachment 自己绘制（见 AttachedStripShape）。
+/// [attachment]（如 Connect「正在 X 上播放」小条）包裹住胶囊底部：
+/// 与胶囊同宽，顶部两角沿胶囊底角的圆弧上卷（见 AttachedStripShape）。
 class PlayerBarGlassCapsule extends StatelessWidget {
   final Widget child;
 
-  /// 附在胶囊正下方中央的挂件（宽度随内容），为空时胶囊只有主体高度。
+  /// 包裹胶囊底部的挂件（[AttachedStripShape]），为空时胶囊只有主体高度。
+  /// 挂件高度 = [attachmentVisibleHeight] + 胶囊圆角（上卷部分与胶囊重叠）。
   final Widget? attachment;
+
+  /// 挂件露出在胶囊底缘以下的高度。
+  final double attachmentVisibleHeight;
 
   const PlayerBarGlassCapsule({
     super.key,
     required this.child,
     this.attachment,
+    this.attachmentVisibleHeight = 0,
   });
 
   @override
@@ -159,77 +164,93 @@ class PlayerBarGlassCapsule extends StatelessWidget {
         DesktopPlayerBar.marginSide,
         DesktopPlayerBar.marginBottom,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: tokens.radius(28),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(isDark ? 70 : 36),
-                  blurRadius: 28,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: LiquidGlass(
-              borderRadius: tokens.radius(28),
-              // 玻璃之上再罩一层极淡的表面色：深色压暗、浅色提亮，保证控件可读
-              child: ColoredBox(
-                color: colorScheme.surfaceContainerLowest.withAlpha(
-                  isDark ? 72 : 104,
-                ),
-                child: SizedBox(
-                  height: DesktopPlayerBar.capsuleHeight,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: child,
-                  ),
+      child: Builder(
+        builder: (context) {
+          final corner = tokens.corner(28);
+          final shadow = BoxDecoration(
+            borderRadius: tokens.radius(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(isDark ? 70 : 36),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          );
+          final glass = LiquidGlass(
+            borderRadius: tokens.radius(28),
+            // 玻璃之上再罩一层极淡的表面色：深色压暗、浅色提亮，保证控件可读
+            child: ColoredBox(
+              color: colorScheme.surfaceContainerLowest.withAlpha(
+                isDark ? 72 : 104,
+              ),
+              child: SizedBox(
+                height: DesktopPlayerBar.capsuleHeight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: child,
                 ),
               ),
             ),
-          ),
-          // 挂件附在胶囊正下方中央（倒圆角衔接由挂件自绘）
-          if (attachment != null) Center(child: attachment),
-        ],
+          );
+          if (attachment == null) {
+            return DecoratedBox(decoration: shadow, child: glass);
+          }
+          // 挂件与胶囊同宽，上卷部分（一个圆角高）叠在胶囊底角之上，露出部分占底部；
+          // 投影包裹整个「胶囊 + 底座」组合，避免胶囊自己的阴影落在衔接缝上
+          return DecoratedBox(
+            decoration: shadow,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(bottom: attachmentVisibleHeight),
+                  child: glass,
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: attachmentVisibleHeight + corner,
+                  child: attachment!,
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-/// 附挂小条的形状：顶边通宽（与胶囊底缘贴合），两侧经内凹倒圆角收窄到本体，
-/// 底部两角为外圆角——小条像从胶囊底部「长」出来的小牌匾。
+/// 包裹胶囊底部的小条形状：与胶囊同宽，顶部两角沿胶囊底角的圆弧上卷，
+/// 底部两角为与胶囊相同的圆角——像给胶囊底部套了一圈底座。
 ///
-/// 注意：小条的内容（文字 / 图标）应在本体宽度内居中，
-/// 即小条部件内部左右各留 [notch] 的肩宽（见 RemotePlayingStrip）。
+/// 小条高度 = 露出高度 + [cornerRadius]（上卷部分与胶囊重叠）；
+/// 内容应放在底部「露出高度」区域内（见 RemotePlayingStrip）。
 class AttachedStripShape extends OutlinedBorder {
-  /// 肩部内凹倒圆角半径（= 单侧肩宽）。
-  final double notch;
+  /// 胶囊的圆角半径（上卷弧度与底部圆角都与之一致）。
+  final double cornerRadius;
 
-  /// 底部外圆角半径。
-  final double bottomRadius;
-
-  const AttachedStripShape({this.notch = 10, this.bottomRadius = 13});
+  const AttachedStripShape({required this.cornerRadius});
 
   @override
   Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
     const pi = 3.141592653589793;
-    final c = notch, b = bottomRadius;
+    final c = cornerRadius;
     return Path()
+      // 左上：从左上角尖沿胶囊底角圆弧下卷到 (left+c, top+c)
       ..moveTo(rect.left, rect.top)
-      ..lineTo(rect.right, rect.top)
-      // 右肩：从顶边右端内凹弧到本体右侧（圆心 (right-c, top)）
-      ..arcTo(Rect.fromCircle(center: Offset(rect.right - c, rect.top), radius: c), 0, pi / 2, false)
-      ..lineTo(rect.right - c, rect.bottom - b)
+      ..arcTo(Rect.fromCircle(center: Offset(rect.left + c, rect.top), radius: c), pi, -pi / 2, false)
+      // 中段顶边：贴在胶囊底缘
+      ..lineTo(rect.right - c, rect.top + c)
+      // 右上：沿胶囊底角圆弧上卷到右上角尖
+      ..arcTo(Rect.fromCircle(center: Offset(rect.right - c, rect.top), radius: c), pi / 2, -pi / 2, false)
+      ..lineTo(rect.right, rect.bottom - c)
       // 右下外圆角
-      ..arcTo(Rect.fromCircle(center: Offset(rect.right - c - b, rect.bottom - b), radius: b), 0, pi / 2, false)
-      ..lineTo(rect.left + c + b, rect.bottom)
+      ..arcTo(Rect.fromCircle(center: Offset(rect.right - c, rect.bottom - c), radius: c), 0, pi / 2, false)
+      ..lineTo(rect.left + c, rect.bottom)
       // 左下外圆角
-      ..arcTo(Rect.fromCircle(center: Offset(rect.left + c + b, rect.bottom - b), radius: b), pi / 2, pi / 2, false)
-      ..lineTo(rect.left + c, rect.top + c)
-      // 左肩：从本体左侧内凹弧回顶边左端（圆心 (left+c, top)）
-      ..arcTo(Rect.fromCircle(center: Offset(rect.left + c, rect.top), radius: c), pi / 2, pi / 2, false)
+      ..arcTo(Rect.fromCircle(center: Offset(rect.left + c, rect.bottom - c), radius: c), pi / 2, pi / 2, false)
       ..close();
   }
 

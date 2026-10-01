@@ -30,6 +30,7 @@ class RemotePlayerBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return PlayerBarGlassCapsule(
       attachment: const RemotePlayingStrip(height: stripHeight),
+      attachmentVisibleHeight: stripHeight,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final sideWidth = (constraints.maxWidth * 0.28).clamp(160.0, 300.0);
@@ -181,8 +182,8 @@ class _RemoteRightControls extends StatelessWidget {
   }
 }
 
-/// 「正在 {设备} 上播放」强调色小条，附在播放栏胶囊正下方中央、宽度随内容，
-/// 顶部两角内凹倒圆角与胶囊底缘衔接（[AttachedStripShape]）；点按打开设备面板。
+/// 「正在 {设备} 上播放」强调色小条，包裹播放栏胶囊底部：
+/// 与胶囊同宽，顶部两角沿胶囊底角圆弧上卷（[AttachedStripShape]）；点按打开设备面板。
 class RemotePlayingStrip extends StatelessWidget {
   final double height;
 
@@ -200,22 +201,22 @@ class RemotePlayingStrip extends StatelessWidget {
       color: tokens.onAccent,
       fontWeight: FontWeight.w700,
     );
-    // 小牌匾：顶边通宽贴住胶囊底缘，两肩内凹倒圆角收窄到本体；宽度随内容。
-    // 左右内边距含肩宽（notch 10），让文字在本体内居中；整体上移 1px 避免与胶囊间露出背景细缝。
-    const shape = AttachedStripShape();
-    return Transform.translate(
-      offset: const Offset(0, -1),
-      child: Material(
-        color: tokens.accent,
-        shape: shape,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          customBorder: shape,
-          onTap: () => DevicePickerSheet.show(context),
-          child: SizedBox(
-            height: height,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+    // 包裹胶囊底部：总高 = 露出高度 + 胶囊圆角（上卷部分叠在胶囊底角上），
+    // 文字放在底部露出区域内；通宽，圆角随胶囊（含设置页的圆角风格）
+    final corner = tokens.corner(28);
+    final shape = AttachedStripShape(cornerRadius: corner);
+    return Material(
+      color: tokens.accent,
+      shape: shape,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        customBorder: shape,
+        onTap: () => DevicePickerSheet.show(context),
+        child: SizedBox(
+          height: height + corner,
+          child: Padding(
+            padding: EdgeInsets.only(top: corner),
+            child: Center(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
