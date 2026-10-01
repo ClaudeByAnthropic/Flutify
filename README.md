@@ -45,6 +45,9 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
     - 别的设备在出声（或远程已暂停而本机没有曲目）时，桌面播放栏与手机迷你播放器切换为远程模式
       （`widgets/connect/`）：曲目、进度按服务端快照推算、播放暂停 / 切歌 / 拖动进度 / 随机 / 循环 / 音量都发给远程设备；
       桌面播放栏下方多一条强调色「正在 {设备} 上播放」。
+    - 远程模式下在本机点歌（单曲、详情页大播放按钮、搜索结果）默认在那台设备上播放（Connect `play` 命令）：
+      歌单 / 专辑 / 艺人 / 已点赞的歌曲交给远程展开上下文，其余以临时列表播放（`services/connect/connect_play_request.dart`，
+      经 `PlaybackProvider.remotePlay` 接管）；命令失败时回到本机播放。
     - 远程模式下歌词照常可用：右栏「正在播放」与其中的歌词卡、手机歌词面板（点远程迷你播放器打开）、沉浸式歌词都展示远程曲目，
       歌词按远程进度滚动（`ConnectProvider.position`），点行跳转与玻璃控制台作用于远程设备（`widgets/connect/now_playing_source.dart`）。
     - 命令被拒（免费账号部分操作）时弹出提示；Jam（一起听）需要 Premium，未实现。

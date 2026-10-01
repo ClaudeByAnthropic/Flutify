@@ -25,6 +25,10 @@ class QueueEntry {
   const QueueEntry(this.uid, this.track);
 }
 
+/// 远程播放接管：见 [PlaybackProvider.remotePlay]。
+typedef RemotePlayHandler =
+    Future<bool> Function(PlaybackContext context, List<SpotifyTrack> tracks, SpotifyTrack? start);
+
 /// 播放状态与队列管理。
 ///
 /// 性能约定：
@@ -47,6 +51,10 @@ class PlaybackProvider extends ChangeNotifier {
   /// 上次播放会话的存储；为空时不还原也不保存（测试默认）。
   final PlaybackSessionStore? sessionStore;
   final Random _random;
+
+  /// 远程播放接管（由 main.dart 接上 Spotify Connect）：点歌时先问它，返回 true 表示已交给远程设备播放，
+  /// 本机不再加载；[start] 为 null 表示从头播放整个上下文。为空或返回 false 时照常在本机播放。
+  RemotePlayHandler? remotePlay;
 
   /// 还原会话后、或尚未加载音频时拖动进度条：下次加载这首歌时从这里开始播放。
   Duration? _resumeAt;
@@ -451,6 +459,13 @@ class PlaybackProvider extends ChangeNotifier {
   /// 播放指定曲目。[contextQueue] 为所在列表（歌单/专辑/搜索结果），
   /// 未提供时以单曲作为上下文。
   Future<void> playTrack(SpotifyTrack track, {List<SpotifyTrack>? contextQueue, PlaybackContext? context}) async {
+    final remote = remotePlay;
+    if (remote != null && await remote(context ?? PlaybackContext.none, contextQueue ?? [track], track)) return;
+    await _playLocal(track, contextQueue: contextQueue, context: context);
+  }
+
+  /// 在本机播放（不经远程接管）。
+  Future<void> _playLocal(SpotifyTrack track, {List<SpotifyTrack>? contextQueue, PlaybackContext? context}) async {
     var tracks = (contextQueue == null || contextQueue.isEmpty) ? [track] : List.of(contextQueue);
     var index = tracks.indexWhere((t) => t.id == track.id);
     if (index == -1) {
@@ -466,8 +481,11 @@ class PlaybackProvider extends ChangeNotifier {
   /// 从头播放整个上下文（详情页大播放按钮）。随机模式下从随机曲目开始。
   Future<void> playContext(List<SpotifyTrack> tracks, PlaybackContext context) async {
     if (tracks.isEmpty) return;
+    // 远程设备按它自己的随机 / 循环设置从头播放
+    final remote = remotePlay;
+    if (remote != null && await remote(context, tracks, null)) return;
     final start = _shuffle ? _random.nextInt(tracks.length) : 0;
-    await playTrack(tracks[start], contextQueue: tracks, context: context);
+    await _playLocal(tracks[start], contextQueue: tracks, context: context);
   }
 
   Future<void> togglePlayPause() async {

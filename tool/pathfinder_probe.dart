@@ -14,6 +14,7 @@ const _appVersion = '1.3.1.234.g59d6bf59';
 const _album = 'spotify:album:4yP0hdKOZPNshxUOjY0cZj'; // After Hours
 const _artist = 'spotify:artist:1Xyo4u8uXC1ZmMpatF05PJ'; // The Weeknd
 const _playlistId = '37i9dQZF1DXcBWIGoYBM5M'; // Today's Top Hits
+const _track = 'spotify:track:0VjIjW4GlUZAMYd2vXMi3b'; // Blinding Lights
 
 final Map<String, _Op> _ops = {
   'home': _Op('76243c78b0e20ecdbe41b794dec8cbe73f75e585b0a7201b8d2e84578412847a', {
@@ -57,6 +58,26 @@ final Map<String, _Op> _ops = {
     'includeLocalConcertsField': false,
     'includeAuthors': false,
   }),
+  // 右栏「正在播放」（NPV）：艺人卡 / 提供者 / 巡演
+  'queryNpvArtist': _Op('604b3771fc8c748bd344d8db8eb1bf2d9cb4f381556cdc0879ddb17a97c80546', {
+    'artistUri': _artist,
+    'trackUri': _track,
+    'contributorsLimit': 10,
+    'contributorsOffset': 0,
+    'enableRelatedVideos': true,
+    'enableRelatedAudioTracks': true,
+  }),
+  'npvV2TrackSupplementalSections': _Op('3268e307f08330b620de5c161a03b48acf66ec57164eac446e0653694a485764', {
+    'trackUri': _track,
+  }),
+  'queryTrackCreditsGroupedModal': _Op('f135fb9be58a72d041ab5d214d817021a272405d883860468e2627afb01a3ca9', {
+    'trackUri': _track,
+    'contributorsLimit': 50,
+    'contributorsOffset': 0,
+  }),
+  'ArtistConcerts': _Op('ef53c43b865496b9890b7167eab1dc614a8949ef9451b3c41184ea888de8bd2b', {
+    'artistId': _artist,
+  }),
 };
 
 Future<void> main(List<String> args) async {
@@ -78,6 +99,7 @@ Future<void> main(List<String> args) async {
     'app-platform': 'Win32_x86_64',
     'spotify-app-version': _appVersion,
     'accept': 'application/json',
+    'accept-language': Platform.environment['PROBE_LANG'] ?? 'zh-CN',
   };
   final out = Directory('tool/probe_out')..createSync(recursive: true);
   final client = HttpClient();
@@ -93,6 +115,28 @@ Future<void> main(List<String> args) async {
 
   final names = args.isEmpty ? [..._ops.keys, 'playlist'] : args;
   for (final name in names) {
+    // playlist:<id>：取任意歌单（例如 daylist 等动态歌单）
+    if (name.startsWith('playlist:')) {
+      final id = name.substring(9);
+      await _get(client, 'playlist_$id',
+          Uri.parse('https://spclient.wg.spotify.com/playlist/v2/playlist/$id?decorate=attributes,length,owner&from=0&length=100'),
+          headers, out);
+      continue;
+    }
+    // 歌曲电台：种子曲目 → 电台歌单
+    if (name == 'radio') {
+      await _get(client, 'radio',
+          Uri.parse('https://spclient.wg.spotify.com/inspiredby-mix/v2/seed_to_playlist/$_track?response-format=json'),
+          headers, out);
+      continue;
+    }
+    // 制作人员（REST 版本）
+    if (name == 'credits_rest') {
+      await _get(client, 'credits_rest',
+          Uri.parse('https://spclient.wg.spotify.com/track-credits-view/v0/experimental/${_track.split(':').last}/credits'),
+          headers, out);
+      continue;
+    }
     if (name == 'playlist') {
       await _get(client, 'playlist',
           Uri.parse('https://spclient.wg.spotify.com/playlist/v2/playlist/$_playlistId?decorate=attributes,length,owner'),

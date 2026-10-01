@@ -338,6 +338,41 @@ void main() {
       expect(volumes.map((r) => jsonDecode(r.body)['volume']), [32768, 65535]);
     });
 
+    test('play：上下文 / 临时列表两种 body', () async {
+      await h.service.start();
+      h.requests.clear();
+
+      await h.service.play('dev-1', contextUri: 'spotify:album:a1', trackUri: 'spotify:track:t2');
+      await h.service.play('dev-1', trackUris: ['spotify:track:t1', 'spotify:track:t2'], trackIndex: 1);
+
+      expect(h.requests.map((r) => r.url.path).toSet(), {
+        '/connect-state/v1/player/command/from/$_observerId/to/dev-1',
+      });
+      final withContext = jsonDecode(h.requests[0].body)['command'] as Map<String, dynamic>;
+      expect(withContext['endpoint'], 'play');
+      expect(withContext['context'], {'uri': 'spotify:album:a1', 'url': 'context://spotify:album:a1', 'metadata': {}});
+      expect(withContext['options'], {
+        'license': 'on-demand',
+        'skip_to': {'track_uri': 'spotify:track:t2'},
+        'player_options_override': {},
+      });
+      final adHoc = jsonDecode(h.requests[1].body)['command'] as Map<String, dynamic>;
+      expect(adHoc['context'], {
+        'uri': '',
+        'url': '',
+        'metadata': {},
+        'pages': [
+          {
+            'tracks': [
+              {'uri': 'spotify:track:t1'},
+              {'uri': 'spotify:track:t2'},
+            ],
+          },
+        ],
+      });
+      expect((adHoc['options'] as Map)['skip_to'], {'track_index': 1});
+    });
+
     test('服务端拒绝（403）→ ConnectException 带状态码', () async {
       await h.service.start();
       h.commandStatus = 403;

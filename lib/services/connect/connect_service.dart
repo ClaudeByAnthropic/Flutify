@@ -157,6 +157,40 @@ class ConnectService {
     await _state.transfer(observerId, toDeviceId, play: play);
   }
 
+  /// 在 [deviceId] 上播放新内容。
+  ///
+  /// - 有上下文（歌单 / 专辑 / 艺人 / 已点赞的歌曲）时传 [contextUri]，由远程设备自己展开曲目与后续播放；
+  /// - 没有可用上下文（搜索结果、单曲、只存在本机的歌单）时传 [trackUris]，以临时列表播放；
+  /// - [trackUri] / [trackIndex] 指定从哪一首开始（都不传则从头）。
+  Future<void> play(
+    String deviceId, {
+    String contextUri = '',
+    List<String> trackUris = const [],
+    String? trackUri,
+    int? trackIndex,
+  }) => _command(deviceId, 'play', {
+    'context': contextUri.isNotEmpty
+        ? {'uri': contextUri, 'url': 'context://$contextUri', 'metadata': <String, Object?>{}}
+        : {
+            'uri': '',
+            'url': '',
+            'metadata': <String, Object?>{},
+            'pages': [
+              {
+                'tracks': [
+                  for (final uri in trackUris) {'uri': uri},
+                ],
+              },
+            ],
+          },
+    'play_origin': {'feature_identifier': 'flutify'},
+    'options': {
+      'license': 'on-demand',
+      'skip_to': {'track_uri': ?trackUri, 'track_index': ?trackIndex},
+      'player_options_override': <String, Object?>{},
+    },
+  });
+
   Future<void> pause(String deviceId) => _command(deviceId, 'pause');
 
   Future<void> resume(String deviceId) => _command(deviceId, 'resume');

@@ -64,6 +64,33 @@ void main() {
     expect(playback.currentTrack?.id, b.id);
   });
 
+  group('remotePlay hook', () {
+    test('handled remotely: nothing is loaded or played locally', () async {
+      final calls = <(PlaybackContext, String, String?)>[];
+      playback.remotePlay = (context, tracks, start) async {
+        calls.add((context, tracks.map((t) => t.id).join(','), start?.id));
+        return true;
+      };
+
+      await playback.playTrack(b, contextQueue: [a, b, c], context: ctx);
+      await playback.playContext([a, b, c], ctx);
+
+      final ids = [a.id, b.id, c.id].join(',');
+      expect(calls, [(ctx, ids, b.id), (ctx, ids, null)]);
+      expect(loader.loaded, isEmpty);
+      expect(playback.currentTrack, isNull);
+    });
+
+    test('declined: plays locally as usual', () async {
+      playback.remotePlay = (_, _, _) async => false;
+
+      await playback.playTrack(b, contextQueue: [a, b, c], context: ctx);
+
+      expect(playback.currentTrack?.id, b.id);
+      expect(playback.upNext.map((e) => e.track.id), [c.id]);
+    });
+  });
+
   test('previous restarts the track when more than 3 seconds in', () async {
     await playback.playTrack(b, contextQueue: [a, b, c], context: ctx);
     audio.positionController.add(const Duration(seconds: 10));

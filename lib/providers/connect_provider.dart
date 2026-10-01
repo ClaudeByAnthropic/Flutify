@@ -6,6 +6,7 @@ import '../models/album.dart';
 import '../models/connect_cluster.dart';
 import '../models/image.dart';
 import '../models/track.dart';
+import '../services/connect/connect_play_request.dart';
 import '../services/connect/connect_service.dart';
 
 /// Spotify Connect 遥控：同账号其他设备的列表、播放状态与远程控制。
@@ -201,6 +202,22 @@ class ConnectProvider extends ChangeNotifier {
 
   /// 把播放转移到 [device]（保持原播放 / 暂停状态之外，默认继续播放）。
   Future<void> transferTo(ConnectDevice device) => _service!.transfer(device.id);
+
+  /// 在活动设备上播放新内容（本机点歌时由 PlaybackProvider 的远程接管钩子调用）。
+  /// 发出后视为远程掌握控制权，播放栏保持远程模式。
+  Future<void> play(ConnectPlayRequest request) async {
+    final target = _target;
+    if (target == null) return;
+    await _service!.play(
+      target,
+      contextUri: request.contextUri,
+      trackUris: request.trackUris,
+      trackUri: request.trackUri,
+      trackIndex: request.trackIndex,
+    );
+    _remoteInControl = true;
+    _notify();
+  }
 
   Future<void> togglePlayPause() async {
     final target = _target;

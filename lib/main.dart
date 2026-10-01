@@ -23,6 +23,8 @@ import 'providers/sleep_timer_provider.dart';
 import 'providers/spotify_provider.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
+import 'services/connect/connect_play_request.dart';
+import 'services/connect/connect_service.dart';
 import 'services/lyrics/lrclib_client.dart';
 import 'services/lyrics/lrclib_lyrics_source.dart';
 import 'services/lyrics/lyrics_disk_cache.dart';
@@ -104,9 +106,7 @@ Future<void> main() async {
   // Windows 上再挂一个任务栏歌词，二者共用同一套本机 / 远程切换与按键路由
   final systemControls = await SystemMediaControls.create();
   final taskbarLyrics = Platform.isWindows ? TaskbarLyricsControls(MethodChannelTaskbarLyrics()) : null;
-  final mediaControls = taskbarLyrics == null
-      ? systemControls
-      : MultiMediaControls([?systemControls, taskbarLyrics]);
+  final mediaControls = taskbarLyrics == null ? systemControls : MultiMediaControls([?systemControls, taskbarLyrics]);
 
   // 歌词补全：Spotify 没有逐行同步歌词时查 LRCLIB，选中的歌词缓存在应用数据目录
   final lyricsFallback = LrclibLyricsSource(
@@ -260,6 +260,29 @@ class FlutifyApp extends StatelessWidget {
             playback.addListener(() {
               if (playback.isPlaying) connect.localPlaybackStarted();
             });
+            // 播放栏处于远程模式时，点歌默认在那台设备上播放；无法远程（本地文件）或命令失败时回到本机播放
+            playback.remotePlay = (context, tracks, start) async {
+              if (!connect.controlsRemote(
+                localPlaying: playback.isPlaying,
+                localHasTrack: playback.currentTrack != null,
+              )) {
+                return false;
+              }
+              final request = ConnectPlayRequest.from(
+                context: context,
+                tracks: tracks,
+                start: start,
+                username: ctx.read<SpotifyAuthService>().username,
+              );
+              if (request == null) return false;
+              try {
+                await connect.play(request);
+                return true;
+              } on ConnectException catch (e) {
+                debugPrint('[Connect] 远程播放失败，改在本机播放：$e');
+                return false;
+              }
+            };
             return connect;
           },
         ),
