@@ -133,10 +133,14 @@ class DesktopPlayerBar extends StatelessWidget {
 ///
 /// 三层观感：柔和投影（浮起）→ 背景模糊 + 提饱和（[LiquidGlass]）→
 /// 极淡的表面色填充（保证文字在繁杂内容上可读）。模糊与不透明度跟随设置页「液态玻璃」。
+/// [footer]（如 Connect「正在 X 上播放」细条）贴在胶囊底部，圆角由胶囊裁切，与胶囊一体。
 class PlayerBarGlassCapsule extends StatelessWidget {
   final Widget child;
 
-  const PlayerBarGlassCapsule({super.key, required this.child});
+  /// 贴在胶囊底部的通宽区域（圆角随胶囊），为空时胶囊只有主体高度。
+  final Widget? footer;
+
+  const PlayerBarGlassCapsule({super.key, required this.child, this.footer});
 
   @override
   Widget build(BuildContext context) {
@@ -163,14 +167,25 @@ class PlayerBarGlassCapsule extends StatelessWidget {
         ),
         child: LiquidGlass(
           borderRadius: tokens.radius(28),
-          child: Container(
-            height: DesktopPlayerBar.capsuleHeight,
-            // 玻璃之上再罩一层极淡的表面色：深色压暗、浅色提亮，保证控件可读
+          // 玻璃之上再罩一层极淡的表面色：深色压暗、浅色提亮，保证控件可读
+          child: ColoredBox(
             color: colorScheme.surfaceContainerLowest.withAlpha(
               isDark ? 72 : 104,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: child,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: DesktopPlayerBar.capsuleHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: child,
+                  ),
+                ),
+                // footer 通宽贴在胶囊底部，底部圆角由 LiquidGlass 的 ClipRRect 裁切
+                ?footer,
+              ],
+            ),
           ),
         ),
       ),

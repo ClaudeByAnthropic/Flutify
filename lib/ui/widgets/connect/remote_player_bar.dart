@@ -17,55 +17,50 @@ import 'remote_transport_controls.dart';
 /// 桌面端播放栏的远程模式：内容与按钮作用于正在使用的远程设备。
 ///
 /// 与本机播放栏相同的悬浮液态玻璃胶囊（左曲目 / 中控制 + 进度 / 右设备与音量），
-/// 底部多一条横贯窗口的强调色细条「正在 {设备} 上播放」；点细条或设备键打开设备面板。
+/// 胶囊底部合并一条强调色细条「正在 {设备} 上播放」（通宽、圆角随胶囊）；点细条或设备键打开设备面板。
 class RemotePlayerBar extends StatelessWidget {
   const RemotePlayerBar({super.key});
 
-  /// 细条高度；总占位另计（见 [reservedHeight]）。胶囊自带 12px 下边距，即胶囊与细条的间隙。
+  /// 细条高度（含在胶囊内）；总占位另计（见 [reservedHeight]）。
   static const double stripHeight = 26;
   static const double reservedHeight =
       DesktopPlayerBar.reservedHeight + stripHeight;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        PlayerBarGlassCapsule(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final sideWidth = (constraints.maxWidth * 0.28).clamp(
-                160.0,
-                300.0,
-              );
-              return Row(
-                children: [
-                  SizedBox(width: sideWidth, child: const _RemoteTrackInfo()),
-                  Expanded(
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 620),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            RemoteTransportControls(),
-                            RemoteScrubber(),
-                          ],
-                        ),
-                      ),
+    return PlayerBarGlassCapsule(
+      footer: const RemotePlayingStrip(height: stripHeight),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final sideWidth = (constraints.maxWidth * 0.28).clamp(
+            160.0,
+            300.0,
+          );
+          return Row(
+            children: [
+              SizedBox(width: sideWidth, child: const _RemoteTrackInfo()),
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 620),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        RemoteTransportControls(),
+                        RemoteScrubber(),
+                      ],
                     ),
                   ),
-                  SizedBox(
-                    width: sideWidth,
-                    child: const _RemoteRightControls(),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-        const RemotePlayingStrip(height: stripHeight),
-      ],
+                ),
+              ),
+              SizedBox(
+                width: sideWidth,
+                child: const _RemoteRightControls(),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -195,7 +190,7 @@ class _RemoteRightControls extends StatelessWidget {
   }
 }
 
-/// 「正在 {设备} 上播放」强调色细条，横贯窗口底部（与官方桌面端一致）；点按打开设备面板。
+/// 「正在 {设备} 上播放」强调色细条，通宽贴在播放栏胶囊底部（底部圆角由胶囊裁切）；点按打开设备面板。
 class RemotePlayingStrip extends StatelessWidget {
   final double height;
 
