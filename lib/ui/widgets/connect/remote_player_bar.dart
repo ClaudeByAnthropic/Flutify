@@ -29,13 +29,10 @@ class RemotePlayerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlayerBarGlassCapsule(
-      footer: const RemotePlayingStrip(height: stripHeight),
+      attachment: const RemotePlayingStrip(height: stripHeight),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final sideWidth = (constraints.maxWidth * 0.28).clamp(
-            160.0,
-            300.0,
-          );
+          final sideWidth = (constraints.maxWidth * 0.28).clamp(160.0, 300.0);
           return Row(
             children: [
               SizedBox(width: sideWidth, child: const _RemoteTrackInfo()),
@@ -45,18 +42,12 @@ class RemotePlayerBar extends StatelessWidget {
                     constraints: const BoxConstraints(maxWidth: 620),
                     child: const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        RemoteTransportControls(),
-                        RemoteScrubber(),
-                      ],
+                      children: [RemoteTransportControls(), RemoteScrubber()],
                     ),
                   ),
                 ),
               ),
-              SizedBox(
-                width: sideWidth,
-                child: const _RemoteRightControls(),
-              ),
+              SizedBox(width: sideWidth, child: const _RemoteRightControls()),
             ],
           );
         },
@@ -190,7 +181,8 @@ class _RemoteRightControls extends StatelessWidget {
   }
 }
 
-/// 「正在 {设备} 上播放」强调色细条，通宽贴在播放栏胶囊底部（底部圆角由胶囊裁切）；点按打开设备面板。
+/// 「正在 {设备} 上播放」强调色细条，与播放栏胶囊同宽贴在其正下方，
+/// 顶部内凹倒圆角与胶囊衔接（[AttachedStripShape]）；点按打开设备面板。
 class RemotePlayingStrip extends StatelessWidget {
   final double height;
 
@@ -210,7 +202,10 @@ class RemotePlayingStrip extends StatelessWidget {
     );
     return Material(
       color: tokens.accent,
+      shape: const AttachedStripShape(),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
+        customBorder: const AttachedStripShape(),
         onTap: () => DevicePickerSheet.show(context),
         child: SizedBox(
           height: height,
