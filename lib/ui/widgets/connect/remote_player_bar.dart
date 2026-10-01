@@ -200,33 +200,37 @@ class RemotePlayingStrip extends StatelessWidget {
       color: tokens.onAccent,
       fontWeight: FontWeight.w700,
     );
-    // 顶部两角内凹倒圆角（与胶囊底缘衔接），底部两角外圆角；宽度随内容
+    // 小牌匾：顶边通宽贴住胶囊底缘，两肩内凹倒圆角收窄到本体；宽度随内容。
+    // 左右内边距含肩宽（notch 10），让文字在本体内居中；整体上移 1px 避免与胶囊间露出背景细缝。
     const shape = AttachedStripShape();
-    return Material(
-      color: tokens.accent,
-      shape: shape,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        customBorder: shape,
-        onTap: () => DevicePickerSheet.show(context),
-        child: SizedBox(
-          height: height,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(device.$2, size: 14, color: tokens.onAccent),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    context.l10n.connectPlayingOn(device.$1),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: style,
+    return Transform.translate(
+      offset: const Offset(0, -1),
+      child: Material(
+        color: tokens.accent,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          customBorder: shape,
+          onTap: () => DevicePickerSheet.show(context),
+          child: SizedBox(
+            height: height,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(device.$2, size: 14, color: tokens.onAccent),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      context.l10n.connectPlayingOn(device.$1),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: style,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

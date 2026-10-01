@@ -198,12 +198,13 @@ class PlayerBarGlassCapsule extends StatelessWidget {
   }
 }
 
-/// 附挂小条的形状：顶部两角为内凹倒圆角（与上方胶囊底缘衔接），底部两角为外圆角。
+/// 附挂小条的形状：顶边通宽（与胶囊底缘贴合），两侧经内凹倒圆角收窄到本体，
+/// 底部两角为外圆角——小条像从胶囊底部「长」出来的小牌匾。
 ///
-/// 内凹角是以「小条顶边外侧、距角点一个半径处」为圆心的四分之一圆，
-/// 让小条像从胶囊底部「长」出来；半径刻意小（默认 10），只要一点衔接感。
+/// 注意：小条的内容（文字 / 图标）应在本体宽度内居中，
+/// 即小条部件内部左右各留 [notch] 的肩宽（见 RemotePlayingStrip）。
 class AttachedStripShape extends OutlinedBorder {
-  /// 顶部内凹倒圆角半径。
+  /// 肩部内凹倒圆角半径（= 单侧肩宽）。
   final double notch;
 
   /// 底部外圆角半径。
@@ -216,47 +217,19 @@ class AttachedStripShape extends OutlinedBorder {
     const pi = 3.141592653589793;
     final c = notch, b = bottomRadius;
     return Path()
-      ..moveTo(rect.left + c, rect.top)
-      // 左上内凹挖口：圆心 (left+c, top+c)，从顶边弧到左边
-      ..arcTo(
-        Rect.fromCircle(center: Offset(rect.left + c, rect.top + c), radius: c),
-        -pi / 2,
-        -pi / 2,
-        false,
-      )
-      ..lineTo(rect.left, rect.bottom - b)
-      // 左下外圆角
-      ..arcTo(
-        Rect.fromCircle(
-          center: Offset(rect.left + b, rect.bottom - b),
-          radius: b,
-        ),
-        pi,
-        pi / 2,
-        false,
-      )
-      ..lineTo(rect.right - b, rect.bottom)
+      ..moveTo(rect.left, rect.top)
+      ..lineTo(rect.right, rect.top)
+      // 右肩：从顶边右端内凹弧到本体右侧（圆心 (right-c, top)）
+      ..arcTo(Rect.fromCircle(center: Offset(rect.right - c, rect.top), radius: c), 0, pi / 2, false)
+      ..lineTo(rect.right - c, rect.bottom - b)
       // 右下外圆角
-      ..arcTo(
-        Rect.fromCircle(
-          center: Offset(rect.right - b, rect.bottom - b),
-          radius: b,
-        ),
-        pi / 2,
-        pi / 2,
-        false,
-      )
-      ..lineTo(rect.right, rect.top + c)
-      // 右上内凹挖口：圆心 (right-c, top+c)，从右边弧回顶边
-      ..arcTo(
-        Rect.fromCircle(
-          center: Offset(rect.right - c, rect.top + c),
-          radius: c,
-        ),
-        0,
-        -pi / 2,
-        false,
-      )
+      ..arcTo(Rect.fromCircle(center: Offset(rect.right - c - b, rect.bottom - b), radius: b), 0, pi / 2, false)
+      ..lineTo(rect.left + c + b, rect.bottom)
+      // 左下外圆角
+      ..arcTo(Rect.fromCircle(center: Offset(rect.left + c + b, rect.bottom - b), radius: b), pi / 2, pi / 2, false)
+      ..lineTo(rect.left + c, rect.top + c)
+      // 左肩：从本体左侧内凹弧回顶边左端（圆心 (left+c, top)）
+      ..arcTo(Rect.fromCircle(center: Offset(rect.left + c, rect.top), radius: c), pi / 2, pi / 2, false)
       ..close();
   }
 
