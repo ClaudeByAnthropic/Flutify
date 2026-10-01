@@ -13,8 +13,18 @@ void main() {
       rememberWindow: false,
       connectEnabled: false,
       remoteLyricsLeadMs: -300,
+      proxyMode: ProxyMode.manual,
+      proxyHost: '10.0.0.2',
+      proxyPort: 8080,
     );
     expect(AppPreferences.decode(prefs.encode()), prefs);
+  });
+
+  test('proxy fields: unknown mode falls back to system, bad port to 0', () {
+    final prefs = AppPreferences.fromJson({'proxyMode': 'socks', 'proxyHost': '  h  ', 'proxyPort': 70000});
+    expect(prefs.proxyMode, ProxyMode.system);
+    expect(prefs.proxyHost, 'h');
+    expect(prefs.proxyPort, 0);
   });
 
   test('empty or corrupt data falls back to defaults', () {

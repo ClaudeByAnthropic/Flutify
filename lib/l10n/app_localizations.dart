@@ -1688,6 +1688,114 @@ abstract class AppLocalizations {
   /// **'其他设备上播放时，歌词比演唱慢就调大，快就调小'**
   String get settingsRemoteLyricsLeadSubtitle;
 
+  /// No description provided for @settingsNetworkSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络'**
+  String get settingsNetworkSection;
+
+  /// No description provided for @settingsProxy.
+  ///
+  /// In zh, this message translates to:
+  /// **'代理'**
+  String get settingsProxy;
+
+  /// No description provided for @settingsProxySystem.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统代理'**
+  String get settingsProxySystem;
+
+  /// No description provided for @settingsProxyNone.
+  ///
+  /// In zh, this message translates to:
+  /// **'不使用'**
+  String get settingsProxyNone;
+
+  /// No description provided for @settingsProxyManual.
+  ///
+  /// In zh, this message translates to:
+  /// **'手动'**
+  String get settingsProxyManual;
+
+  /// No description provided for @settingsProxySystemDetected.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前系统代理：{endpoint}'**
+  String settingsProxySystemDetected(String endpoint);
+
+  /// No description provided for @settingsProxySystemEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统未设置代理，直接连接'**
+  String get settingsProxySystemEmpty;
+
+  /// No description provided for @settingsProxyNoneSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'所有请求直接连接，不经过代理'**
+  String get settingsProxyNoneSubtitle;
+
+  /// No description provided for @settingsProxyManualSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'填写 HTTP 代理的地址与端口'**
+  String get settingsProxyManualSubtitle;
+
+  /// No description provided for @settingsProxyServer.
+  ///
+  /// In zh, this message translates to:
+  /// **'代理服务器'**
+  String get settingsProxyServer;
+
+  /// No description provided for @settingsProxyHostHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'127.0.0.1'**
+  String get settingsProxyHostHint;
+
+  /// No description provided for @settingsProxyPortHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'端口'**
+  String get settingsProxyPortHint;
+
+  /// No description provided for @settingsProxyInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请填写有效的地址和 1–65535 之间的端口'**
+  String get settingsProxyInvalid;
+
+  /// No description provided for @settingsProxyTest.
+  ///
+  /// In zh, this message translates to:
+  /// **'测试连接'**
+  String get settingsProxyTest;
+
+  /// No description provided for @settingsProxyTesting.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在连接 Spotify…'**
+  String get settingsProxyTesting;
+
+  /// No description provided for @settingsProxyTestOk.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接正常，用时 {ms} 毫秒'**
+  String settingsProxyTestOk(int ms);
+
+  /// No description provided for @settingsProxyTestFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接失败：{error}'**
+  String settingsProxyTestFailed(String error);
+
+  /// No description provided for @settingsProxyFootnote.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）。登录页面始终跟随系统代理设置。'**
+  String get settingsProxyFootnote;
+
   /// No description provided for @settingsPrivacySection.
   ///
   /// In zh, this message translates to:

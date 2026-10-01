@@ -147,6 +147,33 @@ void main() {
     expect(find.text('已用 0 KB，上限 1 GB'), findsOneWidget);
   });
 
+  testWidgets('network: proxy mode and manual server persist', (tester) async {
+    await pumpApp(tester);
+    await openSettings(tester);
+
+    expect(savedPrefs().proxyMode, ProxyMode.system);
+    await tapText(tester, '不使用');
+    expect(savedPrefs().proxyMode, ProxyMode.none);
+    expect(find.byKey(const ValueKey('proxy-host')), findsNothing);
+
+    await tapText(tester, '手动');
+    expect(savedPrefs().proxyMode, ProxyMode.manual);
+
+    // 地址框直接粘贴 host:port，自动拆分端口
+    await tester.enterText(find.byKey(const ValueKey('proxy-host')), '127.0.0.1:7890');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
+    expect(savedPrefs().proxyHost, '127.0.0.1');
+    expect(savedPrefs().proxyPort, 7890);
+
+    // 无效端口：提示且不覆盖已保存的值
+    await tester.enterText(find.byKey(const ValueKey('proxy-port')), '0');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
+    expect(find.text('请填写有效的地址和 1–65535 之间的端口'), findsOneWidget);
+    expect(savedPrefs().proxyPort, 7890);
+  });
+
   testWidgets('privacy: clearing search history empties it', (tester) async {
     await pumpApp(tester, seed: (s) => s.addRecentSearch('lofi'));
     await openSettings(tester);

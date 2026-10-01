@@ -10,6 +10,7 @@ import 'sections/glass_section.dart';
 import 'sections/language_section.dart';
 import 'sections/lyrics_section.dart';
 import 'sections/motion_section.dart';
+import 'sections/network_section.dart';
 import 'sections/playback_section.dart';
 import 'sections/privacy_section.dart';
 import 'sections/startup_section.dart';
@@ -18,7 +19,7 @@ import 'sections/text_shape_section.dart';
 import 'widgets/account_card.dart';
 
 /// 设置页（单列顺序）：账号 → 播放 → 歌词 → 外观 → 强调色 → 液态玻璃 → 文字与形状 → 动效
-/// → 语言 → Spotify Connect → 存储 → 隐私 → 启动 → 关于。
+/// → 语言 → Spotify Connect → 网络 → 存储 → 隐私 → 启动 → 关于。
 ///
 /// 所有设置项修改后即时生效、自动保存，无需「保存」按钮。按窗口形态分两套布局：
 /// - 移动端：iOS「设置」式单列分组，顶部 AppBar 带返回；
@@ -48,6 +49,7 @@ const List<Widget> _singleColumn = [
   MotionSection(),
   LanguageSection(),
   ConnectSection(),
+  NetworkSection(),
   StorageSection(),
   PrivacySection(),
   StartupSection(),
@@ -79,7 +81,7 @@ class _MobileSettings extends StatelessWidget {
 
 /// 桌面端：内容区内水平居中的大标题页面（标题与内容列左边对齐）。
 ///
-/// - 内容区宽 ≥ [_twoColumnWidth]：左栏「账号 / 外观 / 文字与形状 / 动效 / 歌词 / 语言 / 启动 / 关于」，
+/// - 内容区宽 ≥ [_twoColumnWidth]：左栏「账号 / 外观 / 文字与形状 / 动效 / 歌词 / 语言 / 网络 / 启动 / 关于」，
 ///   右栏「播放 / 强调色 / 液态玻璃 / Spotify Connect / 存储 / 隐私」（玻璃带预览，较高），两栏高度大致平衡；
 /// - 更窄时单列，限宽 [_singleColumnMaxWidth]。
 class _DesktopSettings extends StatelessWidget {
@@ -112,6 +114,7 @@ class _DesktopSettings extends StatelessWidget {
                           MotionSection(),
                           LyricsSection(),
                           LanguageSection(),
+                          NetworkSection(),
                           StartupSection(),
                           AboutSection(),
                         ],

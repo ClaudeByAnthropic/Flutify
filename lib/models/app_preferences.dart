@@ -11,6 +11,9 @@ enum StartPage { home, library, last }
 /// 歌词行的对齐方式。
 enum LyricsAlign { left, center }
 
+/// 网络代理：跟随系统 / 不使用（直连）/ 手动指定 HTTP 代理。
+enum ProxyMode { system, none, manual }
+
 /// 非外观类的界面偏好（外观见 `AppearanceSettings`，播放类偏好由 PlaybackProvider 持有）。
 ///
 /// 不可变；整体序列化为一段 JSON 存在 `app_prefs` 键下。
@@ -41,6 +44,11 @@ class AppPreferences {
   /// 桌面曲目表格用紧凑视图（无封面、艺人单独一列、行更矮），在歌单页的「查看方式」里切换。
   final bool compactTrackList;
 
+  /// 网络代理方式；[proxyHost] / [proxyPort] 只在 [ProxyMode.manual] 下使用（端口 0 表示未填写）。
+  final ProxyMode proxyMode;
+  final String proxyHost;
+  final int proxyPort;
+
   const AppPreferences({
     this.language = AppLanguage.zh,
     this.lyricsScale = 1.0,
@@ -51,6 +59,9 @@ class AppPreferences {
     this.connectEnabled = true,
     this.remoteLyricsLeadMs = 0,
     this.compactTrackList = false,
+    this.proxyMode = ProxyMode.system,
+    this.proxyHost = '',
+    this.proxyPort = 0,
   });
 
   static const AppPreferences defaults = AppPreferences();
@@ -70,6 +81,9 @@ class AppPreferences {
     bool? connectEnabled,
     int? remoteLyricsLeadMs,
     bool? compactTrackList,
+    ProxyMode? proxyMode,
+    String? proxyHost,
+    int? proxyPort,
   }) {
     return AppPreferences(
       language: language ?? this.language,
@@ -81,6 +95,9 @@ class AppPreferences {
       connectEnabled: connectEnabled ?? this.connectEnabled,
       remoteLyricsLeadMs: remoteLyricsLeadMs ?? this.remoteLyricsLeadMs,
       compactTrackList: compactTrackList ?? this.compactTrackList,
+      proxyMode: proxyMode ?? this.proxyMode,
+      proxyHost: proxyHost ?? this.proxyHost,
+      proxyPort: proxyPort ?? this.proxyPort,
     );
   }
 
@@ -94,6 +111,9 @@ class AppPreferences {
     'connectEnabled': connectEnabled,
     'remoteLyricsLeadMs': remoteLyricsLeadMs,
     'compactTrackList': compactTrackList,
+    'proxyMode': proxyMode.name,
+    'proxyHost': proxyHost,
+    'proxyPort': proxyPort,
   };
 
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
@@ -105,6 +125,7 @@ class AppPreferences {
 
     const d = defaults;
     final lead = json['remoteLyricsLeadMs'];
+    final port = json['proxyPort'];
     return AppPreferences(
       language: pick(AppLanguage.values, json['language'], d.language),
       lyricsScale: number(json['lyricsScale'], d.lyricsScale, minLyricsScale, maxLyricsScale),
@@ -115,6 +136,9 @@ class AppPreferences {
       connectEnabled: flag(json['connectEnabled'], d.connectEnabled),
       remoteLyricsLeadMs: lead is int ? lead.clamp(-maxRemoteLyricsLeadMs, maxRemoteLyricsLeadMs) : 0,
       compactTrackList: flag(json['compactTrackList'], d.compactTrackList),
+      proxyMode: pick(ProxyMode.values, json['proxyMode'], d.proxyMode),
+      proxyHost: json['proxyHost'] is String ? (json['proxyHost'] as String).trim() : d.proxyHost,
+      proxyPort: port is int && port > 0 && port <= 65535 ? port : d.proxyPort,
     );
   }
 
@@ -142,7 +166,10 @@ class AppPreferences {
       other.rememberWindow == rememberWindow &&
       other.connectEnabled == connectEnabled &&
       other.remoteLyricsLeadMs == remoteLyricsLeadMs &&
-      other.compactTrackList == compactTrackList;
+      other.compactTrackList == compactTrackList &&
+      other.proxyMode == proxyMode &&
+      other.proxyHost == proxyHost &&
+      other.proxyPort == proxyPort;
 
   @override
   int get hashCode => Object.hash(
@@ -155,5 +182,8 @@ class AppPreferences {
     connectEnabled,
     remoteLyricsLeadMs,
     compactTrackList,
+    proxyMode,
+    proxyHost,
+    proxyPort,
   );
 }

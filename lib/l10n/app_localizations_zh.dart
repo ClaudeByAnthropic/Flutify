@@ -869,6 +869,67 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsRemoteLyricsLeadSubtitle => '其他设备上播放时，歌词比演唱慢就调大，快就调小';
 
   @override
+  String get settingsNetworkSection => '网络';
+
+  @override
+  String get settingsProxy => '代理';
+
+  @override
+  String get settingsProxySystem => '系统代理';
+
+  @override
+  String get settingsProxyNone => '不使用';
+
+  @override
+  String get settingsProxyManual => '手动';
+
+  @override
+  String settingsProxySystemDetected(String endpoint) {
+    return '当前系统代理：$endpoint';
+  }
+
+  @override
+  String get settingsProxySystemEmpty => '系统未设置代理，直接连接';
+
+  @override
+  String get settingsProxyNoneSubtitle => '所有请求直接连接，不经过代理';
+
+  @override
+  String get settingsProxyManualSubtitle => '填写 HTTP 代理的地址与端口';
+
+  @override
+  String get settingsProxyServer => '代理服务器';
+
+  @override
+  String get settingsProxyHostHint => '127.0.0.1';
+
+  @override
+  String get settingsProxyPortHint => '端口';
+
+  @override
+  String get settingsProxyInvalid => '请填写有效的地址和 1–65535 之间的端口';
+
+  @override
+  String get settingsProxyTest => '测试连接';
+
+  @override
+  String get settingsProxyTesting => '正在连接 Spotify…';
+
+  @override
+  String settingsProxyTestOk(int ms) {
+    return '连接正常，用时 $ms 毫秒';
+  }
+
+  @override
+  String settingsProxyTestFailed(String error) {
+    return '连接失败：$error';
+  }
+
+  @override
+  String get settingsProxyFootnote =>
+      '仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）。登录页面始终跟随系统代理设置。';
+
+  @override
   String get settingsPrivacySection => '隐私';
 
   @override

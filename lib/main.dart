@@ -25,6 +25,7 @@ import 'services/auth/spotify_auth_service.dart';
 import 'services/media_controls/connect_media_source.dart';
 import 'services/media_controls/media_controls_sync.dart';
 import 'services/media_controls/system_media_controls.dart';
+import 'services/network/network_proxy.dart';
 import 'services/playback_session_store.dart';
 import 'services/protocol/audio_cache_store.dart';
 import 'services/protocol/track_audio_loader.dart';
@@ -51,6 +52,13 @@ Future<void> main() async {
 
   // Initialize Core Services
   final storageService = await StorageService.init();
+
+  // 网络代理须在任何网络客户端创建前就位；系统代理最多等 1.5 秒，读不到就先直连、后台补读
+  ProxyHttpOverrides.install(NetworkProxy.instance);
+  await NetworkProxy.instance
+      .configure(AppPreferences.decode(storageService.preferencesJson))
+      .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
+
   final audioPlayerService = AudioPlayerService();
   final spotifyApiService = SpotifyApiService(storageService);
   final authService = SpotifyAuthService(storageService);
@@ -95,6 +103,7 @@ Future<void> main() async {
       trackAudioLoader: trackAudioLoader,
       playbackSessionStore: sessionStore,
       mediaControls: mediaControls,
+      networkProxy: NetworkProxy.instance,
     ),
   );
 }
@@ -116,6 +125,9 @@ class FlutifyApp extends StatelessWidget {
   /// 系统媒体控制；为空时不接入（测试、不支持的平台）。
   final SystemMediaControls? mediaControls;
 
+  /// 网络代理策略；为空时设置页只显示模式、不探测系统代理（测试默认）。
+  final NetworkProxy? networkProxy;
+
   const FlutifyApp({
     super.key,
     required this.storageService,
@@ -125,6 +137,7 @@ class FlutifyApp extends StatelessWidget {
     this.trackAudioLoader,
     this.playbackSessionStore,
     this.mediaControls,
+    this.networkProxy,
   });
 
   @override
@@ -136,6 +149,7 @@ class FlutifyApp extends StatelessWidget {
         Provider<StorageService>.value(value: storageService),
         Provider<AudioPlayerService>.value(value: audioPlayerService),
         Provider<SpotifyApiService>.value(value: spotifyApiService),
+        Provider<NetworkProxy?>.value(value: networkProxy),
         // 非惰性：启动即接入 API 层，首屏请求就能自动续期 access_token
         Provider<SpotifyAuthService>(
           lazy: false,
@@ -165,7 +179,22 @@ class FlutifyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LibraryProvider(storageService, source: spotifyApiService.library)),
         ChangeNotifierProvider(create: (_) => SpotifyProvider(spotifyApiService, storageService)),
         ChangeNotifierProvider(create: (_) => AppearanceProvider(storageService)),
-        ChangeNotifierProvider(create: (_) => PreferencesProvider(storageService)),
+        ChangeNotifierProvider(
+          create: (_) {
+            final preferences = PreferencesProvider(storageService);
+            final proxy = networkProxy;
+            if (proxy == null) return preferences;
+            // 设置页改了代理即时生效（只在代理相关字段变化时重配，避免无谓地重读系统代理）
+            var proxyKey = _proxyKey(preferences.prefs);
+            preferences.addListener(() {
+              final key = _proxyKey(preferences.prefs);
+              if (key == proxyKey) return;
+              proxyKey = key;
+              unawaited(proxy.configure(preferences.prefs));
+            });
+            return preferences;
+          },
+        ),
         // 设置页「存储」分组：音频缓存占用 / 上限 / 清除（未接入协议链路时为 null）
         Provider<AudioCacheStore?>.value(
           value: trackAudioLoader is AudioCacheStore ? trackAudioLoader as AudioCacheStore : null,
@@ -177,7 +206,8 @@ class FlutifyApp extends StatelessWidget {
             final playback = ctx.read<PlaybackProvider>();
             final connect = ConnectProvider(
               spotifyApiService.connect,
-              available: () => spotifyApiService.supportsConnect && ctx.read<PreferencesProvider>().prefs.connectEnabled,
+              available: () =>
+                  spotifyApiService.supportsConnect && ctx.read<PreferencesProvider>().prefs.connectEnabled,
               resolveTrack: spotifyApiService.getTrackByUri,
             );
             // 在其他设备上播放时，系统媒体卡片显示并控制那台设备
@@ -203,6 +233,9 @@ class FlutifyApp extends StatelessWidget {
     );
   }
 }
+
+/// 代理相关偏好的指纹，用于判断是否需要重配 [NetworkProxy]。
+(ProxyMode, String, int) _proxyKey(AppPreferences prefs) => (prefs.proxyMode, prefs.proxyHost, prefs.proxyPort);
 
 /// 按外观设置生成主题；字号缩放与减弱动效通过 MediaQuery 下发给整棵树。
 class _ThemedApp extends StatelessWidget {

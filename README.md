@@ -90,6 +90,10 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 播放：音量均衡（读取 Spotify 文件头里的响度数据，只衰减偏响的歌）、歌曲间淡入淡出（0 – 12 秒，单播放器实现，两首不重叠）；
   - 启动：打开主页 / 音乐库 / 上次位置；桌面端记住窗口大小、位置与最大化状态（显示器变化导致不可见时回到居中，`screen_retriever` 枚举显示器）；
   - Spotify Connect：总开关、远程歌词提前量（±2 秒，只影响歌词切行）；
+  - 网络：代理「系统代理 / 不使用 / 手动」，即时生效、无需重启；「测试连接」请求一次 apresolve 显示耗时。
+    全局 `HttpOverrides` 接管所有 HTTP / WebSocket，接入点的 TCP 连接经 HTTP CONNECT 隧道（`services/network/`）；
+    系统代理在 Windows 读注册表 `Internet Settings`（含绕过列表，30 秒重读，Clash 等开关系统代理后自动跟随），其他平台读 `https_proxy` 等环境变量；
+    只支持 HTTP 代理（不支持 SOCKS / PAC），本机回环地址始终直连，登录 WebView 跟随系统设置；
   - 存储：音频缓存占用、上限（256 MB – 5 GB，超出按最久未播放淘汰，正在播放与预取的下一首始终保留）、一键清除；
   - 隐私：清除搜索记录、清除歌词缓存；关于：版本、键盘快捷键一览（桌面端）、开源许可。
 * **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环、Ctrl+K / Ctrl+L 聚焦搜索、Alt+←/→ 后退 / 前进、F11 沉浸式歌词、Esc 关闭浮层右栏 / 退出沉浸式歌词。
@@ -207,6 +211,7 @@ d:/Flutify/app/
 │   │   ├── protocol/                     # 完整曲目播放链路（AP 握手、音频密钥、CDN 解密、TrackAudioSource）
 │   │   │   ├── progressive_download.dart # 边下边播：流式解密到内存、Range 续传、按区间读取
 │   │   │   └── decrypt/                  # 可插拔解密：DecryptSpec（解法）+ DecryptBackend（内联 / 常驻后台 Isolate）
+│   │   ├── network/                      # 网络代理：系统代理读取、全局选路（HttpOverrides）、CONNECT 隧道、测试连接
 │   │   ├── media_controls/               # 系统媒体控制：Windows SMTC（原生通道）/ audio_service（Android、iOS）+ 播放状态同步
 │   │   ├── downloading_audio_source.dart # 把下载中的音频接到 just_audio（StreamAudioSource）
 │   │   ├── playback_session_store.dart   # 上次播放会话（曲目 / 队列 / 进度）的文件存储
@@ -245,7 +250,7 @@ d:/Flutify/app/
 │   │   │   ├── auth/                     # 登录页外壳 login_screen.dart + stages/（浏览器登录[默认]、密码、手机号、
 │   │   │   │                             #   链接、导入凭据、开发者应用授权、验证码）+ widgets/（品牌标、授权等待页等）
 │   │   │   └── settings/                 # 设置页：账号卡片 + sections/（外观、强调色、液态玻璃、文字与形状、动效、
-│   │   │                                 #   语言、歌词、播放、启动、Connect、存储、隐私、关于）
+│   │   │                                 #   语言、歌词、播放、启动、Connect、网络、存储、隐私、关于）
 │   │   │                                 #   + widgets/（分组、分段控件、滑杆行、色板、自定义取色、玻璃预览）
 │   │   └── widgets/                      # MiniPlayer、TrackTile、CoverImage、PlaybackScrubber、
 │   │                                     # PlayerControls、TrackOptionsSheet、CreatePlaylistDialog 等；

@@ -7,7 +7,10 @@ class SettingsSection extends StatelessWidget {
   final String title;
   final List<Widget> children;
 
-  const SettingsSection({super.key, required this.title, required this.children});
+  /// 卡片下方的小号灰色说明（iOS 分组页脚）。
+  final String? footer;
+
+  const SettingsSection({super.key, required this.title, required this.children, this.footer});
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +47,14 @@ class SettingsSection extends StatelessWidget {
               ],
             ),
           ),
+          if (footer != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                footer!,
+                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+            ),
         ],
       ),
     );

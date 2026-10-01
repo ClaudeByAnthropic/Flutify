@@ -897,6 +897,71 @@ class AppLocalizationsEn extends AppLocalizations {
       'When another device is playing: raise it if lyrics lag behind the singing, lower it if they run ahead';
 
   @override
+  String get settingsNetworkSection => 'Network';
+
+  @override
+  String get settingsProxy => 'Proxy';
+
+  @override
+  String get settingsProxySystem => 'System';
+
+  @override
+  String get settingsProxyNone => 'None';
+
+  @override
+  String get settingsProxyManual => 'Manual';
+
+  @override
+  String settingsProxySystemDetected(String endpoint) {
+    return 'System proxy: $endpoint';
+  }
+
+  @override
+  String get settingsProxySystemEmpty =>
+      'No system proxy set — connecting directly';
+
+  @override
+  String get settingsProxyNoneSubtitle =>
+      'All requests connect directly, without a proxy';
+
+  @override
+  String get settingsProxyManualSubtitle =>
+      'Enter the address and port of an HTTP proxy';
+
+  @override
+  String get settingsProxyServer => 'Proxy server';
+
+  @override
+  String get settingsProxyHostHint => '127.0.0.1';
+
+  @override
+  String get settingsProxyPortHint => 'Port';
+
+  @override
+  String get settingsProxyInvalid =>
+      'Enter a valid address and a port between 1 and 65535';
+
+  @override
+  String get settingsProxyTest => 'Test connection';
+
+  @override
+  String get settingsProxyTesting => 'Connecting to Spotify…';
+
+  @override
+  String settingsProxyTestOk(int ms) {
+    return 'Connected in $ms ms';
+  }
+
+  @override
+  String settingsProxyTestFailed(String error) {
+    return 'Connection failed: $error';
+  }
+
+  @override
+  String get settingsProxyFootnote =>
+      'Only HTTP proxies are supported (the mixed port of Clash, v2rayN, etc. works). The sign-in page always follows the system proxy settings.';
+
+  @override
   String get settingsPrivacySection => 'Privacy';
 
   @override

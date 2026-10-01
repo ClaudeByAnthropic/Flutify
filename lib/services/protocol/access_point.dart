@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../auth/proto_codec.dart';
+import '../network/proxy_tunnel.dart';
 import 'ap_codec.dart';
 import 'ap_crypto.dart' as ap_crypto;
 
@@ -135,8 +136,9 @@ class SpotifyAccessPoint {
   /// 可复用凭据（APWelcome 返回，可持久化后免密重登）。
   ({int type, Uint8List blob})? reusableCredentials;
 
-  SpotifyAccessPoint._(this._socket) {
-    _socket.listen(
+  /// [input] 为经代理隧道建立的连接上的数据流（见 [ProxyTunnel]）；直连时就是 socket 本身。
+  SpotifyAccessPoint._(this._socket, Stream<Uint8List> input) {
+    input.listen(
       (data) => _onBytes(Uint8List.fromList(data)),
       onError: _abort,
       onDone: () => _abort(StateError('AP 连接已关闭')),
@@ -225,8 +227,9 @@ class SpotifyAccessPoint {
 
   /// 对单个接入点完成握手。
   static Future<SpotifyAccessPoint> _connectTo(String host, int port, Duration timeout) async {
-    final socket = await Socket.connect(host, port, timeout: timeout);
-    final ap = SpotifyAccessPoint._(socket);
+    final connection = await ProxyTunnel.connect(host, port, timeout: timeout);
+    final socket = connection.socket;
+    final ap = SpotifyAccessPoint._(socket, connection.input);
 
     try {
       // 1) ClientHello：[0x00,0x04] + u32be(6+len) + payload
