@@ -4,6 +4,7 @@
 //   album   以专辑为上下文，从第 2 首开始（skip_to track_uri）
 //   liked   以「已点赞的歌曲」为上下文（spotify:user:{用户名}:collection）
 //   tracks  没有上下文，以临时列表（pages）播放 3 首，从第 2 首开始
+//   uri <track_uri>  单曲临时列表播放指定曲目
 // 终端只打印状态码与远程播放器的曲目 / 上下文 URI，不打印令牌。
 import 'dart:convert';
 import 'dart:io';
@@ -62,6 +63,9 @@ Future<void> main(List<String> args) async {
 
   try {
     switch (mode) {
+      case 'uri':
+        final uri = args[1];
+        await service.play(active.id, trackUris: [uri], trackUri: uri, trackIndex: 0);
       case 'liked':
         await service.play(active.id, contextUri: 'spotify:user:$username:collection');
       case 'tracks':
