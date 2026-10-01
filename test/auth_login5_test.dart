@@ -33,11 +33,15 @@ void main() {
   late List<http.Request> tokenHttpRequests;
   late List<http.Request> clientTokenRequests;
 
+  /// 为 true 时令牌端点对 refresh_token 续期返回 invalid_grant（模拟凭据被吊销）。
+  late bool revokeRefresh;
+
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     storage = await StorageService.init();
     login5Requests = [];
     tokenRequests = [];
+    revokeRefresh = false;
     tokenHttpRequests = [];
     clientTokenRequests = [];
   });
@@ -130,6 +134,9 @@ void main() {
       if (url.host == 'accounts.spotify.com') {
         tokenHttpRequests.add(request);
         tokenRequests.add(Uri.splitQueryString(request.body));
+        if (revokeRefresh && tokenRequests.last['grant_type'] == 'refresh_token') {
+          return http.Response(jsonEncode({'error': 'invalid_grant', 'error_description': 'Refresh token revoked'}), 400);
+        }
         return http.Response(
           jsonEncode({'access_token': 'oauth-access', 'refresh_token': 'oauth-refresh', 'expires_in': 3600}),
           200,
@@ -410,6 +417,26 @@ void main() {
       final androidData = fieldsOf(fieldsOf(clientTokenRequests.last.bodyBytes)[2]!.first.bytesValue);
       expect(androidData[2]!.first.asString, SpotifyAuthConstants.androidClientId);
       expect(storage.clientTokenProfile, 'android');
+    });
+
+    test('桌面版：refresh_token 被吊销时标记登录过期，不再重复请求令牌端点，登出后清除', () async {
+      final auth = SpotifyAuthService(storage, fakeServer(), null, (_, _) async => 'desktop-user');
+      await auth.completeOAuth(config: const OAuthClientConfig.desktop(), code: 'c', codeVerifier: 'v');
+
+      revokeRefresh = true;
+      await storage.setAccessTokenExpiry(0);
+      await expectLater(auth.ensureAccessToken(), throwsA(isA<OAuthException>()));
+      expect(auth.sessionExpired.value, isTrue);
+      await expectLater(auth.ensureAccessToken(), throwsA(isA<OAuthException>()));
+      expect(
+        tokenRequests.where((r) => r['grant_type'] == 'refresh_token'),
+        hasLength(1),
+        reason: '已知失效后不再打令牌端点',
+      );
+
+      await auth.logout();
+      expect(auth.sessionExpired.value, isFalse);
+      expect(auth.isLoggedIn, isFalse);
     });
 
     test('回环服务：state 匹配时返回授权码；不匹配时报错', () async {

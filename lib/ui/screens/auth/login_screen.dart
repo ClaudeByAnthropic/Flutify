@@ -30,6 +30,16 @@ class LoginScreen extends StatefulWidget {
     return result ?? false;
   }
 
+  /// 登录已过期时「重新登录」：先清掉失效的会话（登录页只在未登录状态下工作），再打开登录页。
+  static Future<bool> signInAgain(BuildContext context) async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    await context.read<AuthProvider>().signOut();
+    final result = await navigator.push<bool>(
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const LoginScreen()),
+    );
+    return result ?? false;
+  }
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }

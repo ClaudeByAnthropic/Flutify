@@ -225,6 +225,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeLoadFailedMessage => 'Check your connection and try again.';
 
   @override
+  String get authSessionExpiredTitle => 'Your session has expired';
+
+  @override
+  String get authSessionExpiredMessage =>
+      'Spotify ended this sign-in (for example, you signed out everywhere or changed your password). Please sign in again.';
+
+  @override
+  String get authSignInAgain => 'Sign in again';
+
+  @override
   String get homeEmptyTitle => 'Nothing here yet';
 
   @override

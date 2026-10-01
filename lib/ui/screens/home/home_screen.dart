@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../l10n/l10n.dart';
 import '../../../models/home_feed.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/spotify_provider.dart';
 import '../../../services/spotify_api_service.dart';
 import '../../navigation/app_routes.dart';
@@ -82,6 +83,20 @@ class HomeScreen extends StatelessWidget {
       ];
     }
     if (home.isEmpty && loading) return [SliverToBoxAdapter(child: HomeSkeleton(desktop: desktop))];
+    // 续期凭据被吊销时任何请求都会失败，提示重新登录而不是「检查网络」
+    if (home.isEmpty && context.select<AuthProvider, bool>((a) => a.sessionExpired)) {
+      return [
+        SliverToBoxAdapter(
+          child: EmptyState(
+            icon: Icons.lock_clock_outlined,
+            title: l10n.authSessionExpiredTitle,
+            message: l10n.authSessionExpiredMessage,
+            actionLabel: l10n.authSignInAgain,
+            onAction: () => LoginScreen.signInAgain(context),
+          ),
+        ),
+      ];
+    }
     if (home.isEmpty) {
       final failed = context.read<SpotifyProvider>().homeError != null;
       return [

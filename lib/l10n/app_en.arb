@@ -73,6 +73,9 @@
 
   "homeLoadFailedTitle": "Couldn't load recommendations",
   "homeLoadFailedMessage": "Check your connection and try again.",
+  "authSessionExpiredTitle": "Your session has expired",
+  "authSessionExpiredMessage": "Spotify ended this sign-in (for example, you signed out everywhere or changed your password). Please sign in again.",
+  "authSignInAgain": "Sign in again",
   "homeEmptyTitle": "Nothing here yet",
   "homeEmptyMessage": "Try another filter, or check back later.",
   "homeClearFilter": "Clear filter",

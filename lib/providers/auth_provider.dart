@@ -60,7 +60,17 @@ class AuthProvider extends ChangeNotifier {
         if (_auth.username != usernameBefore) onSessionChanged?.call();
       }));
     }
+    _auth.sessionExpired.addListener(notifyListeners);
   }
+
+  @override
+  void dispose() {
+    _auth.sessionExpired.removeListener(notifyListeners);
+    super.dispose();
+  }
+
+  /// 已登录但续期凭据被服务端吊销：界面应提示「登录已过期」并引导重新登录，而不是报网络错误。
+  bool get sessionExpired => isSignedIn && _auth.sessionExpired.value;
 
   AuthStatus get status => _status;
   bool get isSignedIn => _status == AuthStatus.signedIn;

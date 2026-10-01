@@ -156,6 +156,8 @@ class FlutifyApp extends StatelessWidget {
           create: (_) {
             final auth = authService ?? SpotifyAuthService(storageService);
             spotifyApiService.attachAuth(auth);
+            // 关窗时若正好在续期，等新令牌落盘：进程会被立即结束，丢掉轮换后的 refresh_token 就得重新登录
+            DesktopWindow.addBeforeCloseHook(auth.settle, timeout: const Duration(seconds: 5));
             return auth;
           },
         ),

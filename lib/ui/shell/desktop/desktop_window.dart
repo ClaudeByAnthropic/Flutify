@@ -66,17 +66,18 @@ class DesktopWindow {
     _enabled = true;
   }
 
-  static final List<Future<void> Function()> _beforeClose = [];
+  static final List<(Future<void> Function(), Duration)> _beforeClose = [];
 
-  /// 关窗前要完成的收尾（如保存播放进度）。每个钩子最多等 [_closeTimeout]，超时也照常关闭。
-  static void addBeforeCloseHook(Future<void> Function() hook) => _beforeClose.add(hook);
+  /// 关窗前要完成的收尾（如保存播放进度）。每个钩子最多等 [timeout]，超时也照常关闭；
+  /// 所有钩子并行执行。
+  static void addBeforeCloseHook(Future<void> Function() hook, {Duration timeout = _closeTimeout}) =>
+      _beforeClose.add((hook, timeout));
 
   static const Duration _closeTimeout = Duration(milliseconds: 800);
 
   static Future<void> _runBeforeClose() async {
     await Future.wait([
-      for (final hook in _beforeClose)
-        Future.sync(hook).timeout(_closeTimeout).catchError((Object _) {}),
+      for (final (hook, timeout) in _beforeClose) Future.sync(hook).timeout(timeout).catchError((Object _) {}),
     ]);
   }
 

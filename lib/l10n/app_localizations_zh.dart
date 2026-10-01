@@ -223,6 +223,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeLoadFailedMessage => '请检查网络连接后重试。';
 
   @override
+  String get authSessionExpiredTitle => '登录已过期';
+
+  @override
+  String get authSessionExpiredMessage =>
+      'Spotify 已让这次登录失效（例如在其他地方退出了所有设备或修改了密码），请重新登录。';
+
+  @override
+  String get authSignInAgain => '重新登录';
+
+  @override
   String get homeEmptyTitle => '这里暂时没有内容';
 
   @override

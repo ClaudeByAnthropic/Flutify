@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/constants/spotify_endpoints.dart';
@@ -50,6 +49,10 @@ class SpotifyAuthService {
   /// 正在进行中的续期请求：并发调用复用同一个 Future，避免重复打令牌端点。
   Future<String>? _refreshInFlight;
   Future<String>? _clientTokenInFlight;
+
+  /// 登录已失效：服务端吊销了续期凭据，只能重新登录。置位后不再请求令牌端点（避免每个请求都打一次），
+  /// 重新登录或登出时清除。不持久化：重启 App 会再试一次续期。
+  final ValueNotifier<bool> sessionExpired = ValueNotifier(false);
 
   SpotifyAuthService._(this._storage, this._client, this._loopback, this._usernameResolver)
       : _clientTokenService = ClientTokenService(_client),
@@ -351,9 +354,24 @@ class SpotifyAuthService {
     if (!_storage.isLoggedIn) {
       return Future.error(StateError('未登录，无法获取 access_token'));
     }
+    if (sessionExpired.value) {
+      return Future.error(const OAuthException('登录已过期，请重新登录', 'invalid_grant'));
+    }
     return _refreshInFlight ??= _refresh().whenComplete(() {
       _refreshInFlight = null;
     });
+  }
+
+  /// 等待进行中的续期落盘（关窗前调用）。
+  ///
+  /// 续期请求一旦发出，服务端可能已轮换 refresh_token、旧值作废；此时进程被结束而新值没写入，
+  /// 下次启动就只能重新登录。
+  Future<void> settle() async {
+    final inFlight = _refreshInFlight;
+    if (inFlight == null) return;
+    try {
+      await inFlight;
+    } catch (_) {}
   }
 
   Future<String> _refresh() async {
@@ -361,8 +379,13 @@ class SpotifyAuthService {
     if (method == AuthMethod.oauth || method == AuthMethod.desktop) {
       final config =
           method == AuthMethod.desktop ? const OAuthClientConfig.desktop() : OAuthClientConfig.developer(_storage.clientId);
-      final tokens = await _oauthFor(config).refresh(config: config, refreshToken: _storage.refreshToken);
-      await _persistOAuth(tokens, method);
+      try {
+        final tokens = await _oauthFor(config).refresh(config: config, refreshToken: _storage.refreshToken);
+        await _persistOAuth(tokens, method);
+      } on OAuthException catch (e) {
+        if (e.isRevoked) sessionExpired.value = true;
+        rethrow;
+      }
       return _storage.accessToken;
     }
 
@@ -373,6 +396,7 @@ class SpotifyAuthService {
       data: Uint8List.fromList(base64Decode(_storage.storedCredential)),
     );
     if (result is! Login5Success) {
+      sessionExpired.value = true;
       throw StateError('凭据续期被要求验证码，请重新登录');
     }
     await _persistLogin5(result.ok);
@@ -465,10 +489,13 @@ class SpotifyAuthService {
   /// 登出：尽力通知服务端（`/api/logout/v1`），然后清除全部登录态（保留 device_id）。
   Future<void> logout() async {
     _pendingSession = null;
+    // 已失效的会话不必再通知服务端（令牌早已过期）
+    final expired = sessionExpired.value;
+    sessionExpired.value = false;
     await _loopback.close();
     final token = _storage.accessToken;
     // 官方客户端身份的会话才通知 spclient；开发者应用 OAuth 无对应会话
-    if (token.isNotEmpty && clientProfile != null) {
+    if (!expired && token.isNotEmpty && clientProfile != null) {
       try {
         await _client.post(
           Uri.parse('${SpotifyEndpoints.defaultSpClientBase}/api/logout/v1'),
@@ -488,6 +515,7 @@ class SpotifyAuthService {
   // ---------------------------------------------------------------------------
 
   Future<void> _persistLogin5(LoginOk ok, {String fallbackUsername = '', Uint8List? fallbackCredential}) async {
+    sessionExpired.value = false;
     await _storage.setAuthMethod(AuthMethod.login5);
     final name = ok.username.isNotEmpty ? ok.username : fallbackUsername;
     if (name.isNotEmpty) await _storage.setUsername(name);
@@ -503,6 +531,7 @@ class SpotifyAuthService {
   }
 
   Future<void> _persistOAuth(OAuthTokens tokens, AuthMethod method) async {
+    sessionExpired.value = false;
     await _storage.setAuthMethod(method);
     await _storage.setAccessToken(tokens.accessToken);
     await _storage.setAccessTokenExpiry(

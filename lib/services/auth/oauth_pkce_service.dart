@@ -136,7 +136,14 @@ class OAuthTokens {
 /// OAuth 流程错误（用户拒绝、client_id 无效、回调地址未登记等）。
 class OAuthException implements Exception {
   final String message;
-  const OAuthException(this.message);
+
+  /// 令牌端点返回的 OAuth 错误码（如 `invalid_grant`）；本地错误为 null。
+  final String? code;
+
+  const OAuthException(this.message, [this.code]);
+
+  /// refresh_token 已被服务端吊销（在别处退出登录、改密码、令牌轮换后旧值作废），只能重新登录。
+  bool get isRevoked => code == 'invalid_grant';
 
   factory OAuthException.fromError(String error, [String? description]) {
     final text = switch (error) {
@@ -147,7 +154,7 @@ class OAuthException implements Exception {
         '回调地址不匹配，请在开发者后台登记 ${OAuthClientConfig.developerRedirectUri}',
       _ => description?.isNotEmpty == true ? '授权失败：$description' : '授权失败（$error）',
     };
-    return OAuthException(text);
+    return OAuthException(text, error);
   }
 
   @override

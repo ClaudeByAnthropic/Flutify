@@ -488,6 +488,24 @@ abstract class AppLocalizations {
   /// **'请检查网络连接后重试。'**
   String get homeLoadFailedMessage;
 
+  /// No description provided for @authSessionExpiredTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录已过期'**
+  String get authSessionExpiredTitle;
+
+  /// No description provided for @authSessionExpiredMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify 已让这次登录失效（例如在其他地方退出了所有设备或修改了密码），请重新登录。'**
+  String get authSessionExpiredMessage;
+
+  /// No description provided for @authSignInAgain.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新登录'**
+  String get authSignInAgain;
+
   /// No description provided for @homeEmptyTitle.
   ///
   /// In zh, this message translates to:
