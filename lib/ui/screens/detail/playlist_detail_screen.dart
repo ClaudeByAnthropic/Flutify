@@ -39,7 +39,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     super.initState();
     final p = widget.playlist;
     final isLibraryOwned = p.id == LibraryProvider.likedSongsId || context.read<LibraryProvider>().isOwnPlaylist(p.id);
-    if (!isLibraryOwned && p.tracks.isEmpty && p.totalTracks > 0) _fetch();
+    // 卡片上的曲目数不可靠（主页 / 搜索卡片常缺，daylist 等动态歌单也可能报 0）：没带曲目就去拉
+    if (!isLibraryOwned && p.tracks.isEmpty) _fetch();
   }
 
   /// 拉取完整歌单；失败时记录错误，由占位提供登录 / 重试。
