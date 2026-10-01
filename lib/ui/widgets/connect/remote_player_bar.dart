@@ -29,7 +29,7 @@ class RemotePlayerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlayerBarGlassCapsule(
-      footer: const RemotePlayingStrip(height: stripHeight),
+      attachment: const RemotePlayingStrip(height: stripHeight),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final sideWidth = (constraints.maxWidth * 0.28).clamp(160.0, 300.0);
@@ -181,8 +181,8 @@ class _RemoteRightControls extends StatelessWidget {
   }
 }
 
-/// 「正在 {设备} 上播放」强调色细条，嵌进播放栏胶囊底部：
-/// 通宽、顶部两角圆角（衔接处露出玻璃），底部圆角随胶囊；点按打开设备面板。
+/// 「正在 {设备} 上播放」强调色小条，附在播放栏胶囊正下方中央、宽度随内容，
+/// 顶部两角内凹倒圆角与胶囊底缘衔接（[AttachedStripShape]）；点按打开设备面板。
 class RemotePlayingStrip extends StatelessWidget {
   final double height;
 
@@ -200,13 +200,8 @@ class RemotePlayingStrip extends StatelessWidget {
       color: tokens.onAccent,
       fontWeight: FontWeight.w700,
     );
-    // 顶部两角圆角（嵌入胶囊的衔接弧度），底部圆角与胶囊一致（28）
-    const shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(
-        top: Radius.circular(13),
-        bottom: Radius.circular(28),
-      ),
-    );
+    // 顶部两角内凹倒圆角（与胶囊底缘衔接），底部两角外圆角；宽度随内容
+    const shape = AttachedStripShape();
     return Material(
       color: tokens.accent,
       shape: shape,
@@ -217,9 +212,9 @@ class RemotePlayingStrip extends StatelessWidget {
         child: SizedBox(
           height: height,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(device.$2, size: 14, color: tokens.onAccent),
                 const SizedBox(width: 6),

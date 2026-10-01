@@ -63,8 +63,16 @@ class DesktopWindow {
       await windowManager.show();
       await windowManager.focus();
       // 最大化必须在窗口显示之后调用：显示前最大化会被 WindowOptions 的尺寸覆盖，
-      // 结果以「最大化前的普通窗口尺寸」启动（表现为记住位置失效）
-      if (saved?.maximized ?? false) await windowManager.maximize();
+      // 结果以「最大化前的普通窗口尺寸」启动（表现为记住位置失效）。
+      // 刚 show 完窗口尚未就绪，立即 maximize 可能被丢弃：稍等片刻并重试一次
+      if (saved?.maximized ?? false) {
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+        await windowManager.maximize();
+        if (!await windowManager.isMaximized()) {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+          await windowManager.maximize();
+        }
+      }
     });
     // 监听器由 windowManager 持有，随进程存活
     final memory = WindowBoundsMemory(

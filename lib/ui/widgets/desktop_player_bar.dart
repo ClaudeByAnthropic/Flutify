@@ -133,15 +133,19 @@ class DesktopPlayerBar extends StatelessWidget {
 ///
 /// 三层观感：柔和投影（浮起）→ 背景模糊 + 提饱和（[LiquidGlass]）→
 /// 极淡的表面色填充（保证文字在繁杂内容上可读）。模糊与不透明度跟随设置页「液态玻璃」。
-/// [footer]（如 Connect「正在 X 上播放」细条）嵌进胶囊底部：通宽、顶部两角圆角，
-/// 底部圆角由胶囊裁切，与胶囊一体。
+/// [attachment]（如 Connect「正在 X 上播放」小条）附在胶囊正下方中央、宽度随内容，
+/// 衔接处的内凹倒圆角由 attachment 自己绘制（见 AttachedStripShape）。
 class PlayerBarGlassCapsule extends StatelessWidget {
   final Widget child;
 
-  /// 嵌在胶囊底部的通宽区域（顶部圆角自绘、底部圆角随胶囊），为空时胶囊只有主体高度。
-  final Widget? footer;
+  /// 附在胶囊正下方中央的挂件（宽度随内容），为空时胶囊只有主体高度。
+  final Widget? attachment;
 
-  const PlayerBarGlassCapsule({super.key, required this.child, this.footer});
+  const PlayerBarGlassCapsule({
+    super.key,
+    required this.child,
+    this.attachment,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -155,43 +159,119 @@ class PlayerBarGlassCapsule extends StatelessWidget {
         DesktopPlayerBar.marginSide,
         DesktopPlayerBar.marginBottom,
       ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: tokens.radius(28),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 70 : 36),
-              blurRadius: 28,
-              offset: const Offset(0, 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: tokens.radius(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(isDark ? 70 : 36),
+                  blurRadius: 28,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: LiquidGlass(
-          borderRadius: tokens.radius(28),
-          // 玻璃之上再罩一层极淡的表面色：深色压暗、浅色提亮，保证控件可读
-          child: ColoredBox(
-            color: colorScheme.surfaceContainerLowest.withAlpha(
-              isDark ? 72 : 104,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
+            child: LiquidGlass(
+              borderRadius: tokens.radius(28),
+              // 玻璃之上再罩一层极淡的表面色：深色压暗、浅色提亮，保证控件可读
+              child: ColoredBox(
+                color: colorScheme.surfaceContainerLowest.withAlpha(
+                  isDark ? 72 : 104,
+                ),
+                child: SizedBox(
                   height: DesktopPlayerBar.capsuleHeight,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: child,
                   ),
                 ),
-                // footer 嵌进胶囊底部：通宽，底部圆角由 LiquidGlass 的 ClipRRect 裁切
-                ?footer,
-              ],
+              ),
             ),
           ),
-        ),
+          // 挂件附在胶囊正下方中央（倒圆角衔接由挂件自绘）
+          if (attachment != null) Center(child: attachment),
+        ],
       ),
     );
   }
+}
+
+/// 附挂小条的形状：顶部两角为内凹倒圆角（与上方胶囊底缘衔接），底部两角为外圆角。
+///
+/// 内凹角是以「小条顶边外侧、距角点一个半径处」为圆心的四分之一圆，
+/// 让小条像从胶囊底部「长」出来；半径刻意小（默认 10），只要一点衔接感。
+class AttachedStripShape extends OutlinedBorder {
+  /// 顶部内凹倒圆角半径。
+  final double notch;
+
+  /// 底部外圆角半径。
+  final double bottomRadius;
+
+  const AttachedStripShape({this.notch = 10, this.bottomRadius = 13});
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
+    const pi = 3.141592653589793;
+    final c = notch, b = bottomRadius;
+    return Path()
+      ..moveTo(rect.left + c, rect.top)
+      // 左上内凹挖口：圆心 (left+c, top+c)，从顶边弧到左边
+      ..arcTo(
+        Rect.fromCircle(center: Offset(rect.left + c, rect.top + c), radius: c),
+        -pi / 2,
+        -pi / 2,
+        false,
+      )
+      ..lineTo(rect.left, rect.bottom - b)
+      // 左下外圆角
+      ..arcTo(
+        Rect.fromCircle(
+          center: Offset(rect.left + b, rect.bottom - b),
+          radius: b,
+        ),
+        pi,
+        pi / 2,
+        false,
+      )
+      ..lineTo(rect.right - b, rect.bottom)
+      // 右下外圆角
+      ..arcTo(
+        Rect.fromCircle(
+          center: Offset(rect.right - b, rect.bottom - b),
+          radius: b,
+        ),
+        pi / 2,
+        pi / 2,
+        false,
+      )
+      ..lineTo(rect.right, rect.top + c)
+      // 右上内凹挖口：圆心 (right-c, top+c)，从右边弧回顶边
+      ..arcTo(
+        Rect.fromCircle(
+          center: Offset(rect.right - c, rect.top + c),
+          radius: c,
+        ),
+        0,
+        -pi / 2,
+        false,
+      )
+      ..close();
+  }
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) =>
+      getOuterPath(rect, textDirection: textDirection);
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {}
+
+  @override
+  OutlinedBorder copyWith({BorderSide? side}) => this;
+
+  @override
+  ShapeBorder scale(double t) => this;
 }
 
 /// 空闲状态：灰色封面占位 + 提示文字 + 禁用的播放键。
