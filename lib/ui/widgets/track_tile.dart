@@ -7,9 +7,12 @@ import '../../core/utils/formatters.dart';
 import '../../l10n/l10n.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../providers/connect_provider.dart';
 import '../../providers/library_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../shell/shell_breakpoints.dart';
+import 'connect/connect_actions.dart';
+import 'connect/now_playing_source.dart';
 import 'cover_image.dart';
 import 'hover_builder.dart';
 import 'track_menu.dart';
@@ -44,9 +47,12 @@ class TrackTile extends StatelessWidget {
     context.read<PlaybackProvider>().playTrack(track, contextQueue: contextQueue, context: playbackContext);
   }
 
-  /// 悬停播放键：当前曲目 → 播放 / 暂停切换；其它曲目 → 从这首开始播放。
+  /// 悬停播放键：当前曲目 → 播放 / 暂停切换（远程模式下切换远程设备）；其它曲目 → 从这首开始播放。
   void _playOrToggle(BuildContext context, bool isCurrent) {
-    if (isCurrent) {
+    if (isCurrent && ConnectActions.isRemoteNow(context)) {
+      final connect = context.read<ConnectProvider>();
+      ConnectActions.run(context, connect.togglePlayPause);
+    } else if (isCurrent) {
       context.read<PlaybackProvider>().togglePlayPause();
     } else if (onTap != null) {
       onTap!();
@@ -61,10 +67,8 @@ class TrackTile extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final hoverCapable = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
 
-    final (isCurrent, isPlaying) = context.select<PlaybackProvider, (bool, bool)>((p) {
-      final current = p.isCurrent(track.id);
-      return (current, current && p.isPlaying);
-    });
+    // 遥控远程设备时按远程曲目高亮（与播放栏一致）
+    final (isCurrent, isPlaying) = NowPlayingSource.trackState(context, track.id);
     final isLiked = context.select<LibraryProvider, bool>((l) => l.isLiked(track.id));
 
     return HoverBuilder(

@@ -26,4 +26,19 @@ class NowPlayingSource {
     if (isRemote(context)) return context.select<ConnectProvider, bool>((c) => c.player.isAudible);
     return context.select<PlaybackProvider, bool>((p) => p.isPlaying);
   }
+
+  /// 曲目行用：[trackId] 是否为当前曲目、是否正在出声。
+  /// 只比较 ID 并返回布尔，其他曲目切换不会让这一行重建。
+  static (bool current, bool playing) trackState(BuildContext context, String trackId) {
+    if (isRemote(context)) {
+      return context.select<ConnectProvider, (bool, bool)>((c) {
+        final current = c.player.trackId == trackId;
+        return (current, current && c.player.isAudible);
+      });
+    }
+    return context.select<PlaybackProvider, (bool, bool)>((p) {
+      final current = p.isCurrent(trackId);
+      return (current, current && p.isPlaying);
+    });
+  }
 }

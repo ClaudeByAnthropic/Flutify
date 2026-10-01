@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/utils/artwork_palette.dart';
 import '../../providers/appearance_provider.dart';
-import '../../providers/playback_provider.dart';
+import 'connect/now_playing_source.dart';
 
 /// 动态取色：当前曲目换封面时取主色，交给 [AppearanceProvider]（仅在开启「跟随封面取色」时取色）。
 ///
@@ -41,7 +41,8 @@ class _DynamicAccentSyncState extends State<DynamicAccentSync> {
 
   @override
   Widget build(BuildContext context) {
-    final url = context.select<PlaybackProvider, String>((p) => p.currentTrack?.coverUrl ?? '');
+    // 遥控远程设备时跟随远程曲目的封面
+    final url = NowPlayingSource.track(context)?.coverUrl ?? '';
     final enabled = context.select<AppearanceProvider, bool>((a) => a.settings.dynamicAccent);
     if (!enabled) _resolvedUrl = null;
     // 构建期间不能通知其他监听者，放到帧末

@@ -18,6 +18,11 @@ import 'package:flutify_app/ui/widgets/connect/remote_mini_player.dart';
 import 'package:flutify_app/ui/widgets/connect/remote_player_bar.dart';
 import 'package:flutify_app/ui/widgets/desktop_player_bar.dart';
 import 'package:flutify_app/ui/widgets/mini_player.dart';
+import 'package:flutify_app/ui/widgets/cover_image.dart';
+import 'package:flutify_app/ui/widgets/track_tile.dart';
+import 'package:flutify_app/ui/widgets/waveform_visualizer.dart';
+import 'package:flutify_app/models/track.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -263,6 +268,44 @@ void main() {
         });
       }
     }
+  });
+
+  group('track list', () {
+    const remote = SpotifyTrack(id: 'synthetic0000000000000a', name: 'Remote Row', durationMs: 200000);
+    const other = SpotifyTrack(id: 'synthetic0000000000000b', name: 'Other Row', durationMs: 180000);
+    const list = Column(mainAxisSize: MainAxisSize.min, children: [TrackTile(track: remote), TrackTile(track: other)]);
+
+    Color? titleColor(WidgetTester tester, String name) => tester.widget<Text>(find.text(name)).style?.color;
+
+    testWidgets('highlights the remote track, not the local one', (tester) async {
+      await pumpHost(tester, const Size(1280, 700), list, cluster: syntheticCluster());
+      final primary = Theme.of(tester.element(find.text('Remote Row'))).colorScheme.primary;
+      expect(titleColor(tester, 'Remote Row'), primary);
+      expect(titleColor(tester, 'Other Row'), isNot(primary));
+      expect(find.byType(WaveformVisualizer), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('hover pause on the remote row pauses the remote device', (tester) async {
+      await pumpHost(tester, const Size(1280, 700), list, cluster: syntheticCluster());
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(find.byType(CoverImage).first));
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.pause_rounded));
+      await tester.pump();
+      expect(service.commands, ['pause:synthetic-speaker']);
+      await unmount(tester);
+    });
+
+    testWidgets('no highlight once the remote session ends', (tester) async {
+      await pumpHost(tester, const Size(1280, 700), list, cluster: syntheticCluster());
+      service.push(syntheticCluster(withActive: false));
+      await tester.pump();
+      expect(find.byType(WaveformVisualizer), findsNothing);
+      await unmount(tester);
+    });
   });
 
   group('device picker', () {

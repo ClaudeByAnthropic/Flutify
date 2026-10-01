@@ -23,8 +23,20 @@ class ConnectActions {
     );
     if (!remote.$1) return false;
     final local = context.select<PlaybackProvider, (bool, bool)>((p) => (p.isPlaying, p.currentTrack != null));
-    if (local.$1) return false;
-    return remote.$2 || !local.$2;
+    return _decide(remote.$2, local.$1, local.$2);
+  }
+
+  /// 同 [showRemote]，但不订阅，供点击等回调里使用。
+  static bool isRemoteNow(BuildContext context) {
+    final connect = context.read<ConnectProvider?>();
+    if (connect == null || !connect.hasRemoteSession) return false;
+    final playback = context.read<PlaybackProvider>();
+    return _decide(connect.player.isAudible, playback.isPlaying, playback.currentTrack != null);
+  }
+
+  static bool _decide(bool remoteAudible, bool localPlaying, bool localHasTrack) {
+    if (localPlaying) return false;
+    return remoteAudible || !localHasTrack;
   }
 
   /// 转移到远程设备：先暂停本机，避免两边同时出声。

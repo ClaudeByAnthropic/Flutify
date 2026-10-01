@@ -77,7 +77,7 @@ class _MobileSettings extends StatelessWidget {
   }
 }
 
-/// 桌面端：内容区内左对齐的大标题页面。
+/// 桌面端：内容区内水平居中的大标题页面（标题与内容列左边对齐）。
 ///
 /// - 内容区宽 ≥ [_twoColumnWidth]：左栏「账号 / 外观 / 文字与形状 / 动效 / 歌词 / 语言 / 启动 / 关于」，
 ///   右栏「播放 / 强调色 / 液态玻璃 / Spotify Connect / 存储 / 隐私」（玻璃带预览，较高），两栏高度大致平衡；
@@ -141,7 +141,7 @@ class _DesktopSettings extends StatelessWidget {
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(32, 28, 32, 48),
             child: Align(
-              alignment: Alignment.topLeft,
+              alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: twoColumns ? _twoColumnMaxWidth : _singleColumnMaxWidth),
                 child: Column(
