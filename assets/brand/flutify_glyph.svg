@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Flutify 字形（单色，可用于单色场景 / 通知图标），由 tool/brand/generate_logo.py 生成 -->
+  <rect x="307.2" y="256.0" width="120.8" height="512.0" rx="60.4" fill="#000000"/>
+  <rect x="307.2" y="256.0" width="430.1" height="120.8" rx="60.4" fill="#000000"/>
+  <rect x="307.2" y="451.6" width="307.2" height="120.8" rx="60.4" fill="#000000"/>
+  <circle cx="551.9" cy="707.6" r="60.4" fill="#000000"/>
+</svg>

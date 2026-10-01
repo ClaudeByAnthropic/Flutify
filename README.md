@@ -260,6 +260,20 @@ d:/Flutify/app/
 
 ---
 
+## 🎨 品牌标识
+
+连续曲率圆角方块（superellipse，n = 5）+ 品牌绿对角渐变 + 白色「F」：竖笔加一长一短两道横笔（递减的音量电平），
+第三行收成圆点（音符 / 播放头）。`tool/brand/generate_logo.py` 是唯一母版，运行 `python tool/brand/generate_logo.py`
+（需要 Pillow）生成：
+
+* `assets/brand/flutify_logo.svg`（矢量母版）、`flutify_glyph.svg`（单色字形）、`flutify_logo_1024.png`
+* `windows/runner/resources/app_icon.ico`（16 – 256 px 共 10 个尺寸）
+* Android 旧版启动图标 `mipmap-*/ic_launcher.png`，以及自适应图标（渐变背景 + 字形前景 + 单色主题图标）
+
+App 内的 `FlutifyMark`（登录页、账号卡片）按同一组比例用 Canvas 绘制，修改几何时两处一起改。
+
+---
+
 ## 🌐 语言与字体
 
 ### 简体中文界面（gen-l10n）
