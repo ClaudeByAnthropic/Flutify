@@ -85,5 +85,22 @@ class DesktopMenu {
     );
   }
 
+  /// 分组小标题（不可点击），例如「排序方式」「查看方式」。
+  static PopupMenuItem<T> heading<T>(String label) {
+    return PopupMenuItem<T>(
+      enabled: false,
+      height: 32,
+      child: Builder(
+        builder: (context) => Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
   static const PopupMenuDivider divider = PopupMenuDivider(height: 8);
 }

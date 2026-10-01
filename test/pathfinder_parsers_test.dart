@@ -227,8 +227,13 @@ void main() {
       'length': 120,
       'contents': {
         'items': [
-          {'uri': 'spotify:track:t1'},
+          {
+            'uri': 'spotify:track:t1',
+            'attributes': {'timestamp': '1700000000000'},
+          },
           {'uri': 'spotify:episode:e1'},
+          // 自动生成歌单的条目没有加入时间
+          {'uri': 'spotify:track:t2', 'attributes': <String, dynamic>{}},
         ],
       },
     });
@@ -237,7 +242,8 @@ void main() {
     expect(parsed.playlist.ownerName, 'Spotify');
     expect(parsed.playlist.description, 'Fresh & new');
     expect(parsed.playlist.totalTracks, 120);
-    expect(parsed.trackUris, ['spotify:track:t1']);
+    expect(parsed.trackUris, ['spotify:track:t1', 'spotify:track:t2']);
+    expect(parsed.addedAt, {'spotify:track:t1': DateTime.fromMillisecondsSinceEpoch(1700000000000)});
   });
 
   test('decorateContextTracks', () {

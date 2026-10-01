@@ -38,6 +38,9 @@ class AppPreferences {
   /// 远程播放时歌词的提前量（毫秒）：正数让歌词更早切行，负数推迟。只影响歌词，不影响进度条。
   final int remoteLyricsLeadMs;
 
+  /// 桌面曲目表格用紧凑视图（无封面、艺人单独一列、行更矮），在歌单页的「查看方式」里切换。
+  final bool compactTrackList;
+
   const AppPreferences({
     this.language = AppLanguage.zh,
     this.lyricsScale = 1.0,
@@ -47,6 +50,7 @@ class AppPreferences {
     this.rememberWindow = true,
     this.connectEnabled = true,
     this.remoteLyricsLeadMs = 0,
+    this.compactTrackList = false,
   });
 
   static const AppPreferences defaults = AppPreferences();
@@ -65,6 +69,7 @@ class AppPreferences {
     bool? rememberWindow,
     bool? connectEnabled,
     int? remoteLyricsLeadMs,
+    bool? compactTrackList,
   }) {
     return AppPreferences(
       language: language ?? this.language,
@@ -75,6 +80,7 @@ class AppPreferences {
       rememberWindow: rememberWindow ?? this.rememberWindow,
       connectEnabled: connectEnabled ?? this.connectEnabled,
       remoteLyricsLeadMs: remoteLyricsLeadMs ?? this.remoteLyricsLeadMs,
+      compactTrackList: compactTrackList ?? this.compactTrackList,
     );
   }
 
@@ -87,6 +93,7 @@ class AppPreferences {
     'rememberWindow': rememberWindow,
     'connectEnabled': connectEnabled,
     'remoteLyricsLeadMs': remoteLyricsLeadMs,
+    'compactTrackList': compactTrackList,
   };
 
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
@@ -107,6 +114,7 @@ class AppPreferences {
       rememberWindow: flag(json['rememberWindow'], d.rememberWindow),
       connectEnabled: flag(json['connectEnabled'], d.connectEnabled),
       remoteLyricsLeadMs: lead is int ? lead.clamp(-maxRemoteLyricsLeadMs, maxRemoteLyricsLeadMs) : 0,
+      compactTrackList: flag(json['compactTrackList'], d.compactTrackList),
     );
   }
 
@@ -133,7 +141,8 @@ class AppPreferences {
       other.startPage == startPage &&
       other.rememberWindow == rememberWindow &&
       other.connectEnabled == connectEnabled &&
-      other.remoteLyricsLeadMs == remoteLyricsLeadMs;
+      other.remoteLyricsLeadMs == remoteLyricsLeadMs &&
+      other.compactTrackList == compactTrackList;
 
   @override
   int get hashCode => Object.hash(
@@ -145,5 +154,6 @@ class AppPreferences {
     rememberWindow,
     connectEnabled,
     remoteLyricsLeadMs,
+    compactTrackList,
   );
 }

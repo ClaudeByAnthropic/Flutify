@@ -434,5 +434,30 @@
   "shortcutOnHoveredTrack": "悬停曲目时：{action}",
   "@shortcutOnHoveredTrack": {
     "placeholders": { "action": { "type": "String" } }
+  },
+  "trackColumnTitle": "标题",
+  "trackColumnArtist": "艺人",
+  "trackColumnAlbum": "专辑",
+  "trackColumnAddedAt": "添加日期",
+  "trackColumnDuration": "时长",
+  "trackSortBy": "排序方式",
+  "trackSortCustom": "自定义顺序",
+  "trackViewAs": "查看方式",
+  "trackViewList": "列表",
+  "trackViewCompact": "紧凑",
+  "trackSearchHint": "在歌单中搜索",
+  "trackSearchClose": "关闭搜索",
+  "trackSearchNoResults": "找不到「{query}」",
+  "@trackSearchNoResults": {
+    "placeholders": { "query": { "type": "String" } }
+  },
+  "addedToday": "今天",
+  "addedDaysAgo": "{count} 天前",
+  "@addedDaysAgo": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "addedWeeksAgo": "{count} 周前",
+  "@addedWeeksAgo": {
+    "placeholders": { "count": { "type": "int" } }
   }
 }

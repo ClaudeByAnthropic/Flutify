@@ -1000,4 +1000,58 @@ class AppLocalizationsZh extends AppLocalizations {
   String shortcutOnHoveredTrack(String action) {
     return '悬停曲目时：$action';
   }
+
+  @override
+  String get trackColumnTitle => '标题';
+
+  @override
+  String get trackColumnArtist => '艺人';
+
+  @override
+  String get trackColumnAlbum => '专辑';
+
+  @override
+  String get trackColumnAddedAt => '添加日期';
+
+  @override
+  String get trackColumnDuration => '时长';
+
+  @override
+  String get trackSortBy => '排序方式';
+
+  @override
+  String get trackSortCustom => '自定义顺序';
+
+  @override
+  String get trackViewAs => '查看方式';
+
+  @override
+  String get trackViewList => '列表';
+
+  @override
+  String get trackViewCompact => '紧凑';
+
+  @override
+  String get trackSearchHint => '在歌单中搜索';
+
+  @override
+  String get trackSearchClose => '关闭搜索';
+
+  @override
+  String trackSearchNoResults(String query) {
+    return '找不到「$query」';
+  }
+
+  @override
+  String get addedToday => '今天';
+
+  @override
+  String addedDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String addedWeeksAgo(int count) {
+    return '$count 周前';
+  }
 }

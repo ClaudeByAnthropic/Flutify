@@ -1933,6 +1933,102 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'悬停曲目时：{action}'**
   String shortcutOnHoveredTrack(String action);
+
+  /// No description provided for @trackColumnTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'标题'**
+  String get trackColumnTitle;
+
+  /// No description provided for @trackColumnArtist.
+  ///
+  /// In zh, this message translates to:
+  /// **'艺人'**
+  String get trackColumnArtist;
+
+  /// No description provided for @trackColumnAlbum.
+  ///
+  /// In zh, this message translates to:
+  /// **'专辑'**
+  String get trackColumnAlbum;
+
+  /// No description provided for @trackColumnAddedAt.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加日期'**
+  String get trackColumnAddedAt;
+
+  /// No description provided for @trackColumnDuration.
+  ///
+  /// In zh, this message translates to:
+  /// **'时长'**
+  String get trackColumnDuration;
+
+  /// No description provided for @trackSortBy.
+  ///
+  /// In zh, this message translates to:
+  /// **'排序方式'**
+  String get trackSortBy;
+
+  /// No description provided for @trackSortCustom.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义顺序'**
+  String get trackSortCustom;
+
+  /// No description provided for @trackViewAs.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看方式'**
+  String get trackViewAs;
+
+  /// No description provided for @trackViewList.
+  ///
+  /// In zh, this message translates to:
+  /// **'列表'**
+  String get trackViewList;
+
+  /// No description provided for @trackViewCompact.
+  ///
+  /// In zh, this message translates to:
+  /// **'紧凑'**
+  String get trackViewCompact;
+
+  /// No description provided for @trackSearchHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在歌单中搜索'**
+  String get trackSearchHint;
+
+  /// No description provided for @trackSearchClose.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭搜索'**
+  String get trackSearchClose;
+
+  /// No description provided for @trackSearchNoResults.
+  ///
+  /// In zh, this message translates to:
+  /// **'找不到「{query}」'**
+  String trackSearchNoResults(String query);
+
+  /// No description provided for @addedToday.
+  ///
+  /// In zh, this message translates to:
+  /// **'今天'**
+  String get addedToday;
+
+  /// No description provided for @addedDaysAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 天前'**
+  String addedDaysAgo(int count);
+
+  /// No description provided for @addedWeeksAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 周前'**
+  String addedWeeksAgo(int count);
 }
 
 class _AppLocalizationsDelegate

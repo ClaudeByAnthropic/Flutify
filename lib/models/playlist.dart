@@ -63,7 +63,12 @@ class SpotifyPlaylist {
       if (json['tracks'] is Map<String, dynamic> && json['tracks']['items'] is List) {
         for (var item in json['tracks']['items']) {
           if (item is Map<String, dynamic> && item['track'] != null) {
-            parsedTracks.add(SpotifyTrack.fromJson(item['track'] as Map<String, dynamic>));
+            // 加入时间在条目上而不在曲目上
+            parsedTracks.add(
+              SpotifyTrack.fromJson(
+                item['track'] as Map<String, dynamic>,
+              ).copyWith(addedAt: SpotifyTrack.parseAddedAt(item['added_at'])),
+            );
           } else if (item is Map<String, dynamic>) {
             parsedTracks.add(SpotifyTrack.fromJson(item));
           }

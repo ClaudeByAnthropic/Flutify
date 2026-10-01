@@ -14,6 +14,10 @@ class SpotifyTrack {
   final int popularity;
   final bool isPlayable;
 
+  /// 加入所在列表（歌单 / 已点赞）的时间；只在列表上下文里有值（歌单详情的「添加日期」列与排序）。
+  /// 自动生成的歌单（daylist 等）没有该信息，为 null。
+  final DateTime? addedAt;
+
   const SpotifyTrack({
     required this.id,
     required this.name,
@@ -26,6 +30,7 @@ class SpotifyTrack {
     this.explicit = false,
     this.popularity = 50,
     this.isPlayable = true,
+    this.addedAt,
   });
 
   String get artistNames => artists.map((a) => a.name).join(', ');
@@ -44,6 +49,7 @@ class SpotifyTrack {
     bool? explicit,
     int? popularity,
     bool? isPlayable,
+    DateTime? addedAt,
   }) {
     return SpotifyTrack(
       id: id ?? this.id,
@@ -57,8 +63,12 @@ class SpotifyTrack {
       explicit: explicit ?? this.explicit,
       popularity: popularity ?? this.popularity,
       isPlayable: isPlayable ?? this.isPlayable,
+      addedAt: addedAt ?? this.addedAt,
     );
   }
+
+  /// 歌单条目 / 收藏条目附带的加入时间（Web API 的 `added_at` ISO 字符串）。
+  static DateTime? parseAddedAt(Object? value) => value is String ? DateTime.tryParse(value) : null;
 
   factory SpotifyTrack.fromJson(Map<String, dynamic> json) {
     return SpotifyTrack(
@@ -78,6 +88,7 @@ class SpotifyTrack {
       explicit: json['explicit'] as bool? ?? false,
       popularity: json['popularity'] as int? ?? 50,
       isPlayable: json['is_playable'] as bool? ?? true,
+      addedAt: parseAddedAt(json['added_at']),
     );
   }
 
@@ -93,5 +104,6 @@ class SpotifyTrack {
     'explicit': explicit,
     'popularity': popularity,
     'is_playable': isPlayable,
+    if (addedAt != null) 'added_at': addedAt!.toUtc().toIso8601String(),
   };
 }

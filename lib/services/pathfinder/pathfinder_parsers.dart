@@ -219,16 +219,27 @@ class PathfinderParsers {
         .toList();
   }
 
-  /// spclient `playlist/v2/playlist/{id}`（JSON）：元数据与曲目 URI 列表。
-  static ({SpotifyPlaylist playlist, List<String> trackUris})? playlistV2(String id, Map<String, dynamic> json) {
+  /// spclient `playlist/v2/playlist/{id}`（JSON）：元数据、曲目 URI 列表与各曲目的加入时间。
+  ///
+  /// 条目 `attributes.timestamp` 为加入时间（毫秒，字符串或数字）；自动生成的歌单（daylist 等）没有。
+  static ({SpotifyPlaylist playlist, List<String> trackUris, Map<String, DateTime> addedAt})? playlistV2(
+    String id,
+    Map<String, dynamic> json,
+  ) {
     final attributes = _map(json['attributes']);
     if (attributes == null) return null;
     final owner = json['ownerUsername'] as String? ?? '';
-    final uris = _list(_map(json['contents'])?['items'])
-        .map((i) => _map(i)?['uri'])
-        .whereType<String>()
-        .where((u) => u.startsWith('spotify:track:'))
-        .toList();
+    final uris = <String>[];
+    final addedAt = <String, DateTime>{};
+    for (final raw in _list(_map(json['contents'])?['items'])) {
+      final item = _map(raw);
+      final uri = item?['uri'];
+      if (uri is! String || !uri.startsWith('spotify:track:')) continue;
+      uris.add(uri);
+      final time = _timestampMs(_map(item?['attributes'])?['timestamp']);
+      // 同一首歌重复出现时保留最早的一次
+      if (time != null) addedAt.putIfAbsent(uri, () => time);
+    }
     return (
       playlist: SpotifyPlaylist(
         id: id,
@@ -240,7 +251,18 @@ class PathfinderParsers {
         totalTracks: _int(json['length']) ?? uris.length,
       ),
       trackUris: uris,
+      addedAt: addedAt,
     );
+  }
+
+  /// 毫秒时间戳（字符串或数字）；不合理的值（≤ 0）视为缺失。
+  static DateTime? _timestampMs(Object? value) {
+    final ms = switch (value) {
+      final int v => v,
+      final String v => int.tryParse(v),
+      _ => null,
+    };
+    return ms == null || ms <= 0 ? null : DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
   /// decorateContextTracks：按 URI 批量补全的曲目。

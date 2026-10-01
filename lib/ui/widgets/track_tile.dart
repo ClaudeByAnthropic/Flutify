@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/flutify_tokens.dart';
 import '../../core/theme/md3e_shapes.dart';
+import '../../core/utils/added_date_format.dart';
 import '../../core/utils/formatters.dart';
 import '../../l10n/l10n.dart';
 import '../../models/playback_context.dart';
@@ -17,6 +18,7 @@ import 'cover_image.dart';
 import 'hover_builder.dart';
 import 'track_hotkeys.dart';
 import 'track_menu.dart';
+import 'track_table/track_table_columns.dart';
 import 'waveform_visualizer.dart';
 
 /// 曲目行。
@@ -34,6 +36,10 @@ class TrackTile extends StatelessWidget {
   final PlaybackContext? playbackContext;
   final VoidCallback? onTap;
 
+  /// 桌面表格列（歌单页）：给出时按列显示艺人 / 专辑 / 添加日期，紧凑视图不显示封面；
+  /// 为 null 时是普通曲目行（封面 + 歌名 / 艺人两行）。
+  final TrackTableColumns? columns;
+
   const TrackTile({
     super.key,
     required this.track,
@@ -42,6 +48,7 @@ class TrackTile extends StatelessWidget {
     this.contextQueue,
     this.playbackContext,
     this.onTap,
+    this.columns,
   });
 
   void _play(BuildContext context) {
@@ -71,11 +78,18 @@ class TrackTile extends StatelessWidget {
     // 遥控远程设备时按远程曲目高亮（与播放栏一致）
     final (isCurrent, isPlaying) = NowPlayingSource.trackState(context, track.id);
     final isLiked = context.select<LibraryProvider, bool>((l) => l.isLiked(track.id));
+    final columns = this.columns;
+    final showCover = columns != null ? !columns.compact : this.showCover;
+    // 紧凑视图且艺人单独成列：标题只占一行
+    final artistInline = !(columns?.artist ?? false);
 
     return HoverBuilder(
       builder: (context, hovered) {
         final revealed = hovered || !hoverCapable;
         final playIcon = isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded;
+        final secondary = theme.textTheme.bodySmall?.copyWith(
+          color: hovered ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+        );
 
         final row = InkWell(
           onTap: onTap ?? () => _play(context),
@@ -83,7 +97,10 @@ class TrackTile extends StatelessWidget {
           onSecondaryTapUp: (details) => TrackMenu.show(context, track, position: details.globalPosition),
           borderRadius: context.tokens.radius(MD3EShapes.radiusMedium),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: EdgeInsets.symmetric(
+              horizontal: TrackTableColumns.horizontalPadding,
+              vertical: (columns?.compact ?? false) ? 4.0 : 8.0,
+            ),
             child: Row(
               children: [
                 // 序号 / 波形 / 悬停播放键
@@ -133,31 +150,23 @@ class TrackTile extends StatelessWidget {
                     ),
                   ),
 
-                const SizedBox(width: 14),
+                const SizedBox(width: TrackTableColumns.leadGap),
 
-                // 歌名与艺人
+                // 歌名与艺人（艺人单独成列时只有歌名一行）
                 Expanded(
+                  flex: TrackTableColumns.titleFlex,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        track.name,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: isCurrent ? colorScheme.primary : colorScheme.onSurface,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 3),
                       Row(
                         children: [
-                          if (track.explicit) const _ExplicitBadge(),
-                          Expanded(
+                          if (track.explicit && !artistInline) const _ExplicitBadge(),
+                          Flexible(
                             child: Text(
-                              track.artistNames,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: hovered ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                              track.name,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: isCurrent ? colorScheme.primary : colorScheme.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -165,9 +174,50 @@ class TrackTile extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (artistInline) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            if (track.explicit) const _ExplicitBadge(),
+                            Expanded(
+                              child: Text(
+                                track.artistNames,
+                                style: secondary,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
+
+                if (columns != null) ...[
+                  if (columns.artist)
+                    _TextCell(flex: TrackTableColumns.artistFlex, text: track.artistNames, style: secondary),
+                  if (columns.album)
+                    _TextCell(
+                      flex: TrackTableColumns.albumFlex,
+                      text: track.album?.name ?? '',
+                      style: secondary,
+                      // 点专辑名打开专辑页（与官方一致）
+                      onTap: TrackMenu.isAvailable(context, track, TrackAction.album)
+                          ? () => TrackMenu.perform(context, track, TrackAction.album)
+                          : null,
+                    ),
+                  if (columns.addedAt)
+                    SizedBox(
+                      width: TrackTableColumns.addedAtWidth,
+                      child: Text(
+                        track.addedAt == null ? '' : AddedDateFormat.format(context.l10n, track.addedAt!),
+                        style: secondary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
 
                 // 已点赞常驻；未点赞只在悬停时出现（保留占位，避免时长列左右跳动）
                 _Reveal(
@@ -185,11 +235,15 @@ class TrackTile extends StatelessWidget {
                   ),
                 ),
 
-                Text(
-                  Formatters.formatDurationMs(track.durationMs),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
+                _maybeFixedWidth(
+                  columns != null,
+                  Text(
+                    Formatters.formatDurationMs(track.durationMs),
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
 
@@ -218,6 +272,49 @@ class TrackTile extends StatelessWidget {
           child: row,
         );
       },
+    );
+  }
+}
+
+/// 表格模式下时长固定列宽（与列表头的时钟图标对齐）；普通行保持自然宽度。
+Widget _maybeFixedWidth(bool fixed, Widget child) =>
+    fixed ? SizedBox(width: TrackTableColumns.durationWidth, child: child) : child;
+
+/// 表格里的文字列（艺人 / 专辑）：单行省略，右侧留出列间距；[onTap] 非空时悬停下划线、可点击。
+class _TextCell extends StatelessWidget {
+  final int flex;
+  final String text;
+  final TextStyle? style;
+  final VoidCallback? onTap;
+
+  const _TextCell({required this.flex, required this.text, this.style, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Text(text, style: style, maxLines: 1, overflow: TextOverflow.ellipsis);
+    final tap = onTap;
+    return Expanded(
+      flex: flex,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 16),
+        child: tap == null
+            ? label
+            : Align(
+                alignment: Alignment.centerLeft,
+                child: HoverBuilder(
+                  cursor: SystemMouseCursors.click,
+                  builder: (context, hovered) => GestureDetector(
+                    onTap: tap,
+                    child: Text(
+                      text,
+                      style: style?.copyWith(decoration: hovered ? TextDecoration.underline : null),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+      ),
     );
   }
 }

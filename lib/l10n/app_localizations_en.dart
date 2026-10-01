@@ -1038,4 +1038,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String shortcutOnHoveredTrack(String action) {
     return 'Hovered track: $action';
   }
+
+  @override
+  String get trackColumnTitle => 'Title';
+
+  @override
+  String get trackColumnArtist => 'Artist';
+
+  @override
+  String get trackColumnAlbum => 'Album';
+
+  @override
+  String get trackColumnAddedAt => 'Date added';
+
+  @override
+  String get trackColumnDuration => 'Duration';
+
+  @override
+  String get trackSortBy => 'Sort by';
+
+  @override
+  String get trackSortCustom => 'Custom order';
+
+  @override
+  String get trackViewAs => 'View as';
+
+  @override
+  String get trackViewList => 'List';
+
+  @override
+  String get trackViewCompact => 'Compact';
+
+  @override
+  String get trackSearchHint => 'Search in playlist';
+
+  @override
+  String get trackSearchClose => 'Close search';
+
+  @override
+  String trackSearchNoResults(String query) {
+    return 'Couldn\'t find \"$query\"';
+  }
+
+  @override
+  String get addedToday => 'Today';
+
+  @override
+  String addedDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days ago',
+      one: '1 day ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String addedWeeksAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count weeks ago',
+      one: '1 week ago',
+    );
+    return '$_temp0';
+  }
 }

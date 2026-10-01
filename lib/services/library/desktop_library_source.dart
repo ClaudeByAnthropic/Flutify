@@ -65,7 +65,14 @@ class DesktopLibrarySource implements LibrarySource {
   Future<List<SpotifyTrack>> fetchLikedTracks() async {
     if (!isSignedIn) return const [];
     final entries = await _collection(CollectionCodec.setCollection, 'track');
-    return _data.tracksByUris([for (final e in entries.take(trackLimit)) e.uri]);
+    final kept = entries.take(trackLimit).toList();
+    final tracks = await _data.tracksByUris([for (final e in kept) e.uri]);
+    // 收藏条目的 added_at 是秒；补全后的曲目按 id 对回去
+    final addedAt = {
+      for (final e in kept)
+        if (e.addedAt > 0) e.id: DateTime.fromMillisecondsSinceEpoch(e.addedAt * 1000),
+    };
+    return [for (final t in tracks) t.copyWith(addedAt: addedAt[t.id])];
   }
 
   @override

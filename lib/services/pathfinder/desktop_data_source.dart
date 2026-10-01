@@ -177,7 +177,10 @@ class DesktopDataSource {
             .then(PathfinderParsers.decoratedTracks),
       );
     }
-    final tracks = (await Future.wait(batches)).expand((t) => t).toList();
+    final tracks = [
+      for (final t in (await Future.wait(batches)).expand((t) => t))
+        t.copyWith(addedAt: parsed.addedAt['spotify:track:${t.id}']),
+    ];
 
     // 歌单无自定义封面时，与官方客户端一样用前几首曲目的专辑封面拼四宫格
     final playlist = parsed.playlist;

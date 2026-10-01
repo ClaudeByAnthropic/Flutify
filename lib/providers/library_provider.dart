@@ -241,7 +241,7 @@ class LibraryProvider extends ChangeNotifier {
   void toggleLike(SpotifyTrack track) {
     final liking = !_likedIds.contains(track.id);
     if (liking) {
-      _likedTracks = [track, ..._likedTracks];
+      _likedTracks = [track.copyWith(addedAt: DateTime.now()), ..._likedTracks];
     } else {
       _likedTracks = _likedTracks.where((t) => t.id != track.id).toList();
     }
@@ -305,7 +305,7 @@ class LibraryProvider extends ChangeNotifier {
     final playlist = _localPlaylists[index];
     if (playlist.tracks.any((t) => t.id == track.id)) return false;
 
-    final tracks = [...playlist.tracks, track];
+    final tracks = [...playlist.tracks, track.copyWith(addedAt: DateTime.now())];
     final updated = playlist.copyWith(
       tracks: tracks,
       totalTracks: tracks.length,

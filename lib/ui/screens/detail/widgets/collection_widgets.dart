@@ -84,20 +84,51 @@ class CollectionActionRow extends StatelessWidget {
   final List<SpotifyTrack> tracks;
   final PlaybackContext playbackContext;
 
-  const CollectionActionRow({super.key, required this.leading, required this.tracks, required this.playbackContext});
+  /// 靠右的工具（歌单页的搜索 / 排序）；可被压缩，空间不够时自身省略。
+  final Widget? trailing;
+
+  const CollectionActionRow({
+    super.key,
+    required this.leading,
+    required this.tracks,
+    required this.playbackContext,
+    this.trailing,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final shuffle = ShuffleButton(size: 26, inactiveColor: colorScheme.onSurfaceVariant);
     final play = ContextPlayButton(tracks: tracks, playbackContext: playbackContext);
+    final trailing = this.trailing;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= 600) {
-          return Row(children: [play, const SizedBox(width: 20), shuffle, const SizedBox(width: 4), ...leading]);
+          return Row(
+            children: [
+              play,
+              const SizedBox(width: 20),
+              shuffle,
+              const SizedBox(width: 4),
+              ...leading,
+              const SizedBox(width: 16),
+              // 占满剩余宽度并靠右：工具内部的输入框需要有界宽度
+              Expanded(child: Align(alignment: Alignment.centerRight, child: trailing)),
+            ],
+          );
         }
-        return Row(children: [...leading, const Spacer(), shuffle, const SizedBox(width: 8), play]);
+        // 窄：工具紧跟自定义按钮，可压缩，随机 + 播放键始终完整
+        return Row(
+          children: [
+            ...leading,
+            if (trailing != null) Flexible(child: Align(alignment: Alignment.centerLeft, child: trailing)),
+            const Spacer(),
+            shuffle,
+            const SizedBox(width: 8),
+            play,
+          ],
+        );
       },
     );
   }

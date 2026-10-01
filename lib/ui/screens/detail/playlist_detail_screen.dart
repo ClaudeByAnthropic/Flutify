@@ -9,9 +9,15 @@ import '../../../models/playlist.dart';
 import '../../../models/share_target.dart';
 import '../../../models/track.dart';
 import '../../../providers/library_provider.dart';
+import '../../../providers/preferences_provider.dart';
 import '../../../services/spotify_api_service.dart';
+import '../../shell/shell_breakpoints.dart';
 import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/share/share_button.dart';
+import '../../widgets/track_table/track_list_toolbar.dart';
+import '../../widgets/track_table/track_sort.dart';
+import '../../widgets/track_table/track_table_columns.dart';
+import '../../widgets/track_table/track_table_header.dart';
 import '../../widgets/track_tile.dart';
 import 'widgets/collection_hero.dart';
 import 'widgets/collection_widgets.dart';
@@ -33,6 +39,24 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   SpotifyPlaylist? _fetched;
   bool _loading = false;
   Object? _error;
+
+  /// 歌单内搜索与排序（只在本页有效，离开即重置，与官方一致）。
+  String _query = '';
+  TrackSort _sort = TrackSort.custom;
+
+  // 排序结果缓存：媒体库通知（点赞等）会重建本页，长歌单不必每次重排
+  List<SpotifyTrack>? _sortedFrom;
+  TrackSort? _sortedBy;
+  List<SpotifyTrack> _sorted = const [];
+
+  List<SpotifyTrack> _sortedTracks(List<SpotifyTrack> tracks) {
+    if (!identical(tracks, _sortedFrom) || _sort != _sortedBy) {
+      _sortedFrom = tracks;
+      _sortedBy = _sort;
+      _sorted = _sort.apply(tracks);
+    }
+    return _sorted;
+  }
 
   @override
   void initState() {
@@ -82,98 +106,185 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final songs = l10n.songCount(tracks.length);
     final summary = totalMs > 0 ? l10n.countAndDuration(songs, Formatters.formatLongDuration(l10n, totalMs)) : songs;
 
+    // 播放按排序后的顺序（与官方一致）；搜索只影响显示
+    final sorted = _sortedTracks(tracks);
+    final visible = TrackSort.filter(sorted, _query);
+    final hasAddedAt = tracks.any((t) => t.addedAt != null);
+    final desktop = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+    final compact = context.select<PreferencesProvider?, bool>((p) => p?.prefs.compactTrackList ?? false);
+
     return Scaffold(
-      body: CollectionTintScope(
-        imageUrl: isLikedSongs ? '' : playlist.coverUrl,
-        fallback: isLikedSongs ? const Color(0xFF4A2FB8) : const Color(0xFF3A3A48),
-        child: CustomScrollView(
-          slivers: [
-            CollectionHero(
-              typeLabel: l10n.typePlaylist,
-              title: title,
-              imageUrl: playlist.coverUrl,
-              coverOverride: isLikedSongs ? const _LikedSongsCover() : null,
-              meta: _PlaylistMeta(description: description, ownerName: playlist.ownerName, summary: summary),
-              collapsedAction: ContextPlayButton(
-                tracks: tracks,
-                playbackContext: playbackContext,
-                size: 44,
-                elevated: false,
-              ),
-            ),
-
-            SliverToBoxAdapter(
-              child: CollectionHeroFade(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  child: CollectionActionRow(
-                    tracks: tracks,
-                    playbackContext: playbackContext,
-                    leading: [
-                      if (!isLikedSongs && !isOwn)
-                        SaveToggleButton(saved: isSaved, onPressed: () => library.togglePlaylistSaved(playlist)),
-                      ShareButton(target: ShareTarget.playlist(playlist)),
-                      if (isOwn)
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_horiz_rounded, size: 28),
-                          tooltip: l10n.commonMoreOptions,
-                          onSelected: (value) {
-                            if (value == 'delete') {
-                              library.deletePlaylist(playlist.id);
-                              Navigator.pop(context);
-                            }
-                          },
-                          itemBuilder: (_) => [PopupMenuItem(value: 'delete', child: Text(l10n.playlistDelete))],
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            if (_loading)
-              const CollectionPlaceholder(loading: true)
-            else if (_error != null)
-              CollectionErrorPlaceholder(
-                signedOut: identical(_error, SpotifyDataException.notSignedIn),
-                onRetry: _fetch,
-              )
-            else if (tracks.isEmpty)
-              CollectionPlaceholder(
-                message: isLikedSongs
-                    ? l10n.playlistLikedEmpty
-                    : isOwn
-                    ? l10n.playlistOwnEmpty
-                    : l10n.playlistEmpty,
-                icon: isLikedSongs ? Icons.favorite_border_rounded : Icons.queue_music_rounded,
-              )
-            else
-              // 定高列表：行高由原型行量出（随字号缩放自适应）。长歌单滚动时不必逐行测量、
-              // 也不用估算总长度，滚动条比例稳定，拖动滚动条跳到中段也只布局可见行。
-              SliverPrototypeExtentList(
-                prototypeItem: TrackTile(track: tracks.first, index: tracks.length, showCover: true),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _buildTile(tracks, index, playbackContext, isOwn ? playlist.id : null),
-                  childCount: tracks.length,
-                ),
-              ),
-
-            const ContentBottomSpacer(),
-          ],
+      body: LayoutBuilder(
+        // 表格列随内容区宽度收起（只在窗口尺寸变化时重算）
+        builder: (context, box) => _buildBody(
+          context,
+          playlist: playlist,
+          tracks: tracks,
+          sorted: sorted,
+          visible: visible,
+          title: title,
+          description: description,
+          summary: summary,
+          isLikedSongs: isLikedSongs,
+          isOwn: isOwn,
+          isSaved: isSaved,
+          playbackContext: playbackContext,
+          hasAddedAt: hasAddedAt,
+          compact: desktop && compact,
+          columns: desktop ? TrackTableColumns.forWidth(box.maxWidth, compact: compact, hasAddedAt: hasAddedAt) : null,
         ),
       ),
     );
   }
 
-  Widget _buildTile(List<SpotifyTrack> tracks, int index, PlaybackContext ctx, String? ownPlaylistId) {
-    final track = tracks[index];
+  Widget _buildBody(
+    BuildContext context, {
+    required SpotifyPlaylist playlist,
+    required List<SpotifyTrack> tracks,
+    required List<SpotifyTrack> sorted,
+    required List<SpotifyTrack> visible,
+    required String title,
+    required String description,
+    required String summary,
+    required bool isLikedSongs,
+    required bool isOwn,
+    required bool isSaved,
+    required PlaybackContext playbackContext,
+    required bool hasAddedAt,
+    required bool compact,
+    required TrackTableColumns? columns,
+  }) {
+    final l10n = context.l10n;
+    final library = context.read<LibraryProvider>();
+    return CollectionTintScope(
+      imageUrl: isLikedSongs ? '' : playlist.coverUrl,
+      fallback: isLikedSongs ? const Color(0xFF4A2FB8) : const Color(0xFF3A3A48),
+      child: CustomScrollView(
+        slivers: [
+          CollectionHero(
+            typeLabel: l10n.typePlaylist,
+            title: title,
+            imageUrl: playlist.coverUrl,
+            coverOverride: isLikedSongs ? const _LikedSongsCover() : null,
+            meta: _PlaylistMeta(description: description, ownerName: playlist.ownerName, summary: summary),
+            collapsedAction: ContextPlayButton(
+              tracks: sorted,
+              playbackContext: playbackContext,
+              size: 44,
+              elevated: false,
+            ),
+          ),
+
+          SliverToBoxAdapter(
+            child: CollectionHeroFade(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: CollectionActionRow(
+                  tracks: sorted,
+                  playbackContext: playbackContext,
+                  trailing: tracks.isEmpty
+                      ? null
+                      : TrackListToolbar(
+                          query: _query,
+                          onQueryChanged: (q) => setState(() => _query = q),
+                          sort: _sort,
+                          onSortChanged: (s) => setState(() => _sort = s),
+                          hasAddedAt: hasAddedAt,
+                          compact: compact,
+                          onCompactChanged: columns == null ? null : _setCompact,
+                        ),
+                  leading: [
+                    if (!isLikedSongs && !isOwn)
+                      SaveToggleButton(saved: isSaved, onPressed: () => library.togglePlaylistSaved(playlist)),
+                    ShareButton(target: ShareTarget.playlist(playlist)),
+                    if (isOwn)
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_horiz_rounded, size: 28),
+                        tooltip: l10n.commonMoreOptions,
+                        onSelected: (value) {
+                          if (value == 'delete') {
+                            library.deletePlaylist(playlist.id);
+                            Navigator.pop(context);
+                          }
+                        },
+                        itemBuilder: (_) => [PopupMenuItem(value: 'delete', child: Text(l10n.playlistDelete))],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          if (_loading)
+            const CollectionPlaceholder(loading: true)
+          else if (_error != null)
+            CollectionErrorPlaceholder(signedOut: identical(_error, SpotifyDataException.notSignedIn), onRetry: _fetch)
+          else if (tracks.isEmpty)
+            CollectionPlaceholder(
+              message: isLikedSongs
+                  ? l10n.playlistLikedEmpty
+                  : isOwn
+                  ? l10n.playlistOwnEmpty
+                  : l10n.playlistEmpty,
+              icon: isLikedSongs ? Icons.favorite_border_rounded : Icons.queue_music_rounded,
+            )
+          else ...[
+            if (columns != null)
+              TrackTableHeader(columns: columns, sort: _sort, onSort: (key) => setState(() => _sort = _sort.tap(key))),
+            if (visible.isEmpty)
+              CollectionPlaceholder(message: l10n.trackSearchNoResults(_query.trim()), icon: Icons.search_off_rounded)
+            else
+              // 定高列表：行高由原型行量出（随字号缩放自适应）。长歌单滚动时不必逐行测量、
+              // 也不用估算总长度，滚动条比例稳定，拖动滚动条跳到中段也只布局可见行。
+              SliverPrototypeExtentList(
+                prototypeItem: TrackTile(
+                  track: visible.first,
+                  index: visible.length,
+                  showCover: true,
+                  columns: columns,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildTile(
+                    visible[index],
+                    index,
+                    queue: sorted,
+                    ctx: playbackContext,
+                    columns: columns,
+                    ownPlaylistId: isOwn ? playlist.id : null,
+                  ),
+                  childCount: visible.length,
+                ),
+              ),
+          ],
+
+          const ContentBottomSpacer(),
+        ],
+      ),
+    );
+  }
+
+  void _setCompact(bool compact) {
+    final prefs = context.read<PreferencesProvider>();
+    prefs.update(prefs.prefs.copyWith(compactTrackList: compact));
+  }
+
+  /// [queue] 是排序后的完整歌单（搜索时也从完整列表接着播），[index] 是在显示列表里的位置。
+  Widget _buildTile(
+    SpotifyTrack track,
+    int index, {
+    required List<SpotifyTrack> queue,
+    required PlaybackContext ctx,
+    required TrackTableColumns? columns,
+    required String? ownPlaylistId,
+  }) {
     final tile = TrackTile(
       key: ValueKey(track.id),
       track: track,
       index: index + 1,
       showCover: true,
-      contextQueue: tracks,
+      contextQueue: queue,
       playbackContext: ctx,
+      columns: columns,
     );
     if (ownPlaylistId == null) return tile;
 

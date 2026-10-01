@@ -47,7 +47,9 @@ class WebApiLibrarySource implements LibrarySource {
     return [
       for (final item in items)
         if (item is Map<String, dynamic> && item['track'] is Map<String, dynamic>)
-          SpotifyTrack.fromJson(item['track'] as Map<String, dynamic>),
+          SpotifyTrack.fromJson(
+            item['track'] as Map<String, dynamic>,
+          ).copyWith(addedAt: SpotifyTrack.parseAddedAt(item['added_at'])),
     ];
   }
 

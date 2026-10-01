@@ -341,5 +341,21 @@
   "sleepTimerEndOfTrackActive": "Sleep timer: pausing at end of track",
   "toastSleepTimerSet": "Sleep timer set: {label}",
   "toastSleepTimerOff": "Sleep timer turned off",
-  "shortcutOnHoveredTrack": "Hovered track: {action}"
+  "shortcutOnHoveredTrack": "Hovered track: {action}",
+  "trackColumnTitle": "Title",
+  "trackColumnArtist": "Artist",
+  "trackColumnAlbum": "Album",
+  "trackColumnAddedAt": "Date added",
+  "trackColumnDuration": "Duration",
+  "trackSortBy": "Sort by",
+  "trackSortCustom": "Custom order",
+  "trackViewAs": "View as",
+  "trackViewList": "List",
+  "trackViewCompact": "Compact",
+  "trackSearchHint": "Search in playlist",
+  "trackSearchClose": "Close search",
+  "trackSearchNoResults": "Couldn't find \"{query}\"",
+  "addedToday": "Today",
+  "addedDaysAgo": "{count, plural, =1{1 day ago} other{{count} days ago}}",
+  "addedWeeksAgo": "{count, plural, =1{1 week ago} other{{count} weeks ago}}"
 }
