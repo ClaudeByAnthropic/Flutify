@@ -1088,6 +1088,12 @@ abstract class AppLocalizations {
   /// **'操作未成功：免费账号可能不支持远程执行此操作'**
   String get connectCommandFailed;
 
+  /// No description provided for @connectVolumeUnsupported.
+  ///
+  /// In zh, this message translates to:
+  /// **'{device} 不支持远程调节音量'**
+  String connectVolumeUnsupported(String device);
+
   /// No description provided for @connectVolume.
   ///
   /// In zh, this message translates to:

@@ -561,6 +561,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'That didn\'t work: free accounts may not support this remote action';
 
   @override
+  String connectVolumeUnsupported(String device) {
+    return '$device doesn\'t support remote volume control';
+  }
+
+  @override
   String get connectVolume => 'Device volume';
 
   @override

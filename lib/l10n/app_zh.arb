@@ -239,6 +239,12 @@
   "connectOffline": "连接已断开，正在重试…",
   "connectSameNetwork": "同一网络",
   "connectCommandFailed": "操作未成功：免费账号可能不支持远程执行此操作",
+  "connectVolumeUnsupported": "{device} 不支持远程调节音量",
+  "@connectVolumeUnsupported": {
+    "placeholders": {
+      "device": { "type": "String" }
+    }
+  },
   "connectVolume": "设备音量",
 
   "trackAddToPlaylist": "添加到歌单",

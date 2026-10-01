@@ -5,6 +5,7 @@ import 'package:flutify_app/providers/playback_provider.dart';
 import 'package:flutify_app/services/media_controls/media_controls_sync.dart';
 import 'package:flutify_app/services/media_controls/system_media_controls.dart';
 import 'package:flutify_app/services/storage_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,6 +33,41 @@ class _FakeControls implements SystemMediaControls {
 
   @override
   void dispose() => controller.close();
+}
+
+/// 替代来源：手动切换是否接管，记录收到的按键。
+class _FakeOverride extends ChangeNotifier implements MediaSourceOverride {
+  bool _active = false;
+  final List<MediaControlEvent> handled = [];
+
+  void set({required bool active}) {
+    _active = active;
+    notifyListeners();
+  }
+
+  @override
+  Listenable get changes => this;
+
+  @override
+  final ValueNotifier<Duration> position = ValueNotifier(Duration.zero);
+
+  @override
+  bool get active => _active;
+
+  @override
+  MediaTrackInfo? get track =>
+      const MediaTrackInfo(id: 'r1', title: 'Remote Song', artist: 'R', album: 'R', artUrl: '', duration: Duration(minutes: 3));
+
+  @override
+  MediaPlaybackInfo get playbackInfo =>
+      const MediaPlaybackInfo(playing: true, buffering: false, position: Duration.zero, canNext: true, canPrevious: true);
+
+  @override
+  bool handle(MediaControlEvent event) {
+    if (!_active) return false;
+    handled.add(event);
+    return true;
+  }
 }
 
 void main() {
@@ -76,6 +112,25 @@ void main() {
     audio.positionController.add(const Duration(seconds: 90));
     expect(controls.playbacks.length, count + 1);
     expect(controls.playbacks.last.position, const Duration(seconds: 90));
+  });
+
+  test('替代来源接管时卡片显示它的曲目，按键交给它；退出后回到本机', () async {
+    await playback.playTrack(a, contextQueue: [a, b]);
+    final remote = _FakeOverride();
+    sync.override = remote;
+    expect(controls.tracks.last?.title, a.name); // 未接管：仍是本机
+
+    remote.set(active: true);
+    expect(controls.tracks.last?.title, 'Remote Song');
+    expect(controls.playbacks.last.playing, isTrue);
+
+    controls.controller.add(const MediaButtonEvent(MediaButton.next));
+    await Future<void>.delayed(Duration.zero);
+    expect(remote.handled, hasLength(1));
+    expect(playback.currentTrack?.id, a.id);
+
+    remote.set(active: false);
+    expect(controls.tracks.last?.title, a.name);
   });
 
   test('系统按键转给播放器', () async {

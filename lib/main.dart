@@ -22,7 +22,7 @@ import 'providers/sleep_timer_provider.dart';
 import 'providers/spotify_provider.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
-import 'services/media_controls/connect_media_redirect.dart';
+import 'services/media_controls/connect_media_source.dart';
 import 'services/media_controls/media_controls_sync.dart';
 import 'services/media_controls/system_media_controls.dart';
 import 'services/playback_session_store.dart';
@@ -180,8 +180,8 @@ class FlutifyApp extends StatelessWidget {
               available: () => spotifyApiService.supportsConnect && ctx.read<PreferencesProvider>().prefs.connectEnabled,
               resolveTrack: spotifyApiService.getTrackByUri,
             );
-            // 在其他设备上播放时，系统媒体键控制那台设备
-            mediaSync?.redirect = connectMediaRedirect(connect, playback);
+            // 在其他设备上播放时，系统媒体卡片显示并控制那台设备
+            mediaSync?.override = ConnectMediaSource(connect, playback);
             // 本机开始播放 → 控制权回到本机（远程暂停后按键不再发给远程）；两者与 App 同生命周期
             playback.addListener(() {
               if (playback.isPlaying) connect.localPlaybackStarted();

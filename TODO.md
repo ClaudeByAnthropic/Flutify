@@ -153,6 +153,9 @@ Spotify 新版桌面三栏布局 + MD3E 质感；跟随系统深浅色；自绘�
       系统按钮回传）。Windows 走自写 C++/WinRT SMTC（`windows/runner/media_controls.cpp`，通道 `flutify/media_controls`）：
       任务栏 / 锁屏 / 音量浮层媒体卡片、键盘媒体键、进度条拖动；Android / iOS 走 audio_service（通知栏 / 锁屏控件，
       `MainActivity` 改继承 `AudioServiceActivity`，Manifest 加前台服务与权限）
+- [x] 媒体卡片跟随 Connect：`MediaSourceOverride` 接口 + `ConnectMediaSource`。在其他设备上播放时（与播放栏远程模式同一规则，
+      `ConnectProvider.controlsRemote`）卡片显示远程曲目 / 状态 / 进度，媒体键与卡片按钮发给远程设备；
+      控制权跟随「最后出声的一方」，暂停远程后按空格 / 播放键仍继续远程，本机开始播放才交回本机
 - [x] Win11 分屏布局：`windows/runner/snap_layout.cpp` + `ui/shell/desktop/snap_layout_bridge.dart`。
       Dart 报告最大化按钮位置，原生在 `WM_NCHITTEST` 返回 `HTMAXBUTTON`（Flutter 子窗口对该区域返回 `HTTRANSPARENT`），
       系统据此弹出分屏布局；悬停 / 按下 / 点击由原生转回 Dart 驱动按钮外观与最大化

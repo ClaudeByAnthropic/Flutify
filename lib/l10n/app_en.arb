@@ -182,6 +182,12 @@
   "connectOffline": "Connection lost, retrying…",
   "connectSameNetwork": "Same network",
   "connectCommandFailed": "That didn't work: free accounts may not support this remote action",
+  "connectVolumeUnsupported": "{device} doesn't support remote volume control",
+  "@connectVolumeUnsupported": {
+    "placeholders": {
+      "device": { "type": "String" }
+    }
+  },
   "connectVolume": "Device volume",
 
   "trackAddToPlaylist": "Add to playlist",

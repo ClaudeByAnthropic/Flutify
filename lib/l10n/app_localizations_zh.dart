@@ -546,6 +546,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connectCommandFailed => '操作未成功：免费账号可能不支持远程执行此操作';
 
   @override
+  String connectVolumeUnsupported(String device) {
+    return '$device 不支持远程调节音量';
+  }
+
+  @override
   String get connectVolume => '设备音量';
 
   @override

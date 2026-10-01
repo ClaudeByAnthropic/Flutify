@@ -8,7 +8,7 @@ import 'package:flutify_app/providers/library_provider.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
 import 'package:flutify_app/providers/spotify_provider.dart';
 import 'package:flutify_app/services/connect/connect_service.dart';
-import 'package:flutify_app/services/media_controls/connect_media_redirect.dart';
+import 'package:flutify_app/services/media_controls/connect_media_source.dart';
 import 'package:flutify_app/services/media_controls/system_media_controls.dart';
 import 'package:flutify_app/ui/widgets/connect/playback_shortcuts.dart';
 import 'package:flutify_app/services/spotify_api_service.dart';
@@ -113,13 +113,18 @@ class FakeConnectService implements ConnectService {
 }
 
 /// 只使用合成数据的 cluster：一台正在播放的音箱 + 一台空闲手机。
-ConnectCluster syntheticCluster({bool playing = true, bool withActive = true, bool withOthers = true}) {
-  const speaker = ConnectDevice(
+ConnectCluster syntheticCluster({
+  bool playing = true,
+  bool withActive = true,
+  bool withOthers = true,
+  int volumeSteps = 64,
+}) {
+  final speaker = ConnectDevice(
     id: 'synthetic-speaker',
     name: 'Synthetic Living Room Speaker With A Long Name',
     type: ConnectDeviceType.speaker,
     volume: 0.4,
-    volumeSteps: 64,
+    volumeSteps: volumeSteps,
   );
   const phone = ConnectDevice(id: 'synthetic-phone', name: 'Synthetic Phone', type: ConnectDeviceType.smartphone);
   return ConnectCluster(
@@ -305,6 +310,15 @@ void main() {
       await unmount(tester);
     });
 
+    testWidgets('volume keys explain when the remote device has fixed volume', (tester) async {
+      await pumpHost(tester, const Size(1280, 700), host, cluster: syntheticCluster(volumeSteps: 0));
+      await ctrl(tester, LogicalKeyboardKey.arrowUp);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(service.commands, isEmpty);
+      expect(find.text(zh.connectVolumeUnsupported('Synthetic Living Room Speaker With A Long Name')), findsOneWidget);
+      await unmount(tester);
+    });
+
     testWidgets('control this device when nothing plays elsewhere', (tester) async {
       await pumpHost(tester, const Size(1280, 700), host, cluster: syntheticCluster(withActive: false));
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
@@ -335,20 +349,25 @@ void main() {
       connect.dispose();
     });
 
-    testWidgets('media keys go to the remote device only in remote mode', (tester) async {
+    testWidgets('media card shows and controls the remote device only in remote mode', (tester) async {
       await pumpHost(tester, const Size(1280, 700), host, cluster: syntheticCluster());
       final context = tester.element(find.byType(SizedBox).last);
-      final redirect = connectMediaRedirect(context.read<ConnectProvider>(), context.read<PlaybackProvider>());
+      final source = ConnectMediaSource(context.read<ConnectProvider>(), context.read<PlaybackProvider>());
 
-      expect(redirect(const MediaButtonEvent(MediaButton.toggle)), isTrue);
-      expect(redirect(const MediaButtonEvent(MediaButton.play)), isTrue); // 已在播放：不重复发送
-      expect(redirect(const MediaButtonEvent(MediaButton.next)), isTrue);
+      expect(source.active, isTrue);
+      expect(source.track?.title, 'A Synthetic Remote Track With A Fairly Long Title');
+      expect(source.playbackInfo.playing, isTrue);
+
+      expect(source.handle(const MediaButtonEvent(MediaButton.toggle)), isTrue);
+      expect(source.handle(const MediaButtonEvent(MediaButton.play)), isTrue); // 已在播放：不重复发送
+      expect(source.handle(const MediaButtonEvent(MediaButton.next)), isTrue);
       await tester.pump();
       expect(service.commands, ['pause:synthetic-speaker', 'next:synthetic-speaker']);
 
       service.push(syntheticCluster(withActive: false));
       await tester.pump();
-      expect(redirect(const MediaButtonEvent(MediaButton.toggle)), isFalse);
+      expect(source.active, isFalse);
+      expect(source.handle(const MediaButtonEvent(MediaButton.toggle)), isFalse);
       await unmount(tester);
     });
   });
