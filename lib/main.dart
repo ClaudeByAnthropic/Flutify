@@ -20,6 +20,7 @@ import 'services/spotify_api_service.dart';
 import 'services/storage_service.dart';
 import 'ui/screens/main_shell.dart';
 import 'ui/shell/desktop/desktop_window.dart';
+import 'ui/shell/desktop/window_frame.dart';
 import 'ui/widgets/dynamic_accent_sync.dart';
 
 Future<void> main() async {
@@ -155,6 +156,9 @@ class _ThemedApp extends StatelessWidget {
       themeMode: settings.themeMode,
       darkTheme: appearance.theme(Brightness.dark),
       theme: appearance.theme(Brightness.light),
+      // 不做主题插值动画：默认 200ms 内每帧 lerp 整套 ThemeData 并重建全树，
+      // 在设置页切换选项时会明显卡顿；改为单帧切换
+      themeAnimationDuration: Duration.zero,
       builder: (context, child) {
         final media = MediaQuery.of(context);
         return MediaQuery(
@@ -166,7 +170,8 @@ class _ThemedApp extends StatelessWidget {
           // 状态栏 / 导航栏图标随深浅色切换；全屏播放器等深色沉浸页面自行覆盖为浅色图标
           child: AnnotatedRegion<SystemUiOverlayStyle>(
             value: systemBarsStyle(Theme.of(context).brightness),
-            child: child!,
+            // 桌面：窗口按钮 / 窄窗口标题条覆盖在所有路由之上
+            child: WindowFrame(child: child!),
           ),
         );
       },

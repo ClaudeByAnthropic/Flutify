@@ -106,18 +106,21 @@ class AccountProfileService {
     return value;
   }
 
-  /// 内部资料接口 `user-profile-view/v3/profile/me`（桌面版会话使用）。
+  /// 内部资料接口 `user-profile-view/v3/profile/{username}`（桌面版会话使用）。
   ///
   /// 桌面版 client_id 为众多客户端共用，公开 Web API 常年处于 429 限流，内部接口不受影响。
+  /// 注意：路径里必须是真实用户名——`profile/me` 会被当作用户名为 "me" 的另一个账号。
   Future<AccountProfile?> fetchProfileView({
+    required String username,
     required String accessToken,
     required String clientToken,
     required SpotifyClientProfile profile,
   }) async {
+    if (username.isEmpty) return null;
     try {
       final res = await _client.get(
-        Uri.parse('${SpotifyEndpoints.defaultSpClientBase}/user-profile-view/v3/profile/me'
-            '?playlist_limit=0&artist_limit=0'),
+        Uri.parse('${SpotifyEndpoints.defaultSpClientBase}/user-profile-view/v3/profile/'
+            '${Uri.encodeComponent(username)}?playlist_limit=0&artist_limit=0'),
         headers: {
           'Authorization': 'Bearer $accessToken',
           if (clientToken.isNotEmpty) 'client-token': clientToken,

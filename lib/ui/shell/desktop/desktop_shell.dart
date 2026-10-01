@@ -28,104 +28,121 @@ class DesktopShell extends StatelessWidget {
 
   const DesktopShell({super.key, required this.pages, required this.topBar});
 
+  /// 桌面端底部提示（SnackBar）的宽度：水平居中、不铺满整个窗口。
+  static const double toastWidth = 440;
+
+  /// 按基础主题缓存「带桌面提示宽度」的主题：拖动侧栏时本组件每帧重建，
+  /// 每次都 new 一个 ThemeData 会让所有依赖主题的子组件跟着重建。
+  static final Expando<ThemeData> _toastThemes = Expando('desktopToastTheme');
+
+  static ThemeData _withToastWidth(ThemeData base) =>
+      _toastThemes[base] ??= base.copyWith(snackBarTheme: base.snackBarTheme.copyWith(width: toastWidth));
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final layout = context.watch<ShellLayoutController>();
     const gutter = ShellBreakpoints.gutter;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
-      body: Column(
-        children: [
-          topBar,
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final forcedCompact = width < ShellBreakpoints.sidebarExpandable;
-                final compact = forcedCompact || layout.sidebarCollapsed;
-                final sidebarWidth = compact ? ShellBreakpoints.sidebarCollapsed : layout.sidebarWidth;
-                final rightOpen = layout.rightPanelVisible;
-                final rightDocked = layout.docked;
+    // 提示的位置由当前布局决定，而不是在弹出那一刻按窗口宽度算死：
+    // - 播放栏作为 bottomNavigationBar，Scaffold 自动把悬浮提示放在它上方；
+    // - 宽度来自主题，窗口拖窄（< 宽度）时 Scaffold 自动改为铺满，切到手机布局后也不残留桌面边距。
+    return Theme(
+      data: _withToastWidth(theme),
+      child: Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
+        bottomNavigationBar: const DesktopPlayerBar(),
+        body: Column(
+          children: [
+            topBar,
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final forcedCompact = width < ShellBreakpoints.sidebarExpandable;
+                  final compact = forcedCompact || layout.sidebarCollapsed;
+                  final sidebarWidth = compact ? ShellBreakpoints.sidebarCollapsed : layout.sidebarWidth;
+                  final rightOpen = layout.rightPanelVisible;
+                  final rightDocked = layout.docked;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: gutter),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutCubic,
-                        width: sidebarWidth,
-                        // 宽度动画过程中按实际宽度选布局：不足展开最小宽度时一律按收起样式绘制，
-                        // 避免展开布局被压缩溢出
-                        child: LayoutBuilder(
-                          builder: (context, box) => LibrarySidebar(
-                            compact: compact || box.maxWidth < ShellBreakpoints.sidebarMin,
-                            onToggleCompact: forcedCompact ? null : layout.toggleSidebar,
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: gutter),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          width: sidebarWidth,
+                          // 宽度动画过程中按实际宽度选布局：不足展开最小宽度时一律按收起样式绘制，
+                          // 避免展开布局被压缩溢出
+                          child: LayoutBuilder(
+                            builder: (context, box) => LibrarySidebar(
+                              compact: compact || box.maxWidth < ShellBreakpoints.sidebarMin,
+                              onToggleCompact: forcedCompact ? null : layout.toggleSidebar,
+                            ),
                           ),
                         ),
-                      ),
-                      if (compact)
-                        const SizedBox(width: gutter)
-                      else
-                        PanelResizeHandle(
-                          onDrag: (dx) => layout.setSidebarWidth(layout.sidebarWidth + dx),
-                          onDragEnd: () => layout.setSidebarWidth(layout.sidebarWidth, persist: true),
-                        ),
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            Positioned.fill(child: PanelSurface(child: pages)),
-                            // 窄窗口：右栏浮于内容之上；点击浮层外或按 Esc 关闭
-                            if (rightOpen && !rightDocked)
-                              Positioned.fill(
-                                child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: layout.closeRightPanel,
-                                ),
-                              ),
-                            if (rightOpen && !rightDocked)
-                              Positioned(
-                                top: 0,
-                                bottom: 0,
-                                right: 0,
-                                width: ShellBreakpoints.nowPlayingWidth,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    borderRadius: PanelSurface.radiusOf(context),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withAlpha(90),
-                                        blurRadius: 32,
-                                        offset: const Offset(-8, 0),
-                                      ),
-                                    ],
-                                  ),
-                                  child: CallbackShortcuts(
-                                    bindings: {
-                                      const SingleActivator(LogicalKeyboardKey.escape): layout.closeRightPanel,
-                                    },
-                                    child: const Focus(autofocus: true, child: NowPlayingPanel()),
+                        if (compact)
+                          const SizedBox(width: gutter)
+                        else
+                          PanelResizeHandle(
+                            onDrag: (dx) => layout.setSidebarWidth(layout.sidebarWidth + dx),
+                            onDragEnd: () => layout.setSidebarWidth(layout.sidebarWidth, persist: true),
+                          ),
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              Positioned.fill(child: PanelSurface(child: pages)),
+                              // 窄窗口：右栏浮于内容之上；点击浮层外或按 Esc 关闭
+                              if (rightOpen && !rightDocked)
+                                Positioned.fill(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: layout.closeRightPanel,
                                   ),
                                 ),
-                              ),
-                          ],
+                              if (rightOpen && !rightDocked)
+                                Positioned(
+                                  top: 0,
+                                  bottom: 0,
+                                  right: 0,
+                                  width: ShellBreakpoints.nowPlayingWidth,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      borderRadius: PanelSurface.radiusOf(context),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withAlpha(90),
+                                          blurRadius: 32,
+                                          offset: const Offset(-8, 0),
+                                        ),
+                                      ],
+                                    ),
+                                    child: CallbackShortcuts(
+                                      bindings: {
+                                        const SingleActivator(LogicalKeyboardKey.escape): layout.closeRightPanel,
+                                      },
+                                      child: const Focus(autofocus: true, child: NowPlayingPanel()),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      if (rightOpen && rightDocked) ...[
-                        const SizedBox(width: gutter),
-                        const SizedBox(width: ShellBreakpoints.nowPlayingWidth, child: NowPlayingPanel()),
+                        if (rightOpen && rightDocked) ...[
+                          const SizedBox(width: gutter),
+                          const SizedBox(width: ShellBreakpoints.nowPlayingWidth, child: NowPlayingPanel()),
+                        ],
                       ],
-                    ],
-                  ),
-                );
-              },
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-          const DesktopPlayerBar(),
-        ],
+          ],
+        ),
       ),
     );
   }

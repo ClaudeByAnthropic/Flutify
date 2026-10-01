@@ -6,6 +6,7 @@ import '../../models/category.dart';
 import '../../models/image.dart';
 import '../../models/playlist.dart';
 import '../../models/track.dart';
+import '../library/playlist_cover.dart';
 
 /// 把桌面端内部接口（Pathfinder GraphQL / spclient playlist v2）的响应转换为 App 数据模型。
 ///
@@ -149,22 +150,6 @@ class PathfinderParsers {
   // 页面
   // ---------------------------------------------------------------------------
 
-  /// home：按分区顺序收集歌单卡片（去重），用于主页各卡架。
-  static List<SpotifyPlaylist> homePlaylists(Map<String, dynamic> data, {int max = 30}) {
-    final sections = _list(_map(_map(_map(data['home'])?['sectionContainer'])?['sections'])?['items']);
-    final seen = <String>{};
-    final result = <SpotifyPlaylist>[];
-    for (final section in sections) {
-      for (final item in _list(_map(_map(section)?['sectionItems'])?['items'])) {
-        final p = playlist(_map(item)?['content']);
-        if (p == null || !seen.add(p.uri)) continue;
-        result.add(p);
-        if (result.length >= max) return result;
-      }
-    }
-    return result;
-  }
-
   /// browseAll：分类卡片（标题、封面、底色）。id 为 `spotify:page:*`。
   static List<SpotifyCategory> categories(Map<String, dynamic> data) {
     final result = <SpotifyCategory>[];
@@ -238,12 +223,6 @@ class PathfinderParsers {
   static ({SpotifyPlaylist playlist, List<String> trackUris})? playlistV2(String id, Map<String, dynamic> json) {
     final attributes = _map(json['attributes']);
     if (attributes == null) return null;
-    // pictureSize：[{targetName: default|large|small, url}]，优先大图
-    final pictures = _list(attributes['pictureSize']).map(_map).whereType<Map<String, dynamic>>().toList();
-    Map<String, dynamic>? picture;
-    for (final target in const ['large', 'default', 'small']) {
-      picture ??= pictures.where((p) => p['targetName'] == target).firstOrNull;
-    }
     final owner = json['ownerUsername'] as String? ?? '';
     final uris = _list(_map(json['contents'])?['items'])
         .map((i) => _map(i)?['uri'])
@@ -257,7 +236,7 @@ class PathfinderParsers {
         uri: 'spotify:playlist:$id',
         description: stripHtml(attributes['description'] as String? ?? ''),
         ownerName: owner.isEmpty || owner == 'spotify' ? 'Spotify' : owner,
-        images: picture?['url'] is String ? [SpotifyImage(url: picture!['url'] as String)] : const [],
+        images: PlaylistCover.fromAttributes(attributes),
         totalTracks: _int(json['length']) ?? uris.length,
       ),
       trackUris: uris,

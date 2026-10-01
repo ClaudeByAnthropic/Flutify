@@ -69,12 +69,42 @@ Spotify 新版桌面三栏布局 + MD3E 质感；跟随系统深浅色；自绘�
 - [ ] 沉浸式歌词进入 / 退出系统全屏是否顺滑（Windows），退出后窗口是否回到原大小
 - [ ] 玻璃模糊调到最大时 Android 上的流畅度；跟随封面取色在浅色主题下的对比度
 
+## 已完成 ④：实机反馈修复（测试全部通过，**待用户实机复测**）
+
+- [x] 桌面版会话缺用户名 → 「已点赞歌曲」/ 歌单根列表为空：登录后用令牌登录 AP 取 canonical username
+      （`SpotifyAuthService._usernameFromAccessPoint`，可注入 `usernameResolver` 便于测试）；旧会话启动时自动补齐并重载媒体库
+- [x] 昵称显示成别人（Micael Widell）：`profile/me` 是用户名为 "me" 的账号，改为 `profile/{用户名}`
+- [x] 桌面设置页嵌入内容区（保留顶栏、窗口按钮），大标题 + 横向设置行，内容区够宽时双栏
+- [x] 窗口外框 `shell/desktop/window_frame.dart`：窗口按钮在所有路由之上；最小窗口 360×600，窄窗口为移动端布局 + 32px 标题条
+- [x] 设置页卡顿：关闭主题插值动画（`themeAnimationDuration: Duration.zero`）；滑杆拖动只局部预览、松手提交
+- [x] 播放失败提示改为 MD3E 悬浮卡（`snackBarTheme` + 错误类型图标），桌面端居中在播放栏之上
+
+- [x] 连续 3 首无法播放自动暂停（设置 →「播放」，默认开启，提示带「下一首」）
+- [x] 布局兜底：强调色色板临界宽度溢出修复；主页快捷网格行高随字号放大；
+      `test/ui/layout_sweep_test.dart` 在 320 – 1440 共 15 个宽度 × 两档字号下检查溢出
+- [x] 底部提示兜底：位置改由外壳决定（桌面播放栏作 bottomNavigationBar + 主题限宽 440），
+      不再在弹出时按窗口宽度算死边距；带按钮的提示 7 秒自动收起；
+      `test/ui/snackbar_sweep_test.dart` 弹出后拖过断点 / 最小窗口，检查文字可读、卡片不出界
+- [x] 头像统一为 `widgets/user_avatar.dart`：无头像时首字 + 按用户名固定的底色，不随强调色 / 封面取色变化
+- [x] 歌单封面：支持上传封面 `attributes.picture`（Base64 图片 ID）；无封面的自建歌单用前几首曲目专辑封面拼四宫格
+      （`services/library/playlist_cover.dart`）
+- [x] 主页按官方结构重做（`services/pathfinder/home_parser.dart` + `ui/screens/home/widgets/`）：
+      吸顶筛选标签（服务端 homeChips，含二级标签）、快捷入口（最多 8 个）、普通卡架（艺人头像 / 显示全部）、
+      最近播放、推荐流网格（FeedBaseline 合并 + 推荐理由，只显示整行）；请求带 `Accept-Language: zh-CN`，
+      问候语 / 分区标题 / 标签由服务端本地化；`test/ui/home_layout_test.dart` 填满数据扫 15 宽度 × 两档字号
+
+### 需要用户在实机上看的
+
+- [ ] 重启后昵称 / 头像是否为本人、「已点赞歌曲」是否出现
+- [ ] 主页 / 音乐库里之前没图的两个歌单是否显示封面
+- [ ] 窄窗口（< 800）下的标题条拖动、窗口按钮；右键菜单位置是否准确
+
 ## 其他待办 / 优化
 
-- [ ] 主页「最近播放」：目前快捷网格是媒体库前 7 个歌单，可改为真实播放历史（`recently-played` / 本机记录）
+- [ ] 主页顶部渐变：随快捷入口悬停的封面取色变化（官方桌面端效果）
+- [ ] 主页播客 / 单集：目前只展示，点按提示暂不支持
 - [ ] 音乐库「按字母顺序」改为按拼音排序（左栏 `library_sidebar_entry.dart` 与移动端 `library_screen.dart` 两处）
 - [ ] 登录页的中文文案迁入 ARB（账号卡片已完成）
 - [ ] 外观设置跨设备同步（目前仅本机）；沉浸式歌词支持逐字歌词（需 color-lyrics 的 syllable 数据）
-- [ ] 主页按官方分区显示（带分区标题）
 - [ ] Spotify Connect 设备列表（dealer / connect-state）
 - [ ] 桌面客户端升级后 Pathfinder hash 失效检测与提示

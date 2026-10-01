@@ -103,15 +103,20 @@ class DesktopLibrarySource implements LibrarySource {
     }
     final playlists = RootlistParser.parse(json);
 
-    // rootlist 未带元数据（名称为空）的条目补查概要，失败则保留空名称条目由 UI 按「未命名」显示
+    // rootlist 未带元数据（名称为空）的条目补查概要；仍无封面（未设置封面的自建歌单）
+    // 用前几首曲目的专辑封面拼四宫格。任一步失败都保留原条目，UI 显示「未命名」/ 占位图标
     return _pooled(playlists, 4, (p) async {
-      if (p.name.isNotEmpty) return p;
+      var result = p;
       try {
-        final summary = await _data.playlistSummary(p.id);
-        return summary ?? p;
+        if (result.name.isEmpty) result = await _data.playlistSummary(p.id) ?? result;
+        if (result.images.isEmpty) {
+          final cover = await _data.playlistMosaic(p.id);
+          if (cover.isNotEmpty) result = result.copyWith(images: cover);
+        }
       } catch (_) {
-        return p;
+        // 封面 / 名称只是装饰，失败不影响歌单列表
       }
+      return result;
     });
   }
 

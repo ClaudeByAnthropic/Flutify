@@ -8,12 +8,12 @@ import '../../../models/album.dart';
 import '../../../models/artist.dart';
 import '../../../models/playlist.dart';
 import '../../../providers/library_provider.dart';
-import '../../../providers/spotify_provider.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/create_playlist_dialog.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/filter_pill.dart';
+import '../../widgets/user_avatar.dart';
 
 enum _LibraryFilter { playlists, artists, albums }
 
@@ -142,7 +142,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = context.l10n;
-    final avatarUrl = context.select<SpotifyProvider, String>((s) => s.user.avatarUrl);
     final playlists = context.select<LibraryProvider, List<SpotifyPlaylist>>((l) => l.playlists);
     final artists = context.select<LibraryProvider, List<SpotifyArtist>>((l) => l.artists);
     final albums = context.select<LibraryProvider, List<SpotifyAlbum>>((l) => l.albums);
@@ -161,7 +160,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 children: [
                   GestureDetector(
                     onTap: widget.onOpenSettings,
-                    child: CoverImage(url: avatarUrl, size: 36, circular: true, placeholderIcon: Icons.person_rounded),
+                    child: const UserAvatar(size: 36),
                   ),
                   const SizedBox(width: 14),
                   Expanded(

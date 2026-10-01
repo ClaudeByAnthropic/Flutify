@@ -4,13 +4,13 @@ import 'package:provider/provider.dart';
 import '../../../l10n/l10n.dart';
 import '../../../providers/auth_provider.dart';
 import '../../navigation/content_history.dart';
-import '../../widgets/cover_image.dart';
+import '../../widgets/user_avatar.dart';
 import 'desktop_window.dart';
 import 'window_caption_buttons.dart';
 
 /// 桌面端顶栏（与窗口标题栏合一，高 64）。
 ///
-/// 布局：`‹ ›` 后退 / 前进 ─── [⌂] [ 🔍 你想听什么？  Ctrl K ] ─── 头像 · 窗口按钮
+/// 布局：`‹ ›` 后退 / 前进 ─── [⌂] [ 🔍 你想听什么？  Ctrl K ] ─── 头像 · （窗口按钮位）
 /// - 空白处可拖动窗口、双击最大化（[WindowDragArea]）；
 /// - 搜索框居中，输入即切到搜索页；`Ctrl K` 聚焦；
 /// - 头像打开设置（账号卡片在设置页顶部）。
@@ -94,9 +94,8 @@ class DesktopTopBar extends StatelessWidget {
               ),
             ),
             _AccountButton(onPressed: onOpenSettings),
-            SizedBox(width: DesktopWindow.enabled ? 8 : 16),
-            if (DesktopWindow.enabled)
-              const Align(alignment: Alignment.topCenter, child: WindowCaptionButtons()),
+            // 窗口按钮由 WindowFrame 浮在右上角（所有页面都可见），这里只留出位置
+            SizedBox(width: DesktopWindow.enabled ? 8 + WindowCaptionButtons.width : 16),
           ],
         ),
       ),
@@ -287,35 +286,13 @@ class _AccountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final (signedIn, name, avatar) = context.select<AuthProvider, (bool, String, String)>(
-      (a) => (a.isSignedIn, a.displayName, a.avatarUrl),
-    );
-    final initial = name.trim().isEmpty ? '' : name.trim().characters.first.toUpperCase();
-
-    Widget face;
-    if (signedIn && avatar.isNotEmpty) {
-      face = CoverImage(url: avatar, size: 32, circular: true, placeholderIcon: Icons.person_rounded);
-    } else if (signedIn && initial.isNotEmpty) {
-      face = CircleAvatar(
-        radius: 16,
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        child: Text(initial, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      );
-    } else {
-      face = CircleAvatar(
-        radius: 16,
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        foregroundColor: colorScheme.onSurfaceVariant,
-        child: const Icon(Icons.person_rounded, size: 18),
-      );
-    }
+    final (signedIn, name) = context.select<AuthProvider, (bool, String)>((a) => (a.isSignedIn, a.displayName));
 
     return Tooltip(
       message: signedIn && name.isNotEmpty ? name : context.l10n.shellAccountMenu,
       child: IconButton(
         onPressed: onPressed,
-        icon: face,
+        icon: const UserAvatar(size: 32),
         style: IconButton.styleFrom(
           fixedSize: const Size(48, 48),
           backgroundColor: colorScheme.surfaceContainerHigh,

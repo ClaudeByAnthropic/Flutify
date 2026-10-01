@@ -52,9 +52,13 @@ class AuthProvider extends ChangeNotifier {
   Uri? _authorizeUrl;
 
   AuthProvider(this._auth) : _status = _auth.isLoggedIn ? AuthStatus.signedIn : AuthStatus.signedOut {
-    // 恢复的会话若缺少昵称头像（登录时资料接口失败），启动后补拉一次
-    if (_auth.isLoggedIn && _auth.displayName.isEmpty) {
-      unawaited(_auth.ensureProfile().then((_) => notifyListeners()));
+    // 恢复的会话缺资料（昵称 / 桌面版用户名）时启动后补拉一次；拿到用户名后媒体库需要重新加载
+    if (_auth.needsProfile) {
+      final usernameBefore = _auth.username;
+      unawaited(_auth.ensureProfile().then((_) {
+        notifyListeners();
+        if (_auth.username != usernameBefore) onSessionChanged?.call();
+      }));
     }
   }
 

@@ -222,27 +222,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeLoadFailedMessage => 'Check your connection and try again.';
 
   @override
-  String get homeMadeForYou => 'Made For You';
+  String get homeEmptyTitle => 'Nothing here yet';
 
   @override
-  String get homeMadeForYouSubtitle =>
-      'Get fresh music and recommendations updated daily.';
+  String get homeEmptyMessage => 'Try another filter, or check back later.';
 
   @override
-  String get homePopularReleases => 'Popular Releases';
+  String get homeClearFilter => 'Clear filter';
 
   @override
-  String get homePopularReleasesSubtitle => 'The biggest albums out right now.';
+  String get homePodcastUnsupported => 'Podcasts aren\'t supported yet';
 
   @override
-  String get homePopularArtists => 'Popular Artists';
+  String get homeTypePodcast => 'Podcast';
 
   @override
-  String get homeNoPodcastsTitle => 'No podcasts yet';
-
-  @override
-  String get homeNoPodcastsMessage =>
-      'Podcast shows and episodes will appear here.';
+  String get homeTypeEpisode => 'Episode';
 
   @override
   String get searchHint => 'What do you want to listen to?';
@@ -448,6 +443,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String playbackErrorAutoPaused(int count) {
+    return '$count songs in a row couldn\'t play, so playback paused';
+  }
+
+  @override
   String get detailSignInRequired => 'Sign in to see what\'s here';
 
   @override
@@ -634,6 +634,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsCornerSquare => 'Square';
+
+  @override
+  String get settingsPlaybackSection => 'Playback';
+
+  @override
+  String get settingsPauseAfterFailures => 'Pause when songs keep failing';
+
+  @override
+  String settingsPauseAfterFailuresSubtitle(int count) {
+    return 'Stop auto-skipping after $count unplayable songs in a row';
+  }
 
   @override
   String get settingsMotionSection => 'Motion';

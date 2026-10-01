@@ -17,11 +17,12 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 
 ### 2. 全面适配 Spotify 核心业务与交互
 * **主页 (Home)**：
-  - 动态问候语（早上好 / 下午好 / 晚上好）与个人头像。
-  - 顶部快速过滤（全部 / 音乐 / 播客）。
-  - Spotify 经典快捷卡片网格（手机 2 列 × 4 行，平板 3 列、宽屏 4 列；首格为 "Liked Songs" 渐变爱心卡片）。
-  - 未登录时主页提示登录，而不是显示「加载失败」。
-  - 横向滚动专辑与歌单卡架（"Made For You"、"Popular Releases"、圆形艺人头像卡架）。
+  - 与官方客户端同一个 home 查询，按服务端分区原样还原（顺序、标题、条目都来自 Spotify）：
+    吸顶筛选标签（全部 / 音乐 / 播客，选中后出现二级标签）→ 快捷入口（最多 8 个，宽屏 4 列、手机 2 列）
+    → 普通卡架（可带艺人头像，条目多于已显示时有「显示全部」）→ 最近播放 → 推荐流网格（每张卡上方标注推荐理由）。
+  - 请求带 `Accept-Language: zh-CN`（官方简体中文语言包名），分区标题与标签由服务端直接返回中文。
+  - 手机端标签栏左侧为头像（点按打开设置）；未登录时主页提示登录，而不是显示「加载失败」。
+  - 播客 / 单集只展示，点按提示暂不支持。
 * **搜索与浏览 (Search & Browse)**：
   - 实时歌曲、艺人、歌单多类型搜索。
   - Spotify 经典 45° 倾斜封面的彩色流派分类卡（Pop、Hip-Hop、Rock、Dance、Chill 等）。
@@ -34,7 +35,8 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - **Mini Player (悬浮胶囊)**：悬浮在毛玻璃底部导航之上，底色取封面主色，圆形封面 + 歌名 / 艺人 + 收藏与播放键，胶囊底边一条细进度线。
   - **Full Screen Player (全屏播放器)**：下拉手势抽屉、封面主色渐变（始终深色，状态栏浅色图标）、高灵敏度滑动进度条（Scrubber）、随机/单曲/列表循环三态切换。
     中间区域可在「封面 / 歌词 / 播放队列」间切换（底部按钮，再点一次回到封面）；**左右滑动封面切歌**，小幅拖动松手回弹；内嵌歌词右上角可进入全屏歌词。
-  - **播放失败提示**：未登录（带「登录」按钮）、曲目不可播放（说明已自动跳过）、网络错误（带「重试」按钮）均以浮动提示条告知，连续失败只保留最新一条。
+  - **播放失败提示**：未登录（带「登录」按钮）、曲目不可播放（说明已自动跳过）、网络错误（带「重试」按钮）均以 MD3E 悬浮提示卡告知（反色表面、大圆角、左侧错误类型图标、胶囊操作键；桌面端居中显示在播放栏之上），连续失败只保留最新一条。
+    连续 3 首无法播放时自动暂停、不再跳过（设置 →「播放」可关闭），提示带「下一首」按钮。
   - **Spotify Connect 设备切换**：支持检测并切换播放设备（PC / 手机 / 音箱）。
   - **实时同步歌词 (Synced Lyrics)**：Apple Music iOS 风格——流动封面背景（`LyricsBackdrop`）、顶部信息胶囊与底部控制台采用液态玻璃（`LiquidGlass`），当前行清晰、上下句按行距逐级模糊变暗；手动滚动时全部变清晰，停手 3 秒后自动回到当前行；点击任意行跳转。
     **所有歌词界面同一套液态玻璃观感**：全屏歌词面板、全屏播放器的歌词视图（背景交叉淡入流动封面、控件收进玻璃）、桌面右栏歌词。
@@ -48,7 +50,8 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 拿不到数据时显示「登录后即可查看」或「暂时无法加载」，带登录 / 重试按钮，不会一直转圈。
 * **悬停与右键（桌面端）**：卡片悬停浮出绿色播放键（按下时由圆变圆角方形）；曲目行悬停时序号变 ▶、露出收藏与「⋯」；右键曲目弹出上下文菜单（加入歌单[二级菜单] / 收藏 / 加入队列 / 前往艺人 / 前往专辑 / 复制链接）。移动端长按曲目打开底部菜单。
 * **深浅色**：默认跟随系统；浅色模式下药丸、播放键、详情页头部与状态栏图标都单独调过对比度。
-* **自定义外观（设置页，iOS 分组样式，修改即时生效并自动保存）**：
+* **自定义外观（设置页，修改即时生效并自动保存）**：手机为 iOS 分组样式；桌面端嵌在主框架内容区（保留顶栏、侧栏与播放栏），
+  大标题 + 横向设置行（标题在左、控件在右），内容区 ≥ 1040px 时分左右两栏。滑杆拖动时只做局部预览、松手才应用到全局，主题切换不做插值动画（单帧完成）。
   - 主题模式（跟随系统 / 浅色 / 深色）、纯黑背景（OLED）；
   - 强调色：7 个预设 + HSV 自定义（十六进制输入），或「跟随封面取色」——强调色随正在播放的封面变化，并自动保证与背景的对比度（WCAG ≥ 3:1）；
   - 液态玻璃模糊强度 / 不透明度（带实时预览）、字号（85% – 130%）、圆角风格（圆润 / 标准 / 方正）、减弱动效（同时尊重系统设置）。
@@ -56,7 +59,9 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 * **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环、Ctrl+K / Ctrl+L 聚焦搜索、Alt+←/→ 后退 / 前进、F11 沉浸式歌词、Esc 关闭浮层右栏 / 退出沉浸式歌词。
 
 ### 3. 响应式外壳（桌面三栏 / 移动端）
-* **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：自绘标题栏（拖动 / 双击最大化 / Win11 风格窗口按钮）+ 顶栏（后退前进、主页、居中搜索、头像）；
+* **窗口外框**（`window_frame.dart`，位于所有路由之上）：Win11 风格窗口按钮在任何页面（设置、登录、对话框）都可见；窗口最小可缩到 360×600，
+  窄于 800px 时切换为移动端布局，顶部多一条 32px 标题条（拖动 + 窗口按钮），可直接在桌面上调试手机界面；沉浸式全屏时隐藏。
+* **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：顶栏与标题栏合一（空白处拖动 / 双击最大化，右侧为窗口按钮留位）+ 后退前进、主页、居中搜索、头像；
   左栏音乐库（筛选、库内搜索、排序，可拖宽，窄于 280px 或手动收起时变为 72px 图标栏；未登录显示登录引导）；
   右栏「正在播放 / 播放队列 / 歌词」；底部播放栏（窗口变窄时依次隐藏音量条、音量键，不溢出）。
 * **右栏形态**：≥ 1280px 停靠在内容右侧（开关状态持久化）；1100 – 1280px 为浮层，默认关闭，点空白处或 Esc 关闭，不遮挡内容。
@@ -90,7 +95,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 | **媒体库** | `lib/services/library/` | `LibrarySource` 抽象：桌面会话走 spclient `collection/v2/paging`（protobuf，已点赞歌曲 / 专辑 / 艺人）+ `playlist/v2/user/{u}/rootlist`（歌单）+ Pathfinder 补全曲目与实体；其他登录方式走 Web API。点赞 / 收藏 / 关注乐观更新并尽力同步到账号（失败记入 `syncError`）；自建歌单仅保存在本机。未登录时媒体库为空 |
 | **歌词** | `lib/services/lyrics_service.dart` | spclient `GET /color-lyrics/v2/track/{id}`，请求头沿用会话身份（桌面会话即桌面端头）；404 = 无歌词（可缓存），其他错误不缓存 |
 | **协议登录** | `lib/services/auth/` | **桌面版 OAuth（默认）**：与官方桌面版相同的 client_id，系统浏览器打开 accounts.spotify.com 登录，本机回环 `127.0.0.1:8898/login` 接收授权码，PKCE 换令牌、refresh_token 续期，并以 Windows 桌面身份申请 `client-token`；**Login5**：密码（自动 Hashcash + 短信验证码，可重新发送）、手机号短信、登录链接 / 一次性令牌、导入 StoredCredential；**开发者应用 OAuth**：自己的 Client ID。会话的 client_id、client-token 平台数据、User-Agent 与 `app-platform` 请求头始终来自同一种客户端身份（`client_profile.dart`）；登出调用 `/api/logout/v1` |
-| **桌面端数据层** | `lib/services/pathfinder/` | 桌面版 OAuth 会话下，公开 Web API（api.spotify.com）会因共享 client_id 频繁 429，因此改走官方桌面端自己的内部接口：Pathfinder GraphQL（`api-partner.spotify.com/pathfinder/v2/query`，持久化查询 hash 取自本机 `xpui.spa` 1.3.1.234）负责主页、分类、搜索、专辑、艺人、唱片目录与曲目补全；spclient `playlist/v2` 负责歌单、`user-profile-view/v3` 负责昵称头像。其余登录方式仍走 Web API |
+| **桌面端数据层** | `lib/services/pathfinder/` | 桌面版 OAuth 会话下，公开 Web API（api.spotify.com）会因共享 client_id 频繁 429，因此改走官方桌面端自己的内部接口：Pathfinder GraphQL（`api-partner.spotify.com/pathfinder/v2/query`，持久化查询 hash 取自本机 `xpui.spa` 1.3.1.234）负责主页、分类、搜索、专辑、艺人、唱片目录与曲目补全；spclient `playlist/v2` 负责歌单（封面依次取 `pictureSize`、上传封面 `picture`、前几首曲目专辑封面拼的 `mosaic.scdn.co` 四宫格，见 `services/library/playlist_cover.dart`）、`user-profile-view/v3/profile/{用户名}` 负责昵称头像。桌面版令牌不含用户名，登录后用令牌登录一次 AP 取 canonical username（歌单根列表、收藏分页都按用户名寻址；注意 `profile/me` 是用户名为 "me" 的另一个账号，不能用）；旧版本缺用户名的会话启动时自动补齐并重新加载媒体库。其余登录方式仍走 Web API |
 | **探测脚本** | `tool/` | 纯 Dart 命令行探针（不属于 App）：`protocol_probe.dart`（播放链路端到端）、`live_probe.dart`（用本机已保存会话实测播放 / 媒体库 / 歌词）、`pathfinder_probe.dart`（Pathfinder 入参探测）、`ap_ports_probe.dart`（AP 网络可达性）。输出只写入 `tool/probe_out/`（已 gitignore，含账号数据，不得进入测试或文档） |
 
 ---
@@ -165,7 +170,7 @@ d:/Flutify/app/
 │   │   │   └── mobile/mobile_bottom_bar.dart # 毛玻璃底部导航 + 悬浮迷你播放器
 │   │   ├── screens/
 │   │   │   ├── main_shell.dart           # 响应式主框架：持有导航 / 历史 / 搜索词 / 布局状态，分发到桌面或移动布局
-│   │   │   ├── home/home_screen.dart     # Spotify 风格主页
+│   │   │   ├── home/home_screen.dart     # 主页（按官方分区组装）；widgets/ 下为标签栏、快捷入口、卡架、推荐流
 │   │   │   ├── search/search_screen.dart # 搜索与倾斜封面流派卡片
 │   │   │   ├── library/library_screen.dart# 媒体库与已点赞歌曲
 │   │   │   ├── detail/                   # 歌单、专辑、艺人详情页

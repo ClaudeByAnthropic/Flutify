@@ -47,13 +47,19 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
     return FlutifyTokens(
       accent: accent,
       onAccent: AccentColors.onAccent(accent),
-      glassSigma: lerpDouble(6, 48, s.glassBlur)!,
-      glassTint: 0.015 + 0.12 * s.glassOpacity,
+      glassSigma: sigmaFor(s.glassBlur),
+      glassTint: tintFor(s.glassOpacity),
       glassOpacity: s.glassOpacity,
       cornerScale: s.cornerStyle.scale,
       squareCorners: s.cornerStyle == CornerStyle.square,
     );
   }
+
+  /// 模糊强度（0~1）→ 模糊半径 sigma；设置页拖动滑杆时的本地预览也用它。
+  static double sigmaFor(double glassBlur) => lerpDouble(6, 48, glassBlur)!;
+
+  /// 不透明度（0~1）→ 玻璃白色填充的 alpha。
+  static double tintFor(double glassOpacity) => 0.015 + 0.12 * glassOpacity;
 
   static final FlutifyTokens fallback = FlutifyTokens.from(AppearanceSettings.defaults, AccentPreset.spotify.color);
 

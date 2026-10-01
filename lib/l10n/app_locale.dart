@@ -14,6 +14,10 @@ class AppLocale {
   /// 当前界面语言：简体中文。
   static const Locale locale = Locale('zh', 'CN');
 
+  /// 请求 Spotify 接口时的 Accept-Language（与官方客户端的语言包名一致：zh-CN 简体、zh-TW / zh-HK 繁体）。
+  /// 服务端据此本地化主页问候语、分区标题、筛选标签等文案；不带时一律返回英文。
+  static const String spotifyLanguage = 'zh-CN';
+
   /// 生成的 AppLocalizations 支持的全部语言（zh / en）。
   static const List<Locale> supportedLocales = AppLocalizations.supportedLocales;
 

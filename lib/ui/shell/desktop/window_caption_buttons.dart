@@ -6,11 +6,17 @@ import 'desktop_window.dart';
 
 /// Windows 11 风格的窗口按钮组：最小化 / 最大化（还原）/ 关闭。
 ///
-/// - 每个按钮 46×40，图形用 CustomPainter 以 1px 细线绘制（对齐 Segoe Fluent Icons 的比例）；
+/// - 每个按钮 46 宽（默认 40 高），图形用 CustomPainter 以 1px 细线绘制（对齐 Segoe Fluent Icons 的比例）；
 /// - 悬停为半透明底色，关闭按钮悬停为系统红 #C42B1C、图形变白；
 /// - 监听窗口最大化状态，切换「最大化 / 向下还原」图形。
 class WindowCaptionButtons extends StatefulWidget {
-  const WindowCaptionButtons({super.key});
+  /// 按钮高度：桌面顶栏用 40，窄窗口标题条用更矮的 32。
+  final double height;
+
+  const WindowCaptionButtons({super.key, this.height = 40});
+
+  /// 三个按钮的总宽度，顶栏据此在右侧留出空位。
+  static const double width = _CaptionButton.width * 3;
 
   @override
   State<WindowCaptionButtons> createState() => _WindowCaptionButtonsState();
@@ -49,17 +55,20 @@ class _WindowCaptionButtonsState extends State<WindowCaptionButtons> with Window
         _CaptionButton(
           tooltip: l10n.windowMinimize,
           glyph: _Glyph.minimize,
+          height: widget.height,
           onPressed: windowManager.minimize,
         ),
         _CaptionButton(
           tooltip: _maximized ? l10n.windowRestore : l10n.windowMaximize,
           glyph: _maximized ? _Glyph.restore : _Glyph.maximize,
+          height: widget.height,
           onPressed: DesktopWindow.toggleMaximize,
         ),
         _CaptionButton(
           tooltip: l10n.windowClose,
           glyph: _Glyph.close,
           destructive: true,
+          height: widget.height,
           onPressed: windowManager.close,
         ),
       ],
@@ -73,14 +82,18 @@ class _CaptionButton extends StatefulWidget {
   final String tooltip;
   final _Glyph glyph;
   final bool destructive;
+  final double height;
   final VoidCallback onPressed;
 
   const _CaptionButton({
     required this.tooltip,
     required this.glyph,
+    required this.height,
     required this.onPressed,
     this.destructive = false,
   });
+
+  static const double width = 46;
 
   @override
   State<_CaptionButton> createState() => _CaptionButtonState();
@@ -122,8 +135,8 @@ class _CaptionButtonState extends State<_CaptionButton> {
           onTap: widget.onPressed,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
-            width: 46,
-            height: 40,
+            width: _CaptionButton.width,
+            height: widget.height,
             color: background,
             child: CustomPaint(painter: _GlyphPainter(widget.glyph, foreground)),
           ),

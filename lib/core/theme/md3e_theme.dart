@@ -189,6 +189,22 @@ class MD3ETheme {
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
       ),
 
+      // Expressive SnackBar：悬浮、大圆角、反色表面；操作按钮为浅色调胶囊
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colorScheme.inverseSurface,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: colorScheme.onInverseSurface,
+          fontWeight: FontWeight.w600,
+          height: 1.3,
+        ),
+        actionTextColor: colorScheme.inversePrimary,
+        actionBackgroundColor: colorScheme.inversePrimary.withAlpha(36),
+        shape: RoundedRectangleBorder(borderRadius: tokens.radius(20)),
+        elevation: 6,
+        insetPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      ),
+
       // Bottom Sheet Theme
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colorScheme.surfaceContainerHigh,

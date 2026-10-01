@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../../core/constants/spotify_endpoints.dart';
+import '../protocol/access_point.dart';
 import '../storage_service.dart';
 import 'account_profile_service.dart';
 import 'auth_constants.dart';
@@ -40,6 +41,9 @@ class SpotifyAuthService {
   final AccountProfileService _profiles;
   final OAuthLoopbackServer _loopback;
 
+  /// 按 access_token 查询 canonical username（默认登录 AP 读 APWelcome；测试注入替身）。
+  final Future<String> Function(String accessToken, String deviceId) _usernameResolver;
+
   /// 等待验证码的登录会话（密码 / 手机号登录触发短信挑战后保留）。
   Login5Session? _pendingSession;
 
@@ -47,15 +51,27 @@ class SpotifyAuthService {
   Future<String>? _refreshInFlight;
   Future<String>? _clientTokenInFlight;
 
-  SpotifyAuthService._(this._storage, this._client, this._loopback)
+  SpotifyAuthService._(this._storage, this._client, this._loopback, this._usernameResolver)
       : _clientTokenService = ClientTokenService(_client),
         _login5 = Login5Service(_client),
         _oauth = OAuthPkceService(_client),
         _desktopOAuth = OAuthPkceService(_client, userAgent: SpotifyClientProfile.desktop.userAgent),
         _profiles = AccountProfileService(_client);
 
-  factory SpotifyAuthService(StorageService storage, [http.Client? client, OAuthLoopbackServer? loopback]) =>
-      SpotifyAuthService._(storage, client ?? http.Client(), loopback ?? OAuthLoopbackServer());
+  factory SpotifyAuthService(
+    StorageService storage, [
+    http.Client? client,
+    OAuthLoopbackServer? loopback,
+    Future<String> Function(String accessToken, String deviceId)? usernameResolver,
+  ]) {
+    final http.Client effectiveClient = client ?? http.Client();
+    return SpotifyAuthService._(
+      storage,
+      effectiveClient,
+      loopback ?? OAuthLoopbackServer(),
+      usernameResolver ?? (token, deviceId) => _usernameFromAccessPoint(effectiveClient, token, deviceId),
+    );
+  }
 
   bool get isLoggedIn => _storage.isLoggedIn;
   AuthMethod get method => _storage.authMethod;
@@ -363,9 +379,21 @@ class SpotifyAuthService {
     return _storage.accessToken;
   }
 
-  /// 桌面版会话：先走内部资料接口，失败再回退公开 /v1/me（后者常被限流）。
+  /// 桌面版会话：先确定用户名，再走内部资料接口，失败回退公开 /v1/me（后者常被限流）。
   Future<void> _loadDesktopProfile() async {
+    if (_storage.username.isEmpty) {
+      // 旧版本按 `profile/me` 取到的是另一个账号的资料，先清掉，取不到新资料时宁可显示用户名
+      await _storage.setDisplayName('');
+      await _storage.setAvatarUrl('');
+      try {
+        final username = await _usernameResolver(_storage.accessToken, _storage.deviceId);
+        if (username.isNotEmpty) await _storage.setUsername(username);
+      } catch (_) {
+        // AP 不可达时交给 /v1/me 回退（其响应的 id 即用户名）
+      }
+    }
     final profile = await _profiles.fetchProfileView(
+          username: _storage.username,
           accessToken: _storage.accessToken,
           clientToken: _storage.clientToken,
           profile: SpotifyClientProfile.desktop,
@@ -377,14 +405,34 @@ class SpotifyAuthService {
           profile: SpotifyClientProfile.desktop,
         );
     if (profile == null) return;
-    if (profile.id.isNotEmpty) await _storage.setUsername(profile.id);
+    if (profile.id.isNotEmpty && _storage.username.isEmpty) await _storage.setUsername(profile.id);
     await _storage.setDisplayName(profile.displayName);
     await _storage.setAvatarUrl(profile.avatarUrl);
   }
 
-  /// 已登录但昵称缺失时补拉资料（如登录时资料接口失败）；失败静默。
+  /// 桌面版 OAuth 的令牌响应不含用户名：用 access_token 登录 AP，从 APWelcome 取 canonical username。
+  /// 媒体库（rootlist / 收藏集合）与资料接口都按用户名寻址，缺它整个媒体库为空。
+  static Future<String> _usernameFromAccessPoint(http.Client client, String accessToken, String deviceId) async {
+    final ap = await SpotifyAccessPoint.connect(client: client);
+    try {
+      final welcome = await ap.authenticate(
+        ApCredentials.accessToken(accessToken),
+        deviceId: deviceId.isEmpty ? null : deviceId,
+      );
+      return welcome.canonicalUsername;
+    } finally {
+      ap.close();
+    }
+  }
+
+  /// 恢复的会话缺资料时需要补拉：昵称缺失，或桌面版会话缺用户名（旧版本登录的会话）。
+  bool get needsProfile =>
+      isLoggedIn &&
+      (_storage.displayName.isEmpty || (_storage.authMethod == AuthMethod.desktop && _storage.username.isEmpty));
+
+  /// 补拉资料（如登录时资料接口失败、旧会话缺用户名）；失败静默。
   Future<void> ensureProfile() async {
-    if (!isLoggedIn || _storage.displayName.isNotEmpty) return;
+    if (!needsProfile) return;
     try {
       await ensureAccessToken();
       if (_storage.authMethod == AuthMethod.desktop) {

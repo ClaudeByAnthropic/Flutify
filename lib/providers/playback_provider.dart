@@ -52,6 +52,11 @@ class PlaybackProvider extends ChangeNotifier {
   /// 连续「不可播放 → 自动跳过」的次数；超过一轮上下文长度就停下，避免整个歌单都不可播时死循环。
   int _consecutiveSkips = 0;
 
+  /// 连续多少首不可播放时自动暂停（[pauseAfterFailures] 开启时生效）。
+  static const int failureLimit = 3;
+
+  bool _pauseAfterFailures;
+
   /// 最近一次播放失败（成功开始播放新曲目或调用 [clearPlaybackError] 后为 null）。
   PlaybackError? _playbackError;
   int _errorSerial = 0;
@@ -96,6 +101,7 @@ class PlaybackProvider extends ChangeNotifier {
 
   PlaybackProvider(this._audio, this._storage, {Random? random, this.audioLoader})
       : _random = random ?? Random(),
+        _pauseAfterFailures = _storage.pauseAfterFailures,
         _volume = _storage.volume,
         _volumeBeforeMute = _storage.volume > 0 ? _storage.volume : 0.8 {
     _initAudioListeners();
@@ -123,6 +129,16 @@ class PlaybackProvider extends ChangeNotifier {
   bool get shuffle => _shuffle;
   SpotifyRepeatMode get repeatMode => _repeatMode;
   double get volume => _volume;
+
+  /// 连续 [failureLimit] 首无法播放时自动暂停，而不是继续跳过（设置页「播放」分组，持久化）。
+  bool get pauseAfterFailures => _pauseAfterFailures;
+
+  void setPauseAfterFailures(bool value) {
+    if (value == _pauseAfterFailures) return;
+    _pauseAfterFailures = value;
+    _storage.setPauseAfterFailures(value);
+    notifyListeners();
+  }
 
   /// 用户手动添加的待播队列（只读）。
   List<QueueEntry> get userQueue => List.unmodifiable(_userQueue);
@@ -265,10 +281,24 @@ class PlaybackProvider extends ChangeNotifier {
   }
 
   /// 处理加载失败：暴露错误状态；「不可播放」类自动跳到下一首（有上限）。
+  ///
+  /// 上限有两层：
+  /// - 开启 [pauseAfterFailures]（默认）：连续第 [failureLimit] 首仍不可播放时停下，标记 autoPaused；
+  /// - 始终：跳过次数不超过一轮上下文长度，避免整个歌单都不可播时死循环。
   Future<void> _handleLoadFailure(SpotifyTrack track, TrackPlaybackException failure) async {
-    final canSkip = failure.shouldSkip && _consecutiveSkips < max(max(_order.length, _userQueue.length + 1), 1) &&
+    final failures = _consecutiveSkips + 1;
+    final hitLimit = failure.shouldSkip && _pauseAfterFailures && failures >= failureLimit;
+    final canSkip = failure.shouldSkip && !hitLimit &&
+        _consecutiveSkips < max(max(_order.length, _userQueue.length + 1), 1) &&
         (_userQueue.isNotEmpty || _orderPos + 1 < _order.length || _repeatMode == SpotifyRepeatMode.context);
-    _playbackError = PlaybackError(serial: ++_errorSerial, track: track, exception: failure, skipped: canSkip);
+    _playbackError = PlaybackError(
+      serial: ++_errorSerial,
+      track: track,
+      exception: failure,
+      skipped: canSkip,
+      autoPaused: hitLimit,
+      consecutiveFailures: failures,
+    );
     _errorController.add(_playbackError!);
     _setLoading(false);
     if (canSkip) {

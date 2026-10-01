@@ -70,8 +70,27 @@ class _MainShellState extends State<MainShell> {
     super.dispose();
   }
 
+  /// 打开设置：
+  /// - 桌面布局：推入当前 Tab 的内容区，保留顶栏（后退 / 搜索 / 窗口按钮）、侧栏与播放栏；
+  ///   已在设置页时不重复推入；
+  /// - 移动端布局：根 Navigator 全屏推入（iOS「设置」式，盖住底部导航）。
   void _openSettings() {
-    Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+    if (!ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)) {
+      Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+      return;
+    }
+    final navigator = _navigatorKeys[_currentIndex].currentState;
+    if (navigator == null) return;
+    Route<dynamic>? top;
+    navigator.popUntil((route) {
+      top = route;
+      return true;
+    });
+    if (top?.settings.name == SettingsScreen.routeName) return;
+    navigator.push(MaterialPageRoute(
+      settings: const RouteSettings(name: SettingsScreen.routeName),
+      builder: (_) => const SettingsScreen(),
+    ));
   }
 
   /// 再次点击当前 Tab：回到该 Tab 根页面（Spotify 行为）。

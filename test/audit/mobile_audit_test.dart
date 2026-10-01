@@ -223,4 +223,37 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 11));
   });
+
+  // 桌面设置页：嵌在内容区。宽窗口双栏、较窄窗口单列横向行
+  for (final (name, windowSize) in const [('wide', Size(1440, 900)), ('narrow', Size(1000, 760))]) {
+    testWidgets('audit desktop settings $name', skip: !enabled, (tester) async {
+      await tester.runAsync(loadFonts);
+      tester.view.physicalSize = windowSize;
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      ArtworkPalette.enabled = false;
+
+      SharedPreferences.setMockInitialValues({});
+      final storage = await StorageService.init();
+      await tester.pumpWidget(FlutifyApp(
+        storageService: storage,
+        audioPlayerService: FakeAudioPlayerService(),
+        spotifyApiService: FakeSpotifyApiService(storage),
+        trackAudioLoader: FakeTrackAudioSource(),
+      ));
+      await settle(tester);
+      await tester.tap(find.byTooltip('账号'));
+      await settle(tester);
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      await shot(tester, 'desktop_settings_$name');
+      await tester.drag(find.byType(SettingsScreen), const Offset(0, -600));
+      await settle(tester);
+      await shot(tester, 'desktop_settings_${name}_bottom');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 11));
+    });
+  }
 }

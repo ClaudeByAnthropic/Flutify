@@ -220,25 +220,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeLoadFailedMessage => '请检查网络连接后重试。';
 
   @override
-  String get homeMadeForYou => '为你打造';
+  String get homeEmptyTitle => '这里暂时没有内容';
 
   @override
-  String get homeMadeForYouSubtitle => '每日更新的新鲜音乐与推荐。';
+  String get homeEmptyMessage => '换个筛选标签看看，或稍后再来。';
 
   @override
-  String get homePopularReleases => '热门新发行';
+  String get homeClearFilter => '清除筛选';
 
   @override
-  String get homePopularReleasesSubtitle => '当下最受欢迎的专辑。';
+  String get homePodcastUnsupported => '暂不支持播客，敬请期待';
 
   @override
-  String get homePopularArtists => '热门艺人';
+  String get homeTypePodcast => '播客';
 
   @override
-  String get homeNoPodcastsTitle => '暂无播客';
-
-  @override
-  String get homeNoPodcastsMessage => '播客节目和单集会显示在这里。';
+  String get homeTypeEpisode => '单集';
 
   @override
   String get searchHint => '你想听什么？';
@@ -437,6 +434,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String playbackErrorAutoPaused(int count) {
+    return '连续 $count 首无法播放，已暂停';
+  }
+
+  @override
   String get detailSignInRequired => '登录后即可查看这里的内容';
 
   @override
@@ -617,6 +619,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsCornerSquare => '方正';
+
+  @override
+  String get settingsPlaybackSection => '播放';
+
+  @override
+  String get settingsPauseAfterFailures => '连续无法播放时暂停';
+
+  @override
+  String settingsPauseAfterFailuresSubtitle(int count) {
+    return '连续 $count 首无法播放就停下，不再继续自动跳过';
+  }
 
   @override
   String get settingsMotionSection => '动效';

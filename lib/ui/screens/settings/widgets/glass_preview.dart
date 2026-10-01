@@ -7,8 +7,14 @@ import '../../../widgets/liquid_glass.dart';
 /// 液态玻璃实时预览：几团彩色光斑上叠一块玻璃胶囊，拖动滑杆时即时可见效果。
 ///
 /// 光斑颜色取当前强调色及其两个邻近色相，预览与真实歌词界面的观感接近。
+///
+/// [blur] / [opacity] 为拖动中的草稿值（0~1）：滑杆松手前只重绘预览本身，
+/// 不触发全局主题重建；为 null 时使用已生效的主题值。
 class GlassPreview extends StatelessWidget {
-  const GlassPreview({super.key});
+  final double? blur;
+  final double? opacity;
+
+  const GlassPreview({super.key, this.blur, this.opacity});
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +35,8 @@ class GlassPreview extends StatelessWidget {
             _Blob(alignment: const Alignment(0.9, -0.4), size: 100, color: shifted(-70)),
             Center(
               child: LiquidGlass(
+                blur: blur == null ? null : FlutifyTokens.sigmaFor(blur!),
+                tint: opacity == null ? null : FlutifyTokens.tintFor(opacity!),
                 padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

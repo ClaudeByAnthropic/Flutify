@@ -16,8 +16,12 @@ class DesktopWindow {
   /// 自绘标题栏是否生效。
   static bool get enabled => _enabled;
 
-  /// 窗口最小尺寸：保证「72px 音乐库 + 内容」布局不被挤坏。
-  static const Size minimumSize = Size(960, 640);
+  /// 窗口最小尺寸：可缩到手机宽度，窄于 `ShellBreakpoints.desktop` 时切换为移动端布局，
+  /// 便于在桌面上直接调试手机界面。
+  static const Size minimumSize = Size(360, 600);
+
+  /// 当前是否处于系统全屏（沉浸式歌词）；全屏时 `WindowFrame` 隐藏窗口按钮与标题条。
+  static final ValueNotifier<bool> fullScreen = ValueNotifier(false);
 
   /// 在 runApp 之前调用。
   static Future<void> init() async {
@@ -49,6 +53,7 @@ class DesktopWindow {
   /// 进入 / 退出系统全屏（沉浸式歌词使用）。未启用自绘标题栏（测试、移动端）时不做任何事。
   static Future<void> setFullScreen(bool value) async {
     if (!_enabled) return;
+    fullScreen.value = value;
     if (await windowManager.isFullScreen() == value) return;
     await windowManager.setFullScreen(value);
   }

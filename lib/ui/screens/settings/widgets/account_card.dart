@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../widgets/cover_image.dart';
+import '../../../widgets/user_avatar.dart';
 import '../../auth/login_screen.dart';
 import '../../auth/widgets/flutify_mark.dart';
 
@@ -96,23 +96,12 @@ class _SignedIn extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final tokens = context.tokens;
     final l10n = context.l10n;
     final name = auth.displayName;
-    final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
 
     return Row(
       children: [
-        auth.avatarUrl.isNotEmpty
-            ? CoverImage(url: auth.avatarUrl, size: 52, circular: true, placeholderIcon: Icons.person_rounded)
-            : CircleAvatar(
-                radius: 26,
-                backgroundColor: tokens.accent,
-                child: Text(
-                  initial,
-                  style: TextStyle(color: tokens.onAccent, fontWeight: FontWeight.w800, fontSize: 20),
-                ),
-              ),
+        const UserAvatar(size: 52),
         const SizedBox(width: 14),
         Expanded(
           child: Column(

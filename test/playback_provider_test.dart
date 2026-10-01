@@ -189,6 +189,47 @@ void main() {
       expect(playback.isBuffering, isFalse);
     });
 
+    test('连续 3 首不可播放：停在第 3 首并标记自动暂停；「下一首」可继续', () async {
+      for (final t in [a, b, c]) {
+        loader.failures[t.id] = unavailable;
+      }
+      final events = <PlaybackError>[];
+      final sub = playback.playbackErrors.listen(events.add);
+
+      await playback.playTrack(a, contextQueue: [a, b, c, x], context: ctx);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(playback.pauseAfterFailures, isTrue, reason: '默认开启');
+      expect(playback.currentTrack?.id, c.id, reason: '第 3 首失败后不再跳到第 4 首');
+      expect(audio.playedFiles, isEmpty);
+      expect(events.map((e) => (e.skipped, e.autoPaused, e.consecutiveFailures)), [
+        (true, false, 1),
+        (true, false, 2),
+        (false, true, 3),
+      ]);
+
+      await playback.nextTrack();
+      expect(playback.currentTrack?.id, x.id);
+      expect(audio.playedFiles, hasLength(1));
+      await sub.cancel();
+    });
+
+    test('关闭「连续无法播放时暂停」：继续跳过直到可播放的曲目，并持久化', () async {
+      for (final t in [a, b, c]) {
+        loader.failures[t.id] = unavailable;
+      }
+      playback.setPauseAfterFailures(false);
+
+      await playback.playTrack(a, contextQueue: [a, b, c, x], context: ctx);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(playback.currentTrack?.id, x.id);
+      expect(audio.playedFiles, hasLength(1));
+      final reloaded = PlaybackProvider(audio, await StorageService.init(), audioLoader: loader);
+      addTearDown(reloaded.dispose);
+      expect(reloaded.pauseAfterFailures, isFalse);
+    });
+
     test('未登录（无加载器）：提示请先登录，不跳歌', () async {
       SharedPreferences.setMockInitialValues({});
       final bare = PlaybackProvider(audio, await StorageService.init());

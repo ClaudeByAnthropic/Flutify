@@ -124,12 +124,10 @@ void main() {
     );
     await playMix(tester);
 
-    final feed = find.byType(Scrollable).first;
-    await tester.scrollUntilVisible(find.text('Album A'), 300, scrollable: feed);
-    // 再上滑一段，确保卡片不被底部的迷你播放器 / 导航栏遮挡
-    await tester.drag(feed, const Offset(0, -250));
+    // 主页只展示服务端的推荐分区；媒体库中的专辑从「音乐库」进入
+    await tester.tap(find.text('音乐库').last);
     await settle(tester);
-    await tester.tap(find.text('Album A'));
+    await tester.tap(find.text('Album A').first);
     await settle(tester);
 
     expect(find.byType(CollectionHero), findsOneWidget);

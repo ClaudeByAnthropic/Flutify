@@ -4,7 +4,9 @@ import '../core/constants/spotify_endpoints.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
 import '../models/category.dart';
+import '../l10n/app_locale.dart';
 import '../models/device.dart';
+import '../models/home_feed.dart';
 import '../models/image.dart';
 import '../models/lyrics.dart';
 import '../models/playlist.dart';
@@ -94,6 +96,7 @@ class SpotifyApiService {
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Accept-Language': AppLocale.spotifyLanguage,
       if (token.isNotEmpty) 'Authorization': 'Bearer $token',
       if (clientToken.isNotEmpty) 'client-token': clientToken,
       // 与令牌所属客户端一致的 UA / app-platform / spotify-app-version（开发者应用 OAuth 为空）
@@ -101,8 +104,7 @@ class SpotifyApiService {
     };
   }
 
-  String get _baseUrl =>
-      _storage.apiBaseUrl.trim().isEmpty ? SpotifyEndpoints.defaultWebApiBase : _storage.apiBaseUrl;
+  String get _baseUrl => _storage.apiBaseUrl.trim().isEmpty ? SpotifyEndpoints.defaultWebApiBase : _storage.apiBaseUrl;
 
   /// 是否已有可用的 access_token（登录或手动填写）。
   bool get isConfigured => _storage.accessToken.isNotEmpty;
@@ -154,13 +156,48 @@ class SpotifyApiService {
   // ---------------------------------------------------------------------------
   // 主页 / 浏览
   // ---------------------------------------------------------------------------
-  Future<List<SpotifyPlaylist>> getFeaturedPlaylists() async {
-    if (!isConfigured) return const [];
-    if (_useDesktop) return _desktopLoad(_desktop.homePlaylists);
+  /// 主页。[facet] 为筛选标签 id（空 = 全部）。
+  ///
+  /// 桌面版会话：与官方桌面端同一 home 查询，完整还原分区；
+  /// 其余会话：公开 Web API 没有主页接口，只能用推荐歌单拼一个卡架（[facet] 无效）。
+  Future<HomeFeed> getHome({String facet = ''}) async {
+    if (!isConfigured) return HomeFeed.empty;
+    if (_useDesktop) return _desktopLoad(() => _desktop.home(facet: facet));
 
-    final data = await _getJson('${SpotifyEndpoints.featuredPlaylists}?limit=10');
+    final data = await _getJson('${SpotifyEndpoints.featuredPlaylists}?limit=20');
     final items = (data['playlists'] as Map<String, dynamic>?)?['items'];
-    return items is List ? items.whereType<Map<String, dynamic>>().map(SpotifyPlaylist.fromJson).toList() : const [];
+    final playlists = items is List
+        ? items.whereType<Map<String, dynamic>>().map(SpotifyPlaylist.fromJson).toList()
+        : const [];
+    if (playlists.isEmpty) return HomeFeed.empty;
+    return HomeFeed(
+      sections: [
+        HomeSection(
+          uri: 'spotify:section:featured',
+          kind: HomeSectionKind.shelf,
+          title: (data['message'] as String?) ?? '',
+          items: [
+            for (final p in playlists)
+              HomeItem(
+                kind: HomeItemKind.playlist,
+                uri: p.contextUri,
+                title: p.name,
+                subtitle: p.description,
+                images: p.images,
+                playlist: p,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 「显示全部」：某个分区的更多条目。找不到该分区（主页已刷新换了一批）时抛 [SpotifyDataException]。
+  Future<HomeSection> getHomeSection(String uri, {String facet = ''}) async {
+    if (!isConfigured) throw SpotifyDataException.notSignedIn;
+    if (_useDesktop) return _desktopLoad(() => _desktop.homeSection(uri, facet: facet));
+    final home = await getHome();
+    return home.sections.firstWhere((s) => s.uri == uri, orElse: () => throw const SpotifyDataException('没有找到对应的内容'));
   }
 
   Future<List<SpotifyCategory>> getCategories() async {

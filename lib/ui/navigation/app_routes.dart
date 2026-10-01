@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../models/album.dart';
 import '../../models/artist.dart';
+import '../../models/home_feed.dart';
 import '../../models/playlist.dart';
 import '../screens/detail/album_detail_screen.dart';
 import '../screens/detail/artist_detail_screen.dart';
 import '../screens/detail/playlist_detail_screen.dart';
+import '../screens/home/home_section_screen.dart';
 
 /// 详情页导航入口。
 ///
@@ -21,11 +23,14 @@ class AppRoutes {
   static void openPlaylist(BuildContext context, SpotifyPlaylist playlist) =>
       _push(context, PlaylistDetailScreen(playlist: playlist));
 
-  static void openAlbum(BuildContext context, SpotifyAlbum album) =>
-      _push(context, AlbumDetailScreen(album: album));
+  static void openAlbum(BuildContext context, SpotifyAlbum album) => _push(context, AlbumDetailScreen(album: album));
 
   static void openArtist(BuildContext context, SpotifyArtist artist) =>
       _push(context, ArtistDetailScreen(artist: artist));
+
+  /// 主页分区的「显示全部」。
+  static void openHomeSection(BuildContext context, HomeSection section, {String facet = ''}) =>
+      _push(context, HomeSectionScreen(section: section, facet: facet));
 
   static void _push(BuildContext context, Widget page) {
     // 先取出两个 Navigator：关闭弹层后 context 可能已失效

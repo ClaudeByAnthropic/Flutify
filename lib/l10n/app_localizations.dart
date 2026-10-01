@@ -482,47 +482,41 @@ abstract class AppLocalizations {
   /// **'请检查网络连接后重试。'**
   String get homeLoadFailedMessage;
 
-  /// No description provided for @homeMadeForYou.
+  /// No description provided for @homeEmptyTitle.
   ///
   /// In zh, this message translates to:
-  /// **'为你打造'**
-  String get homeMadeForYou;
+  /// **'这里暂时没有内容'**
+  String get homeEmptyTitle;
 
-  /// No description provided for @homeMadeForYouSubtitle.
+  /// No description provided for @homeEmptyMessage.
   ///
   /// In zh, this message translates to:
-  /// **'每日更新的新鲜音乐与推荐。'**
-  String get homeMadeForYouSubtitle;
+  /// **'换个筛选标签看看，或稍后再来。'**
+  String get homeEmptyMessage;
 
-  /// No description provided for @homePopularReleases.
+  /// No description provided for @homeClearFilter.
   ///
   /// In zh, this message translates to:
-  /// **'热门新发行'**
-  String get homePopularReleases;
+  /// **'清除筛选'**
+  String get homeClearFilter;
 
-  /// No description provided for @homePopularReleasesSubtitle.
+  /// No description provided for @homePodcastUnsupported.
   ///
   /// In zh, this message translates to:
-  /// **'当下最受欢迎的专辑。'**
-  String get homePopularReleasesSubtitle;
+  /// **'暂不支持播客，敬请期待'**
+  String get homePodcastUnsupported;
 
-  /// No description provided for @homePopularArtists.
+  /// No description provided for @homeTypePodcast.
   ///
   /// In zh, this message translates to:
-  /// **'热门艺人'**
-  String get homePopularArtists;
+  /// **'播客'**
+  String get homeTypePodcast;
 
-  /// No description provided for @homeNoPodcastsTitle.
+  /// No description provided for @homeTypeEpisode.
   ///
   /// In zh, this message translates to:
-  /// **'暂无播客'**
-  String get homeNoPodcastsTitle;
-
-  /// No description provided for @homeNoPodcastsMessage.
-  ///
-  /// In zh, this message translates to:
-  /// **'播客节目和单集会显示在这里。'**
-  String get homeNoPodcastsMessage;
+  /// **'单集'**
+  String get homeTypeEpisode;
 
   /// No description provided for @searchHint.
   ///
@@ -884,6 +878,12 @@ abstract class AppLocalizations {
   /// **'「{track}」加载失败，请检查网络'**
   String playbackErrorNetwork(String track);
 
+  /// No description provided for @playbackErrorAutoPaused.
+  ///
+  /// In zh, this message translates to:
+  /// **'连续 {count} 首无法播放，已暂停'**
+  String playbackErrorAutoPaused(int count);
+
   /// No description provided for @detailSignInRequired.
   ///
   /// In zh, this message translates to:
@@ -1219,6 +1219,24 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'方正'**
   String get settingsCornerSquare;
+
+  /// No description provided for @settingsPlaybackSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'播放'**
+  String get settingsPlaybackSection;
+
+  /// No description provided for @settingsPauseAfterFailures.
+  ///
+  /// In zh, this message translates to:
+  /// **'连续无法播放时暂停'**
+  String get settingsPauseAfterFailures;
+
+  /// No description provided for @settingsPauseAfterFailuresSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'连续 {count} 首无法播放就停下，不再继续自动跳过'**
+  String settingsPauseAfterFailuresSubtitle(int count);
 
   /// No description provided for @settingsMotionSection.
   ///

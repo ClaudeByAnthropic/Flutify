@@ -35,12 +35,15 @@ class TrackMenu {
   }
 
   static Future<T?> _menu<T>(BuildContext context, Offset position, List<PopupMenuEntry<T>> items) {
-    final overlay = Overlay.of(context, rootOverlay: true).context.findRenderObject()! as RenderBox;
+    // 菜单显示在根 Navigator 的 Overlay 里：全局坐标需换算到它的本地坐标
+    // （桌面窄窗口时它在标题条之下，并不从窗口原点开始）
+    final overlay = Navigator.of(context, rootNavigator: true).overlay!.context.findRenderObject()! as RenderBox;
+    final local = overlay.globalToLocal(position);
     final colorScheme = Theme.of(context).colorScheme;
     return showMenu<T>(
       context: context,
       useRootNavigator: true,
-      position: RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
+      position: RelativeRect.fromRect(local & const Size(1, 1), Offset.zero & overlay.size),
       color: colorScheme.surfaceContainerHigh,
       elevation: 8,
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),

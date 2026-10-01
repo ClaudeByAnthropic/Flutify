@@ -5,6 +5,7 @@ import '../../core/theme/md3e_shapes.dart';
 import '../shell/shell_breakpoints.dart';
 import 'cover_image.dart';
 import 'hover_builder.dart';
+import 'text_metrics.dart';
 
 /// 专辑 / 歌单 / 艺人卡片（横向卡架与网格共用）。
 ///
@@ -21,6 +22,9 @@ class ExpressiveCard extends StatelessWidget {
   final VoidCallback? onPlayTap;
   final double width;
 
+  /// 卡片外边距：横向卡架默认右侧留 14，网格中由网格间距负责（传 zero）。
+  final EdgeInsetsGeometry margin;
+
   const ExpressiveCard({
     super.key,
     required this.title,
@@ -30,7 +34,24 @@ class ExpressiveCard extends StatelessWidget {
     required this.onTap,
     this.onPlayTap,
     this.width = 148,
+    this.margin = const EdgeInsets.only(right: 14.0),
   });
+
+  /// 内边距与封面下方间距（与 [build] 中的布局一致）。
+  static const double _padding = 6;
+  static const double _coverGap = 10;
+  static const double _subtitleGap = 2;
+
+  /// 宽为 [width] 的卡片完整显示所需高度（标题 1 行 + 副标题 2 行，按当前字号实测行高）。
+  ///
+  /// 卡架 / 网格据此给定高度，字号放大时不会溢出。
+  static double heightFor(BuildContext context, double width) {
+    final textTheme = Theme.of(context).textTheme;
+    final title = TextMetrics.lineHeight(context, textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700));
+    final subtitle = TextMetrics.lineHeight(context, textTheme.bodySmall);
+    // 末尾 4px 余量：吸收不同字体的基线取整误差
+    return _padding * 2 + (width - _padding * 2) + _coverGap + title + _subtitleGap + subtitle * 2 + 4;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +63,7 @@ class ExpressiveCard extends StatelessWidget {
 
     return Container(
       width: width,
-      margin: const EdgeInsets.only(right: 14.0),
+      margin: margin,
       child: HoverBuilder(
         builder: (context, hovered) => Material(
           color: hovered ? colorScheme.surfaceContainerHigh : Colors.transparent,
@@ -53,7 +74,7 @@ class ExpressiveCard extends StatelessWidget {
             // 悬停底色由 Material 负责（带动画的 InkWell 悬停色会与之叠加变脏）
             hoverColor: Colors.transparent,
             child: Padding(
-              padding: const EdgeInsets.all(6.0),
+              padding: const EdgeInsets.all(_padding),
               child: Column(
                 crossAxisAlignment: isCircular ? CrossAxisAlignment.center : CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -68,11 +89,7 @@ class ExpressiveCard extends StatelessWidget {
                             shape: isCircular ? BoxShape.circle : BoxShape.rectangle,
                             borderRadius: isCircular ? null : tokens.radius(MD3EShapes.radiusMedium),
                             boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(60),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
+                              BoxShadow(color: Colors.black.withAlpha(60), blurRadius: 10, offset: const Offset(0, 4)),
                             ],
                           ),
                           clipBehavior: Clip.antiAlias,
@@ -91,7 +108,7 @@ class ExpressiveCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: _coverGap),
                   Text(
                     title,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -103,7 +120,7 @@ class ExpressiveCard extends StatelessWidget {
                     textAlign: isCircular ? TextAlign.center : TextAlign.start,
                   ),
                   if (subtitle != null && subtitle!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: _subtitleGap),
                     Text(
                       subtitle!,
                       style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),

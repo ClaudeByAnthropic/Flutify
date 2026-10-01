@@ -96,13 +96,12 @@
 
   "homeLoadFailedTitle": "无法加载推荐内容",
   "homeLoadFailedMessage": "请检查网络连接后重试。",
-  "homeMadeForYou": "为你打造",
-  "homeMadeForYouSubtitle": "每日更新的新鲜音乐与推荐。",
-  "homePopularReleases": "热门新发行",
-  "homePopularReleasesSubtitle": "当下最受欢迎的专辑。",
-  "homePopularArtists": "热门艺人",
-  "homeNoPodcastsTitle": "暂无播客",
-  "homeNoPodcastsMessage": "播客节目和单集会显示在这里。",
+  "homeEmptyTitle": "这里暂时没有内容",
+  "homeEmptyMessage": "换个筛选标签看看，或稍后再来。",
+  "homeClearFilter": "清除筛选",
+  "homePodcastUnsupported": "暂不支持播客，敬请期待",
+  "homeTypePodcast": "播客",
+  "homeTypeEpisode": "单集",
 
   "searchHint": "你想听什么？",
   "searchRecent": "最近搜索",
@@ -193,6 +192,10 @@
   "@playbackErrorNetwork": {
     "placeholders": { "track": { "type": "String" } }
   },
+  "playbackErrorAutoPaused": "连续 {count} 首无法播放，已暂停",
+  "@playbackErrorAutoPaused": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "detailSignInRequired": "登录后即可查看这里的内容",
   "detailLoadFailed": "暂时无法加载，请检查网络后重试",
 
@@ -267,6 +270,12 @@
   "settingsCornerRounded": "圆润",
   "settingsCornerStandard": "标准",
   "settingsCornerSquare": "方正",
+  "settingsPlaybackSection": "播放",
+  "settingsPauseAfterFailures": "连续无法播放时暂停",
+  "settingsPauseAfterFailuresSubtitle": "连续 {count} 首无法播放就停下，不再继续自动跳过",
+  "@settingsPauseAfterFailuresSubtitle": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "settingsMotionSection": "动效",
   "settingsReduceMotion": "减弱动效",
   "settingsReduceMotionSubtitle": "关闭流动背景、过渡与悬停等装饰性动画",

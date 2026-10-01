@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -117,7 +118,11 @@ void main() {
         if (url.path.startsWith('/identity/v3/user/username/')) {
           return http.Response.bytes(identityProfile(), 200);
         }
+        // 真实服务端行为：profile/me 是用户名为 "me" 的另一个账号，只有按本人用户名请求才是本人资料
         if (url.path == '/user-profile-view/v3/profile/me') {
+          return http.Response(jsonEncode({'name': 'Someone Else', 'image_url': 'https://i.scdn.co/other'}), 200);
+        }
+        if (url.path == '/user-profile-view/v3/profile/desktop-user') {
           return http.Response(jsonEncode({'name': 'Desktop User', 'image_url': 'https://i.scdn.co/me'}), 200);
         }
         return http.Response('', 200); // /api/logout/v1
@@ -361,9 +366,16 @@ void main() {
 
     test('桌面版：以桌面身份申请 client-token，请求头一致，refresh_token 续期', () async {
       await storage.setClientId('0123456789abcdef0123456789abcdef');
-      final auth = SpotifyAuthService(storage, fakeServer());
+      final resolverTokens = <String>[];
+      final auth = SpotifyAuthService(storage, fakeServer(), null, (token, _) async {
+        resolverTokens.add(token);
+        return 'desktop-user';
+      });
 
       await auth.completeOAuth(config: const OAuthClientConfig.desktop(), code: 'c', codeVerifier: 'v');
+      // 桌面版令牌响应不含用户名：用令牌向 AP 查询 canonical username（媒体库按它寻址）
+      expect(resolverTokens, ['oauth-access']);
+      expect(auth.username, 'desktop-user');
       expect(tokenRequests.single['client_id'], SpotifyAuthConstants.desktopClientId);
       expect(tokenRequests.single['redirect_uri'], 'http://127.0.0.1:8898/login');
       expect(tokenHttpRequests.single.headers['User-Agent'], SpotifyAuthConstants.desktopUserAgent);
@@ -381,7 +393,8 @@ void main() {
       expect(clientTokenRequests.single.headers['User-Agent'], SpotifyAuthConstants.desktopUserAgent);
       expect(storage.clientTokenProfile, 'desktop');
 
-      expect(auth.displayName, 'Desktop User', reason: '桌面版资料来自内部 profile-view 接口');
+      expect(auth.displayName, 'Desktop User', reason: '桌面版资料来自内部 profile-view/{用户名}，不能用 profile/me');
+      expect(auth.avatarUrl, 'https://i.scdn.co/me');
       expect(auth.clientHeaders['app-platform'], SpotifyAuthConstants.desktopPlatform);
       expect(auth.clientHeaders['user-agent'], SpotifyAuthConstants.desktopUserAgent);
 
@@ -457,6 +470,24 @@ void main() {
   });
 
   group('AuthProvider', () {
+    test('旧版桌面会话缺用户名：启动时补齐用户名、改正昵称并重新加载媒体库', () async {
+      // 旧版本登录后只按 profile/me 存了别人的昵称，用户名为空
+      await storage.setAuthMethod(AuthMethod.desktop);
+      await storage.setAccessToken('oauth-access');
+      await storage.setAccessTokenExpiry(DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch);
+      await storage.setRefreshToken('oauth-refresh');
+      await storage.setDisplayName('Someone Else');
+      expect(storage.isLoggedIn, isTrue);
+
+      final provider = AuthProvider(SpotifyAuthService(storage, fakeServer(), null, (_, _) async => 'desktop-user'));
+      final reloaded = Completer<void>();
+      provider.onSessionChanged = reloaded.complete;
+      await reloaded.future.timeout(const Duration(seconds: 5));
+
+      expect(provider.username, 'desktop-user');
+      expect(provider.displayName, 'Desktop User');
+    });
+
     test('验证码流转、重新发送冷却与登出', () async {
       final provider = AuthProvider(SpotifyAuthService(storage, fakeServer()));
       var sessionChanges = 0;

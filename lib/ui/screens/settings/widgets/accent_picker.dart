@@ -26,8 +26,8 @@ class AccentPicker extends StatelessWidget {
     if (color != null) onChanged(color);
   }
 
-  /// 色块之间的最小间距。
-  static const double _minGap = 10;
+  /// 色块之间的最小间距：判断一行放几个与单行排布用同一个值，否则临界宽度会溢出。
+  static const double _gap = 14;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +52,7 @@ class AccentPicker extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, box) {
           // 一行放得下就一行；放不下时均分成若干行（手机上 4 + 4），避免 6 + 2 的残行
-          final fit = ((box.maxWidth + _minGap) / (_Swatch.outer + _minGap)).floor().clamp(1, swatches.length);
+          final fit = ((box.maxWidth + _gap) / (_Swatch.outer + _gap)).floor().clamp(1, swatches.length);
           final rows = (swatches.length / fit).ceil();
           final perRow = (swatches.length / rows).ceil();
           return Column(
@@ -64,7 +64,7 @@ class AccentPicker extends StatelessWidget {
                     mainAxisAlignment: rows == 1 ? MainAxisAlignment.start : MainAxisAlignment.spaceBetween,
                     children: [
                       for (final (i, s) in swatches.skip(r * perRow).take(perRow).indexed) ...[
-                        if (rows == 1 && i > 0) const SizedBox(width: 14),
+                        if (rows == 1 && i > 0) const SizedBox(width: _gap),
                         s,
                       ],
                     ],

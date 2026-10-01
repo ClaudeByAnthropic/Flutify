@@ -176,31 +176,6 @@ void main() {
     expect(result.playlists.single.ownerName, 'Someone');
   });
 
-  test('home：跨分区去重收集歌单', () {
-    Map<String, dynamic> card(String id) => {
-          'uri': 'spotify:playlist:$id',
-          'content': {
-            '__typename': 'PlaylistResponseWrapper',
-            'data': {'uri': 'spotify:playlist:$id', 'name': id, 'content': {'totalCount': 50}},
-          },
-        };
-    final playlists = PathfinderParsers.homePlaylists({
-      'home': {
-        'sectionContainer': {
-          'sections': {
-            'items': [
-              {'sectionItems': {'items': [card('p1'), card('p2')]}},
-              {'sectionItems': {'items': [card('p2'), card('p3')]}},
-            ],
-          },
-        },
-      },
-    });
-
-    expect(playlists.map((p) => p.id), ['p1', 'p2', 'p3']);
-    expect(playlists.first.totalTracks, 50);
-  });
-
   test('browseAll：分类卡片', () {
     final categories = PathfinderParsers.categories({
       'browseStart': {

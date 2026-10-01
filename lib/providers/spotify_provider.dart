@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/artist.dart';
 import '../models/category.dart';
 import '../models/device.dart';
+import '../models/home_feed.dart';
 import '../models/lyrics.dart';
 import '../models/playlist.dart';
 import '../models/track.dart';
@@ -20,12 +21,17 @@ class SpotifyProvider extends ChangeNotifier {
   final StorageService _storage;
 
   SpotifyUser _user = SpotifyUser.guest;
-  List<SpotifyPlaylist> _featuredPlaylists = [];
+  HomeFeed _home = HomeFeed.empty;
   List<SpotifyCategory> _categories = [];
   List<SpotifyDevice> _devices = [];
   SpotifyDevice? _activeDevice;
   bool _isLoadingHome = false;
   String? _homeError;
+
+  // 主页筛选标签：切换时只重新请求主页，不动用户 / 分类 / 设备
+  String _homeFacet = '';
+  bool _isLoadingFeed = false;
+  int _feedGeneration = 0;
 
   // Search
   Timer? _searchTimer;
@@ -50,11 +56,17 @@ class SpotifyProvider extends ChangeNotifier {
   }
 
   SpotifyUser get user => _user;
-  List<SpotifyPlaylist> get featuredPlaylists => _featuredPlaylists;
+  HomeFeed get home => _home;
   List<SpotifyCategory> get categories => _categories;
   List<SpotifyDevice> get devices => _devices;
   SpotifyDevice? get activeDevice => _activeDevice;
   bool get isLoadingHome => _isLoadingHome;
+
+  /// 当前主页筛选标签 id（空 = 全部）。
+  String get homeFacet => _homeFacet;
+
+  /// 主页内容加载中（首次加载或切换筛选标签）。
+  bool get isLoadingFeed => _isLoadingHome || _isLoadingFeed;
 
   /// 主页数据加载失败的说明（简体中文）；成功或未登录为 null。
   /// 未登录时各列表为空且不算错误，UI 应展示登录引导而不是错误。
@@ -67,13 +79,14 @@ class SpotifyProvider extends ChangeNotifier {
   List<SpotifyPlaylist> get searchPlaylists => _searchPlaylists;
   List<String> get recentSearches => _recentSearches;
 
-  /// 加载主页数据（用户、推荐歌单、分类、设备）。登录 / 登出后应再次调用。
+  /// 加载主页数据（用户、主页分区、分类、设备）。登录 / 登出后应再次调用。
   ///
   /// 四个请求互不依赖，并行发出；任意一个失败只影响自己的那部分数据，
   /// 失败原因记入 [homeError]（取第一条）。
   Future<void> loadInitialData() async {
     _isLoadingHome = true;
     _homeError = null;
+    final feedGeneration = ++_feedGeneration;
     notifyListeners();
 
     Future<T> guard<T>(Future<T> request, T fallback) async {
@@ -87,18 +100,45 @@ class SpotifyProvider extends ChangeNotifier {
 
     final results = await Future.wait<Object>([
       guard<SpotifyUser>(_api.getCurrentUser(), SpotifyUser.guest),
-      guard<List<SpotifyPlaylist>>(_api.getFeaturedPlaylists(), const []),
+      guard<HomeFeed>(_api.getHome(facet: _homeFacet), HomeFeed.empty),
       guard<List<SpotifyCategory>>(_api.getCategories(), const []),
       guard<List<SpotifyDevice>>(_api.getDevices(), const []),
     ]);
     if (_disposed) return; // 加载期间 provider 已被销毁（如测试 / 热重载）
     _user = results[0] as SpotifyUser;
-    _featuredPlaylists = results[1] as List<SpotifyPlaylist>;
+    // 加载期间用户已切换筛选标签：以那次请求的结果为准
+    if (feedGeneration == _feedGeneration) {
+      _home = results[1] as HomeFeed;
+      _isLoadingFeed = false;
+    }
     _categories = results[2] as List<SpotifyCategory>;
     _devices = results[3] as List<SpotifyDevice>;
     _activeDevice = _devices.isEmpty ? null : _devices.firstWhere((d) => d.isActive, orElse: () => _devices.first);
 
     _isLoadingHome = false;
+    notifyListeners();
+  }
+
+  /// 切换主页筛选标签（[facet] 为空 = 全部）：只重新请求主页分区。
+  ///
+  /// 连续点击时丢弃过期请求的结果；失败时保留旧内容并记入 [homeError]。
+  Future<void> selectHomeFacet(String facet) async {
+    if (facet == _homeFacet && !_home.isEmpty) return;
+    _homeFacet = facet;
+    final generation = ++_feedGeneration;
+    _isLoadingFeed = true;
+    notifyListeners();
+
+    HomeFeed? feed;
+    try {
+      feed = await _api.getHome(facet: facet);
+      _homeError = null;
+    } catch (e) {
+      _homeError = e is SpotifyDataException ? e.toString() : '加载失败：$e';
+    }
+    if (_disposed || generation != _feedGeneration) return;
+    if (feed != null) _home = feed;
+    _isLoadingFeed = false;
     notifyListeners();
   }
 
@@ -180,12 +220,16 @@ class SpotifyProvider extends ChangeNotifier {
     //
     // 只缓存成功结果（含「这首歌没有歌词」）；网络 / 鉴权错误不缓存，下次打开歌词页会重试，
     // 本次对 UI 返回空歌词（显示「暂无歌词」）。
-    return _lyricsInFlight[trackId] ??= _api.getLyrics(trackId).then((lyrics) {
-      _lyricsCache[trackId] = lyrics;
-      return lyrics;
-    }).catchError((Object _) => const SpotifyLyrics(lines: [])).whenComplete(() {
-      _lyricsInFlight.remove(trackId);
-    });
+    return _lyricsInFlight[trackId] ??= _api
+        .getLyrics(trackId)
+        .then((lyrics) {
+          _lyricsCache[trackId] = lyrics;
+          return lyrics;
+        })
+        .catchError((Object _) => const SpotifyLyrics(lines: []))
+        .whenComplete(() {
+          _lyricsInFlight.remove(trackId);
+        });
   }
 
   // ---------------------------------------------------------------------------

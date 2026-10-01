@@ -12,11 +12,19 @@ class PlaybackError {
   /// 播放器是否已自动跳到下一首（仅「不可播放」类错误会跳）。
   final bool skipped;
 
+  /// 连续 [consecutiveFailures] 首无法播放、已按设置自动暂停（不再继续跳过）。
+  final bool autoPaused;
+
+  /// 截至本次，连续无法播放的曲目数（含本首）。
+  final int consecutiveFailures;
+
   const PlaybackError({
     required this.serial,
     required this.track,
     required this.exception,
     required this.skipped,
+    this.autoPaused = false,
+    this.consecutiveFailures = 1,
   });
 
   TrackPlaybackFailure get kind => exception.kind;
