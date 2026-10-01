@@ -8,13 +8,11 @@ import '../../../core/theme/flutify_tokens.dart';
 import '../../../core/theme/system_bars.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/track.dart';
-import '../../../providers/connect_provider.dart';
-import '../../../providers/playback_provider.dart';
 import '../../../services/storage_service.dart';
 import '../../shell/desktop/desktop_window.dart';
 import '../../shell/desktop/window_caption_buttons.dart';
-import '../../widgets/connect/connect_actions.dart';
 import '../../widgets/connect/now_playing_source.dart';
+import '../../widgets/connect/playback_shortcuts.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
 import 'lyrics/glass_icon_button.dart';
@@ -119,10 +117,6 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
     // 遥控远程设备时展示远程曲目，快捷键也发给远程设备
     final remote = NowPlayingSource.isRemote(context);
     final track = NowPlayingSource.track(context);
-    final playback = context.read<PlaybackProvider>();
-    final connect = context.read<ConnectProvider?>();
-    VoidCallback action(VoidCallback local, Future<void> Function()? onRemote) =>
-        remote && onRemote != null ? () => ConnectActions.run(context, onRemote) : local;
     // 只铺满窗口时顶部让出窗口按钮那一行
     final topInset = _screen || !DesktopWindow.enabled ? 0.0 : _captionInset;
     final l10n = context.l10n;
@@ -133,15 +127,8 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
         bindings: {
           const SingleActivator(LogicalKeyboardKey.escape): _close,
           const SingleActivator(LogicalKeyboardKey.f11): _toggleMode,
-          const SingleActivator(LogicalKeyboardKey.space): action(playback.togglePlayPause, connect?.togglePlayPause),
-          const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): action(
-            playback.nextTrack,
-            connect?.skipNext,
-          ),
-          const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): action(
-            playback.previousTrack,
-            connect?.skipPrevious,
-          ),
+          // 播放类按键与主窗口相同，远程模式下控制其他设备
+          ...PlaybackShortcuts.bindings(context),
         },
         child: Focus(
           autofocus: true,

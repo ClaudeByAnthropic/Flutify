@@ -22,6 +22,7 @@ import 'providers/sleep_timer_provider.dart';
 import 'providers/spotify_provider.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
+import 'services/media_controls/connect_media_redirect.dart';
 import 'services/media_controls/media_controls_sync.dart';
 import 'services/media_controls/system_media_controls.dart';
 import 'services/playback_session_store.dart';
@@ -128,6 +129,8 @@ class FlutifyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 播放 Provider 创建时生成，Connect Provider 创建时接上远程转发（两个 create 各只执行一次）
+    MediaControlsSync? mediaSync;
     return MultiProvider(
       providers: [
         Provider<StorageService>.value(value: storageService),
@@ -154,7 +157,7 @@ class FlutifyApp extends StatelessWidget {
             DesktopWindow.addBeforeCloseHook(playback.flushSession);
             // 与 App 同生命周期，不需要单独释放
             final controls = mediaControls;
-            if (controls != null) MediaControlsSync(playback, controls);
+            if (controls != null) mediaSync = MediaControlsSync(playback, controls);
             return playback;
           },
         ),
@@ -170,11 +173,17 @@ class FlutifyApp extends StatelessWidget {
         // Spotify Connect 遥控：非惰性，启动即接入（桌面版会话且设置里未关闭），播放栏才能及时显示远程播放
         ChangeNotifierProvider(
           lazy: false,
-          create: (ctx) => ConnectProvider(
-            spotifyApiService.connect,
-            available: () => spotifyApiService.supportsConnect && ctx.read<PreferencesProvider>().prefs.connectEnabled,
-            resolveTrack: spotifyApiService.getTrackByUri,
-          ),
+          create: (ctx) {
+            final playback = ctx.read<PlaybackProvider>();
+            final connect = ConnectProvider(
+              spotifyApiService.connect,
+              available: () => spotifyApiService.supportsConnect && ctx.read<PreferencesProvider>().prefs.connectEnabled,
+              resolveTrack: spotifyApiService.getTrackByUri,
+            );
+            // 在其他设备上播放时，系统媒体键控制那台设备
+            mediaSync?.redirect = connectMediaRedirect(connect, playback);
+            return connect;
+          },
         ),
         // 登录态变化后：重新拉取主页数据与媒体库（未登录时清空），Connect 重新接入或断开
         ChangeNotifierProvider(

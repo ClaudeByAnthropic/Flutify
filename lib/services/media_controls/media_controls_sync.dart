@@ -17,6 +17,10 @@ class MediaControlsSync {
 
   static const Duration timelineInterval = Duration(seconds: 5);
 
+  /// 系统按键先交给它：返回 true 表示已处理（例如远程模式下转给 Connect 设备，见 [connectMediaRedirect]），
+  /// 本机不再响应。
+  bool Function(MediaControlEvent event)? redirect;
+
   StreamSubscription<MediaControlEvent>? _events;
   String? _trackId;
   MediaPlaybackInfo? _lastPlayback;
@@ -84,6 +88,7 @@ class MediaControlsSync {
   );
 
   void _onEvent(MediaControlEvent event) {
+    if (redirect?.call(event) ?? false) return;
     switch (event) {
       case MediaButtonEvent(button: MediaButton.play):
         if (!playback.isPlaying) unawaited(playback.togglePlayPause());

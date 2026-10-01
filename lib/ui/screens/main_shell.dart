@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/app_preferences.dart';
-import '../../providers/playback_provider.dart';
 import '../../providers/preferences_provider.dart';
 import '../../providers/spotify_provider.dart';
 import '../../services/storage_service.dart';
@@ -15,6 +14,7 @@ import '../shell/desktop/desktop_top_bar.dart';
 import '../shell/shell_breakpoints.dart';
 import '../shell/mobile/mobile_bottom_bar.dart';
 import '../shell/shell_layout_controller.dart';
+import '../widgets/connect/playback_shortcuts.dart';
 import '../widgets/playback_error_listener.dart';
 import '../widgets/track_hotkeys.dart';
 import 'home/home_screen.dart';
@@ -142,16 +142,9 @@ class _MainShellState extends State<MainShell> {
   void _onSearchSubmitted(String query) => context.read<SpotifyProvider>().commitRecentSearch(query);
 
   /// 桌面快捷键（与 Spotify 桌面端一致）。输入框聚焦时空格会被 TextField 拦截，不会误触。
-  Map<ShortcutActivator, VoidCallback> _shortcuts(PlaybackProvider playback) => {
-    const SingleActivator(LogicalKeyboardKey.space): playback.togglePlayPause,
-    const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): playback.nextTrack,
-    const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): playback.previousTrack,
-    const SingleActivator(LogicalKeyboardKey.arrowUp, control: true): () =>
-        playback.setVolume(playback.volume + 0.1, persist: true),
-    const SingleActivator(LogicalKeyboardKey.arrowDown, control: true): () =>
-        playback.setVolume(playback.volume - 0.1, persist: true),
-    const SingleActivator(LogicalKeyboardKey.keyS, control: true): playback.toggleShuffle,
-    const SingleActivator(LogicalKeyboardKey.keyR, control: true): playback.cycleRepeatMode,
+  /// 播放类按键在远程模式下控制正在播放的其他设备（[PlaybackShortcuts]）。
+  Map<ShortcutActivator, VoidCallback> _shortcuts() => {
+    ...PlaybackShortcuts.bindings(context),
     const SingleActivator(LogicalKeyboardKey.keyK, control: true): _searchFocus.requestFocus,
     const SingleActivator(LogicalKeyboardKey.keyL, control: true): _searchFocus.requestFocus,
     const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () => _histories[_currentIndex].back(),
@@ -188,7 +181,7 @@ class _MainShellState extends State<MainShell> {
         // 曲目快捷键在外层：全局快捷键（Ctrl+S 等）先匹配，字母键再交给悬停的曲目行
         child: TrackHotkeys(
           child: CallbackShortcuts(
-          bindings: _shortcuts(context.read<PlaybackProvider>()),
+          bindings: _shortcuts(),
           child: Focus(
             autofocus: true,
             child: DesktopShell(

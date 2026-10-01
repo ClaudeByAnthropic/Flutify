@@ -13,30 +13,22 @@ import '../../../providers/playback_provider.dart';
 class ConnectActions {
   ConnectActions._();
 
-  /// 播放栏是否切换为远程模式：
-  /// - 本机正在出声 → 本机优先；
-  /// - 远程正在出声 → 远程；
-  /// - 远程已暂停、本机没有曲目 → 远程（显示远程上次的曲目，可一键继续）。
+  /// 播放栏是否切换为远程模式（规则见 [ConnectProvider.controlsRemote]）；在 build 中调用，按需订阅。
   static bool showRemote(BuildContext context) {
-    final remote = context.select<ConnectProvider?, (bool, bool)>(
-      (c) => (c?.hasRemoteSession ?? false, c?.player.isAudible ?? false),
-    );
-    if (!remote.$1) return false;
+    final remote = context.select<ConnectProvider?, bool>((c) => c?.hasRemoteSession ?? false);
+    if (!remote) return false;
     final local = context.select<PlaybackProvider, (bool, bool)>((p) => (p.isPlaying, p.currentTrack != null));
-    return _decide(remote.$2, local.$1, local.$2);
+    return context.select<ConnectProvider, bool>(
+      (c) => c.controlsRemote(localPlaying: local.$1, localHasTrack: local.$2),
+    );
   }
 
-  /// 同 [showRemote]，但不订阅，供点击等回调里使用。
+  /// 同 [showRemote]，但不订阅，供点击、快捷键等回调里使用。
   static bool isRemoteNow(BuildContext context) {
     final connect = context.read<ConnectProvider?>();
-    if (connect == null || !connect.hasRemoteSession) return false;
+    if (connect == null) return false;
     final playback = context.read<PlaybackProvider>();
-    return _decide(connect.player.isAudible, playback.isPlaying, playback.currentTrack != null);
-  }
-
-  static bool _decide(bool remoteAudible, bool localPlaying, bool localHasTrack) {
-    if (localPlaying) return false;
-    return remoteAudible || !localHasTrack;
+    return connect.controlsRemote(localPlaying: playback.isPlaying, localHasTrack: playback.currentTrack != null);
   }
 
   /// 转移到远程设备：先暂停本机，避免两边同时出声。

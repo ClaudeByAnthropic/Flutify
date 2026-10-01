@@ -8,6 +8,9 @@ import 'package:flutify_app/providers/library_provider.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
 import 'package:flutify_app/providers/spotify_provider.dart';
 import 'package:flutify_app/services/connect/connect_service.dart';
+import 'package:flutify_app/services/media_controls/connect_media_redirect.dart';
+import 'package:flutify_app/services/media_controls/system_media_controls.dart';
+import 'package:flutify_app/ui/widgets/connect/playback_shortcuts.dart';
 import 'package:flutify_app/services/spotify_api_service.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/player/device_picker_sheet.dart';
@@ -268,6 +271,64 @@ void main() {
         });
       }
     }
+  });
+
+  group('keyboard shortcuts and media keys', () {
+    final host = Builder(
+      builder: (context) => CallbackShortcuts(
+        bindings: PlaybackShortcuts.bindings(context),
+        child: const Focus(autofocus: true, child: SizedBox(width: 10, height: 10)),
+      ),
+    );
+
+    Future<void> ctrl(WidgetTester tester, LogicalKeyboardKey key) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(key);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    }
+
+    testWidgets('control the remote device while it is playing', (tester) async {
+      await pumpHost(tester, const Size(1280, 700), host, cluster: syntheticCluster());
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await ctrl(tester, LogicalKeyboardKey.arrowRight);
+      await ctrl(tester, LogicalKeyboardKey.arrowLeft);
+      await ctrl(tester, LogicalKeyboardKey.keyS);
+      await ctrl(tester, LogicalKeyboardKey.arrowUp);
+      await tester.pump(const Duration(milliseconds: 200)); // 音量请求节流 150ms
+      expect(service.commands, [
+        'pause:synthetic-speaker',
+        'next:synthetic-speaker',
+        'prev:synthetic-speaker',
+        'shuffle:true',
+        'volume:synthetic-speaker',
+      ]);
+      await unmount(tester);
+    });
+
+    testWidgets('control this device when nothing plays elsewhere', (tester) async {
+      await pumpHost(tester, const Size(1280, 700), host, cluster: syntheticCluster(withActive: false));
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await ctrl(tester, LogicalKeyboardKey.arrowRight);
+      expect(service.commands, isEmpty);
+      await unmount(tester);
+    });
+
+    testWidgets('media keys go to the remote device only in remote mode', (tester) async {
+      await pumpHost(tester, const Size(1280, 700), host, cluster: syntheticCluster());
+      final context = tester.element(find.byType(SizedBox).last);
+      final redirect = connectMediaRedirect(context.read<ConnectProvider>(), context.read<PlaybackProvider>());
+
+      expect(redirect(const MediaButtonEvent(MediaButton.toggle)), isTrue);
+      expect(redirect(const MediaButtonEvent(MediaButton.play)), isTrue); // 已在播放：不重复发送
+      expect(redirect(const MediaButtonEvent(MediaButton.next)), isTrue);
+      await tester.pump();
+      expect(service.commands, ['pause:synthetic-speaker', 'next:synthetic-speaker']);
+
+      service.push(syntheticCluster(withActive: false));
+      await tester.pump();
+      expect(redirect(const MediaButtonEvent(MediaButton.toggle)), isFalse);
+      await unmount(tester);
+    });
   });
 
   group('track list', () {

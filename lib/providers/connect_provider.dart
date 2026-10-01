@@ -65,6 +65,13 @@ class ConnectProvider extends ChangeNotifier {
   /// 有远程设备且它上面有曲目（播放中或已暂停）。
   bool get hasRemoteSession => activeDevice != null && player.hasTrack;
 
+  /// 播放控制（播放栏、快捷键、媒体键）是否应发给远程设备，即播放栏是否为远程模式：
+  /// - 本机正在出声 → 本机优先；
+  /// - 远程正在出声 → 远程；
+  /// - 远程已暂停、本机没有曲目 → 远程（可一键继续远程上次的曲目）。
+  bool controlsRemote({required bool localPlaying, required bool localHasTrack}) =>
+      hasRemoteSession && !localPlaying && (player.isAudible || !localHasTrack);
+
   /// 远程曲目的完整信息（含艺人）；补全中或失败时为 null，UI 回退到 [player] 里的标题 / 专辑。
   SpotifyTrack? get remoteTrack => _tracks[player.trackUri];
 

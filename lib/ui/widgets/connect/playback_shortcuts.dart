@@ -1,0 +1,60 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../../../providers/connect_provider.dart';
+import '../../../providers/playback_provider.dart';
+import 'connect_actions.dart';
+
+/// 播放类键盘快捷键（主窗口与沉浸式歌词共用，与 Spotify 桌面端一致）。
+///
+/// 每次按键时才判断控制对象（[ConnectActions.isRemoteNow]）：播放栏处于远程模式（在其他设备上播放）时
+/// 发给远程设备，失败弹出提示；否则控制本机。远程设备不支持调音量时音量键不做任何事。
+class PlaybackShortcuts {
+  PlaybackShortcuts._();
+
+  static const double _volumeStep = 0.1;
+
+  static Map<ShortcutActivator, VoidCallback> bindings(BuildContext context) {
+    VoidCallback route(void Function(PlaybackProvider p) local, Future<void> Function(ConnectProvider c) remote) => () {
+      if (ConnectActions.isRemoteNow(context)) {
+        final connect = context.read<ConnectProvider>();
+        ConnectActions.run(context, () => remote(connect));
+      } else {
+        local(context.read<PlaybackProvider>());
+      }
+    };
+
+    VoidCallback volume(double delta) => () {
+      if (ConnectActions.isRemoteNow(context)) {
+        final connect = context.read<ConnectProvider>();
+        if (connect.activeDevice?.supportsVolume ?? false) connect.setVolume(connect.volume + delta);
+      } else {
+        final playback = context.read<PlaybackProvider>();
+        playback.setVolume(playback.volume + delta, persist: true);
+      }
+    };
+
+    return {
+      const SingleActivator(LogicalKeyboardKey.space): route((p) => p.togglePlayPause(), (c) => c.togglePlayPause()),
+      const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): route(
+        (p) => p.nextTrack(),
+        (c) => c.skipNext(),
+      ),
+      const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): route(
+        (p) => p.previousTrack(),
+        (c) => c.skipPrevious(),
+      ),
+      const SingleActivator(LogicalKeyboardKey.arrowUp, control: true): volume(_volumeStep),
+      const SingleActivator(LogicalKeyboardKey.arrowDown, control: true): volume(-_volumeStep),
+      const SingleActivator(LogicalKeyboardKey.keyS, control: true): route(
+        (p) => p.toggleShuffle(),
+        (c) => c.toggleShuffle(),
+      ),
+      const SingleActivator(LogicalKeyboardKey.keyR, control: true): route(
+        (p) => p.cycleRepeatMode(),
+        (c) => c.cycleRepeat(),
+      ),
+    };
+  }
+}
