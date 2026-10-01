@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../../models/app_preferences.dart';
+import '../../../services/storage_service.dart';
+import 'window_bounds_memory.dart';
+
 /// 桌面窗口外观：隐藏系统标题栏，由顶栏自绘（拖动区 + 最小化 / 最大化 / 关闭）。
 ///
 /// 只在 Windows / macOS / Linux 的真实运行中启用；Widget 测试和移动端
@@ -23,23 +27,57 @@ class DesktopWindow {
   /// 当前是否处于系统全屏（沉浸式歌词）；全屏时 `WindowFrame` 隐藏窗口按钮与标题条。
   static final ValueNotifier<bool> fullScreen = ValueNotifier(false);
 
-  /// 在 runApp 之前调用。
-  static Future<void> init() async {
+  /// 沉浸式歌词正以「仅铺满窗口」方式显示：`WindowFrame` 不加窄窗口标题条，
+  /// 窗口按钮以深色样式浮在右上角（沉浸式背景始终是深色）。
+  static final ValueNotifier<bool> immersiveWindow = ValueNotifier(false);
+
+  /// 在 runApp 之前调用。开启「记住窗口大小和位置」时，在窗口显示前就放到上次的位置（不闪一下再跳）。
+  static Future<void> init(StorageService storage) async {
     if (kIsWeb || !(Platform.isWindows || Platform.isMacOS || Platform.isLinux)) return;
     await windowManager.ensureInitialized();
-    const options = WindowOptions(
-      size: Size(1360, 860),
+    bool remember() => AppPreferences.decode(storage.preferencesJson).rememberWindow;
+    final saved = remember() ? await WindowBoundsMemory.restorable(storage, minimumSize: minimumSize) : null;
+    final options = WindowOptions(
+      size: saved?.rect.size ?? const Size(1360, 860),
       minimumSize: minimumSize,
-      center: true,
+      center: saved == null,
       title: 'Flutify',
       titleBarStyle: TitleBarStyle.hidden,
       windowButtonVisibility: false,
     );
     await windowManager.waitUntilReadyToShow(options, () async {
+      if (saved != null) {
+        await windowManager.setPosition(saved.rect.topLeft);
+        if (saved.maximized) await windowManager.maximize();
+      }
       await windowManager.show();
       await windowManager.focus();
     });
+    // 监听器由 windowManager 持有，随进程存活
+    WindowBoundsMemory(
+      storage,
+      minimumSize: minimumSize,
+      enabled: remember,
+      fullScreen: () => fullScreen.value,
+    ).attach();
+    // 拦截关闭（窗口按钮 / Alt+F4 / 任务栏），先跑完收尾钩子再销毁窗口
+    await windowManager.setPreventClose(true);
+    windowManager.addListener(_CloseGuard());
     _enabled = true;
+  }
+
+  static final List<Future<void> Function()> _beforeClose = [];
+
+  /// 关窗前要完成的收尾（如保存播放进度）。每个钩子最多等 [_closeTimeout]，超时也照常关闭。
+  static void addBeforeCloseHook(Future<void> Function() hook) => _beforeClose.add(hook);
+
+  static const Duration _closeTimeout = Duration(milliseconds: 800);
+
+  static Future<void> _runBeforeClose() async {
+    await Future.wait([
+      for (final hook in _beforeClose)
+        Future.sync(hook).timeout(_closeTimeout).catchError((Object _) {}),
+    ]);
   }
 
   static Future<void> toggleMaximize() async {
@@ -73,6 +111,19 @@ class DesktopWindow {
     final size = await windowManager.getSize();
     await windowManager.setSize(Size(size.width + 1, size.height));
     await windowManager.setSize(size);
+  }
+}
+
+/// 收到关闭请求时先执行 [DesktopWindow.addBeforeCloseHook] 注册的收尾，再真正销毁窗口。
+class _CloseGuard with WindowListener {
+  bool _closing = false;
+
+  @override
+  Future<void> onWindowClose() async {
+    if (_closing) return;
+    _closing = true;
+    await DesktopWindow._runBeforeClose();
+    await windowManager.destroy();
   }
 }
 

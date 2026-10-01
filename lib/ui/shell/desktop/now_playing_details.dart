@@ -18,7 +18,10 @@ import '../shell_layout_controller.dart';
 class NowPlayingDetails extends StatelessWidget {
   final SpotifyTrack track;
 
-  const NowPlayingDetails({super.key, required this.track});
+  /// 「接下来播放」取自本机队列；展示远程曲目时关闭。
+  final bool showNextUp;
+
+  const NowPlayingDetails({super.key, required this.track, this.showNextUp = true});
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +37,7 @@ class NowPlayingDetails extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withAlpha(60), blurRadius: 24, offset: const Offset(0, 8)),
-              ],
+              boxShadow: [BoxShadow(color: Colors.black.withAlpha(60), blurRadius: 24, offset: const Offset(0, 8))],
             ),
             child: CoverImage(url: track.coverUrl, borderRadius: BorderRadius.circular(12)),
           ),
@@ -71,12 +72,8 @@ class NowPlayingDetails extends StatelessWidget {
             LikeButton(track: track, size: 22, inactiveColor: colorScheme.onSurfaceVariant),
           ],
         ),
-        if (track.artists.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          _AboutArtistCard(artist: track.artists.first),
-        ],
-        const SizedBox(height: 16),
-        const _NextUpCard(),
+        if (track.artists.isNotEmpty) ...[const SizedBox(height: 20), _AboutArtistCard(artist: track.artists.first)],
+        if (showNextUp) ...[const SizedBox(height: 16), const _NextUpCard()],
       ],
     );
   }
@@ -216,10 +213,7 @@ class _NextUpCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 6, 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

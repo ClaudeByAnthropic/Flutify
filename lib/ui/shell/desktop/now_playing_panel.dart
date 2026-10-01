@@ -4,12 +4,12 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/track.dart';
-import '../../../providers/playback_provider.dart';
 import '../../screens/player/immersive_lyrics_screen.dart';
 import '../../screens/player/lyrics/glass_icon_button.dart';
 import '../../screens/player/lyrics/lyrics_backdrop.dart';
 import '../../screens/player/lyrics/lyrics_view.dart';
 import '../../screens/player/queue_list.dart';
+import '../../widgets/connect/now_playing_source.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/filter_pill.dart';
 import '../panel_surface.dart';
@@ -26,7 +26,9 @@ class NowPlayingPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final layout = context.watch<ShellLayoutController>();
-    final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
+    // 遥控远程设备时展示远程曲目（歌词按远程进度滚动）
+    final remote = NowPlayingSource.isRemote(context);
+    final track = NowPlayingSource.track(context);
     final l10n = context.l10n;
 
     final labels = {
@@ -78,12 +80,15 @@ class NowPlayingPanel extends StatelessWidget {
                 key: ValueKey(layout.tab),
                 child: switch (layout.tab) {
                   NowPlayingTab.queue => const QueueList(horizontalPadding: 16),
-                  NowPlayingTab.details => track == null
-                      ? _Nothing(title: l10n.playerNothingPlayingTitle, message: l10n.playerNothingPlayingMessage)
-                      : NowPlayingDetails(track: track),
-                  NowPlayingTab.lyrics => track == null
-                      ? _Nothing(title: l10n.lyricsNotPlaying, message: l10n.lyricsNothingPlayingMessage)
-                      : _LyricsCard(track: track),
+                  NowPlayingTab.details =>
+                    track == null
+                        ? _Nothing(title: l10n.playerNothingPlayingTitle, message: l10n.playerNothingPlayingMessage)
+                        // 「接下来播放」是本机队列，远程时不显示
+                        : NowPlayingDetails(track: track, showNextUp: !remote),
+                  NowPlayingTab.lyrics =>
+                    track == null
+                        ? _Nothing(title: l10n.lyricsNotPlaying, message: l10n.lyricsNothingPlayingMessage)
+                        : _LyricsCard(track: track, remote: remote),
                 },
               ),
             ),
@@ -98,8 +103,9 @@ class NowPlayingPanel extends StatelessWidget {
 /// 右上角玻璃按钮进入桌面沉浸式歌词。
 class _LyricsCard extends StatelessWidget {
   final SpotifyTrack track;
+  final bool remote;
 
-  const _LyricsCard({required this.track});
+  const _LyricsCard({required this.track, required this.remote});
 
   @override
   Widget build(BuildContext context) {
@@ -112,8 +118,9 @@ class _LyricsCard extends StatelessWidget {
           children: [
             LyricsBackdrop(imageUrl: track.coverUrl),
             LyricsView(
-              key: ValueKey(track.id),
+              key: ValueKey((track.id, remote)),
               trackId: track.id,
+              remote: remote,
               topInset: 56,
               bottomInset: 16,
               fontSize: 24,

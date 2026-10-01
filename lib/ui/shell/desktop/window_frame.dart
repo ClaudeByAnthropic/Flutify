@@ -10,7 +10,7 @@ import 'window_caption_buttons.dart';
 /// - 宽窗口（桌面布局）：窗口按钮浮在右上角，顶栏只为它留出空位，并负责拖动；
 /// - 窄窗口（移动端布局）：顶部加一条 32px 标题条（拖动区 + 窗口按钮），内容整体下移，
 ///   相当于在桌面上模拟手机屏幕；
-/// - 系统全屏（沉浸式歌词）时两者都隐藏；
+/// - 系统全屏（沉浸式歌词）时两者都隐藏；沉浸式歌词仅铺满窗口时只浮深色窗口按钮；
 /// - 未启用自绘标题栏（测试、移动端）时原样返回子组件。
 ///
 /// 自带一层 [Overlay]：Builder 位于 Navigator 之外，窗口按钮的 Tooltip 需要它。
@@ -53,11 +53,27 @@ class _FrameBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
-    return ValueListenableBuilder<bool>(
-      valueListenable: DesktopWindow.fullScreen,
+    return ListenableBuilder(
+      listenable: Listenable.merge([DesktopWindow.fullScreen, DesktopWindow.immersiveWindow]),
       child: child,
-      builder: (context, fullScreen, child) {
-        if (fullScreen) return child!;
+      builder: (context, child) {
+        if (DesktopWindow.fullScreen.value) return child!;
+        // 沉浸式歌词铺满窗口：任何宽度都只浮窗口按钮，深色样式贴合深色背景
+        if (DesktopWindow.immersiveWindow.value) {
+          return Stack(
+            children: [
+              Positioned.fill(child: child!),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Theme(
+                  data: ThemeData(brightness: Brightness.dark, colorScheme: const ColorScheme.dark()),
+                  child: const WindowCaptionButtons(),
+                ),
+              ),
+            ],
+          );
+        }
         if (wide) {
           return Stack(
             children: [
@@ -73,7 +89,10 @@ class _FrameBody extends StatelessWidget {
           children: [
             const _CaptionStrip(),
             Expanded(
-              child: MediaQuery(data: media.copyWith(size: screen, padding: EdgeInsets.zero), child: child!),
+              child: MediaQuery(
+                data: media.copyWith(size: screen, padding: EdgeInsets.zero),
+                child: child!,
+              ),
             ),
           ],
         );

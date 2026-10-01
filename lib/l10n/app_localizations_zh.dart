@@ -489,7 +489,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lyricsImmersive => '沉浸式歌词';
 
   @override
-  String get lyricsExitImmersive => '退出全屏（Esc）';
+  String get lyricsExitImmersive => '退出全屏歌词（Esc）';
+
+  @override
+  String get lyricsFillScreen => '铺满整个屏幕（F11）';
+
+  @override
+  String get lyricsFillWindow => '只铺满窗口（F11）';
 
   @override
   String get deviceConnectTitle => '连接到设备';
@@ -722,6 +728,214 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsBrightness => '亮度';
+
+  @override
+  String get settingsLanguageSection => '语言';
+
+  @override
+  String get settingsLanguage => '界面语言';
+
+  @override
+  String get settingsLanguageSubtitle => '同时影响主页推荐等由 Spotify 提供的文案';
+
+  @override
+  String get settingsLanguageSystem => '跟随系统';
+
+  @override
+  String get settingsLanguageZh => '中文';
+
+  @override
+  String get settingsLanguageEn => 'English';
+
+  @override
+  String get settingsStorageSection => '存储';
+
+  @override
+  String get settingsAudioCache => '音频缓存';
+
+  @override
+  String settingsAudioCacheUsage(String used, String limit) {
+    return '已用 $used，上限 $limit';
+  }
+
+  @override
+  String get settingsAudioCacheCalculating => '正在计算…';
+
+  @override
+  String get settingsAudioCacheLimit => '缓存上限';
+
+  @override
+  String get settingsAudioCacheLimitSubtitle => '超出后自动删除最久没播放的歌曲';
+
+  @override
+  String get settingsClearAudioCache => '清除音频缓存';
+
+  @override
+  String get settingsClearAudioCacheTitle => '清除音频缓存？';
+
+  @override
+  String get settingsClearAudioCacheMessage =>
+      '已下载的歌曲会被删除，再次播放时重新下载。正在播放的歌曲会保留。';
+
+  @override
+  String settingsAudioCacheCleared(String size) {
+    return '已释放 $size';
+  }
+
+  @override
+  String get settingsLyricsSection => '歌词';
+
+  @override
+  String get settingsLyricsSize => '歌词字号';
+
+  @override
+  String get settingsLyricsAlign => '对齐方式';
+
+  @override
+  String get settingsLyricsAlignLeft => '左对齐';
+
+  @override
+  String get settingsLyricsAlignCenter => '居中';
+
+  @override
+  String get settingsLyricsBlur => '其他行模糊';
+
+  @override
+  String get settingsLyricsImmersiveScreen => '全屏歌词铺满整个屏幕';
+
+  @override
+  String get settingsLyricsImmersiveScreenSubtitle =>
+      '关闭时只铺满窗口；在全屏歌词里按 F11 也能切换';
+
+  @override
+  String get settingsOff => '关';
+
+  @override
+  String get settingsNormalize => '音量均衡';
+
+  @override
+  String get settingsNormalizeSubtitle => '按 Spotify 提供的响度数据，把偏响的歌调低到一致的音量';
+
+  @override
+  String get settingsFade => '歌曲间淡入淡出';
+
+  @override
+  String get settingsFadeSubtitle => '结尾逐渐淡出，下一首淡入';
+
+  @override
+  String settingsSeconds(int count) {
+    return '$count 秒';
+  }
+
+  @override
+  String get settingsStartupSection => '启动';
+
+  @override
+  String get settingsStartPage => '启动时打开';
+
+  @override
+  String get settingsStartPageHome => '主页';
+
+  @override
+  String get settingsStartPageLibrary => '音乐库';
+
+  @override
+  String get settingsStartPageLast => '上次位置';
+
+  @override
+  String get settingsRememberWindow => '记住窗口大小和位置';
+
+  @override
+  String get settingsRememberWindowSubtitle => '下次启动时还原；显示器变化导致窗口不可见时回到屏幕中央';
+
+  @override
+  String get settingsConnectSection => 'Spotify Connect';
+
+  @override
+  String get settingsConnectEnabled => '启用 Spotify Connect';
+
+  @override
+  String get settingsConnectEnabledSubtitle => '显示并遥控同一账号在其他设备上的播放';
+
+  @override
+  String get settingsRemoteLyricsLead => '远程歌词提前';
+
+  @override
+  String get settingsRemoteLyricsLeadSubtitle => '其他设备上播放时，歌词比演唱慢就调大，快就调小';
+
+  @override
+  String get settingsPrivacySection => '隐私';
+
+  @override
+  String get settingsClearSearchHistory => '清除搜索记录';
+
+  @override
+  String settingsSearchHistoryCount(int count) {
+    return '$count 条记录';
+  }
+
+  @override
+  String get settingsSearchHistoryEmpty => '没有搜索记录';
+
+  @override
+  String get settingsClearLyricsCache => '清除歌词缓存';
+
+  @override
+  String get settingsClearLyricsCacheSubtitle => '清除后重新从 Spotify 获取歌词';
+
+  @override
+  String get settingsCleared => '已清除';
+
+  @override
+  String get settingsAboutSection => '关于';
+
+  @override
+  String get settingsVersion => '版本';
+
+  @override
+  String get settingsShortcuts => '键盘快捷键';
+
+  @override
+  String get settingsLicenses => '开源许可';
+
+  @override
+  String get shortcutPlayPause => '播放 / 暂停';
+
+  @override
+  String get shortcutNext => '下一首';
+
+  @override
+  String get shortcutPrevious => '上一首';
+
+  @override
+  String get shortcutVolumeUp => '调高音量';
+
+  @override
+  String get shortcutVolumeDown => '调低音量';
+
+  @override
+  String get shortcutShuffle => '随机播放';
+
+  @override
+  String get shortcutRepeat => '切换循环模式';
+
+  @override
+  String get shortcutSearch => '搜索';
+
+  @override
+  String get shortcutBack => '后退';
+
+  @override
+  String get shortcutForward => '前进';
+
+  @override
+  String get shortcutImmersive => '全屏歌词';
+
+  @override
+  String get shortcutImmersiveMode => '全屏歌词中：切换铺满屏幕 / 窗口';
+
+  @override
+  String get shortcutExitImmersive => '退出全屏歌词';
 
   @override
   String get accountTitle => 'Spotify 账号';

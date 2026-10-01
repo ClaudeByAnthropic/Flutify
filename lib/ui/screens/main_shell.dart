@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/app_preferences.dart';
 import '../../providers/playback_provider.dart';
+import '../../providers/preferences_provider.dart';
 import '../../providers/spotify_provider.dart';
+import '../../services/storage_service.dart';
 import '../navigation/app_routes.dart';
 import '../navigation/content_history.dart';
 import '../navigation/tab_navigator.dart';
@@ -33,8 +36,10 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   static const int _home = 0;
   static const int _search = 1;
+  static const int _library = 2;
 
-  int _currentIndex = _home;
+  /// 初始 Tab 按设置页「启动时打开」决定（initState 中读取）。
+  late int _currentIndex;
 
   final List<GlobalKey<NavigatorState>> _navigatorKeys = List.generate(3, (_) => GlobalKey<NavigatorState>());
   final List<ContentHistory> _histories = List.generate(3, (_) => ContentHistory());
@@ -55,7 +60,25 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
+    _currentIndex = _startIndex();
     AppRoutes.contentNavigator = () => _navigatorKeys[_currentIndex].currentState;
+  }
+
+  /// 启动页：主页 / 音乐库 / 上次所在 Tab（未注入 Provider 的测试一律主页）。
+  int _startIndex() {
+    final prefs = Provider.of<PreferencesProvider?>(context, listen: false)?.prefs;
+    final storage = Provider.of<StorageService?>(context, listen: false);
+    return switch (prefs?.startPage) {
+      StartPage.library => _library,
+      StartPage.last => (storage?.lastTab ?? _home).clamp(_home, _library),
+      _ => _home,
+    };
+  }
+
+  /// 切换 Tab 并记录（供「上次位置」使用）。
+  void _setIndex(int index) {
+    setState(() => _currentIndex = index);
+    Provider.of<StorageService?>(context, listen: false)?.setLastTab(index);
   }
 
   @override
@@ -87,10 +110,12 @@ class _MainShellState extends State<MainShell> {
       return true;
     });
     if (top?.settings.name == SettingsScreen.routeName) return;
-    navigator.push(MaterialPageRoute(
-      settings: const RouteSettings(name: SettingsScreen.routeName),
-      builder: (_) => const SettingsScreen(),
-    ));
+    navigator.push(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: SettingsScreen.routeName),
+        builder: (_) => const SettingsScreen(),
+      ),
+    );
   }
 
   /// 再次点击当前 Tab：回到该 Tab 根页面（Spotify 行为）。
@@ -99,12 +124,12 @@ class _MainShellState extends State<MainShell> {
       _histories[index].popToRoot();
       return;
     }
-    setState(() => _currentIndex = index);
+    _setIndex(index);
   }
 
   /// 桌面顶栏搜索：聚焦或输入即切到搜索页，并回到搜索根页（显示浏览 / 结果）。
   void _activateSearch() {
-    if (_currentIndex != _search) setState(() => _currentIndex = _search);
+    if (_currentIndex != _search) _setIndex(_search);
     _histories[_search].popToRoot();
   }
 
@@ -117,34 +142,34 @@ class _MainShellState extends State<MainShell> {
 
   /// 桌面快捷键（与 Spotify 桌面端一致）。输入框聚焦时空格会被 TextField 拦截，不会误触。
   Map<ShortcutActivator, VoidCallback> _shortcuts(PlaybackProvider playback) => {
-        const SingleActivator(LogicalKeyboardKey.space): playback.togglePlayPause,
-        const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): playback.nextTrack,
-        const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): playback.previousTrack,
-        const SingleActivator(LogicalKeyboardKey.arrowUp, control: true): () =>
-            playback.setVolume(playback.volume + 0.1, persist: true),
-        const SingleActivator(LogicalKeyboardKey.arrowDown, control: true): () =>
-            playback.setVolume(playback.volume - 0.1, persist: true),
-        const SingleActivator(LogicalKeyboardKey.keyS, control: true): playback.toggleShuffle,
-        const SingleActivator(LogicalKeyboardKey.keyR, control: true): playback.cycleRepeatMode,
-        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _searchFocus.requestFocus,
-        const SingleActivator(LogicalKeyboardKey.keyL, control: true): _searchFocus.requestFocus,
-        const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () => _histories[_currentIndex].back(),
-        const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () => _histories[_currentIndex].forward(),
-        const SingleActivator(LogicalKeyboardKey.f11): () => ImmersiveLyricsScreen.open(context),
-      };
+    const SingleActivator(LogicalKeyboardKey.space): playback.togglePlayPause,
+    const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): playback.nextTrack,
+    const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): playback.previousTrack,
+    const SingleActivator(LogicalKeyboardKey.arrowUp, control: true): () =>
+        playback.setVolume(playback.volume + 0.1, persist: true),
+    const SingleActivator(LogicalKeyboardKey.arrowDown, control: true): () =>
+        playback.setVolume(playback.volume - 0.1, persist: true),
+    const SingleActivator(LogicalKeyboardKey.keyS, control: true): playback.toggleShuffle,
+    const SingleActivator(LogicalKeyboardKey.keyR, control: true): playback.cycleRepeatMode,
+    const SingleActivator(LogicalKeyboardKey.keyK, control: true): _searchFocus.requestFocus,
+    const SingleActivator(LogicalKeyboardKey.keyL, control: true): _searchFocus.requestFocus,
+    const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () => _histories[_currentIndex].back(),
+    const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () => _histories[_currentIndex].forward(),
+    const SingleActivator(LogicalKeyboardKey.f11): () => ImmersiveLyricsScreen.open(context),
+  };
 
   Widget _pages() => IndexedStack(
-        index: _currentIndex,
-        children: [
-          for (var i = 0; i < _roots.length; i++)
-            TabNavigator(
-              navigatorKey: _navigatorKeys[i],
-              root: _roots[i],
-              active: i == _currentIndex,
-              observers: [_histories[i]],
-            ),
-        ],
-      );
+    index: _currentIndex,
+    children: [
+      for (var i = 0; i < _roots.length; i++)
+        TabNavigator(
+          navigatorKey: _navigatorKeys[i],
+          root: _roots[i],
+          active: i == _currentIndex,
+          observers: [_histories[i]],
+        ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) => PlaybackErrorListener(child: _buildLayout(context));

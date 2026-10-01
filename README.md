@@ -45,13 +45,21 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
     - 别的设备在出声（或远程已暂停而本机没有曲目）时，桌面播放栏与手机迷你播放器切换为远程模式
       （`widgets/connect/`）：曲目、进度按服务端快照推算、播放暂停 / 切歌 / 拖动进度 / 随机 / 循环 / 音量都发给远程设备；
       桌面播放栏下方多一条强调色「正在 {设备} 上播放」。
+    - 远程模式下歌词照常可用：右栏「正在播放 / 歌词」、手机歌词面板（点远程迷你播放器打开）、沉浸式歌词都展示远程曲目，
+      歌词按远程进度滚动（`ConnectProvider.position`），点行跳转与玻璃控制台作用于远程设备（`widgets/connect/now_playing_source.dart`）。
     - 命令被拒（免费账号部分操作）时弹出提示；Jam（一起听）需要 Premium，未实现。
   - **实时同步歌词 (Synced Lyrics)**：Apple Music iOS 风格——流动封面背景（`LyricsBackdrop`）、顶部信息胶囊与底部控制台采用液态玻璃（`LiquidGlass`），当前行清晰、上下句按行距逐级模糊变暗；手动滚动时全部变清晰，停手 3 秒后自动回到当前行；点击任意行跳转。
     **所有歌词界面同一套液态玻璃观感**：全屏歌词面板、全屏播放器的歌词视图（背景交叉淡入流动封面、控件收进玻璃）、桌面右栏歌词。
-  - **桌面沉浸式歌词**（`immersive_lyrics_screen.dart`）：窗口进入系统全屏，左侧大封面 + 玻璃控制台、右侧大字号歌词；Esc / F11 退出，鼠标静止 3 秒隐藏光标与按钮。入口：播放栏右侧、右栏歌词右上角、全屏播放器歌词、F11。
+  - **桌面沉浸式歌词**（`immersive_lyrics_screen.dart`）：左侧大封面 + 玻璃控制台、右侧大字号歌词；鼠标静止 3 秒隐藏光标与按钮。
+    两种铺满方式，右上角按钮或 F11 切换并记住选择：默认**只铺满窗口**（保留深色窗口按钮，顶部可拖动窗口），或进入系统全屏铺满整个屏幕；Esc 退出。
+    入口：播放栏右侧、右栏歌词右上角、全屏播放器歌词、F11。
   - **播放队列管理器 (Queue)**：与 Spotify 一致的双层队列——"Next in queue"（用户手动添加，优先播放）+ "Next from: 上下文"，两段均支持拖拽排序、滑动删除、点击跳播、一键清空。
   - **播放上下文 (Playback Context)**：记录"正在从哪个歌单 / 专辑 / 艺人 / 搜索播放"，全屏播放器顶部显示「正在播放歌单」等，详情页播放键可在"播放整个上下文 / 暂停 / 继续"间切换。
   - **真随机与循环**：随机模式基于打乱的播放顺序表，切换时以当前曲目为起点重建；列表循环在末尾回绕，单曲循环重播。
+  - **恢复上次播放**：重启后播放栏 / 迷你播放器直接显示上次的曲目，暂停在上次的进度；播放队列、播放来源、随机 / 循环一并还原，
+    点播放从断点继续（还原后先拖进度条也会从拖到的位置开始）。启动时不下载音频。
+    会话存在应用数据目录的 `playback_session.json`（`services/playback_session_store.dart`），只保存播放顺序中当前曲目前 20 首、后 200 首；
+    切歌、排队、暂停、拖动时保存，播放中每 15 秒保存一次进度，桌面端关窗（含 Alt+F4）与手机切到后台时再保存一次。
 * **详情页**：歌单（本地歌单可删除 / 滑动移除曲目）、专辑（发行信息、"More by"）、艺人（关注、热门曲目、唱片目录）。
   - 大头图（`CollectionHero`）：封面主色铺满头部并一直渐隐到操作行，没有硬边；宽屏为 232px 封面 + 自适应字号大标题（放不下时逐档缩小），手机为居中封面。
   - 向上滚动后收起为吸顶标题栏，带小号播放键。
@@ -69,6 +77,14 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 强调色：7 个预设 + HSV 自定义（十六进制输入），或「跟随封面取色」——强调色随正在播放的封面变化，并自动保证与背景的对比度（WCAG ≥ 3:1）；
   - 液态玻璃模糊强度 / 不透明度（带实时预览）、字号（85% – 130%）、圆角风格（圆润 / 标准 / 方正）、减弱动效（同时尊重系统设置）。
   - 实现：`AppearanceProvider` 生成主题，主题之外的参数通过 ThemeExtension `FlutifyTokens` 下发（`context.tokens`、`context.motion()`）。
+* **其他设置项**（全部免费账号可用；非外观偏好统一存在 `AppPreferences`，由 `PreferencesProvider` 持久化，播放类偏好由 `PlaybackProvider` 持有）：
+  - 语言：跟随系统 / 中文 / English，切换后同时用新语言重新拉取主页等 Spotify 文案；
+  - 歌词：字号（80% – 140%）、左对齐 / 居中、其他行模糊强度（可关）、全屏歌词默认铺满屏幕还是窗口；
+  - 播放：音量均衡（读取 Spotify 文件头里的响度数据，只衰减偏响的歌）、歌曲间淡入淡出（0 – 12 秒，单播放器实现，两首不重叠）；
+  - 启动：打开主页 / 音乐库 / 上次位置；桌面端记住窗口大小、位置与最大化状态（显示器变化导致不可见时回到居中，`screen_retriever` 枚举显示器）；
+  - Spotify Connect：总开关、远程歌词提前量（±2 秒，只影响歌词切行）；
+  - 存储：音频缓存占用、上限（256 MB – 5 GB，超出按最久未播放淘汰，正在播放与预取的下一首始终保留）、一键清除；
+  - 隐私：清除搜索记录、清除歌词缓存；关于：版本、键盘快捷键一览（桌面端）、开源许可。
 * **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环、Ctrl+K / Ctrl+L 聚焦搜索、Alt+←/→ 后退 / 前进、F11 沉浸式歌词、Esc 关闭浮层右栏 / 退出沉浸式歌词。
 
 ### 3. 响应式外壳（桌面三栏 / 移动端）
@@ -89,6 +105,15 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 
 * **播放进度独立通知**：`PlaybackProvider.positionNotifier`（`ValueNotifier<Duration>`）单独承载高频进度，只有进度条 / 歌词监听它；`notifyListeners` 仅在曲目、播放状态、队列等离散变化时触发。
 * **精确订阅**：组件通过 `context.select` 订阅所需字段；`LibraryProvider` 采用写时复制列表，保证 `select` 比较稳定。
+* **长列表**：曲目行未悬停时不构建 IconButton（每个自带 Tooltip / Focus / Ink 二十多个组件），只放同尺寸占位，悬停后才换成真按钮；歌单曲目用 `SliverPrototypeExtentList` 定高，滚动不逐行测量、总长度不靠估算；详情页头部按宽度缓存组件，滚动偏移变化不重建。
+* **边下边播**（`services/protocol/progressive_download.dart` + `services/downloading_audio_source.dart`）：
+  未缓存的曲目在 CDN 返回文件头（约 170 字节）后就开始播放，不再等整首下载完；数据边下载边解密到内存，
+  播放器经 just_audio 本地代理按 Range 读取，拖到还没下载的位置时短暂缓冲。下载中途断线时按已收到的字节数用 HTTP Range 续传
+  （AES-CTR 从任意偏移解密，`AesCtr.atOffset`），并轮换 CDN 地址，最多 4 次；仍失败时已缓冲部分播完并提示网络错误。
+  下载完成后才写入缓存（先写 `.part` 再改名）；预取的下一首若还没下完就被点播，直接接着这份下载边下边播。
+  边下边播时等当前曲目下完再预取下一首，不抢起播带宽。AES 逐块加密改为原地运算，解密整首不再产生几十万个临时数组。
+* **音频缓存**：下载完成时把 Spotify 私有头里的响度数据另存为同名 `.norm` 旁路文件（私有头会被剥掉，标准解码器不认识）；
+  缓存命中时刷新文件修改时间，淘汰按修改时间从旧到新。功能上线前下载的旧缓存没有 `.norm`，按原音量播放。
 * **图片解码降采样**：`CoverImage` 按显示尺寸 × DPR 设置 `memCacheWidth`，避免大图全尺寸解码。
 * **歌词**：二分查找当前行，仅在行切换时重建；用户手动滚动后暂停自动滚动 3 秒。
 * **搜索**：300ms 防抖 + 请求代次号，丢弃过期结果；歌词与封面取色均带缓存与并发合并。
@@ -106,7 +131,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 | **API 路由注册表** | `lib/core/constants/spotify_endpoints.dart` | 包含所有 Spotify Web API 及 SpClient 内部端点（`/me`, `/me/player`, `/browse/*`, `/color-lyrics/*`） |
 | **数据模型层** | `lib/models/` | `SpotifyTrack`, `SpotifyAlbum`, `SpotifyArtist`, `SpotifyPlaylist`, `SpotifyLyrics`, `SpotifyDevice` 均严格遵循 Spotify JSON 字段结构 |
 | **API 服务层** | `lib/services/spotify_api_service.dart` | 支持带 `Bearer Token` 的网络请求，支持配置自定义代理或逆向服务。**不含任何示例 / Mock 数据**：未登录时搜索、媒体库等返回空结果，实体详情（歌单 / 专辑 / 艺人）失败时抛 `SpotifyDataException`，由界面展示错误与重试 |
-| **完整曲目播放** | `lib/services/protocol/` + `audio_player_service.dart` | 纯逆向协议链路：extended-metadata（TRACK_V4）→ storage-resolve → AP 音频密钥（DH + Shannon 握手，`0xab` 令牌登录、`0x0c` 取密钥）→ CDN 下载 + AES-128-CTR 解密 → 去掉 Spotify 头部后写入本地文件 → just_audio 播放。仅支持 OGG Vorbis / MP3；FLAC / AAC 属 Widevine DRM，会抛 `TrackPlaybackException`。`PlaybackProvider.playbackError` / `playbackErrors` 暴露错误，「不可播放」类自动跳下一首（有上限）；AP 连接会记住上次可用的接入点并重试多个候选 |
+| **完整曲目播放** | `lib/services/protocol/` + `audio_player_service.dart` | 纯逆向协议链路：extended-metadata（TRACK_V4）→ storage-resolve → AP 音频密钥（DH + Shannon 握手，`0xab` 令牌登录、`0x0c` 取密钥）→ CDN 下载 + AES-128-CTR 解密（边下边播，见「性能架构」）→ 去掉 Spotify 头部后交给 just_audio，下载完成后写入本地缓存。仅支持 OGG Vorbis / MP3；FLAC / AAC 属 Widevine DRM，会抛 `TrackPlaybackException`。`PlaybackProvider.playbackError` / `playbackErrors` 暴露错误，「不可播放」类自动跳下一首（有上限）；AP 连接会记住上次可用的接入点并重试多个候选 |
 | **媒体库** | `lib/services/library/` | `LibrarySource` 抽象：桌面会话走 spclient `collection/v2/paging`（protobuf，已点赞歌曲 / 专辑 / 艺人）+ `playlist/v2/user/{u}/rootlist`（歌单）+ Pathfinder 补全曲目与实体；其他登录方式走 Web API。点赞 / 收藏 / 关注乐观更新并尽力同步到账号（失败记入 `syncError`）；自建歌单仅保存在本机。未登录时媒体库为空 |
 | **歌词** | `lib/services/lyrics_service.dart` | spclient `GET /color-lyrics/v2/track/{id}`，请求头沿用会话身份（桌面会话即桌面端头）；404 = 无歌词（可缓存），其他错误不缓存 |
 | **协议登录** | `lib/services/auth/` | **桌面版 OAuth（默认）**：与官方桌面版相同的 client_id，系统浏览器打开 accounts.spotify.com 登录，本机回环 `127.0.0.1:8898/login` 接收授权码，PKCE 换令牌、refresh_token 续期，并以 Windows 桌面身份申请 `client-token`；**Login5**：密码（自动 Hashcash + 短信验证码，可重新发送）、手机号短信、登录链接 / 一次性令牌、导入 StoredCredential；**开发者应用 OAuth**：自己的 Client ID。会话的 client_id、client-token 平台数据、User-Agent 与 `app-platform` 请求头始终来自同一种客户端身份（`client_profile.dart`）；登出调用 `/api/logout/v1` |
@@ -143,6 +168,7 @@ d:/Flutify/app/
 │   │   ├── track.dart, album.dart, artist.dart
 │   │   ├── playlist.dart, lyrics.dart, device.dart
 │   │   ├── playback_context.dart         # 播放上下文（歌单 / 专辑 / 艺人 / 搜索）
+│   │   ├── playback_session.dart         # 上次播放会话（重启还原）
 │   │   └── user_profile.dart, playback_state.dart
 │   ├── services/
 │   │   ├── auth/                         # Spotify 协议登录（对应 SpotifyApi/api-docs/01-认证与账号）
@@ -164,6 +190,9 @@ d:/Flutify/app/
 │   │   │   ├── pathfinder_parsers.dart   # 响应 → App 数据模型（宽松解析、解包 Wrapper）
 │   │   │   └── desktop_data_source.dart  # 页面级数据：主页/分类/搜索/专辑/艺人/歌单，5 分钟查询缓存
 │   │   ├── protocol/                     # 完整曲目播放链路（AP 握手、音频密钥、CDN 解密、TrackAudioSource）
+│   │   │   └── progressive_download.dart # 边下边播：流式解密到内存、Range 续传、按区间读取
+│   │   ├── downloading_audio_source.dart # 把下载中的音频接到 just_audio（StreamAudioSource）
+│   │   ├── playback_session_store.dart   # 上次播放会话（曲目 / 队列 / 进度）的文件存储
 │   │   ├── library/                      # 媒体库来源：collection 编解码、rootlist 解析、桌面 / Web API 实现
 │   │   ├── connect/                      # Spotify Connect：dealer 长连接与重连、connect-state 注册 / 命令、ConnectService 总控
 │   │   ├── lyrics_service.dart           # spclient color-lyrics 取词与解析
@@ -176,6 +205,7 @@ d:/Flutify/app/
 │   │   ├── library_provider.dart         # 收藏歌曲、歌单、关注艺人、收藏专辑（持久化）
 │   │   ├── spotify_provider.dart         # 主页数据、防抖搜索、搜索历史、歌词缓存
 │   │   ├── connect_provider.dart         # Connect 遥控：设备 / 远程播放状态、远程曲目补全、命令、音量节流
+│   │   ├── preferences_provider.dart     # 非外观偏好（语言 / 歌词样式 / 启动页 / 窗口记忆 / Connect）
 │   │   └── appearance_provider.dart      # 外观设置（主题 / 强调色 / 玻璃 / 字号 / 圆角 / 动效），防抖持久化
 │   ├── ui/
 │   │   ├── navigation/                   # Tab 内嵌 Navigator、统一跳转 AppRoutes、后退 / 前进历史 content_history
@@ -197,7 +227,8 @@ d:/Flutify/app/
 │   │   │   │   └── widgets/swipeable_artwork.dart # 左右滑动切歌的封面
 │   │   │   ├── auth/                     # 登录页外壳 login_screen.dart + stages/（浏览器登录[默认]、密码、手机号、
 │   │   │   │                             #   链接、导入凭据、开发者应用授权、验证码）+ widgets/（品牌标、授权等待页等）
-│   │   │   └── settings/                 # 设置页：账号卡片 + sections/（外观、强调色、液态玻璃、文字与形状、动效）
+│   │   │   └── settings/                 # 设置页：账号卡片 + sections/（外观、强调色、液态玻璃、文字与形状、动效、
+│   │   │                                 #   语言、歌词、播放、启动、Connect、存储、隐私、关于）
 │   │   │                                 #   + widgets/（分组、分段控件、滑杆行、色板、自定义取色、玻璃预览）
 │   │   └── widgets/                      # MiniPlayer、TrackTile、CoverImage、PlaybackScrubber、
 │   │                                     # PlayerControls、TrackOptionsSheet、CreatePlaylistDialog 等；

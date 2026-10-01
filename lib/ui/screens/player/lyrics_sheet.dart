@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
 import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/track.dart';
-import '../../../providers/playback_provider.dart';
+import '../../widgets/connect/now_playing_source.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/liquid_glass.dart';
@@ -14,6 +12,7 @@ import 'lyrics/lyrics_glass_controls.dart';
 import 'lyrics/lyrics_view.dart';
 
 /// 同步歌词面板（Apple Music iOS 风格，手机 / 窄窗口使用）。
+/// 遥控远程设备时同样可用（手机上点远程迷你播放器即打开它）。
 ///
 /// 层级（自下而上）：
 /// 1. 流动封面背景 [LyricsBackdrop]；
@@ -39,7 +38,9 @@ class LyricsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
+    // 遥控远程设备时展示远程曲目，歌词按远程进度滚动、控制台作用于远程设备
+    final remote = NowPlayingSource.isRemote(context);
+    final track = NowPlayingSource.track(context);
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
     final corner = Radius.circular(context.tokens.corner(32));
 
@@ -62,19 +63,15 @@ class LyricsSheet extends StatelessWidget {
               )
             else
               LyricsView(
-                key: ValueKey(track.id),
+                key: ValueKey((track.id, remote)),
                 trackId: track.id,
+                remote: remote,
                 topInset: _headerHeight,
                 bottomInset: _controlsHeight + bottomSafe,
               ),
             Positioned(left: 0, right: 0, top: 0, child: _Header(track: track)),
             if (track != null)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16 + bottomSafe,
-                child: const LyricsGlassControls(),
-              ),
+              Positioned(left: 16, right: 16, bottom: 16 + bottomSafe, child: const LyricsGlassControls()),
           ],
         ),
       ),

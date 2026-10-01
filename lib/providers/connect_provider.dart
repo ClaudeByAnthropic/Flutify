@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/album.dart';
 import '../models/connect_cluster.dart';
+import '../models/image.dart';
 import '../models/track.dart';
 import '../services/connect/connect_service.dart';
 
@@ -32,16 +34,15 @@ class ConnectProvider extends ChangeNotifier {
 
   bool _disposed = false;
 
-  ConnectProvider(
-    this._service, {
-    required this._available,
-    required this._resolveTrack,
-  }) {
+  ConnectProvider(this._service, {required this._available, required this._resolveTrack}) {
     final service = _service;
     if (service == null) return;
     // 广播流不会重放：先取服务当前快照，再订阅后续变化
     _cluster = service.current;
     _status = service.status;
+    _resolveRemoteTrack(_cluster.player.trackUri);
+    _updateDisplayTrack();
+    _syncPositionTicker();
     _clusterSub = service.clusters.listen(_onCluster);
     _statusSub = service.statusChanges.listen((s) {
       _status = s;
@@ -67,6 +68,16 @@ class ConnectProvider extends ChangeNotifier {
   /// 远程曲目的完整信息（含艺人）；补全中或失败时为 null，UI 回退到 [player] 里的标题 / 专辑。
   SpotifyTrack? get remoteTrack => _tracks[player.trackUri];
 
+  /// 供歌词、右栏等「按曲目展示」的界面使用：补全后为完整曲目，补全前由 [player] 的标题 / 专辑 / 封面拼出；
+  /// 不是曲目（播客单集等）时为 null。按曲目缓存，同一首歌返回同一个对象，`select` 不会无谓重建。
+  SpotifyTrack? get displayTrack => _displayTrack;
+  SpotifyTrack? _displayTrack;
+
+  /// 远程播放进度（按服务端快照推算）：远程出声时每 250ms 更新，歌词按它切行。
+  ValueListenable<Duration> get position => _position;
+  final ValueNotifier<Duration> _position = ValueNotifier(Duration.zero);
+  Timer? _positionTimer;
+
   /// 服务端当前时间，用于推算远程播放进度。
   int get serverNowMs => _service?.serverNowMs ?? DateTime.now().millisecondsSinceEpoch;
 
@@ -87,6 +98,8 @@ class ConnectProvider extends ChangeNotifier {
       await service.stop();
       _cluster = ConnectCluster.empty;
       _tracks.clear();
+      _updateDisplayTrack();
+      _syncPositionTicker();
       _notify();
     }
   }
@@ -103,6 +116,8 @@ class ConnectProvider extends ChangeNotifier {
     _cluster = cluster;
     if (_pendingVolume != null && _volumeTimer == null) _pendingVolume = null;
     _resolveRemoteTrack(cluster.player.trackUri);
+    _updateDisplayTrack();
+    _syncPositionTicker();
     _notify();
   }
 
@@ -111,9 +126,48 @@ class ConnectProvider extends ChangeNotifier {
     _resolving.add(uri);
     _resolveTrack(uri).then((track) => _tracks[uri] = track, onError: (_) => _tracks[uri] = null).whenComplete(() {
       _resolving.remove(uri);
+      _updateDisplayTrack();
       _notify();
     });
   }
+
+  void _updateDisplayTrack() {
+    final p = player;
+    final resolved = remoteTrack;
+    if (resolved != null) {
+      _displayTrack = resolved;
+    } else if (p.trackId.isEmpty) {
+      _displayTrack = null;
+    } else if (_displayTrack?.uri != p.trackUri) {
+      _displayTrack = SpotifyTrack(
+        id: p.trackId,
+        name: p.title,
+        uri: p.trackUri,
+        durationMs: p.durationMs,
+        album: SpotifyAlbum(
+          id: p.albumUri.startsWith('spotify:album:') ? p.albumUri.substring(14) : '',
+          name: p.albumTitle,
+          uri: p.albumUri,
+          images: [if (p.imageUrl.isNotEmpty) SpotifyImage(url: p.imageUrl)],
+        ),
+      );
+    }
+  }
+
+  /// 远程出声时定时推算进度；暂停 / 无会话时停表，只在收到快照时更新一次。
+  void _syncPositionTicker() {
+    if (_disposed) return;
+    _tickPosition();
+    final ticking = hasRemoteSession && player.isAudible;
+    if (ticking && _positionTimer == null) {
+      _positionTimer = Timer.periodic(const Duration(milliseconds: 250), (_) => _tickPosition());
+    } else if (!ticking) {
+      _positionTimer?.cancel();
+      _positionTimer = null;
+    }
+  }
+
+  void _tickPosition() => _position.value = Duration(milliseconds: player.positionAt(serverNowMs));
 
   // ---------------------------------------------------------------------------
   // 远程控制：全部作用于当前活动设备
@@ -188,6 +242,8 @@ class ConnectProvider extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _volumeTimer?.cancel();
+    _positionTimer?.cancel();
+    _position.dispose();
     _clusterSub?.cancel();
     _statusSub?.cancel();
     _service?.stop();

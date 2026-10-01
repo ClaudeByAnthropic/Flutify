@@ -2,15 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/l10n.dart';
 import '../../shell/shell_breakpoints.dart';
+import 'sections/about_section.dart';
 import 'sections/accent_section.dart';
 import 'sections/appearance_section.dart';
+import 'sections/connect_section.dart';
 import 'sections/glass_section.dart';
+import 'sections/language_section.dart';
+import 'sections/lyrics_section.dart';
 import 'sections/motion_section.dart';
 import 'sections/playback_section.dart';
+import 'sections/privacy_section.dart';
+import 'sections/startup_section.dart';
+import 'sections/storage_section.dart';
 import 'sections/text_shape_section.dart';
 import 'widgets/account_card.dart';
 
-/// 设置页：账号 → 播放 → 外观 → 强调色 → 液态玻璃 → 文字与形状 → 动效。
+/// 设置页（单列顺序）：账号 → 播放 → 歌词 → 外观 → 强调色 → 液态玻璃 → 文字与形状 → 动效
+/// → 语言 → Spotify Connect → 存储 → 隐私 → 启动 → 关于。
 ///
 /// 所有设置项修改后即时生效、自动保存，无需「保存」按钮。按窗口形态分两套布局：
 /// - 移动端：iOS「设置」式单列分组，顶部 AppBar 带返回；
@@ -29,6 +37,23 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
+/// 单列布局（移动端、窄桌面）的分组顺序：常用的播放 / 歌词在前，一次性操作（存储、隐私）与关于在后。
+const List<Widget> _singleColumn = [
+  PlaybackSection(),
+  LyricsSection(),
+  AppearanceSection(),
+  AccentSection(),
+  GlassSection(),
+  TextShapeSection(),
+  MotionSection(),
+  LanguageSection(),
+  ConnectSection(),
+  StorageSection(),
+  PrivacySection(),
+  StartupSection(),
+  AboutSection(),
+];
+
 /// 移动端：单列、限宽 720（平板横屏时不拉得过长）。
 class _MobileSettings extends StatelessWidget {
   const _MobileSettings();
@@ -44,16 +69,7 @@ class _MobileSettings extends StatelessWidget {
           child: ListView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-            children: const [
-              AccountCard(),
-              SizedBox(height: 28),
-              PlaybackSection(),
-              AppearanceSection(),
-              AccentSection(),
-              GlassSection(),
-              TextShapeSection(),
-              MotionSection(),
-            ],
+            children: const [AccountCard(), SizedBox(height: 28), ..._singleColumn],
           ),
         ),
       ),
@@ -63,8 +79,8 @@ class _MobileSettings extends StatelessWidget {
 
 /// 桌面端：内容区内左对齐的大标题页面。
 ///
-/// - 内容区宽 ≥ [_twoColumnWidth]：左栏「账号 / 外观 / 文字与形状 / 动效」，
-///   右栏「播放 / 强调色 / 液态玻璃」（玻璃带预览，较高），两栏高度大致平衡；
+/// - 内容区宽 ≥ [_twoColumnWidth]：左栏「账号 / 外观 / 文字与形状 / 动效 / 歌词 / 语言 / 启动 / 关于」，
+///   右栏「播放 / 强调色 / 液态玻璃 / Spotify Connect / 存储 / 隐私」（玻璃带预览，较高），两栏高度大致平衡；
 /// - 更窄时单列，限宽 [_singleColumnMaxWidth]。
 class _DesktopSettings extends StatelessWidget {
   const _DesktopSettings();
@@ -94,6 +110,10 @@ class _DesktopSettings extends StatelessWidget {
                           AppearanceSection(),
                           TextShapeSection(),
                           MotionSection(),
+                          LyricsSection(),
+                          LanguageSection(),
+                          StartupSection(),
+                          AboutSection(),
                         ],
                       ),
                     ),
@@ -101,23 +121,21 @@ class _DesktopSettings extends StatelessWidget {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [PlaybackSection(), AccentSection(), GlassSection()],
+                        children: [
+                          PlaybackSection(),
+                          AccentSection(),
+                          GlassSection(),
+                          ConnectSection(),
+                          StorageSection(),
+                          PrivacySection(),
+                        ],
                       ),
                     ),
                   ],
                 )
               : const Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AccountCard(),
-                    SizedBox(height: 28),
-                    PlaybackSection(),
-                    AppearanceSection(),
-                    AccentSection(),
-                    GlassSection(),
-                    TextShapeSection(),
-                    MotionSection(),
-                  ],
+                  children: [AccountCard(), SizedBox(height: 28), ..._singleColumn],
                 );
 
           return SingleChildScrollView(

@@ -11,6 +11,9 @@ import 'package:flutter/material.dart';
 class SettingsSliderTile extends StatefulWidget {
   final String title;
 
+  /// 标题下方的灰色说明（可选）。
+  final String? subtitle;
+
   /// 把数值格式化为右侧标签（如 `65%`）。
   final String Function(double value) labelOf;
   final double value;
@@ -29,6 +32,7 @@ class SettingsSliderTile extends StatefulWidget {
   const SettingsSliderTile({
     super.key,
     required this.title,
+    this.subtitle,
     required this.labelOf,
     required this.value,
     this.min = 0,
@@ -67,7 +71,17 @@ class _SettingsSliderTileState extends State<SettingsSliderTile> {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
 
-    final titleText = Text(widget.title, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600));
+    final title = Text(widget.title, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600));
+    final Widget titleText = widget.subtitle == null
+        ? title
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              title,
+              const SizedBox(height: 2),
+              Text(widget.subtitle!, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+            ],
+          );
     final valueText = Text(
       widget.labelOf(_current),
       textAlign: TextAlign.end,
@@ -79,10 +93,9 @@ class _SettingsSliderTileState extends State<SettingsSliderTile> {
         Expanded(
           // 分档只用于吸附，不画刻度点（iOS 滑杆观感更干净）
           child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              tickMarkShape: SliderTickMarkShape.noTickMark,
-              showValueIndicator: ShowValueIndicator.never,
-            ),
+            data: SliderTheme.of(
+              context,
+            ).copyWith(tickMarkShape: SliderTickMarkShape.noTickMark, showValueIndicator: ShowValueIndicator.never),
             child: Slider(
               value: _current,
               min: widget.min,
@@ -117,7 +130,12 @@ class _SettingsSliderTileState extends State<SettingsSliderTile> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(children: [Expanded(child: titleText), valueText]),
+              Row(
+                children: [
+                  Expanded(child: titleText),
+                  valueText,
+                ],
+              ),
               slider,
             ],
           ),

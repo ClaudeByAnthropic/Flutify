@@ -147,7 +147,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 icon: isLikedSongs ? Icons.favorite_border_rounded : Icons.queue_music_rounded,
               )
             else
-              SliverList(
+              // 定高列表：行高由原型行量出（随字号缩放自适应）。长歌单滚动时不必逐行测量、
+              // 也不用估算总长度，滚动条比例稳定，拖动滚动条跳到中段也只布局可见行。
+              SliverPrototypeExtentList(
+                prototypeItem: TrackTile(track: tracks.first, index: tracks.length, showCover: true),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _buildTile(tracks, index, playbackContext, isOwn ? playlist.id : null),
                   childCount: tracks.length,
@@ -173,10 +176,11 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     );
     if (ownPlaylistId == null) return tile;
 
-    // 自建歌单支持左滑移除曲目
+    // 自建歌单支持左滑移除曲目。定高列表里行不能收缩，滑出后立即移除（不做收起动画）
     return Dismissible(
       key: ValueKey('own_${track.id}'),
       direction: DismissDirection.endToStart,
+      resizeDuration: null,
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),

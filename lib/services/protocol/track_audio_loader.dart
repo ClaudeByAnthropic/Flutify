@@ -5,33 +5,62 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'access_point.dart';
-import 'aes.dart';
+import 'audio_cache_store.dart';
+import 'audio_normalization.dart';
 import 'extended_metadata.dart';
+import 'progressive_download.dart';
 import 'spotify_id.dart';
 import 'storage_resolver.dart';
 import 'track_metadata.dart';
 import 'track_playback_exception.dart';
 
+export 'audio_normalization.dart';
+export 'progressive_download.dart' show ProgressiveAudio;
 export 'track_playback_exception.dart';
 
 /// 音频解密 IV（协议固定常量，对应 librespot `audio/src/decrypt.rs` 的 AUDIO_AESIV）。
 final Uint8List kAudioAesIv = Uint8List.fromList([
-  0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77,
-  0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93,
+  0x72,
+  0xe0,
+  0x67,
+  0xfb,
+  0xdd,
+  0xcb,
+  0xcf,
+  0x77,
+  0xeb,
+  0xe8,
+  0xbc,
+  0x64,
+  0x3f,
+  0x63,
+  0x0d,
+  0x93,
 ]);
 
-/// 一首「完整版全曲」的本地音频（已解密，可直接交给播放器）。
+/// 一首「完整版全曲」的音频（已解密，可直接交给播放器）。
+///
+/// [stream] 为空时 [file] 是已落盘的缓存文件；非空时曲目仍在下载，应按流播放，
+/// 下载完成后才会写入 [file]。
 class LoadedAudio {
   final File file;
   final TrackAudioFile source;
   final int? durationMs;
   final String trackId;
 
+  /// 文件自带的响度数据（音量均衡用）；MP3 / 旧缓存没有时为 null。
+  final AudioNormalization? normalization;
+
+  /// 边下边播的音频流（[TrackAudioSource.open] 未命中缓存时）。
+  final ProgressiveAudio? stream;
+
   const LoadedAudio({
     required this.file,
     required this.source,
     required this.durationMs,
     required this.trackId,
+    this.normalization,
+    this.stream,
   });
 
   String get path => file.path;
@@ -41,19 +70,52 @@ typedef AccessTokenGetter = Future<String> Function();
 
 /// 曲目音频来源抽象：PlaybackProvider 只依赖它，测试可用替身实现（不必真的联网）。
 abstract class TrackAudioSource {
-  /// 取得一首曲目的本地可播放文件；失败抛 [TrackPlaybackException]。
+  /// 取得一首曲目的本地可播放文件（等整首下载完）；失败抛 [TrackPlaybackException]。
   Future<LoadedAudio> load(String trackIdOrUri, {void Function(double progress)? progress});
+
+  /// 尽快取得可播放的音频：已缓存时与 [load] 相同；否则文件头一到就返回边下边播的
+  /// [LoadedAudio.stream]。失败抛 [TrackPlaybackException]。
+  Future<LoadedAudio> open(String trackIdOrUri, {void Function(double progress)? progress});
 
   /// 预取（失败静默，不影响当前播放）。
   Future<void> prefetch(String trackIdOrUri);
 }
 
+/// 一次加载会话：要么命中缓存（[cached]），要么正在下载（[download]，完成后写入 [destination]）。
+class _AudioSession {
+  final SpotifyId id;
+  final TrackAudioFile file;
+  final int? durationMs;
+  final LoadedAudio? cached;
+  final ProgressiveDownload? download;
+  final File destination;
+
+  /// 下载完成并落盘后的结果（仅 [download] 非空时）。
+  Future<LoadedAudio>? persisted;
+
+  _AudioSession.cached(LoadedAudio audio, this.id)
+    : file = audio.source,
+      durationMs = audio.durationMs,
+      cached = audio,
+      download = null,
+      destination = audio.file;
+
+  _AudioSession.downloading({
+    required this.id,
+    required this.file,
+    required this.durationMs,
+    required ProgressiveDownload this.download,
+    required this.destination,
+  }) : cached = null;
+}
+
 /// 完整曲目音频加载器：metadata → storage-resolve → AP 音频密钥 → CDN 下载解密。
 ///
 /// 全程只走逆向协议（不依赖官方客户端/Web 播放器）。产物缓存在 [cacheDirectory]/audio，
-/// 同一 file_id 的曲目直接复用；下载中断只写临时文件，不会留下半截缓存。
-/// 同一曲目的并发请求（预取 + 用户点播）合并为一次，缓存总量超过 [maxCacheBytes] 时淘汰最旧文件。
-class TrackAudioLoader implements TrackAudioSource {
+/// 同一 file_id 的曲目直接复用；下载在内存中完成，结束后才写入缓存，不会留下半截文件。
+/// 同一曲目的并发请求（预取 + 用户点播）共享一次下载：点播时若预取还没下完，
+/// 直接边下边播这份下载。缓存总量超过 [maxCacheBytes] 时淘汰最旧文件。
+class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   final AccessTokenGetter accessToken;
   final AccessTokenGetter? clientToken;
   final String cacheDirectory;
@@ -61,13 +123,17 @@ class TrackAudioLoader implements TrackAudioSource {
   final List<AudioFileFormat> formatPreference;
   final String? deviceId;
 
-  /// 音频缓存目录的容量上限（字节）。
-  final int maxCacheBytes;
+  int _maxCacheBytes;
+
+  /// 最近加载的两个文件（正在播放的 + 预取的下一首）：清缓存 / 淘汰时保留。
+  final List<String> _recentPaths = [];
+
+  bool _isProtected(File f) => _recentPaths.contains(f.path);
 
   Future<SpotifyAccessPoint>? _apSession;
 
-  /// 进行中的加载（按曲目 id 合并，避免两路同时写同一个 .part 文件）。
-  final Map<String, Future<LoadedAudio>> _inFlight = {};
+  /// 进行中的加载会话（按曲目 id 合并）；下载完成并落盘后移除。
+  final Map<String, Future<_AudioSession>> _inFlight = {};
 
   TrackAudioLoader({
     required this.accessToken,
@@ -75,46 +141,159 @@ class TrackAudioLoader implements TrackAudioSource {
     required this.cacheDirectory,
     this.formatPreference = kPlayableFormatPreference,
     this.deviceId,
-    this.maxCacheBytes = 512 * 1024 * 1024,
+    this._maxCacheBytes = 512 * 1024 * 1024,
     http.Client? client,
   }) : _client = client ?? http.Client();
 
+  // ---------------------------------------------------------------------------
+  // 缓存管理（AudioCacheStore）
+  // ---------------------------------------------------------------------------
+
+  Directory get _audioDir => Directory('$cacheDirectory${Platform.pathSeparator}audio');
+
+  /// 音频缓存目录的容量上限（字节）。
+  @override
+  int get maxCacheBytes => _maxCacheBytes;
+
+  @override
+  set maxCacheBytes(int value) {
+    _maxCacheBytes = value;
+    _trimCache();
+  }
+
+  /// 缓存里的音频文件（不含下载中的 .part 与响度旁路文件）。
+  List<File> _audioFiles() {
+    final dir = _audioDir;
+    if (!dir.existsSync()) return const [];
+    return dir
+        .listSync()
+        .whereType<File>()
+        .where((f) => !f.path.endsWith('.part') && !f.path.endsWith('.${AudioNormalization.sidecarExtension}'))
+        .toList();
+  }
+
+  /// 删除音频文件及其响度旁路文件；返回释放的字节数（删除失败为 0）。
+  static int _deleteAudio(File file) {
+    try {
+      final size = file.lengthSync();
+      file.deleteSync();
+      final sidecar = AudioNormalization.sidecarFor(file);
+      if (sidecar.existsSync()) sidecar.deleteSync();
+      return size;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  @override
+  Future<int> sizeBytes() async {
+    try {
+      final dir = _audioDir;
+      if (!dir.existsSync()) return 0;
+      var total = 0;
+      await for (final entity in dir.list()) {
+        if (entity is File) total += await entity.length();
+      }
+      return total;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  @override
+  Future<int> clear() async {
+    var freed = 0;
+    try {
+      for (final f in _audioFiles()) {
+        if (_isProtected(f)) continue;
+        freed += _deleteAudio(f);
+      }
+    } catch (_) {}
+    return freed;
+  }
+
   Future<Map<String, String>> _headers() async {
     final token = await accessToken();
-    final headers = <String, String>{
-      'Authorization': 'Bearer $token',
-      'Accept': 'application/x-protobuf',
-    };
+    final headers = <String, String>{'Authorization': 'Bearer $token', 'Accept': 'application/x-protobuf'};
     if (clientToken != null) {
       headers['client-token'] = await clientToken!();
     }
     return headers;
   }
 
-  /// 加载一首完整曲目（base62 id 或 `spotify:track:` URI），返回本地已解密文件。
+  /// 加载一首完整曲目（base62 id 或 `spotify:track:` URI），等整首下载完，返回本地已解密文件。
   ///
   /// [progress] 回调 0.0~1.0（下载/解密进度）。已缓存时立即返回。
   @override
-  Future<LoadedAudio> load(
-    String trackIdOrUri, {
-    void Function(double progress)? progress,
-  }) {
+  Future<LoadedAudio> load(String trackIdOrUri, {void Function(double progress)? progress}) async {
+    final session = await _session(trackIdOrUri);
+    final cached = session.cached;
+    if (cached != null) {
+      progress?.call(1.0);
+      return cached;
+    }
+    if (progress != null) session.download!.addProgressListener(progress);
+    return session.persisted!;
+  }
+
+  /// 边下边播：已缓存时返回本地文件；否则文件头一到就返回 [LoadedAudio.stream]，
+  /// 下载在后台继续并在完成后写入缓存。
+  @override
+  Future<LoadedAudio> open(String trackIdOrUri, {void Function(double progress)? progress}) async {
+    final session = await _session(trackIdOrUri);
+    final cached = session.cached;
+    if (cached != null) {
+      progress?.call(1.0);
+      return cached;
+    }
+    final download = session.download!;
+    if (progress != null) download.addProgressListener(progress);
+    try {
+      await download.ready;
+    } catch (e) {
+      throw TrackPlaybackException(TrackPlaybackFailure.network, '音频下载失败，请检查网络后重试', e);
+    }
+    _protect(session.destination);
+    return LoadedAudio(
+      file: session.destination,
+      source: session.file,
+      durationMs: session.durationMs,
+      trackId: session.id.toBase62(),
+      normalization: download.normalization,
+      stream: download,
+    );
+  }
+
+  /// 取得（或复用进行中的）加载会话。会话在下载落盘后移出 [_inFlight]，之后再请求直接命中缓存。
+  Future<_AudioSession> _session(String trackIdOrUri) {
     final SpotifyId id;
     try {
       id = SpotifyId.fromUri(trackIdOrUri);
     } on FormatException {
-      return Future.error(
-        const TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌不是 Spotify 曲目，无法播放'),
-      );
+      return Future.error(const TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌不是 Spotify 曲目，无法播放'));
     }
     final key = id.toBase62();
-    // 已在加载同一首：复用其结果（进度回调只属于第一个调用者）
-    return _inFlight[key] ??= _load(id, progress).whenComplete(() {
-      _inFlight.remove(key);
-    });
+    final existing = _inFlight[key];
+    if (existing != null) return existing;
+
+    final future = _startSession(id);
+    _inFlight[key] = future;
+    void release() {
+      if (identical(_inFlight[key], future)) _inFlight.remove(key);
+    }
+
+    future.then((session) {
+      final persisted = session.persisted;
+      if (persisted == null) {
+        release();
+      } else {
+        persisted.then<void>((_) {}, onError: (Object _) {}).whenComplete(release);
+      }
+    }, onError: (Object _) => release());
+    return future;
   }
 
-  Future<LoadedAudio> _load(SpotifyId id, void Function(double progress)? progress) async {
+  Future<_AudioSession> _startSession(SpotifyId id) async {
     // 1) metadata：取各格式 file_id
     final TrackMetadata meta;
     try {
@@ -138,8 +317,11 @@ class TrackAudioLoader implements TrackAudioSource {
     for (final c in candidates) {
       final cached = _cacheFile(c.file);
       if (cached.existsSync() && cached.lengthSync() > 0) {
-        progress?.call(1.0);
-        return LoadedAudio(file: cached, source: c.file, durationMs: durationMs, trackId: id.toBase62());
+        // 更新修改时间：淘汰按「最久未用」而不是「最早下载」
+        try {
+          cached.setLastModifiedSync(DateTime.now());
+        } catch (_) {}
+        return _AudioSession.cached(_loaded(cached, c.file, durationMs, id), id);
       }
     }
 
@@ -170,72 +352,94 @@ class TrackAudioLoader implements TrackAudioSource {
       }
     }
     if (file == null || key == null) {
-      throw TrackPlaybackException(
-        TrackPlaybackFailure.unavailable,
-        '这首歌暂时无法播放（可能需要 Premium 或受版权限制）',
-        keyError,
-      );
+      throw TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌暂时无法播放（可能需要 Premium 或受版权限制）', keyError);
     }
 
-    // 4) CDN 解析 + 下载 + 流式解密
-    final cached = _cacheFile(file);
-    await cached.parent.create(recursive: true);
-    final tmp = File('${cached.path}.part');
+    // 4) CDN 解析，随后在后台下载 + 流式解密（边下边播由 open 读取同一份下载）
+    final List<String> cdnUrls;
     try {
-      final storage = await resolveAudioStorage(
-        fileIdHex: file.fileIdHex,
-        headers: _headers,
-        client: _client,
-      );
-      await _downloadAndDecrypt(
-        urls: storage.cdnUrls,
-        key: key,
-        destination: tmp,
-        progress: progress,
-      );
-      await _finalize(tmp, cached, file.format);
+      cdnUrls = (await resolveAudioStorage(fileIdHex: file.fileIdHex, headers: _headers, client: _client)).cdnUrls;
     } catch (e) {
-      if (tmp.existsSync()) tmp.deleteSync();
       throw TrackPlaybackException(TrackPlaybackFailure.network, '音频下载失败，请检查网络后重试', e);
     }
-    _trimCache(keep: cached);
-
-    return LoadedAudio(file: cached, source: file, durationMs: durationMs, trackId: id.toBase62());
-  }
-
-  /// 落盘：Spotify 的 Ogg 文件以 0xa7 字节的私有头页开头（librespot `SPOTIFY_OGG_HEADER_END`），
-  /// 标准解码器不认识，剥掉后第二页必须以 `OggS` 开头；其余格式原样重命名。
-  static Future<void> _finalize(File tmp, File destination, AudioFileFormat format) async {
-    const spotifyOggHeaderEnd = 0xa7;
-    final isOgg = format.extension == 'ogg';
-    if (isOgg && tmp.lengthSync() > spotifyOggHeaderEnd + 4) {
-      final raf = await tmp.open();
-      await raf.setPosition(spotifyOggHeaderEnd);
-      final magic = await raf.read(4);
-      await raf.close();
-      if (String.fromCharCodes(magic) == 'OggS') {
-        await tmp.openRead(spotifyOggHeaderEnd).pipe(destination.openWrite());
-        tmp.deleteSync();
-        return;
+    final destination = _cacheFile(file);
+    final download = ProgressiveDownload(urls: cdnUrls, key: key, iv: kAudioAesIv, format: file.format, client: _client)
+      ..start();
+    final session = _AudioSession.downloading(
+      id: id,
+      file: file,
+      durationMs: durationMs,
+      download: download,
+      destination: destination,
+    );
+    final source = file;
+    session.persisted = () async {
+      try {
+        await download.done;
+        await _persist(download, destination);
+      } catch (e) {
+        throw TrackPlaybackException(TrackPlaybackFailure.network, '音频下载失败，请检查网络后重试', e);
       }
-    }
-    if (destination.existsSync()) destination.deleteSync(); // Windows 上 rename 不覆盖已有文件
-    tmp.renameSync(destination.path);
+      final result = _loaded(destination, source, durationMs, id);
+      _trimCache();
+      return result;
+    }();
+    session.persisted!.ignore(); // 只预取 / 只边下边播时没人等它，失败不应成为未捕获异常
+    return session;
   }
 
-  /// 缓存淘汰：目录总量超过 [maxCacheBytes] 时，按修改时间从旧到新删除（保留 [keep]）。
-  void _trimCache({required File keep}) {
+  /// 标记为最近使用（正在播放 + 预取的下一首），清缓存 / 淘汰时跳过。
+  void _protect(File file) {
+    _recentPaths
+      ..remove(file.path)
+      ..add(file.path);
+    if (_recentPaths.length > 2) _recentPaths.removeAt(0);
+  }
+
+  LoadedAudio _loaded(File cached, TrackAudioFile source, int? durationMs, SpotifyId id) {
+    _protect(cached);
+    return LoadedAudio(
+      file: cached,
+      source: source,
+      durationMs: durationMs,
+      trackId: id.toBase62(),
+      normalization: AudioNormalization.readSidecar(cached),
+    );
+  }
+
+  /// 落盘：写入已去掉 Spotify 私有头的音频（规则见 [SpotifyAudioHeader]），先写 `.part` 再改名，
+  /// 中途失败不会留下半截缓存。私有头里的响度数据另存为 `.norm` 旁路文件。
+  static Future<void> _persist(ProgressiveDownload download, File destination) async {
+    await destination.parent.create(recursive: true);
+    final tmp = File('${destination.path}.part');
     try {
-      final dir = keep.parent;
-      final files = dir.listSync().whereType<File>().where((f) => !f.path.endsWith('.part')).toList();
+      await tmp.writeAsBytes(download.playableBytes, flush: true);
+      if (destination.existsSync()) destination.deleteSync(); // Windows 上 rename 不覆盖已有文件
+      await tmp.rename(destination.path);
+    } catch (_) {
+      if (tmp.existsSync()) tmp.deleteSync();
+      rethrow;
+    }
+    final loudness = download.normalizationBytes;
+    if (loudness != null) {
+      try {
+        AudioNormalization.sidecarFor(destination).writeAsBytesSync(loudness);
+      } catch (_) {}
+    }
+  }
+
+  /// 缓存淘汰：音频总量超过 [maxCacheBytes] 时，按修改时间（最近一次使用）从旧到新删除，
+  /// 最近加载的两首（正在播放 + 预取）保留。
+  void _trimCache() {
+    try {
+      final files = _audioFiles();
       var total = files.fold<int>(0, (sum, f) => sum + f.lengthSync());
-      if (total <= maxCacheBytes) return;
+      if (total <= _maxCacheBytes) return;
       files.sort((a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()));
       for (final f in files) {
-        if (total <= maxCacheBytes) break;
-        if (f.path == keep.path) continue;
-        total -= f.lengthSync();
-        f.deleteSync();
+        if (total <= _maxCacheBytes) break;
+        if (_isProtected(f)) continue;
+        total -= _deleteAudio(f);
       }
     } catch (_) {
       // 淘汰失败（文件被占用等）不影响播放
@@ -256,8 +460,10 @@ class TrackAudioLoader implements TrackAudioSource {
   /// 该扩展缺失时回退 `metadata/4/track/{gid}`（旧接口，新版客户端身份下常不含 file）。
   Future<TrackMetadata> fetchTrackMetadata(SpotifyId id) async {
     try {
-      final payload = await ExtendedMetadataClient(_client, headers: _headers)
-          .fetch('spotify:track:${id.toBase62()}', ExtensionKind.trackV4);
+      final payload = await ExtendedMetadataClient(
+        _client,
+        headers: _headers,
+      ).fetch('spotify:track:${id.toBase62()}', ExtensionKind.trackV4);
       if (payload != null) {
         final meta = TrackMetadata.parse(payload);
         if (meta.files.isNotEmpty || meta.alternatives.isNotEmpty) return meta;
@@ -288,10 +494,7 @@ class TrackAudioLoader implements TrackAudioSource {
   Future<SpotifyAccessPoint> _ensureAccessPoint() async {
     Future<SpotifyAccessPoint> create() async {
       final ap = await SpotifyAccessPoint.connect(client: _client);
-      await ap.authenticate(
-        ApCredentials.accessToken(await accessToken()),
-        deviceId: deviceId,
-      );
+      await ap.authenticate(ApCredentials.accessToken(await accessToken()), deviceId: deviceId);
       return ap;
     }
 
@@ -314,59 +517,10 @@ class TrackAudioLoader implements TrackAudioSource {
     session?.then((ap) => ap.close()).catchError((_) {});
   }
 
-  File _cacheFile(TrackAudioFile file) =>
-      File('$cacheDirectory${Platform.pathSeparator}audio${Platform.pathSeparator}'
-          '${file.fileIdHex}.${file.extension}');
-
-  Future<void> _downloadAndDecrypt({
-    required List<String> urls,
-    required Uint8List key,
-    required File destination,
-    void Function(double progress)? progress,
-  }) async {
-    Object? lastError;
-    for (final url in urls) {
-      try {
-        await _downloadOne(url, key, destination, progress);
-        return;
-      } catch (e) {
-        lastError = e;
-      }
-    }
-    throw StateError('所有 CDN 地址下载失败：$lastError');
-  }
-
-  Future<void> _downloadOne(
-    String url,
-    Uint8List key,
-    File destination,
-    void Function(double progress)? progress,
-  ) async {
-    final request = http.Request('GET', Uri.parse(url));
-    final response = await _client.send(request);
-    if (response.statusCode != 200) {
-      throw StateError('CDN 返回 HTTP ${response.statusCode}');
-    }
-
-    final total = response.contentLength ?? -1;
-    final cipher = AesCtr(key, kAudioAesIv);
-    final sink = destination.openWrite();
-    var received = 0;
-    try {
-      await for (final chunk in response.stream) {
-        final data = Uint8List.fromList(chunk);
-        cipher.process(data); // AES-128-CTR 流式解密（与文件格式无关）
-        sink.add(data);
-        received += data.length;
-        if (total > 0) progress?.call((received / total).clamp(0.0, 1.0));
-      }
-      await sink.flush();
-    } finally {
-      await sink.close();
-    }
-    if (received == 0) throw StateError('CDN 返回空文件');
-    progress?.call(1.0);
-  }
+  File _cacheFile(TrackAudioFile file) => File(
+    '$cacheDirectory${Platform.pathSeparator}audio${Platform.pathSeparator}'
+    '${file.fileIdHex}.${file.extension}',
+  );
 
   /// 释放资源（AP 会话与 HTTP 客户端）。
   void dispose() {

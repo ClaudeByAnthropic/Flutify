@@ -47,7 +47,12 @@ class RemoteScrubber extends StatefulWidget {
   /// 紧凑模式（桌面播放栏）：细轨道、小圆点。
   final bool compact;
 
-  const RemoteScrubber({super.key, this.compact = true});
+  /// 颜色（歌词玻璃控制台用白色）；为 null 时跟随主题。
+  final Color? activeColor;
+  final Color? inactiveColor;
+  final Color? labelColor;
+
+  const RemoteScrubber({super.key, this.compact = true, this.activeColor, this.inactiveColor, this.labelColor});
 
   @override
   State<RemoteScrubber> createState() => _RemoteScrubberState();
@@ -62,7 +67,7 @@ class _RemoteScrubberState extends State<RemoteScrubber> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final labelStyle = theme.textTheme.labelSmall?.copyWith(
-      color: colorScheme.onSurfaceVariant,
+      color: widget.labelColor ?? colorScheme.onSurfaceVariant,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
 
@@ -82,6 +87,9 @@ class _RemoteScrubberState extends State<RemoteScrubber> {
                   trackHeight: widget.compact ? 3 : 4,
                   thumbShape: RoundSliderThumbShape(enabledThumbRadius: widget.compact ? 5 : 7),
                   overlayShape: RoundSliderOverlayShape(overlayRadius: widget.compact ? 10 : 16),
+                  activeTrackColor: widget.activeColor,
+                  thumbColor: widget.activeColor,
+                  inactiveTrackColor: widget.inactiveColor,
                 ),
                 child: Slider(
                   value: value,

@@ -5,10 +5,12 @@ import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../../providers/connect_provider.dart';
 import '../../screens/player/device_picker_sheet.dart';
+import '../../screens/player/lyrics_sheet.dart';
+import '../../shell/shell_layout_controller.dart';
 import '../cover_image.dart';
-import 'connect_actions.dart';
 import 'connect_device_icon.dart';
 import 'remote_progress.dart';
+import 'remote_transport_controls.dart';
 
 /// 桌面端播放栏的远程模式：内容与按钮作用于正在使用的远程设备。
 ///
@@ -76,9 +78,15 @@ class _RemoteTrackInfo extends StatelessWidget {
     final track = connect.remoteTrack;
     final title = track?.name ?? player.title;
     final subtitle = track?.artistNames ?? player.albumTitle;
+    final layout = context.read<ShellLayoutController?>();
     return Row(
       children: [
-        CoverImage(url: track?.coverUrl ?? player.imageUrl, size: 56, borderRadius: BorderRadius.circular(8)),
+        // 点封面：右栏切到「正在播放」（与本机播放栏点封面打开正在播放一致）
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => layout == null ? LyricsSheet.show(context) : layout.showTab(NowPlayingTab.details),
+          child: CoverImage(url: track?.coverUrl ?? player.imageUrl, size: 56, borderRadius: BorderRadius.circular(8)),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -106,115 +114,62 @@ class _RemoteTrackInfo extends StatelessWidget {
   }
 }
 
-/// 远程播放控制：随机 / 上一首 / 播放暂停 / 下一首 / 循环。
-class RemoteTransportControls extends StatelessWidget {
-  /// 手机等窄处可以去掉随机与循环。
-  final bool showModes;
+/// 右侧：正在播放 / 歌词（右栏标签，远程曲目同样可看）+ 设备键（强调色，表示正在遥控）+ 远程音量。
+class _RemoteRightControls extends StatelessWidget {
+  const _RemoteRightControls();
 
-  const RemoteTransportControls({super.key, this.showModes = true});
-
-  /// M3 IconButton 默认补到 48px 点击区，这里收紧到 32px（与本机播放栏一致）。
-  static final ButtonStyle _compact = IconButton.styleFrom(
-    fixedSize: const Size.square(32),
-    minimumSize: const Size.square(32),
+  static const double _sliderWidth = 92;
+  static const double _buttonSize = 36;
+  static final ButtonStyle _style = IconButton.styleFrom(
+    fixedSize: const Size.square(_buttonSize),
+    minimumSize: const Size.square(_buttonSize),
     padding: EdgeInsets.zero,
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   );
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     final colorScheme = Theme.of(context).colorScheme;
     final connect = context.watch<ConnectProvider>();
-    final player = connect.player;
-    final l10n = context.l10n;
+    final device = connect.activeDevice;
+    // 三栏框架下切换右栏标签；没有框架（单独使用播放栏）时歌词回退为底部面板
+    final layout = context.watch<ShellLayoutController?>();
 
-    Widget button(IconData icon, String tooltip, Future<void> Function() action, {Color? color, double size = 22}) {
+    Widget panelButton(NowPlayingTab tab, IconData icon, String tooltip) {
+      final active = layout != null && layout.rightPanelVisible && layout.tab == tab;
       return IconButton(
-        icon: Icon(icon, size: size),
-        color: color ?? colorScheme.onSurface,
+        icon: Icon(icon, size: 20),
+        color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
         tooltip: tooltip,
-        style: _compact,
-        onPressed: () => ConnectActions.run(context, action),
+        style: _style,
+        onPressed: () => layout == null ? LyricsSheet.show(context) : layout.showTab(tab),
       );
     }
 
-    final repeatIcon = player.repeatTrack ? Icons.repeat_one_rounded : Icons.repeat_rounded;
-    final repeatOn = player.repeatContext || player.repeatTrack;
-    // 提示文字描述「点按后会怎样」，与本机播放控件一致
-    final repeatTooltip = player.repeatTrack
-        ? l10n.playerRepeatOff
-        : (player.repeatContext ? l10n.playerRepeatOneOn : l10n.playerRepeatOn);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (showModes) ...[
-          button(
-            Icons.shuffle_rounded,
-            player.shuffle ? l10n.playerShuffleOff : l10n.playerShuffleOn,
-            connect.toggleShuffle,
-            color: player.shuffle ? colorScheme.primary : colorScheme.onSurfaceVariant,
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-        ],
-        button(Icons.skip_previous_rounded, l10n.playerPrevious, connect.skipPrevious),
-        const SizedBox(width: 10),
-        // 深色：白底黑图标；浅色：黑底白图标（与本机播放栏一致）
-        Material(
-          color: colorScheme.onSurface,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: () => ConnectActions.run(context, connect.togglePlayPause),
-            child: SizedBox.square(
-              dimension: 36,
-              child: Icon(
-                player.isAudible ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                size: 22,
-                color: colorScheme.surface,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        button(Icons.skip_next_rounded, l10n.playerNext, connect.skipNext),
-        if (showModes) ...[
-          const SizedBox(width: 8),
-          button(
-            repeatIcon,
-            repeatTooltip,
-            connect.cycleRepeat,
-            color: repeatOn ? colorScheme.primary : colorScheme.onSurfaceVariant,
-            size: 18,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// 右侧：设备键（强调色，表示正在遥控）+ 远程音量。
-class _RemoteRightControls extends StatelessWidget {
-  const _RemoteRightControls();
-
-  static const double _sliderWidth = 92;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final connect = context.watch<ConnectProvider>();
-    final device = connect.activeDevice;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final showSlider = device != null && device.supportsVolume && constraints.maxWidth >= 40 + _sliderWidth + 40;
+        final panelButtons = layout == null ? 1 : 2;
+        final showPanels = constraints.maxWidth >= (panelButtons + 1) * _buttonSize;
+        final used = (showPanels ? panelButtons : 0) * _buttonSize + _buttonSize;
+        final showSlider = device != null && device.supportsVolume && constraints.maxWidth >= used + _sliderWidth + 8;
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            if (showPanels) ...[
+              if (layout != null)
+                panelButton(
+                  NowPlayingTab.details,
+                  Icons.picture_in_picture_alt_rounded,
+                  context.l10n.shellNowPlayingView,
+                ),
+              panelButton(NowPlayingTab.lyrics, Icons.lyrics_outlined, context.l10n.lyricsTitle),
+            ],
             IconButton(
               icon: Icon(device == null ? Icons.devices_rounded : connectDeviceIcon(device.type), size: 20),
               color: tokens.accent,
               tooltip: context.l10n.deviceConnectTitle,
+              style: _style,
               onPressed: () => DevicePickerSheet.show(context),
             ),
             if (showSlider)

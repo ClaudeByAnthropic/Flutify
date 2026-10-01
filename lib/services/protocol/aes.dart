@@ -68,6 +68,12 @@ class AesCipher {
   /// 单块加密（16 字节）。
   Uint8List encryptBlock(Uint8List block) {
     final s = Uint8List.fromList(block);
+    encryptInPlace(s);
+    return s;
+  }
+
+  /// 原地加密 16 字节状态（不分配内存，CTR 解密整首曲目时逐块调用）。
+  void encryptInPlace(Uint8List s) {
     _addRoundKey(s, 0);
     for (var round = 1; round < _rounds; round++) {
       _subBytes(s);
@@ -78,7 +84,6 @@ class AesCipher {
     _subBytes(s);
     _shiftRows(s);
     _addRoundKey(s, _rounds);
-    return s;
   }
 
   void _addRoundKey(Uint8List s, int round) {
@@ -94,13 +99,25 @@ class AesCipher {
   }
 
   static void _shiftRows(Uint8List s) {
-    // 状态按列排布：s[r + 4c]；行 r 循环左移 r 格
-    for (var r = 1; r < 4; r++) {
-      final row = [for (var c = 0; c < 4; c++) s[r + 4 * c]];
-      for (var c = 0; c < 4; c++) {
-        s[r + 4 * c] = row[(c + r) % 4];
-      }
-    }
+    // 状态按列排布：s[r + 4c]；行 r 循环左移 r 格（展开写，避免每块分配临时列表）
+    var t = s[1];
+    s[1] = s[5];
+    s[5] = s[9];
+    s[9] = s[13];
+    s[13] = t;
+
+    t = s[2];
+    s[2] = s[10];
+    s[10] = t;
+    t = s[6];
+    s[6] = s[14];
+    s[14] = t;
+
+    t = s[15];
+    s[15] = s[11];
+    s[11] = s[7];
+    s[7] = s[3];
+    s[3] = t;
   }
 
   static void _mixColumns(Uint8List s) {
@@ -125,7 +142,7 @@ class AesCipher {
 class AesCtr {
   final AesCipher _cipher;
   final Uint8List _counter;
-  Uint8List? _keystream;
+  final Uint8List _keystream = Uint8List(16);
   int _keystreamPos = 16;
   int _offset = 0;
 
@@ -135,21 +152,54 @@ class AesCtr {
     if (iv.length != 16) throw ArgumentError('CTR IV must be 16 bytes');
   }
 
-  /// XOR 加/解密 [data]（原地）。可任意分块调用。
-  void process(Uint8List data) {
-    for (var i = 0; i < data.length; i++) {
-      if (_keystreamPos == 16) {
-        _keystream = _cipher.encryptBlock(_counter);
-        _keystreamPos = 0;
-        _incrementCounter();
-      }
-      data[i] ^= _keystream![_keystreamPos++];
-      _offset++;
+  /// 从第 [offset] 字节开始加/解密（CTR 可随机访问：计数器 = IV + offset ~/ 16）。
+  /// 用于断点续传：HTTP Range 从中途开始时，解密状态与从头处理到该位置完全一致。
+  factory AesCtr.atOffset(Uint8List key, Uint8List iv, int offset) {
+    if (offset < 0) throw ArgumentError('offset must be >= 0');
+    final ctr = AesCtr(key, iv);
+    ctr._addToCounter(offset ~/ 16);
+    final rem = offset % 16;
+    if (rem > 0) {
+      ctr._nextKeystreamBlock();
+      ctr._keystreamPos = rem;
     }
+    ctr._offset = offset;
+    return ctr;
   }
 
-  /// 已处理的字节数。
+  /// XOR 加/解密 [data]（原地）。可任意分块调用。
+  void process(Uint8List data) {
+    final keystream = _keystream;
+    var pos = _keystreamPos;
+    for (var i = 0; i < data.length; i++) {
+      if (pos == 16) {
+        _nextKeystreamBlock();
+        pos = 0;
+      }
+      data[i] ^= keystream[pos++];
+    }
+    _keystreamPos = pos;
+    _offset += data.length;
+  }
+
+  /// 已处理的字节数（含 [AesCtr.atOffset] 的起始偏移）。
   int get offset => _offset;
+
+  void _nextKeystreamBlock() {
+    _keystream.setAll(0, _counter);
+    _cipher.encryptInPlace(_keystream);
+    _incrementCounter();
+  }
+
+  /// 128 位大端计数器加上 [blocks]。
+  void _addToCounter(int blocks) {
+    var carry = blocks;
+    for (var i = 15; i >= 0 && carry > 0; i--) {
+      final sum = _counter[i] + (carry & 0xff);
+      _counter[i] = sum & 0xff;
+      carry = (carry >> 8) + (sum >> 8);
+    }
+  }
 
   void _incrementCounter() {
     for (var i = 15; i >= 0; i--) {

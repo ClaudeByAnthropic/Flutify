@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
@@ -8,14 +10,18 @@ import 'core/theme/system_bars.dart';
 import 'core/utils/error_placeholder.dart';
 import 'core/utils/orientation_policy.dart';
 import 'l10n/app_locale.dart';
+import 'models/app_preferences.dart';
 import 'providers/appearance_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/connect_provider.dart';
 import 'providers/library_provider.dart';
 import 'providers/playback_provider.dart';
+import 'providers/preferences_provider.dart';
 import 'providers/spotify_provider.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
+import 'services/playback_session_store.dart';
+import 'services/protocol/audio_cache_store.dart';
 import 'services/protocol/track_audio_loader.dart';
 import 'services/spotify_api_service.dart';
 import 'services/storage_service.dart';
@@ -23,6 +29,7 @@ import 'ui/screens/main_shell.dart';
 import 'ui/shell/desktop/desktop_window.dart';
 import 'ui/shell/desktop/window_frame.dart';
 import 'ui/widgets/dynamic_accent_sync.dart';
+import 'ui/widgets/playback_session_keeper.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,6 +55,7 @@ Future<void> main() async {
   final supportDir = await getApplicationSupportDirectory();
   final trackAudioLoader = TrackAudioLoader(
     cacheDirectory: supportDir.path,
+    maxCacheBytes: storageService.audioCacheLimitMb * 1024 * 1024,
     deviceId: storageService.deviceId,
     accessToken: () async {
       try {
@@ -58,8 +66,13 @@ Future<void> main() async {
     clientToken: () => authService.ensureClientToken(),
   );
 
-  // 桌面端：隐藏系统标题栏（由顶栏自绘）、设置最小窗口尺寸
-  await DesktopWindow.init();
+  // 上次播放会话（曲目 / 队列 / 进度）：单独的 JSON 文件，不放进 SharedPreferences
+  final sessionStore = FilePlaybackSessionStore(
+    File('${supportDir.path}${Platform.pathSeparator}playback_session.json'),
+  );
+
+  // 桌面端：隐藏系统标题栏（由顶栏自绘）、设置最小窗口尺寸、还原上次的窗口位置
+  await DesktopWindow.init(storageService);
 
   runApp(
     FlutifyApp(
@@ -68,6 +81,7 @@ Future<void> main() async {
       spotifyApiService: spotifyApiService,
       authService: authService,
       trackAudioLoader: trackAudioLoader,
+      playbackSessionStore: sessionStore,
     ),
   );
 }
@@ -83,6 +97,9 @@ class FlutifyApp extends StatelessWidget {
   /// 完整曲目音频来源（协议链路）；为空时任何曲目都无法播放（PlaybackProvider 报「请先登录」）。
   final TrackAudioSource? trackAudioLoader;
 
+  /// 上次播放会话的存储；为空时不还原、不保存（测试默认）。
+  final PlaybackSessionStore? playbackSessionStore;
+
   const FlutifyApp({
     super.key,
     required this.storageService,
@@ -90,6 +107,7 @@ class FlutifyApp extends StatelessWidget {
     required this.spotifyApiService,
     this.authService,
     this.trackAudioLoader,
+    this.playbackSessionStore,
   });
 
   @override
@@ -109,17 +127,32 @@ class FlutifyApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(
-          create: (_) => PlaybackProvider(audioPlayerService, storageService, audioLoader: trackAudioLoader),
+          create: (_) {
+            final playback = PlaybackProvider(
+              audioPlayerService,
+              storageService,
+              audioLoader: trackAudioLoader,
+              sessionStore: playbackSessionStore,
+            );
+            // 关窗前保存进度（进程退出时 Provider 不一定来得及 dispose）
+            DesktopWindow.addBeforeCloseHook(playback.flushSession);
+            return playback;
+          },
         ),
         ChangeNotifierProvider(create: (_) => LibraryProvider(storageService, source: spotifyApiService.library)),
         ChangeNotifierProvider(create: (_) => SpotifyProvider(spotifyApiService, storageService)),
         ChangeNotifierProvider(create: (_) => AppearanceProvider(storageService)),
-        // Spotify Connect 遥控：非惰性，启动即接入（桌面版会话），播放栏才能及时显示远程播放
+        ChangeNotifierProvider(create: (_) => PreferencesProvider(storageService)),
+        // 设置页「存储」分组：音频缓存占用 / 上限 / 清除（未接入协议链路时为 null）
+        Provider<AudioCacheStore?>.value(
+          value: trackAudioLoader is AudioCacheStore ? trackAudioLoader as AudioCacheStore : null,
+        ),
+        // Spotify Connect 遥控：非惰性，启动即接入（桌面版会话且设置里未关闭），播放栏才能及时显示远程播放
         ChangeNotifierProvider(
           lazy: false,
-          create: (_) => ConnectProvider(
+          create: (ctx) => ConnectProvider(
             spotifyApiService.connect,
-            available: () => spotifyApiService.supportsConnect,
+            available: () => spotifyApiService.supportsConnect && ctx.read<PreferencesProvider>().prefs.connectEnabled,
             resolveTrack: spotifyApiService.getTrackByUri,
           ),
         ),
@@ -133,7 +166,7 @@ class FlutifyApp extends StatelessWidget {
             },
         ),
       ],
-      child: const DynamicAccentSync(child: _ThemedApp()),
+      child: const PlaybackSessionKeeper(child: DynamicAccentSync(child: _ThemedApp())),
     );
   }
 }
@@ -146,12 +179,13 @@ class _ThemedApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final appearance = context.watch<AppearanceProvider>();
     final settings = appearance.settings;
+    final language = context.select<PreferencesProvider, AppLanguage>((p) => p.prefs.language);
 
     return MaterialApp(
       title: 'Flutify',
       debugShowCheckedModeBanner: false,
-      // 界面固定简体中文；系统组件文案由 Global*Localizations 提供
-      locale: AppLocale.locale,
+      // 默认简体中文，可在设置里改为跟随系统 / English；系统组件文案由 Global*Localizations 提供
+      locale: AppLocale.localeFor(language),
       supportedLocales: AppLocale.supportedLocales,
       localizationsDelegates: AppLocale.delegates,
       themeMode: settings.themeMode,
@@ -161,6 +195,8 @@ class _ThemedApp extends StatelessWidget {
       // 在设置页切换选项时会明显卡顿；改为单帧切换
       themeAnimationDuration: Duration.zero,
       builder: (context, child) {
+        // 实际生效的界面语言决定请求 Spotify 时的 Accept-Language（主页文案等随之本地化）
+        AppLocale.resolved(Localizations.localeOf(context));
         final media = MediaQuery.of(context);
         return MediaQuery(
           data: media.copyWith(

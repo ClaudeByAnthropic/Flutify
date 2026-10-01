@@ -501,7 +501,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lyricsImmersive => 'Immersive lyrics';
 
   @override
-  String get lyricsExitImmersive => 'Exit full screen (Esc)';
+  String get lyricsExitImmersive => 'Exit lyrics (Esc)';
+
+  @override
+  String get lyricsFillScreen => 'Fill the screen (F11)';
+
+  @override
+  String get lyricsFillWindow => 'Fit to window (F11)';
 
   @override
   String get deviceConnectTitle => 'Connect to a device';
@@ -742,6 +748,230 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsBrightness => 'Brightness';
+
+  @override
+  String get settingsLanguageSection => 'Language';
+
+  @override
+  String get settingsLanguage => 'App language';
+
+  @override
+  String get settingsLanguageSubtitle =>
+      'Also changes text provided by Spotify, such as home feed titles';
+
+  @override
+  String get settingsLanguageSystem => 'System';
+
+  @override
+  String get settingsLanguageZh => '中文';
+
+  @override
+  String get settingsLanguageEn => 'English';
+
+  @override
+  String get settingsStorageSection => 'Storage';
+
+  @override
+  String get settingsAudioCache => 'Audio cache';
+
+  @override
+  String settingsAudioCacheUsage(String used, String limit) {
+    return '$used of $limit used';
+  }
+
+  @override
+  String get settingsAudioCacheCalculating => 'Calculating…';
+
+  @override
+  String get settingsAudioCacheLimit => 'Cache limit';
+
+  @override
+  String get settingsAudioCacheLimitSubtitle =>
+      'Songs you haven\'t played for the longest are removed first';
+
+  @override
+  String get settingsClearAudioCache => 'Clear audio cache';
+
+  @override
+  String get settingsClearAudioCacheTitle => 'Clear audio cache?';
+
+  @override
+  String get settingsClearAudioCacheMessage =>
+      'Downloaded songs will be deleted and downloaded again when you play them. The song that\'s playing is kept.';
+
+  @override
+  String settingsAudioCacheCleared(String size) {
+    return 'Freed $size';
+  }
+
+  @override
+  String get settingsLyricsSection => 'Lyrics';
+
+  @override
+  String get settingsLyricsSize => 'Lyrics size';
+
+  @override
+  String get settingsLyricsAlign => 'Alignment';
+
+  @override
+  String get settingsLyricsAlignLeft => 'Left';
+
+  @override
+  String get settingsLyricsAlignCenter => 'Centre';
+
+  @override
+  String get settingsLyricsBlur => 'Blur other lines';
+
+  @override
+  String get settingsLyricsImmersiveScreen =>
+      'Full-screen lyrics fill the screen';
+
+  @override
+  String get settingsLyricsImmersiveScreenSubtitle =>
+      'When off, they fill only the window. Press F11 in full-screen lyrics to switch';
+
+  @override
+  String get settingsOff => 'Off';
+
+  @override
+  String get settingsNormalize => 'Normalize volume';
+
+  @override
+  String get settingsNormalizeSubtitle =>
+      'Uses Spotify\'s loudness data to turn loud songs down to a consistent level';
+
+  @override
+  String get settingsFade => 'Fade between songs';
+
+  @override
+  String get settingsFadeSubtitle =>
+      'Fades out at the end of a song and fades the next one in';
+
+  @override
+  String settingsSeconds(int count) {
+    return '$count s';
+  }
+
+  @override
+  String get settingsStartupSection => 'Startup';
+
+  @override
+  String get settingsStartPage => 'Open at launch';
+
+  @override
+  String get settingsStartPageHome => 'Home';
+
+  @override
+  String get settingsStartPageLibrary => 'Library';
+
+  @override
+  String get settingsStartPageLast => 'Last page';
+
+  @override
+  String get settingsRememberWindow => 'Remember window size and position';
+
+  @override
+  String get settingsRememberWindowSubtitle =>
+      'Restored at next launch; centred again if the screen it was on is gone';
+
+  @override
+  String get settingsConnectSection => 'Spotify Connect';
+
+  @override
+  String get settingsConnectEnabled => 'Enable Spotify Connect';
+
+  @override
+  String get settingsConnectEnabledSubtitle =>
+      'Show and control playback on your other devices';
+
+  @override
+  String get settingsRemoteLyricsLead => 'Remote lyrics lead';
+
+  @override
+  String get settingsRemoteLyricsLeadSubtitle =>
+      'When another device is playing: raise it if lyrics lag behind the singing, lower it if they run ahead';
+
+  @override
+  String get settingsPrivacySection => 'Privacy';
+
+  @override
+  String get settingsClearSearchHistory => 'Clear search history';
+
+  @override
+  String settingsSearchHistoryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count searches',
+      one: '1 search',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsSearchHistoryEmpty => 'No search history';
+
+  @override
+  String get settingsClearLyricsCache => 'Clear lyrics cache';
+
+  @override
+  String get settingsClearLyricsCacheSubtitle =>
+      'Lyrics will be fetched from Spotify again';
+
+  @override
+  String get settingsCleared => 'Cleared';
+
+  @override
+  String get settingsAboutSection => 'About';
+
+  @override
+  String get settingsVersion => 'Version';
+
+  @override
+  String get settingsShortcuts => 'Keyboard shortcuts';
+
+  @override
+  String get settingsLicenses => 'Open-source licences';
+
+  @override
+  String get shortcutPlayPause => 'Play / pause';
+
+  @override
+  String get shortcutNext => 'Next song';
+
+  @override
+  String get shortcutPrevious => 'Previous song';
+
+  @override
+  String get shortcutVolumeUp => 'Volume up';
+
+  @override
+  String get shortcutVolumeDown => 'Volume down';
+
+  @override
+  String get shortcutShuffle => 'Shuffle';
+
+  @override
+  String get shortcutRepeat => 'Change repeat mode';
+
+  @override
+  String get shortcutSearch => 'Search';
+
+  @override
+  String get shortcutBack => 'Back';
+
+  @override
+  String get shortcutForward => 'Forward';
+
+  @override
+  String get shortcutImmersive => 'Full-screen lyrics';
+
+  @override
+  String get shortcutImmersiveMode =>
+      'In full-screen lyrics: fill screen / window';
+
+  @override
+  String get shortcutExitImmersive => 'Exit full-screen lyrics';
 
   @override
   String get accountTitle => 'Spotify account';

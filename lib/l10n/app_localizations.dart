@@ -983,8 +983,20 @@ abstract class AppLocalizations {
   /// No description provided for @lyricsExitImmersive.
   ///
   /// In zh, this message translates to:
-  /// **'退出全屏（Esc）'**
+  /// **'退出全屏歌词（Esc）'**
   String get lyricsExitImmersive;
+
+  /// No description provided for @lyricsFillScreen.
+  ///
+  /// In zh, this message translates to:
+  /// **'铺满整个屏幕（F11）'**
+  String get lyricsFillScreen;
+
+  /// No description provided for @lyricsFillWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'只铺满窗口（F11）'**
+  String get lyricsFillWindow;
 
   /// No description provided for @deviceConnectTitle.
   ///
@@ -1417,6 +1429,402 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'亮度'**
   String get settingsBrightness;
+
+  /// No description provided for @settingsLanguageSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'语言'**
+  String get settingsLanguageSection;
+
+  /// No description provided for @settingsLanguage.
+  ///
+  /// In zh, this message translates to:
+  /// **'界面语言'**
+  String get settingsLanguage;
+
+  /// No description provided for @settingsLanguageSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'同时影响主页推荐等由 Spotify 提供的文案'**
+  String get settingsLanguageSubtitle;
+
+  /// No description provided for @settingsLanguageSystem.
+  ///
+  /// In zh, this message translates to:
+  /// **'跟随系统'**
+  String get settingsLanguageSystem;
+
+  /// No description provided for @settingsLanguageZh.
+  ///
+  /// In zh, this message translates to:
+  /// **'中文'**
+  String get settingsLanguageZh;
+
+  /// No description provided for @settingsLanguageEn.
+  ///
+  /// In zh, this message translates to:
+  /// **'English'**
+  String get settingsLanguageEn;
+
+  /// No description provided for @settingsStorageSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'存储'**
+  String get settingsStorageSection;
+
+  /// No description provided for @settingsAudioCache.
+  ///
+  /// In zh, this message translates to:
+  /// **'音频缓存'**
+  String get settingsAudioCache;
+
+  /// No description provided for @settingsAudioCacheUsage.
+  ///
+  /// In zh, this message translates to:
+  /// **'已用 {used}，上限 {limit}'**
+  String settingsAudioCacheUsage(String used, String limit);
+
+  /// No description provided for @settingsAudioCacheCalculating.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在计算…'**
+  String get settingsAudioCacheCalculating;
+
+  /// No description provided for @settingsAudioCacheLimit.
+  ///
+  /// In zh, this message translates to:
+  /// **'缓存上限'**
+  String get settingsAudioCacheLimit;
+
+  /// No description provided for @settingsAudioCacheLimitSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'超出后自动删除最久没播放的歌曲'**
+  String get settingsAudioCacheLimitSubtitle;
+
+  /// No description provided for @settingsClearAudioCache.
+  ///
+  /// In zh, this message translates to:
+  /// **'清除音频缓存'**
+  String get settingsClearAudioCache;
+
+  /// No description provided for @settingsClearAudioCacheTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'清除音频缓存？'**
+  String get settingsClearAudioCacheTitle;
+
+  /// No description provided for @settingsClearAudioCacheMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'已下载的歌曲会被删除，再次播放时重新下载。正在播放的歌曲会保留。'**
+  String get settingsClearAudioCacheMessage;
+
+  /// No description provided for @settingsAudioCacheCleared.
+  ///
+  /// In zh, this message translates to:
+  /// **'已释放 {size}'**
+  String settingsAudioCacheCleared(String size);
+
+  /// No description provided for @settingsLyricsSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词'**
+  String get settingsLyricsSection;
+
+  /// No description provided for @settingsLyricsSize.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词字号'**
+  String get settingsLyricsSize;
+
+  /// No description provided for @settingsLyricsAlign.
+  ///
+  /// In zh, this message translates to:
+  /// **'对齐方式'**
+  String get settingsLyricsAlign;
+
+  /// No description provided for @settingsLyricsAlignLeft.
+  ///
+  /// In zh, this message translates to:
+  /// **'左对齐'**
+  String get settingsLyricsAlignLeft;
+
+  /// No description provided for @settingsLyricsAlignCenter.
+  ///
+  /// In zh, this message translates to:
+  /// **'居中'**
+  String get settingsLyricsAlignCenter;
+
+  /// No description provided for @settingsLyricsBlur.
+  ///
+  /// In zh, this message translates to:
+  /// **'其他行模糊'**
+  String get settingsLyricsBlur;
+
+  /// No description provided for @settingsLyricsImmersiveScreen.
+  ///
+  /// In zh, this message translates to:
+  /// **'全屏歌词铺满整个屏幕'**
+  String get settingsLyricsImmersiveScreen;
+
+  /// No description provided for @settingsLyricsImmersiveScreenSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭时只铺满窗口；在全屏歌词里按 F11 也能切换'**
+  String get settingsLyricsImmersiveScreenSubtitle;
+
+  /// No description provided for @settingsOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'关'**
+  String get settingsOff;
+
+  /// No description provided for @settingsNormalize.
+  ///
+  /// In zh, this message translates to:
+  /// **'音量均衡'**
+  String get settingsNormalize;
+
+  /// No description provided for @settingsNormalizeSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'按 Spotify 提供的响度数据，把偏响的歌调低到一致的音量'**
+  String get settingsNormalizeSubtitle;
+
+  /// No description provided for @settingsFade.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌曲间淡入淡出'**
+  String get settingsFade;
+
+  /// No description provided for @settingsFadeSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'结尾逐渐淡出，下一首淡入'**
+  String get settingsFadeSubtitle;
+
+  /// No description provided for @settingsSeconds.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 秒'**
+  String settingsSeconds(int count);
+
+  /// No description provided for @settingsStartupSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动'**
+  String get settingsStartupSection;
+
+  /// No description provided for @settingsStartPage.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动时打开'**
+  String get settingsStartPage;
+
+  /// No description provided for @settingsStartPageHome.
+  ///
+  /// In zh, this message translates to:
+  /// **'主页'**
+  String get settingsStartPageHome;
+
+  /// No description provided for @settingsStartPageLibrary.
+  ///
+  /// In zh, this message translates to:
+  /// **'音乐库'**
+  String get settingsStartPageLibrary;
+
+  /// No description provided for @settingsStartPageLast.
+  ///
+  /// In zh, this message translates to:
+  /// **'上次位置'**
+  String get settingsStartPageLast;
+
+  /// No description provided for @settingsRememberWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'记住窗口大小和位置'**
+  String get settingsRememberWindow;
+
+  /// No description provided for @settingsRememberWindowSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'下次启动时还原；显示器变化导致窗口不可见时回到屏幕中央'**
+  String get settingsRememberWindowSubtitle;
+
+  /// No description provided for @settingsConnectSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify Connect'**
+  String get settingsConnectSection;
+
+  /// No description provided for @settingsConnectEnabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用 Spotify Connect'**
+  String get settingsConnectEnabled;
+
+  /// No description provided for @settingsConnectEnabledSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示并遥控同一账号在其他设备上的播放'**
+  String get settingsConnectEnabledSubtitle;
+
+  /// No description provided for @settingsRemoteLyricsLead.
+  ///
+  /// In zh, this message translates to:
+  /// **'远程歌词提前'**
+  String get settingsRemoteLyricsLead;
+
+  /// No description provided for @settingsRemoteLyricsLeadSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'其他设备上播放时，歌词比演唱慢就调大，快就调小'**
+  String get settingsRemoteLyricsLeadSubtitle;
+
+  /// No description provided for @settingsPrivacySection.
+  ///
+  /// In zh, this message translates to:
+  /// **'隐私'**
+  String get settingsPrivacySection;
+
+  /// No description provided for @settingsClearSearchHistory.
+  ///
+  /// In zh, this message translates to:
+  /// **'清除搜索记录'**
+  String get settingsClearSearchHistory;
+
+  /// No description provided for @settingsSearchHistoryCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 条记录'**
+  String settingsSearchHistoryCount(int count);
+
+  /// No description provided for @settingsSearchHistoryEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有搜索记录'**
+  String get settingsSearchHistoryEmpty;
+
+  /// No description provided for @settingsClearLyricsCache.
+  ///
+  /// In zh, this message translates to:
+  /// **'清除歌词缓存'**
+  String get settingsClearLyricsCache;
+
+  /// No description provided for @settingsClearLyricsCacheSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'清除后重新从 Spotify 获取歌词'**
+  String get settingsClearLyricsCacheSubtitle;
+
+  /// No description provided for @settingsCleared.
+  ///
+  /// In zh, this message translates to:
+  /// **'已清除'**
+  String get settingsCleared;
+
+  /// No description provided for @settingsAboutSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'关于'**
+  String get settingsAboutSection;
+
+  /// No description provided for @settingsVersion.
+  ///
+  /// In zh, this message translates to:
+  /// **'版本'**
+  String get settingsVersion;
+
+  /// No description provided for @settingsShortcuts.
+  ///
+  /// In zh, this message translates to:
+  /// **'键盘快捷键'**
+  String get settingsShortcuts;
+
+  /// No description provided for @settingsLicenses.
+  ///
+  /// In zh, this message translates to:
+  /// **'开源许可'**
+  String get settingsLicenses;
+
+  /// No description provided for @shortcutPlayPause.
+  ///
+  /// In zh, this message translates to:
+  /// **'播放 / 暂停'**
+  String get shortcutPlayPause;
+
+  /// No description provided for @shortcutNext.
+  ///
+  /// In zh, this message translates to:
+  /// **'下一首'**
+  String get shortcutNext;
+
+  /// No description provided for @shortcutPrevious.
+  ///
+  /// In zh, this message translates to:
+  /// **'上一首'**
+  String get shortcutPrevious;
+
+  /// No description provided for @shortcutVolumeUp.
+  ///
+  /// In zh, this message translates to:
+  /// **'调高音量'**
+  String get shortcutVolumeUp;
+
+  /// No description provided for @shortcutVolumeDown.
+  ///
+  /// In zh, this message translates to:
+  /// **'调低音量'**
+  String get shortcutVolumeDown;
+
+  /// No description provided for @shortcutShuffle.
+  ///
+  /// In zh, this message translates to:
+  /// **'随机播放'**
+  String get shortcutShuffle;
+
+  /// No description provided for @shortcutRepeat.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换循环模式'**
+  String get shortcutRepeat;
+
+  /// No description provided for @shortcutSearch.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索'**
+  String get shortcutSearch;
+
+  /// No description provided for @shortcutBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'后退'**
+  String get shortcutBack;
+
+  /// No description provided for @shortcutForward.
+  ///
+  /// In zh, this message translates to:
+  /// **'前进'**
+  String get shortcutForward;
+
+  /// No description provided for @shortcutImmersive.
+  ///
+  /// In zh, this message translates to:
+  /// **'全屏歌词'**
+  String get shortcutImmersive;
+
+  /// No description provided for @shortcutImmersiveMode.
+  ///
+  /// In zh, this message translates to:
+  /// **'全屏歌词中：切换铺满屏幕 / 窗口'**
+  String get shortcutImmersiveMode;
+
+  /// No description provided for @shortcutExitImmersive.
+  ///
+  /// In zh, this message translates to:
+  /// **'退出全屏歌词'**
+  String get shortcutExitImmersive;
 
   /// No description provided for @accountTitle.
   ///

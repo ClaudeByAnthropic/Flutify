@@ -4,15 +4,21 @@ import 'package:provider/provider.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../providers/playback_provider.dart';
 import '../widgets/settings_section.dart';
+import '../widgets/settings_slider_tile.dart';
 
-/// 播放：连续多首无法播放时自动暂停（默认开启）。
+/// 播放：连续多首无法播放时自动暂停（默认开启）、音量均衡、歌曲间淡入淡出。
+///
+/// 都只作用于本机播放；遥控其他设备（Spotify Connect）时由对方设备自己的设置决定。
 class PlaybackSection extends StatelessWidget {
   const PlaybackSection({super.key});
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final enabled = context.select<PlaybackProvider, bool>((p) => p.pauseAfterFailures);
+    final playback = context.read<PlaybackProvider>();
+    final (pauseAfterFailures, normalize, fadeSeconds) = context.select<PlaybackProvider, (bool, bool, int)>(
+      (p) => (p.pauseAfterFailures, p.normalizeVolume, p.fadeSeconds),
+    );
 
     return SettingsSection(
       title: l10n.settingsPlaybackSection,
@@ -20,8 +26,23 @@ class PlaybackSection extends StatelessWidget {
         SettingsSwitchTile(
           title: l10n.settingsPauseAfterFailures,
           subtitle: l10n.settingsPauseAfterFailuresSubtitle(PlaybackProvider.failureLimit),
-          value: enabled,
-          onChanged: context.read<PlaybackProvider>().setPauseAfterFailures,
+          value: pauseAfterFailures,
+          onChanged: playback.setPauseAfterFailures,
+        ),
+        SettingsSwitchTile(
+          title: l10n.settingsNormalize,
+          subtitle: l10n.settingsNormalizeSubtitle,
+          value: normalize,
+          onChanged: playback.setNormalizeVolume,
+        ),
+        SettingsSliderTile(
+          title: l10n.settingsFade,
+          subtitle: l10n.settingsFadeSubtitle,
+          value: fadeSeconds.toDouble(),
+          max: PlaybackProvider.maxFadeSeconds.toDouble(),
+          divisions: PlaybackProvider.maxFadeSeconds,
+          labelOf: (v) => v.round() == 0 ? l10n.settingsOff : l10n.settingsSeconds(v.round()),
+          onChanged: (v) => playback.setFadeSeconds(v.round()),
         ),
       ],
     );

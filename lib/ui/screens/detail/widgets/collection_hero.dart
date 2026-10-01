@@ -87,7 +87,7 @@ class CollectionHeroFade extends StatelessWidget {
 /// - 窄（手机）：封面居中，标题与元信息在下方；
 /// - 向上滚动时内容淡出，收起为 64px 标题栏：封面主色底 + [collapsedAction]（播放键）+ 标题；
 /// - 移动端（非桌面框架）左上角常驻返回键；桌面端由顶栏负责后退。
-class CollectionHero extends StatelessWidget {
+class CollectionHero extends StatefulWidget {
   /// 标题上方的小字：歌单 / 专辑 / 单曲 / 艺人。
   final String typeLabel;
   final String title;
@@ -117,20 +117,34 @@ class CollectionHero extends StatelessWidget {
   });
 
   @override
+  State<CollectionHero> createState() => _CollectionHeroState();
+}
+
+/// 性能：SliverLayoutBuilder 的约束里含滚动偏移，每滚一帧都会回调 builder。
+/// 这里按宽度缓存同一个组件实例，宽度不变时直接返回，框架会跳过整棵头部子树。
+/// 缓存只在 build（组件参数或依赖的主题 / 媒体查询变化）时失效。
+class _CollectionHeroState extends State<CollectionHero> {
+  double? _cachedWidth;
+  Widget? _cachedSliver;
+
+  @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final tone = CollectionTint.maybeOf(context) ?? CollectionTint.toneFor(const Color(0xFF3A3A48), brightness);
     final topPadding = MediaQuery.paddingOf(context).top;
     final inDesktopShell = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
     final showBack = !inDesktopShell && (ModalRoute.of(context)?.canPop ?? false);
+    _cachedSliver = null;
 
     return SliverLayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.crossAxisExtent;
-        return SliverPersistentHeader(
+        if (_cachedSliver != null && _cachedWidth == width) return _cachedSliver!;
+        _cachedWidth = width;
+        return _cachedSliver = SliverPersistentHeader(
           pinned: true,
           delegate: _HeroDelegate(
-            hero: this,
+            hero: widget,
             tone: tone,
             wide: width >= 600,
             width: width,

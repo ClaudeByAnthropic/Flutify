@@ -4,15 +4,22 @@ import 'package:flutify_app/core/utils/artwork_palette.dart';
 import 'package:flutify_app/l10n/app_localizations.dart';
 import 'package:flutify_app/models/connect_cluster.dart';
 import 'package:flutify_app/providers/connect_provider.dart';
+import 'package:flutify_app/providers/library_provider.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
+import 'package:flutify_app/providers/spotify_provider.dart';
 import 'package:flutify_app/services/connect/connect_service.dart';
+import 'package:flutify_app/services/spotify_api_service.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/player/device_picker_sheet.dart';
+import 'package:flutify_app/ui/screens/player/immersive_lyrics_screen.dart';
+import 'package:flutify_app/ui/screens/player/lyrics_sheet.dart';
+import 'package:flutify_app/ui/shell/desktop/desktop_window.dart';
 import 'package:flutify_app/ui/widgets/connect/remote_mini_player.dart';
 import 'package:flutify_app/ui/widgets/connect/remote_player_bar.dart';
 import 'package:flutify_app/ui/widgets/desktop_player_bar.dart';
 import 'package:flutify_app/ui/widgets/mini_player.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -129,6 +136,7 @@ ConnectCluster syntheticCluster({bool playing = true, bool withActive = true, bo
 void main() {
   late FakeConnectService service;
   late AppLocalizations zh;
+  late StorageService storage;
 
   setUp(() {
     service = FakeConnectService();
@@ -148,11 +156,15 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     SharedPreferences.setMockInitialValues({});
-    final storage = await StorageService.init();
+    storage = await StorageService.init();
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          Provider<StorageService>.value(value: storage),
+          // 未登录：歌词请求直接返回空，不联网
+          ChangeNotifierProvider(create: (_) => SpotifyProvider(SpotifyApiService(storage), storage)),
+          ChangeNotifierProvider(create: (_) => LibraryProvider(storage)),
           ChangeNotifierProvider(create: (_) => PlaybackProvider(FakeAudioPlayerService(), storage)),
           ChangeNotifierProvider(
             create: (_) => ConnectProvider(service, available: () => available, resolveTrack: (_) async => null),
@@ -307,6 +319,69 @@ void main() {
       service.setStatus(ConnectStatus.connecting);
       await open(tester);
       expect(find.text(zh.connectConnecting), findsOneWidget);
+      await unmount(tester);
+    });
+  });
+
+  group('remote lyrics', () {
+    const remoteTitle = 'A Synthetic Remote Track With A Fairly Long Title';
+
+    testWidgets('tapping the remote capsule opens lyrics with remote controls', (tester) async {
+      await pumpHost(tester, const Size(390, 844), const MiniPlayer(), cluster: syntheticCluster(playing: false));
+      await tester.tap(find.byType(RemoteMiniPlayer));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      final sheet = find.byType(LyricsSheet);
+      expect(sheet, findsOneWidget);
+      expect(find.descendant(of: sheet, matching: find.text(remoteTitle)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // 玻璃控制台的播放键发给远程设备，而不是本机
+      await tester.tap(find.descendant(of: sheet, matching: find.byIcon(Icons.play_arrow_rounded)));
+      await tester.pump();
+      expect(service.commands, ['resume:synthetic-speaker']);
+      await unmount(tester);
+    });
+
+    testWidgets('remote position drives the lyrics clock', (tester) async {
+      await pumpHost(tester, const Size(390, 844), const SizedBox(), cluster: syntheticCluster());
+      final connect = Provider.of<ConnectProvider>(tester.element(find.byType(Scaffold)), listen: false);
+      // 快照：30s @ 服务端 1000000；服务端时间以快照为准，推算结果即快照进度
+      expect(connect.position.value, const Duration(seconds: 30));
+      expect(connect.displayTrack?.name, remoteTitle);
+      await unmount(tester);
+    });
+  });
+
+  group('immersive lyrics', () {
+    Widget opener() => Builder(
+      builder: (context) =>
+          TextButton(onPressed: () => ImmersiveLyricsScreen.open(context), child: const Text('immersive')),
+    );
+
+    testWidgets('opens fitted to the window; F11 switches to the whole screen and is remembered', (tester) async {
+      await pumpHost(tester, const Size(1280, 800), opener(), cluster: syntheticCluster());
+      await tester.tap(find.text('immersive'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byType(ImmersiveLyricsScreen), findsOneWidget);
+      expect(find.text('A Synthetic Remote Track With A Fairly Long Title'), findsOneWidget);
+      expect(DesktopWindow.immersiveWindow.value, isTrue);
+      expect(storage.immersiveScreenFullscreen, isFalse);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+      await tester.pump();
+      expect(DesktopWindow.immersiveWindow.value, isFalse);
+      expect(storage.immersiveScreenFullscreen, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(ImmersiveLyricsScreen), findsNothing);
+      expect(DesktopWindow.immersiveWindow.value, isFalse);
+      expect(tester.takeException(), isNull);
       await unmount(tester);
     });
   });

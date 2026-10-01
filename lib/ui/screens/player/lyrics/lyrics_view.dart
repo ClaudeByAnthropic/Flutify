@@ -1,13 +1,18 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../l10n/l10n.dart';
+import '../../../../models/app_preferences.dart';
 import '../../../../models/lyrics.dart';
+import '../../../../providers/connect_provider.dart';
 import '../../../../providers/playback_provider.dart';
+import '../../../../providers/preferences_provider.dart';
 import '../../../../providers/spotify_provider.dart';
+import '../../../widgets/connect/connect_actions.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/skeleton.dart';
 import 'lyric_line_view.dart';
@@ -35,6 +40,10 @@ class LyricsView extends StatefulWidget {
   /// 歌词区左右留白。
   final double horizontalPadding;
 
+  /// 跟随正在遥控的远程设备：进度取 [ConnectProvider.position]，点行跳转发给远程设备。
+  /// 创建后不可切换，调用方用包含它的 key 让本地 / 远程切换时重建。
+  final bool remote;
+
   const LyricsView({
     super.key,
     required this.trackId,
@@ -42,6 +51,7 @@ class LyricsView extends StatefulWidget {
     this.bottomInset = 0,
     this.fontSize = 30,
     this.horizontalPadding = 28,
+    this.remote = false,
   });
 
   @override
@@ -58,8 +68,8 @@ class _LyricsViewState extends State<LyricsView> {
   /// 歌词区可视高度（由 LayoutBuilder 写入），用于把当前行对准"未被玻璃遮挡区域"的正中。
   double _viewportHeight = 0;
 
-  late final ValueNotifier<Duration> _position;
-  late final PlaybackProvider _playback;
+  late final ValueListenable<Duration> _position;
+  late final void Function(Duration position) _seek;
   final ScrollController _scroll = ScrollController();
 
   SpotifyLyrics? _lyrics;
@@ -68,13 +78,27 @@ class _LyricsViewState extends State<LyricsView> {
   bool _browsing = false;
   Timer? _browseTimer;
 
+  /// 歌词样式（设置页「歌词」分组）；没有 PreferencesProvider（部分测试）时用默认值。
+  AppPreferences _style = AppPreferences.defaults;
+
   bool get _isSynced => _lyrics?.syncType == 'LINE_SYNCED';
+
+  /// 用于切行的时间点：固定提前量 + 远程模式下用户设置的提前量（服务端快照推算会有偏差）。
+  int get _lookupMs => _position.value.inMilliseconds + _leadMs + (widget.remote ? _style.remoteLyricsLeadMs : 0);
 
   @override
   void initState() {
     super.initState();
-    _playback = context.read<PlaybackProvider>();
-    _position = _playback.positionNotifier..addListener(_onPosition);
+    if (widget.remote) {
+      final connect = context.read<ConnectProvider>();
+      _position = connect.position;
+      _seek = (d) => ConnectActions.run(context, () => connect.seekTo(d.inMilliseconds));
+    } else {
+      final playback = context.read<PlaybackProvider>();
+      _position = playback.positionNotifier;
+      _seek = playback.seekTo;
+    }
+    _position.addListener(_onPosition);
 
     final spotify = context.read<SpotifyProvider>();
     final cached = spotify.cachedLyrics(widget.trackId);
@@ -90,7 +114,7 @@ class _LyricsViewState extends State<LyricsView> {
   void _setLyrics(SpotifyLyrics lyrics) {
     _lyrics = lyrics;
     _lineKeys = List.generate(lyrics.lines.length, (_) => GlobalKey());
-    _activeIndex = _indexFor(_position.value.inMilliseconds + _leadMs);
+    _activeIndex = _indexFor(_lookupMs);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive(animate: false));
   }
 
@@ -99,8 +123,7 @@ class _LyricsViewState extends State<LyricsView> {
   int get _focusIndex => _activeIndex < 0 ? 0 : _activeIndex;
 
   /// 对焦中心的纵坐标：顶部信息胶囊与底部控制台之间的正中。
-  double get _focusCenterY =>
-      (widget.topInset + (_viewportHeight - widget.bottomInset)) / 2;
+  double get _focusCenterY => (widget.topInset + (_viewportHeight - widget.bottomInset)) / 2;
 
   /// 最后一个 startTimeMs <= ms 的行；在第一行之前返回 -1。
   int _indexFor(int ms) {
@@ -120,7 +143,7 @@ class _LyricsViewState extends State<LyricsView> {
 
   void _onPosition() {
     if (!_isSynced) return;
-    final index = _indexFor(_position.value.inMilliseconds + _leadMs);
+    final index = _indexFor(_lookupMs);
     if (index == _activeIndex) return;
     setState(() => _activeIndex = index);
     if (!_browsing) {
@@ -165,7 +188,7 @@ class _LyricsViewState extends State<LyricsView> {
 
   void _seekToLine(LyricLine line) {
     _browseTimer?.cancel();
-    _playback.seekTo(Duration(milliseconds: line.startTimeMs));
+    _seek(Duration(milliseconds: line.startTimeMs));
     if (_browsing) setState(() => _browsing = false);
   }
 
@@ -179,6 +202,12 @@ class _LyricsViewState extends State<LyricsView> {
 
   @override
   Widget build(BuildContext context) {
+    final style = context.select<PreferencesProvider?, AppPreferences>((p) => p?.prefs ?? AppPreferences.defaults);
+    // 字号 / 对齐变化后行高改变，重新把对焦行对准中心
+    if (style.lyricsScale != _style.lyricsScale || style.lyricsAlign != _style.lyricsAlign) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive(animate: false));
+    }
+    _style = style;
     final lyrics = _lyrics;
     if (lyrics == null) return _LoadingLines(topInset: widget.topInset);
     if (lyrics.lines.isEmpty) {
@@ -195,18 +224,22 @@ class _LyricsViewState extends State<LyricsView> {
       );
     }
 
-    return LayoutBuilder(builder: (context, constraints) {
-      // 窗口尺寸变化后重新把对焦行对准中心
-      if (constraints.maxHeight != _viewportHeight) {
-        _viewportHeight = constraints.maxHeight;
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive(animate: false));
-      }
-      return _buildLines(lyrics);
-    });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 窗口尺寸变化后重新把对焦行对准中心
+        if (constraints.maxHeight != _viewportHeight) {
+          _viewportHeight = constraints.maxHeight;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive(animate: false));
+        }
+        return _buildLines(lyrics);
+      },
+    );
   }
 
   Widget _buildLines(SpotifyLyrics lyrics) {
     final centerY = _focusCenterY;
+    final centered = _style.lyricsAlign == LyricsAlign.center;
+    final fontSize = widget.fontSize * _style.lyricsScale;
 
     return NotificationListener<UserScrollNotification>(
       onNotification: _onUserScroll,
@@ -230,7 +263,7 @@ class _LyricsViewState extends State<LyricsView> {
             _viewportHeight - centerY,
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
             children: [
               if (!_isSynced)
                 Padding(
@@ -244,7 +277,9 @@ class _LyricsViewState extends State<LyricsView> {
                 LyricLineView(
                   key: _lineKeys[i],
                   text: lyrics.lines[i].words,
-                  fontSize: widget.fontSize,
+                  fontSize: fontSize,
+                  centered: centered,
+                  blurScale: _style.lyricsBlur,
                   // 以对焦行为中心：当句清晰，上下句按行距逐级模糊
                   distance: _isSynced ? i - _focusIndex : 0,
                   focusAll: !_isSynced || _browsing,

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutify_app/services/audio_player_service.dart';
+import 'package:flutify_app/services/protocol/progressive_download.dart';
 import 'package:just_audio/just_audio.dart';
 
 /// 不依赖平台通道的音频服务替身：记录调用，并允许测试手动推送播放器事件。
@@ -11,6 +12,9 @@ class FakeAudioPlayerService implements AudioPlayerService {
 
   final List<String> playedFiles = [];
   final List<Duration> seeks = [];
+
+  /// 每次加载音源时的起始位置（null 表示从头）。
+  final List<Duration?> initialPositions = [];
   double lastVolume = 1.0;
   bool _playing = false;
   bool _hasSource = false;
@@ -32,10 +36,19 @@ class FakeAudioPlayerService implements AudioPlayerService {
   bool get hasSource => _hasSource;
 
   @override
-  Future<void> playFile(String path) async {
+  Future<void> playFile(String path, {Duration? initialPosition, bool autoplay = true}) async {
     playedFiles.add(path);
+    initialPositions.add(initialPosition);
     _hasSource = true;
-    _playing = true;
+    _playing = autoplay;
+  }
+
+  @override
+  Future<void> playStream(ProgressiveAudio audio, {Duration? initialPosition, bool autoplay = true}) async {
+    playedFiles.add('stream');
+    initialPositions.add(initialPosition);
+    _hasSource = true;
+    _playing = autoplay;
   }
 
   @override

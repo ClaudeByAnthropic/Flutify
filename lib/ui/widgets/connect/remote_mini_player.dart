@@ -6,6 +6,7 @@ import '../../../core/utils/artwork_palette.dart';
 import '../../../l10n/l10n.dart';
 import '../../../providers/connect_provider.dart';
 import '../../screens/player/device_picker_sheet.dart';
+import '../../screens/player/lyrics_sheet.dart';
 import '../cover_image.dart';
 import 'connect_actions.dart';
 import 'connect_device_icon.dart';
@@ -14,7 +15,7 @@ import 'remote_progress.dart';
 /// 移动端迷你播放器的远程模式：外观与本机胶囊一致，内容与按钮作用于远程设备。
 ///
 /// - 第二行改为强调色「正在 {设备} 上播放」（与官方移动端一致）；
-/// - 点按打开设备面板（可转移或在此设备继续）；左右滑动切歌；
+/// - 点按打开歌词面板（远程曲目、远程进度、远程控制台）；设备键打开设备面板；左右滑动切歌；
 /// - 底部细进度线按服务端快照推算。
 class RemoteMiniPlayer extends StatelessWidget {
   const RemoteMiniPlayer({super.key});
@@ -50,7 +51,7 @@ class RemoteMiniPlayer extends StatelessWidget {
             type: MaterialType.transparency,
             child: InkWell(
               customBorder: shape,
-              onTap: () => DevicePickerSheet.show(context),
+              onTap: () => LyricsSheet.show(context),
               child: GestureDetector(
                 onHorizontalDragEnd: (details) {
                   final v = details.primaryVelocity ?? 0;

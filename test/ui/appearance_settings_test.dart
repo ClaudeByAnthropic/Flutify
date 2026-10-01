@@ -32,12 +32,14 @@ void main() {
 
     SharedPreferences.setMockInitialValues({});
     storage = await StorageService.init();
-    await tester.pumpWidget(FlutifyApp(
-      storageService: storage,
-      audioPlayerService: FakeAudioPlayerService(),
-      spotifyApiService: FakeSpotifyApiService(storage, lyricsById: lyrics),
-      trackAudioLoader: FakeTrackAudioSource(),
-    ));
+    await tester.pumpWidget(
+      FlutifyApp(
+        storageService: storage,
+        audioPlayerService: FakeAudioPlayerService(),
+        spotifyApiService: FakeSpotifyApiService(storage, lyricsById: lyrics),
+        trackAudioLoader: FakeTrackAudioSource(),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 300));
   }
 
@@ -51,8 +53,10 @@ void main() {
 
   testWidgets('settings: appearance options apply instantly and persist', (tester) async {
     await pumpApp(tester, const Size(500, 2400));
-    Navigator.of(tester.element(find.byType(MainShell)), rootNavigator: true)
-        .push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
+    Navigator.of(
+      tester.element(find.byType(MainShell)),
+      rootNavigator: true,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
     await settle(tester);
 
     // 调试信息已移除：没有凭据输入框
@@ -89,12 +93,18 @@ void main() {
   });
 
   testWidgets('desktop: immersive lyrics opens from the player bar and closes with Esc', (tester) async {
-    await pumpApp(tester, const Size(1440, 900), lyrics: {
-      SampleCatalog.track1.id: const SpotifyLyrics(lines: [
-        LyricLine(startTimeMs: 0, words: 'Immersive first line'),
-        LyricLine(startTimeMs: 4000, words: 'Immersive second line'),
-      ]),
-    });
+    await pumpApp(
+      tester,
+      const Size(1440, 900),
+      lyrics: {
+        SampleCatalog.track1.id: const SpotifyLyrics(
+          lines: [
+            LyricLine(startTimeMs: 0, words: 'Immersive first line'),
+            LyricLine(startTimeMs: 4000, words: 'Immersive second line'),
+          ],
+        ),
+      },
+    );
     final playback = Provider.of<PlaybackProvider>(tester.element(find.byType(MainShell)), listen: false);
     await playback.playTrack(
       SampleCatalog.track1,
@@ -107,7 +117,7 @@ void main() {
     await settle(tester);
     expect(find.byType(ImmersiveLyricsScreen), findsOneWidget);
     expect(find.text('Immersive first line'), findsOneWidget);
-    expect(find.byTooltip('退出全屏（Esc）'), findsOneWidget);
+    expect(find.byTooltip('退出全屏歌词（Esc）'), findsOneWidget);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);

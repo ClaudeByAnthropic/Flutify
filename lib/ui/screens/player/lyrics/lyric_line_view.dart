@@ -21,6 +21,12 @@ class LyricLineView extends StatelessWidget {
   /// 字号；行距随字号等比放大。
   final double fontSize;
 
+  /// 居中对齐时文字居中、缩放以中心为基准；默认左对齐（Apple Music）。
+  final bool centered;
+
+  /// 模糊强度倍率（设置页「其他行模糊」）：0 不模糊，1 默认。
+  final double blurScale;
+
   const LyricLineView({
     super.key,
     required this.text,
@@ -28,6 +34,8 @@ class LyricLineView extends StatelessWidget {
     this.focusAll = false,
     this.onTap,
     this.fontSize = 30,
+    this.centered = false,
+    this.blurScale = 1,
   });
 
   static const double _maxBlur = 3.5;
@@ -38,13 +46,13 @@ class LyricLineView extends StatelessWidget {
     final d = distance.abs();
     final isActive = distance == 0;
 
-    // 相邻句 1.0、隔一句 2.0 …… 上限 3.5：近处可辨认，远处退为氛围
-    final blur = focusAll || isActive ? 0.0 : (d * 1.0).clamp(0.0, _maxBlur);
+    // 相邻句 1.0、隔一句 2.0 …… 上限 3.5：近处可辨认，远处退为氛围；再乘用户设置的强度
+    final blur = focusAll || isActive ? 0.0 : (d * 1.0).clamp(0.0, _maxBlur) * blurScale;
     final opacity = focusAll
         ? (isActive ? 1.0 : 0.62)
         : isActive
-            ? 1.0
-            : (0.52 - d * 0.06).clamp(0.2, 0.46);
+        ? 1.0
+        : (0.52 - d * 0.06).clamp(0.2, 0.46);
     final scale = isActive ? 1.0 : 0.965;
 
     return GestureDetector(
@@ -58,7 +66,7 @@ class LyricLineView extends StatelessWidget {
           curve: Curves.easeOutCubic,
           builder: (context, v, _) {
             // 透明度直接写进文字颜色，省去 Opacity 的离屏图层
-            Widget result = _LineText(text: text, opacity: v.opacity, fontSize: fontSize);
+            Widget result = _LineText(text: text, opacity: v.opacity, fontSize: fontSize, centered: centered);
             // sigma 过小时跳过滤镜，避免无意义的离屏渲染
             if (v.blur > 0.05) {
               result = ImageFiltered(
@@ -66,7 +74,11 @@ class LyricLineView extends StatelessWidget {
                 child: result,
               );
             }
-            return Transform.scale(scale: v.scale, alignment: Alignment.centerLeft, child: result);
+            return Transform.scale(
+              scale: v.scale,
+              alignment: centered ? Alignment.center : Alignment.centerLeft,
+              child: result,
+            );
           },
         ),
       ),
@@ -79,8 +91,9 @@ class _LineText extends StatelessWidget {
   final String text;
   final double opacity;
   final double fontSize;
+  final bool centered;
 
-  const _LineText({required this.text, required this.opacity, required this.fontSize});
+  const _LineText({required this.text, required this.opacity, required this.fontSize, required this.centered});
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +102,7 @@ class _LineText extends StatelessWidget {
       width: double.infinity,
       child: Text(
         isInterlude ? '•  •  •' : text,
+        textAlign: centered ? TextAlign.center : TextAlign.start,
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.w800,

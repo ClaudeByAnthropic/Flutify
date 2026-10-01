@@ -210,6 +210,16 @@ class SpotifyProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   SpotifyLyrics? cachedLyrics(String trackId) => _lyricsCache[trackId];
 
+  /// 已缓存歌词的曲目数（设置页「隐私」分组展示）。
+  int get cachedLyricsCount => _lyricsCache.length;
+
+  /// 清空歌词缓存：已打开的歌词视图不受影响，之后打开的会重新请求。
+  void clearLyricsCache() {
+    if (_lyricsCache.isEmpty) return;
+    _lyricsCache.clear();
+    notifyListeners();
+  }
+
   /// 获取歌词：命中缓存直接返回，并发请求合并为同一个 Future。
   Future<SpotifyLyrics> fetchLyrics(String trackId) {
     final cached = _lyricsCache[trackId];

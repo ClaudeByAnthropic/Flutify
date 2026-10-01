@@ -28,7 +28,14 @@ class StorageService {
   static const String _keyRecentSearches = 'sp_recent_searches';
   static const String _keyVolume = 'sp_volume';
   static const String _keyPauseAfterFailures = 'play_pause_after_failures';
+  static const String _keyImmersiveScreen = 'ui_immersive_screen'; // 沉浸式歌词铺满整个屏幕
   static const String _keyAppearance = 'ui_appearance'; // 外观设置 JSON
+  static const String _keyPreferences = 'app_prefs'; // 其余界面偏好 JSON（AppPreferences）
+  static const String _keyLastTab = 'ui_last_tab'; // 上次所在 Tab（启动页「上次位置」）
+  static const String _keyWindowBounds = 'ui_window_bounds'; // 桌面窗口位置 / 大小 JSON
+  static const String _keyNormalize = 'play_normalize';
+  static const String _keyFadeSeconds = 'play_fade_seconds';
+  static const String _keyAudioCacheLimitMb = 'cache_audio_limit_mb';
 
   // 媒体库（JSON 序列化的实体列表）
   static const String keyLibraryLikedTracks = 'lib_liked_tracks';
@@ -113,10 +120,10 @@ class StorageService {
 
   /// 是否已登录：Login5 需要可复用凭据；OAuth 需要 refresh_token（开发者应用还需 client_id）。
   bool get isLoggedIn => switch (authMethod) {
-        AuthMethod.login5 => storedCredential.isNotEmpty && username.isNotEmpty,
-        AuthMethod.oauth => refreshToken.isNotEmpty && clientId.isNotEmpty,
-        AuthMethod.desktop => refreshToken.isNotEmpty,
-      };
+    AuthMethod.login5 => storedCredential.isNotEmpty && username.isNotEmpty,
+    AuthMethod.oauth => refreshToken.isNotEmpty && clientId.isNotEmpty,
+    AuthMethod.desktop => refreshToken.isNotEmpty,
+  };
 
   /// 清除全部登录态（登出）。device_id 与 OAuth client_id 保留，便于下次登录。
   Future<void> clearLogin() async {
@@ -144,9 +151,37 @@ class StorageService {
   bool get pauseAfterFailures => _prefs.getBool(_keyPauseAfterFailures) ?? true;
   Future<bool> setPauseAfterFailures(bool value) => _prefs.setBool(_keyPauseAfterFailures, value);
 
+  /// 沉浸式歌词是否进入系统全屏（铺满整个屏幕）；默认 false，只铺满窗口。
+  bool get immersiveScreenFullscreen => _prefs.getBool(_keyImmersiveScreen) ?? false;
+  Future<bool> setImmersiveScreenFullscreen(bool value) => _prefs.setBool(_keyImmersiveScreen, value);
+
   /// 外观设置（JSON 字符串，解析见 AppearanceSettings.fromJson）；未保存过为空串。
   String get appearanceJson => _prefs.getString(_keyAppearance) ?? '';
   Future<bool> setAppearanceJson(String value) => _prefs.setString(_keyAppearance, value);
+
+  /// 界面偏好（JSON 字符串，解析见 AppPreferences.decode）；未保存过为空串。
+  String get preferencesJson => _prefs.getString(_keyPreferences) ?? '';
+  Future<bool> setPreferencesJson(String value) => _prefs.setString(_keyPreferences, value);
+
+  /// 上次所在的主 Tab 下标（0 主页 / 1 搜索 / 2 音乐库）。
+  int get lastTab => _prefs.getInt(_keyLastTab) ?? 0;
+  Future<bool> setLastTab(int value) => _prefs.setInt(_keyLastTab, value);
+
+  /// 桌面窗口位置与大小（JSON，见 WindowBoundsMemory）；未保存过为空串。
+  String get windowBoundsJson => _prefs.getString(_keyWindowBounds) ?? '';
+  Future<bool> setWindowBoundsJson(String value) => _prefs.setString(_keyWindowBounds, value);
+
+  /// 音量均衡（按 Spotify 响度数据衰减偏响的歌），默认关闭。
+  bool get normalizeVolume => _prefs.getBool(_keyNormalize) ?? false;
+  Future<bool> setNormalizeVolume(bool value) => _prefs.setBool(_keyNormalize, value);
+
+  /// 歌曲间淡入淡出时长（秒），0 为关闭。
+  int get fadeSeconds => _prefs.getInt(_keyFadeSeconds) ?? 0;
+  Future<bool> setFadeSeconds(int value) => _prefs.setInt(_keyFadeSeconds, value);
+
+  /// 音频缓存上限（MB），默认 512。
+  int get audioCacheLimitMb => _prefs.getInt(_keyAudioCacheLimitMb) ?? 512;
+  Future<bool> setAudioCacheLimitMb(int value) => _prefs.setInt(_keyAudioCacheLimitMb, value);
 
   // ---------------------------------------------------------------------------
   // Generic JSON list persistence (used by LibraryProvider)

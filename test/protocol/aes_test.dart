@@ -84,5 +84,22 @@ void main() {
       }
       expect(hexOf(chunked), hexOf(expected));
     });
+
+    test('atOffset 从任意偏移开始，与从头处理到该位置等价（断点续传）', () {
+      final key = hex('f8e18cf61b5ee520660e33a6d725c0d7');
+      // 计数器低字节接近溢出，覆盖跨字节进位
+      final iv = hex('e652d95733c05b6d69ef66a427ffffff');
+      final pt = Uint8List.fromList(List.generate(1000, (i) => (i * 7 + 3) & 0xff));
+      final full = Uint8List.fromList(pt);
+      AesCtr(key, iv).process(full);
+
+      for (final offset in [0, 1, 15, 16, 17, 255, 256, 513, 999]) {
+        final tail = Uint8List.fromList(pt.sublist(offset));
+        final cipher = AesCtr.atOffset(key, iv, offset);
+        cipher.process(tail);
+        expect(hexOf(tail), hexOf(Uint8List.sublistView(full, offset)), reason: 'offset $offset');
+        expect(cipher.offset, pt.length);
+      }
+    });
   });
 }

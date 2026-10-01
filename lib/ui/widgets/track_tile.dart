@@ -93,14 +93,14 @@ class TrackTile extends StatelessWidget {
                               onTap: () => _playOrToggle(context, isCurrent),
                             )
                           : isCurrent
-                              ? WaveformVisualizer(isPlaying: isPlaying, color: colorScheme.primary)
-                              : Text(
-                                  '$index',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                          ? WaveformVisualizer(isPlaying: isPlaying, color: colorScheme.primary)
+                          : Text(
+                              '$index',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   )
                 else if (showCover)
@@ -113,10 +113,7 @@ class TrackTile extends StatelessWidget {
                         CoverImage(url: track.coverUrl, size: 48, borderRadius: context.tokens.radius(8)),
                         if (isCurrent || hovered)
                           DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: context.tokens.radius(8),
-                            ),
+                            decoration: BoxDecoration(color: Colors.black54, borderRadius: context.tokens.radius(8)),
                             child: Center(
                               child: hovered
                                   ? _HoverPlayIcon(
@@ -169,7 +166,9 @@ class TrackTile extends StatelessWidget {
 
                 // 已点赞常驻；未点赞只在悬停时出现（保留占位，避免时长列左右跳动）
                 _Reveal(
-                  visible: isLiked || revealed,
+                  visible: revealed,
+                  fixedExtent: hoverCapable,
+                  idle: isLiked ? Icon(Icons.favorite_rounded, color: colorScheme.primary, size: 22) : null,
                   child: IconButton(
                     icon: Icon(
                       isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -191,6 +190,7 @@ class TrackTile extends StatelessWidget {
 
                 _Reveal(
                   visible: revealed,
+                  fixedExtent: hoverCapable,
                   child: Builder(
                     // 独立 context：桌面菜单锚定在按钮下方
                     builder: (buttonContext) => IconButton(
@@ -210,22 +210,30 @@ class TrackTile extends StatelessWidget {
   }
 }
 
-/// 悬停出现的控件：隐藏时保留占位、不响应点击。
+/// 悬停出现的行内按钮。
+///
+/// 性能：IconButton 自带 Tooltip / Focus / Ink / Theme 等二十多个组件，长歌单每行两个，
+/// 滚动时新进入视口的行几乎全部开销都在这里。因此未悬停时不构建按钮，
+/// 只放同尺寸占位（[idle] 为常驻的静态图标，例如已点赞的爱心）；悬停后才换成真按钮。
+/// 鼠标总是先悬停再点击，所以静态图标无需响应点击。
+///
+/// [fixedExtent]（桌面）：两种状态都放进固定 40×40 的格子，切换时时长列不会左右跳动。
 class _Reveal extends StatelessWidget {
+  static const double _extent = 40;
+
   final bool visible;
+  final bool fixedExtent;
+  final Widget? idle;
   final Widget child;
 
-  const _Reveal({required this.visible, required this.child});
+  const _Reveal({required this.visible, required this.fixedExtent, required this.child, this.idle});
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: !visible,
-      child: AnimatedOpacity(
-        opacity: visible ? 1 : 0,
-        duration: const Duration(milliseconds: 120),
-        child: child,
-      ),
+    if (!fixedExtent) return visible ? child : const SizedBox.shrink();
+    return SizedBox.square(
+      dimension: _extent,
+      child: visible ? child : Center(child: idle),
     );
   }
 }
