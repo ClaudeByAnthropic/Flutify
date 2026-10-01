@@ -24,15 +24,29 @@ class WindowBoundsMemory with WindowListener {
 
   Timer? _debounce;
 
-  WindowBoundsMemory(this._storage, {required this._minimumSize, required this._enabled, required this._fullScreen});
+  WindowBoundsMemory(
+    this._storage, {
+    required this._minimumSize,
+    required this._enabled,
+    required this._fullScreen,
+  });
 
   /// 读取可恢复的位置；没有记录、数据损坏或窗口会落在所有显示器之外时返回 null。
-  static Future<SavedWindowBounds?> restorable(StorageService storage, {required Size minimumSize}) async {
-    final saved = SavedWindowBounds.decode(storage.windowBoundsJson, minimumSize: minimumSize);
+  static Future<SavedWindowBounds?> restorable(
+    StorageService storage, {
+    required Size minimumSize,
+  }) async {
+    final saved = SavedWindowBounds.decode(
+      storage.windowBoundsJson,
+      minimumSize: minimumSize,
+    );
     if (saved == null) return null;
     try {
       final displays = await screenRetriever.getAllDisplays();
-      final areas = [for (final d in displays) (d.visiblePosition ?? Offset.zero) & (d.visibleSize ?? d.size)];
+      final areas = [
+        for (final d in displays)
+          (d.visiblePosition ?? Offset.zero) & (d.visibleSize ?? d.size),
+      ];
       return saved.isReachableOn(areas) ? saved : null;
     } catch (_) {
       return null;
@@ -51,16 +65,29 @@ class WindowBoundsMemory with WindowListener {
     _debounce = Timer(const Duration(milliseconds: 500), _save);
   }
 
+  /// 立即保存（关窗前调用，不等防抖）。
+  Future<void> saveNow() {
+    _debounce?.cancel();
+    return _save();
+  }
+
   Future<void> _save() async {
     if (!_enabled() || _fullScreen()) return;
     try {
-      if (await windowManager.isFullScreen() || await windowManager.isMinimized()) return;
+      if (await windowManager.isFullScreen() || await windowManager.isMinimized()) {
+        return;
+      }
       final maximized = await windowManager.isMaximized();
       // 最大化时保留之前的普通窗口位置，只更新最大化标记
-      final previous = SavedWindowBounds.decode(_storage.windowBoundsJson, minimumSize: _minimumSize);
+      final previous = SavedWindowBounds.decode(
+        _storage.windowBoundsJson,
+        minimumSize: _minimumSize,
+      );
       final rect = maximized ? previous?.rect : await windowManager.getBounds();
       if (rect == null) return;
-      await _storage.setWindowBoundsJson(SavedWindowBounds(rect, maximized: maximized).encode());
+      await _storage.setWindowBoundsJson(
+        SavedWindowBounds(rect, maximized: maximized).encode(),
+      );
     } catch (_) {
       // 原生通道不可用（测试 / 关闭中）时忽略
     }

@@ -17,15 +17,14 @@ import 'remote_transport_controls.dart';
 /// 桌面端播放栏的远程模式：内容与按钮作用于正在使用的远程设备。
 ///
 /// 与本机播放栏相同的悬浮液态玻璃胶囊（左曲目 / 中控制 + 进度 / 右设备与音量），
-/// 胶囊右下方多一颗强调色药丸「正在 {设备} 上播放」；点药丸或设备键打开设备面板。
+/// 底部多一条横贯窗口的强调色细条「正在 {设备} 上播放」；点细条或设备键打开设备面板。
 class RemotePlayerBar extends StatelessWidget {
   const RemotePlayerBar({super.key});
 
-  /// 药丸高度与其和胶囊的间距；总占位另计（见 [reservedHeight]）。
+  /// 细条高度；总占位另计（见 [reservedHeight]）。胶囊自带 12px 下边距，即胶囊与细条的间隙。
   static const double stripHeight = 26;
-  static const double stripGap = 6;
   static const double reservedHeight =
-      DesktopPlayerBar.reservedHeight + stripGap + stripHeight;
+      DesktopPlayerBar.reservedHeight + stripHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +64,6 @@ class RemotePlayerBar extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(height: stripGap),
         const RemotePlayingStrip(height: stripHeight),
       ],
     );
@@ -197,7 +195,7 @@ class _RemoteRightControls extends StatelessWidget {
   }
 }
 
-/// 「正在 {设备} 上播放」强调色药丸，悬浮在玻璃胶囊右下方；点按打开设备面板。
+/// 「正在 {设备} 上播放」强调色细条，横贯窗口底部（与官方桌面端一致）；点按打开设备面板。
 class RemotePlayingStrip extends StatelessWidget {
   final double height;
 
@@ -215,38 +213,28 @@ class RemotePlayingStrip extends StatelessWidget {
       color: tokens.onAccent,
       fontWeight: FontWeight.w700,
     );
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        // 与胶囊右边距对齐，再内收一点落在胶囊投影范围内
-        padding: const EdgeInsets.only(right: DesktopPlayerBar.marginSide + 8),
-        child: Material(
-          color: tokens.accent,
-          borderRadius: BorderRadius.circular(999),
-          elevation: 0,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(999),
-            onTap: () => DevicePickerSheet.show(context),
-            child: SizedBox(
-              height: height,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(device.$2, size: 14, color: tokens.onAccent),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        context.l10n.connectPlayingOn(device.$1),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: style,
-                      ),
-                    ),
-                  ],
+    return Material(
+      color: tokens.accent,
+      child: InkWell(
+        onTap: () => DevicePickerSheet.show(context),
+        child: SizedBox(
+          height: height,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Icon(device.$2, size: 14, color: tokens.onAccent),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    context.l10n.connectPlayingOn(device.$1),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: style,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),

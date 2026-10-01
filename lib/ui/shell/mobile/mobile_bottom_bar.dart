@@ -6,16 +6,20 @@ import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../widgets/mini_player.dart';
 
-/// 移动端底部区域：悬浮胶囊迷你播放器 + 毛玻璃底部导航。
+/// 移动端底部区域：悬浮胶囊迷你播放器 + 悬浮药丸式液态玻璃底部导航（iOS 风格）。
 ///
-/// 配合 `Scaffold(extendBody: true)` 使用：内容滚动到导航栏下方时透过毛玻璃可见；
-/// 迷你播放器背后铺一层由透明渐变到页面底色的遮罩，保证其边缘的文字 / 封面不与内容混在一起。
+/// 配合 `Scaffold(extendBody: true)` 使用：内容滚动到导航药丸下方时透过模糊可见；
+/// 迷你播放器背后铺一层淡淡的渐变遮罩，保证其边缘的文字 / 封面不与内容混在一起。
 /// 整体高度通过 MediaQuery 底部 padding 传给页面（见 ContentBottomSpacer）。
 class MobileBottomBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
-  const MobileBottomBar({super.key, required this.selectedIndex, required this.onSelected});
+  const MobileBottomBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,22 +33,33 @@ class MobileBottomBar extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [colorScheme.surface.withAlpha(0), colorScheme.surface.withAlpha(170)],
+              colors: [
+                colorScheme.surface.withAlpha(0),
+                colorScheme.surface.withAlpha(120),
+              ],
             ),
           ),
           child: const MiniPlayer(),
         ),
-        _GlassNavigationBar(selectedIndex: selectedIndex, onSelected: onSelected),
+        const SizedBox(height: 10),
+        _GlassNavigationPill(
+          selectedIndex: selectedIndex,
+          onSelected: onSelected,
+        ),
       ],
     );
   }
 }
 
-class _GlassNavigationBar extends StatelessWidget {
+/// 悬浮药丸导航：模糊 + 表面色填充 + 一圈发丝描边 + 柔和投影，浮在内容之上。
+class _GlassNavigationPill extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
-  const _GlassNavigationBar({required this.selectedIndex, required this.onSelected});
+  const _GlassNavigationPill({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -54,41 +69,68 @@ class _GlassNavigationBar extends StatelessWidget {
     final tokens = context.tokens;
     // 底色不透明度随设置页「玻璃不透明度」变化（默认 0.3 → 深色 175 / 浅色 205）；
     // 浅色下需要更高的不透明度，否则白底上的深色内容会让图标难以辨认
-    final alpha = (isDark ? 120 + tokens.glassOpacity * 185 : 150 + tokens.glassOpacity * 183).clamp(0, 250).round();
+    final alpha =
+        (isDark
+                ? 120 + tokens.glassOpacity * 185
+                : 150 + tokens.glassOpacity * 183)
+            .clamp(0, 250)
+            .round();
     final sigma = tokens.glassSigma * 0.8;
+    final bottomSafe = MediaQuery.paddingOf(context).bottom;
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colorScheme.surface.withAlpha(alpha),
-            border: Border(top: BorderSide(color: colorScheme.outlineVariant.withAlpha(110), width: 0.5)),
-          ),
-          child: NavigationBar(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: onSelected,
-            backgroundColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            elevation: 0,
-            destinations: [
-              NavigationDestination(
-                icon: const Icon(Icons.home_outlined),
-                selectedIcon: const Icon(Icons.home_filled),
-                label: l10n.navHome,
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomSafe + 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isDark ? 70 : 30),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.surface.withAlpha(alpha),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withAlpha(110),
+                  width: 0.5,
+                ),
               ),
-              NavigationDestination(
-                icon: const Icon(Icons.search_rounded),
-                selectedIcon: const Icon(Icons.search_rounded),
-                label: l10n.navSearch,
+              child: NavigationBar(
+                height: 64,
+                selectedIndex: selectedIndex,
+                onDestinationSelected: onSelected,
+                backgroundColor: Colors.transparent,
+                surfaceTintColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                elevation: 0,
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.home_outlined),
+                    selectedIcon: const Icon(Icons.home_filled),
+                    label: l10n.navHome,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.search_rounded),
+                    selectedIcon: const Icon(Icons.search_rounded),
+                    label: l10n.navSearch,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.library_music_outlined),
+                    selectedIcon: const Icon(Icons.library_music_rounded),
+                    label: l10n.navLibrary,
+                  ),
+                ],
               ),
-              NavigationDestination(
-                icon: const Icon(Icons.library_music_outlined),
-                selectedIcon: const Icon(Icons.library_music_rounded),
-                label: l10n.navLibrary,
-              ),
-            ],
+            ),
           ),
         ),
       ),

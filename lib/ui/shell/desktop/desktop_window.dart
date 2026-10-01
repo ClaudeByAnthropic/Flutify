@@ -33,10 +33,15 @@ class DesktopWindow {
 
   /// 在 runApp 之前调用。开启「记住窗口大小和位置」时，在窗口显示前就放到上次的位置（不闪一下再跳）。
   static Future<void> init(StorageService storage) async {
-    if (kIsWeb || !(Platform.isWindows || Platform.isMacOS || Platform.isLinux)) return;
+    if (kIsWeb || !(Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+      return;
+    }
     await windowManager.ensureInitialized();
-    bool remember() => AppPreferences.decode(storage.preferencesJson).rememberWindow;
-    final saved = remember() ? await WindowBoundsMemory.restorable(storage, minimumSize: minimumSize) : null;
+    bool remember() =>
+        AppPreferences.decode(storage.preferencesJson).rememberWindow;
+    final saved = remember()
+        ? await WindowBoundsMemory.restorable(storage, minimumSize: minimumSize)
+        : null;
     final options = WindowOptions(
       size: saved?.rect.size ?? const Size(1360, 860),
       minimumSize: minimumSize,
@@ -46,20 +51,22 @@ class DesktopWindow {
       windowButtonVisibility: false,
     );
     await windowManager.waitUntilReadyToShow(options, () async {
-      if (saved != null) {
-        await windowManager.setPosition(saved.rect.topLeft);
-        if (saved.maximized) await windowManager.maximize();
-      }
+      if (saved != null) await windowManager.setPosition(saved.rect.topLeft);
       await windowManager.show();
       await windowManager.focus();
+      // 最大化必须在窗口显示之后调用：显示前最大化会被 WindowOptions 的尺寸覆盖，
+      // 结果以「最大化前的普通窗口尺寸」启动（表现为记住位置失效）
+      if (saved?.maximized ?? false) await windowManager.maximize();
     });
     // 监听器由 windowManager 持有，随进程存活
-    WindowBoundsMemory(
+    final memory = WindowBoundsMemory(
       storage,
       minimumSize: minimumSize,
       enabled: remember,
       fullScreen: () => fullScreen.value,
-    ).attach();
+    )..attach();
+    // 移动 / 缩放后 500ms 内直接关窗会丢掉最后一次位置，关窗前补存一次
+    addBeforeCloseHook(memory.saveNow);
     // 拦截关闭（窗口按钮 / Alt+F4 / 任务栏），先跑完收尾钩子再销毁窗口
     await windowManager.setPreventClose(true);
     windowManager.addListener(_CloseGuard());
@@ -70,14 +77,17 @@ class DesktopWindow {
 
   /// 关窗前要完成的收尾（如保存播放进度）。每个钩子最多等 [timeout]，超时也照常关闭；
   /// 所有钩子并行执行。
-  static void addBeforeCloseHook(Future<void> Function() hook, {Duration timeout = _closeTimeout}) =>
-      _beforeClose.add((hook, timeout));
+  static void addBeforeCloseHook(
+    Future<void> Function() hook, {
+    Duration timeout = _closeTimeout,
+  }) => _beforeClose.add((hook, timeout));
 
   static const Duration _closeTimeout = Duration(milliseconds: 800);
 
   static Future<void> _runBeforeClose() async {
     await Future.wait([
-      for (final (hook, timeout) in _beforeClose) Future.sync(hook).timeout(timeout).catchError((Object _) {}),
+      for (final (hook, timeout) in _beforeClose)
+        Future.sync(hook).timeout(timeout).catchError((Object _) {}),
     ]);
   }
 
@@ -116,7 +126,9 @@ class DesktopWindow {
     if (!Platform.isWindows) return;
     // 等原生还原落定：进入全屏前若是最大化，插件会异步再发一次 SC_MAXIMIZE
     await Future<void>.delayed(const Duration(milliseconds: 80));
-    if (await windowManager.isFullScreen() || await windowManager.isMaximized()) return;
+    if (await windowManager.isFullScreen() || await windowManager.isMaximized()) {
+      return;
+    }
     final size = await windowManager.getSize();
     await windowManager.setSize(Size(size.width + 1, size.height));
     await windowManager.setSize(size);
