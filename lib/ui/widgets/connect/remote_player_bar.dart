@@ -21,8 +21,8 @@ import 'remote_transport_controls.dart';
 class RemotePlayerBar extends StatelessWidget {
   const RemotePlayerBar({super.key});
 
-  /// 细条高度（含在胶囊内）；总占位另计（见 [reservedHeight]）。
-  static const double stripHeight = 26;
+  /// 细条露出高度（含在胶囊内）；总占位另计（见 [reservedHeight]）。
+  static const double stripHeight = 18;
   static const double reservedHeight =
       DesktopPlayerBar.reservedHeight + stripHeight;
 
@@ -197,7 +197,7 @@ class RemotePlayingStrip extends StatelessWidget {
       return d == null ? null : (d.name, connectDeviceIcon(d.type));
     });
     if (device == null) return const SizedBox.shrink();
-    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
       color: tokens.onAccent,
       fontWeight: FontWeight.w700,
     );
@@ -217,20 +217,23 @@ class RemotePlayingStrip extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.only(top: corner),
             child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(device.$2, size: 14, color: tokens.onAccent),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      context.l10n.connectPlayingOn(device.$1),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: style,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(device.$2, size: 12, color: tokens.onAccent),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        context.l10n.connectPlayingOn(device.$1),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: style,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

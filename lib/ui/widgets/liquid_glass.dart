@@ -8,7 +8,9 @@ import '../shell/desktop/desktop_window.dart';
 /// iOS 风格的克制型玻璃容器。
 ///
 /// 三层叠加：
-/// 1. 背景模糊 + 轻微提饱和（1.15×，只让身后颜色略微通透，不"发光"）；
+/// 1. 背景模糊（纯 blur；曾经用 compose 叠加 1.15× 提饱和，但 Windows 引擎对
+///    compose 后的 BackdropFilter 在路由弹出 / 窗口尺寸变化时会访问冲突崩溃，
+///    WER dump 确认栈全在 flutter_windows.dll 内，故只用单层模糊）；
 /// 2. 极淡的白色填充（玻璃体本身几乎不可见，靠模糊界定形状）；
 /// 3. 一圈发丝级描边，上缘略亮于下缘，暗示光从上方来。
 ///
@@ -36,14 +38,6 @@ class LiquidGlass extends StatelessWidget {
     this.tint,
   });
 
-  /// 饱和度 1.15 的颜色矩阵（按 Rec.709 亮度权重）。
-  static const ColorFilter _saturate = ColorFilter.matrix(<double>[
-    1.1181, -0.1073, -0.0108, 0, 0, //
-    -0.0319, 1.0427, -0.0108, 0, 0, //
-    -0.0319, -0.1073, 1.1392, 0, 0, //
-    0, 0, 0, 1, 0, //
-  ]);
-
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
@@ -65,13 +59,10 @@ class LiquidGlass extends StatelessWidget {
         builder: (context, transitioning, _) {
           if (transitioning) return body;
           return BackdropFilter(
-            filter: ImageFilter.compose(
-              outer: _saturate,
-              inner: ImageFilter.blur(
-                sigmaX: sigma,
-                sigmaY: sigma,
-                tileMode: TileMode.mirror,
-              ),
+            filter: ImageFilter.blur(
+              sigmaX: sigma,
+              sigmaY: sigma,
+              tileMode: TileMode.mirror,
             ),
             child: body,
           );
