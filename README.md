@@ -59,11 +59,13 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - **歌词补全（LRCLIB）**（`services/lyrics/`，移植自原「任务栏歌词」项目）：Spotify 没有逐行同步歌词（只有纯文本或完全没有）时，
     从 [LRCLIB](https://lrclib.net) 开放歌词库补全，歌词底部注明来源。查询顺序：`/api/get` 精确匹配 → `/api/search` 曲名 + 第一位艺人 → 只按曲名 →
     全文 `q` 搜索（含简繁互换的曲名），请求间隔 600ms、429 / 5xx / 断网退避重试两次。
+    **歌手对不上的同名歌直接排除**（LRCLIB 上同名歌很多，配错歌比没有歌词更糟；多位艺人拆开逐一比对，中文先统一简繁，本地化译名与原名文字不同时不判断），
     选词按**原唱语言**投票（同一首歌占多数的语言即原词，曲名 / 歌手只算小票，避免英文歌配上日文译词），翻译版 / 罗马音 / 双语对照降为备选，
     中文歌按曲名与歌手的字形对齐简繁（对照表 `zh_script_table.dart` 由 `tool/gen_zh_script_table.ps1` 调 Windows `LCMapStringEx` 生成）。
     结果按曲目 ID 存进应用数据目录 `lyrics_lrc/`；补全请求因网络失败时不缓存，下次再试。设置 → 歌词 →「补全歌词」可关闭。
   - **任务栏歌词（Windows）**：原「任务栏歌词」项目的原生 C++ 重写，嵌在 Win11 任务栏天气小组件右侧（`windows/runner/taskbar_lyrics*.cpp`），
     不需要单独的 exe。当前句大字、下一句小字，切句时上滚（300ms）；放不下时缩小或折成两行；无同步歌词时显示封面 + 歌名 + 播放控制。
+    没取到歌词（网络抖动 / 限流）时 10 秒、30 秒、90 秒后各重试一次；App 内歌词页先取到时立即同步到任务栏（`SpotifyProvider.lyricsCached`）。
     悬停显示上一首 / 播放暂停 / 下一首，点击打开 Flutify，右键菜单「打开 Flutify / 重新获取歌词 / 关闭任务栏歌词」。
     它作为第二个系统媒体控制端挂在 `MediaControlsSync` 上（`MultiMediaControls`），因此和 SMTC 一样自动跟随本机 / Connect 远程播放，按键路由也相同。
     窗口跑在独立线程（跨进程子窗口会与 explorer 共享输入队列，不能占用 Flutter 主线程），UIA 定位小组件按钮，explorer 重启后自动重新嵌入。

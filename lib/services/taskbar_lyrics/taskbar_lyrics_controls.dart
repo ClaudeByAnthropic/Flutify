@@ -15,7 +15,8 @@ import 'taskbar_lyrics_channel.dart';
 ///
 /// 职责：
 /// - 收到曲目后按 [lyricsLoader] 取歌词（与 App 内歌词同一来源，含 LRCLIB 补全），只把逐行同步歌词推给原生；
-///   纯文本或没有歌词时原生显示控制条（封面 + 歌名 + 按钮）；
+///   纯文本或没有歌词时原生显示控制条（封面 + 歌名 + 按钮）；没取到时按 [retryDelays] 重试，
+///   App 内先取到时由 [lyricsCached] 立即补上；
 /// - 下载封面字节交给原生解码（只保留最近一张）；
 /// - 关闭时不向原生推任何曲目数据，开启时补推当前状态。
 /// 「打开 Flutify」「关闭任务栏歌词」由界面层（TaskbarLyricsBinding）通过回调处理。
@@ -44,7 +45,19 @@ class TaskbarLyricsControls implements SystemMediaControls {
   String? _artUrl;
   Uint8List? _art;
 
-  TaskbarLyricsControls(this._platform, {http.Client? client}) : _http = client ?? http.Client() {
+  /// 没拿到同步歌词（请求失败 / 限流 / 网络抖动）时的重试间隔；确定「没有歌词」的结果有缓存，重试不会再联网。
+  final List<Duration> retryDelays;
+
+  // 当前曲目是否已推送同步歌词，以及已重试的次数
+  bool _hasLyrics = false;
+  int _retries = 0;
+  Timer? _retryTimer;
+
+  TaskbarLyricsControls(
+    this._platform, {
+    http.Client? client,
+    this.retryDelays = const [Duration(seconds: 10), Duration(seconds: 30), Duration(seconds: 90)],
+  }) : _http = client ?? http.Client() {
     _platformEvents = _platform.events.listen(_onPlatformEvent);
   }
 
@@ -61,6 +74,7 @@ class TaskbarLyricsControls implements SystemMediaControls {
     if (enabled) {
       unawaited(_platform.setEnabled(true).then((_) => _pushAll()));
     } else {
+      _resetLyricsState();
       unawaited(_platform.setEnabled(false));
     }
   }
@@ -80,6 +94,7 @@ class TaskbarLyricsControls implements SystemMediaControls {
   Future<void> setTrack(MediaTrackInfo? track) async {
     _track = track;
     _generation++;
+    _resetLyricsState();
     if (_enabled) await _pushTrack();
   }
 
@@ -92,6 +107,7 @@ class TaskbarLyricsControls implements SystemMediaControls {
 
   @override
   void dispose() {
+    _retryTimer?.cancel();
     _platformEvents?.cancel();
     unawaited(_platform.setEnabled(false));
     _events.close();
@@ -155,7 +171,34 @@ class TaskbarLyricsControls implements SystemMediaControls {
       return;
     }
     if (generation != _generation || !_enabled) return;
-    await _platform.setLyrics(lyrics.isSynced ? lyrics.lines : null);
+    if (lyrics.isSynced) {
+      _hasLyrics = true;
+      _retryTimer?.cancel();
+      await _platform.setLyrics(lyrics.lines);
+    } else {
+      await _platform.setLyrics(null);
+      _scheduleRetry(track, generation);
+    }
+  }
+
+  void _scheduleRetry(MediaTrackInfo track, int generation) {
+    if (_retries >= retryDelays.length || (_retryTimer?.isActive ?? false)) return;
+    _retryTimer = Timer(retryDelays[_retries++], () {
+      if (generation == _generation && _enabled && !_hasLyrics) unawaited(_pushLyrics(track, generation));
+    });
+  }
+
+  void _resetLyricsState() {
+    _retryTimer?.cancel();
+    _hasLyrics = false;
+    _retries = 0;
+  }
+
+  /// App 内（歌词页、右栏）取到了某首歌的歌词：若正是任务栏上这首、且任务栏还没有歌词，立即补上。
+  void lyricsCached(String trackId) {
+    final track = _track;
+    if (!_enabled || _hasLyrics || track == null || track.id != trackId) return;
+    unawaited(_pushLyrics(track, _generation));
   }
 
   static LyricsQuery _query(MediaTrackInfo track) => LyricsQuery(
@@ -187,6 +230,7 @@ class TaskbarLyricsControls implements SystemMediaControls {
       case TaskbarLyricsEvent.refetch:
         final track = _track;
         if (track != null) {
+          _resetLyricsState();
           unawaited(_platform.setLyrics(null).then((_) => _pushLyrics(track, _generation, reload: true)));
         }
     }

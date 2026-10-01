@@ -114,6 +114,17 @@ void main() {
     expect(requests.where((u) => u.path.contains('/color-lyrics/')), hasLength(1));
   });
 
+  test('歌词写入缓存时通知曲目 ID；失败不通知', () async {
+    final cached = <String>[];
+    final sub = spotify.lyricsCached.listen(cached.add);
+    await spotify.fetchLyrics(LyricsQuery.fromTrack(SampleCatalog.track1));
+    lyricsStatus = 503;
+    await spotify.fetchLyrics(LyricsQuery.fromTrack(SampleCatalog.track3));
+    await Future<void>.delayed(Duration.zero);
+    expect(cached, [SampleCatalog.track1.id]);
+    await sub.cancel();
+  });
+
   test('没有歌词（404）也会缓存为空歌词', () async {
     lyricsStatus = 404;
     final id = SampleCatalog.track2.id;

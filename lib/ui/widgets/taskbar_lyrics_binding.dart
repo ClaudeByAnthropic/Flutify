@@ -15,7 +15,7 @@ import '../shell/desktop/desktop_window.dart';
 /// 把任务栏歌词接到界面状态上（放在 MaterialApp.builder 里，需要本地化文案）：
 /// - 设置「歌词 → 任务栏歌词」的开关、颜色、不透明度；
 /// - 跟随强调色时取当前主题强调色的深 / 浅两档（随封面取色变化）；
-/// - 歌词来源 = SpotifyProvider（与 App 内歌词共享缓存与 LRCLIB 补全）；
+/// - 歌词来源 = SpotifyProvider（与 App 内歌词共享缓存与 LRCLIB 补全）；App 内取到歌词时同步给任务栏；
 /// - 右键菜单「打开 Flutify」把窗口带到前台，「关闭任务栏歌词」写回设置。
 /// 没有注入 [TaskbarLyricsControls]（非 Windows、测试）时原样返回 [child]。
 class TaskbarLyricsBinding extends StatefulWidget {
@@ -29,6 +29,7 @@ class TaskbarLyricsBinding extends StatefulWidget {
 
 class _TaskbarLyricsBindingState extends State<TaskbarLyricsBinding> {
   TaskbarLyricsControls? _controls;
+  StreamSubscription<String>? _lyricsCached;
 
   // 强调色的两档只在强调色变化时重算（需要生成整套主题）
   Color? _accent;
@@ -52,10 +53,12 @@ class _TaskbarLyricsBindingState extends State<TaskbarLyricsBinding> {
         preferences.update(preferences.prefs.copyWith(taskbarLyrics: false));
       }
       ..lyricsSourceReady();
+    _lyricsCached = spotify.lyricsCached.listen(controls.lyricsCached);
   }
 
   @override
   void dispose() {
+    unawaited(_lyricsCached?.cancel());
     _controls
       ?..lyricsLoader = null
       ..lyricsReloader = null

@@ -1,4 +1,5 @@
 import '../../models/lyrics_query.dart';
+import 'artist_match.dart';
 import 'lrclib_candidate.dart';
 import 'lyric_script.dart';
 import 'translation_filter.dart';
@@ -17,10 +18,15 @@ class LrclibSelection {
 /// 规则：
 /// - 歌曲语言 = 原唱语言，以同一首歌候选歌词中占多数的语言为准——原词在库里份数最多，译文 / 音译是少数；
 ///   曲名 / 歌手只作平局参考（Spotify 会本地化歌手名，J-pop 也常用英文曲名，单看它们会把英文歌配上日文译词）；
+/// - 歌手对不上（[ArtistMatcher]，同名的另一首歌）直接排除：配错歌比没有歌词更糟；
 /// - 翻译版、罗马音、双语对照（[TranslationFilter]）降到「退而求其次」档，只有别无选择时才用；
-/// - 打分：语言吻合为主项，曲名一致、时长接近加分；中文再按曲名 / 歌手的字形对齐简繁。
+/// - 打分：语言吻合为主项，歌手对上、曲名一致、时长接近加分；中文再按曲名 / 歌手的字形对齐简繁。
 class LrclibSelector {
   LrclibSelector._();
+
+  /// 歌手可比且对不上的候选。
+  static bool _otherArtist(LrclibCandidate c, LyricsQuery query) =>
+      ArtistMatcher.compare(query.artist, c.artistName) == ArtistMatch.mismatch;
 
   /// 曲名 + 歌手里繁体专用字多于简体时，认为这首歌要繁体歌词。
   static bool wantsTraditional(LyricsQuery query) {
@@ -29,7 +35,11 @@ class LrclibSelector {
     return trad > 0 && trad > ZhScript.countSimplified(meta);
   }
 
-  static LrclibSelection? select(List<LrclibCandidate> candidates, LyricsQuery query) {
+  static LrclibSelection? select(List<LrclibCandidate> all, LyricsQuery query) {
+    final candidates = [
+      for (final c in all)
+        if (!_otherArtist(c, query)) c,
+    ];
     final title = query.title;
     final durSec = query.durationMs / 1000;
     final wantHant = wantsTraditional(query);
@@ -42,7 +52,7 @@ class LrclibSelector {
     var bestScore = double.negativeInfinity, altScore = double.negativeInfinity;
     for (final c in candidates) {
       if (c.lines.isEmpty) continue;
-      final score = _score(c, target, title, durSec, wantHant);
+      final score = _score(c, target, title, durSec, wantHant) + (_sameArtist(c, query) ? 15 : 0);
       if (c.rejected) {
         if (score - 40 > altScore) {
           altScore = score - 40;
@@ -80,9 +90,10 @@ class LrclibSelector {
 
     final durSec = query.durationMs / 1000;
     for (final c in candidates) {
-      if (c.lines.isEmpty || c.rejected) continue;
+      if (c.lines.isEmpty || c.rejected || _otherArtist(c, query)) continue;
       var w = 1.0;
       if (_sameTitle(c.trackName, query.title)) w += 1;
+      if (_sameArtist(c, query)) w += 1;
       if (durSec > 0 && c.duration > 0) {
         final dd = (c.duration - durSec).abs();
         if (dd <= 3) {
@@ -126,6 +137,9 @@ class LrclibSelector {
     }
     return score;
   }
+
+  static bool _sameArtist(LrclibCandidate c, LyricsQuery query) =>
+      ArtistMatcher.compare(query.artist, c.artistName) == ArtistMatch.match;
 
   static bool _sameTitle(String a, String b) => a.trim().toLowerCase() == b.trim().toLowerCase();
 }

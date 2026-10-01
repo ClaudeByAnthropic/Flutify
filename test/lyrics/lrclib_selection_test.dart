@@ -1,4 +1,5 @@
 import 'package:flutify_app/models/lyrics_query.dart';
+import 'package:flutify_app/services/lyrics/artist_match.dart';
 import 'package:flutify_app/services/lyrics/lrclib_candidate.dart';
 import 'package:flutify_app/services/lyrics/lrclib_selector.dart';
 import 'package:flutify_app/services/lyrics/lyric_script.dart';
@@ -73,5 +74,33 @@ void main() {
     });
 
     test('没有候选返回 null', () => expect(LrclibSelector.select([], query), isNull));
+
+    test('歌手对不上的同名歌即使时长吻合也不用', () {
+      const q = LyricsQuery(trackId: 't', title: 'Road', artist: 'Alpha & Beta, Gamma', durationMs: 200000);
+      final other = candidate(english, artist: 'Delta Band');
+      final mine = candidate(english.replaceAll('road', 'street'), artist: 'Alpha, Beta', duration: 210);
+      expect(LrclibSelector.select([other, mine], q)?.synced, contains('street'));
+      expect(LrclibSelector.select([other], q), isNull, reason: '配错歌比没有歌词更糟');
+    });
+
+    test('歌手文字不同（本地化译名）时不排除', () {
+      const q = LyricsQuery(trackId: 't', title: '路', artist: '某歌手', durationMs: 200000);
+      expect(LrclibSelector.select([candidate(chinese, title: '路', artist: 'Some Singer')], q), isNotNull);
+    });
+  });
+
+  group('ArtistMatcher', () {
+    test('多位艺人拆分、忽略大小写与标点', () {
+      expect(ArtistMatcher.compare('GAMPER & DADONI, ILIRA', 'Gamper, Dadoni'), ArtistMatch.match);
+      expect(ArtistMatcher.compare('Alpha', 'Alpha feat. Beta'), ArtistMatch.match);
+      expect(ArtistMatcher.compare('Tiësto', 'Tiësto, Someone Else'), ArtistMatch.match);
+      expect(ArtistMatcher.compare('Alpha & Beta', 'Delta Band'), ArtistMatch.mismatch);
+    });
+
+    test('繁简统一后比较；文字不同或为空时无法判断', () {
+      expect(ArtistMatcher.compare('陈奕迅', '陳奕迅'), ArtistMatch.match);
+      expect(ArtistMatcher.compare('某歌手', 'Some Singer'), ArtistMatch.unknown);
+      expect(ArtistMatcher.compare('', 'Alpha'), ArtistMatch.unknown);
+    });
   });
 }

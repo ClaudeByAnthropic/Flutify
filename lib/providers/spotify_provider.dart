@@ -50,6 +50,7 @@ class SpotifyProvider extends ChangeNotifier {
   final Map<String, SpotifyLyrics> _lyricsCache = {};
   final Map<String, Future<SpotifyLyrics>> _lyricsInFlight = {};
   int _lyricsGeneration = 0;
+  final StreamController<String> _lyricsCached = StreamController.broadcast();
 
   /// dispose 之后异步回调不得再 notifyListeners。
   bool _disposed = false;
@@ -216,6 +217,9 @@ class SpotifyProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   SpotifyLyrics? cachedLyrics(String trackId) => _lyricsCache[trackId];
 
+  /// 某首歌的歌词取到并写入缓存时发出曲目 ID（任务栏歌词据此补上之前没取到的歌词）。
+  Stream<String> get lyricsCached => _lyricsCached.stream;
+
   /// 已缓存歌词的曲目数（设置页「隐私」分组展示）。
   int get cachedLyricsCount => _lyricsCache.length;
 
@@ -256,7 +260,10 @@ class SpotifyProvider extends ChangeNotifier {
     return _lyricsInFlight[trackId] ??= _lyrics
         .resolve(query)
         .then((resolved) {
-          if (resolved.cacheable) _lyricsCache[trackId] = resolved.lyrics;
+          if (resolved.cacheable) {
+            _lyricsCache[trackId] = resolved.lyrics;
+            if (!_disposed) _lyricsCached.add(trackId);
+          }
           return resolved.lyrics;
         })
         .catchError((Object _) => const SpotifyLyrics(lines: []))
@@ -277,6 +284,7 @@ class SpotifyProvider extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _searchTimer?.cancel();
+    unawaited(_lyricsCached.close());
     super.dispose();
   }
 }

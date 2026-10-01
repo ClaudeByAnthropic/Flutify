@@ -40,8 +40,9 @@ class LrclibLyricsSource {
   }) : _sleep = sleep ?? Future.delayed;
 
   /// 缓存键：优先用 Spotify 曲目 ID（同一首歌的本地化曲名会变，ID 不会）。
+  /// 版本号随选词规则升级（v2：加入歌手比对），让旧规则可能选错的结果失效。
   static String cacheKey(LyricsQuery q) =>
-      q.trackId.isNotEmpty ? 'v1|${q.trackId}' : 'v1|${q.title}\u0001${q.artist}\u0001${q.album}';
+      q.trackId.isNotEmpty ? 'v2|${q.trackId}' : 'v2|${q.title}\u0001${q.artist}\u0001${q.album}';
 
   /// 删除这首歌的本地缓存（「重新获取歌词」）。
   Future<void> forget(LyricsQuery query) async => cache?.remove(cacheKey(query));

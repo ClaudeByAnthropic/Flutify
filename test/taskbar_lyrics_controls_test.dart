@@ -211,6 +211,45 @@ void main() {
     expect(platform.calls, isNot(contains('lyrics:1')));
   });
 
+  group('没取到歌词时补推', () {
+    late TaskbarLyricsControls retrying;
+    late List<SpotifyLyrics> answers;
+
+    setUp(() {
+      answers = [const SpotifyLyrics(lines: []), syncedLyrics];
+      retrying = TaskbarLyricsControls(
+        platform,
+        client: MockClient((_) async => http.Response('', 404)),
+        retryDelays: const [Duration(milliseconds: 20)],
+      )..lyricsLoader = (_) async => answers.length > 1 ? answers.removeAt(0) : answers.first;
+    });
+
+    tearDown(() => retrying.dispose());
+
+    test('第一次没取到，按间隔重试后补上', () async {
+      await retrying.setTrack(track);
+      retrying.configure(enabled: true, style: style);
+      await settle();
+      await settle();
+      expect(platform.lyrics, isNull);
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(platform.lyrics, hasLength(2));
+    });
+
+    test('App 内取到同一首的歌词时立即补上；别的歌不理会', () async {
+      await retrying.setTrack(track);
+      retrying.configure(enabled: true, style: style);
+      await settle();
+      await settle();
+      retrying.lyricsCached('other');
+      await settle();
+      expect(platform.lyrics, isNull);
+      retrying.lyricsCached('id1');
+      await settle();
+      expect(platform.lyrics, hasLength(2));
+    });
+  });
+
   group('MultiMediaControls', () {
     test('状态推给每一端，事件合并，dispose 级联', () async {
       final a = _RecordingControls(), b = _RecordingControls(periodic: true);
