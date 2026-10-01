@@ -7,8 +7,8 @@ import '../../../providers/connect_provider.dart';
 import '../../screens/player/device_picker_sheet.dart';
 import '../../screens/player/lyrics_sheet.dart';
 import '../../shell/shell_layout_controller.dart';
-import '../cover_image.dart';
 import '../playback_status_button.dart';
+import '../player_bar_cover.dart';
 import 'connect_device_icon.dart';
 import 'remote_progress.dart';
 import 'remote_transport_controls.dart';
@@ -79,14 +79,14 @@ class _RemoteTrackInfo extends StatelessWidget {
     final track = connect.remoteTrack;
     final title = track?.name ?? player.title;
     final subtitle = track?.artistNames ?? player.albumTitle;
-    final layout = context.read<ShellLayoutController?>();
+    final layout = context.watch<ShellLayoutController?>();
     return Row(
       children: [
-        // 点封面：右栏切到「正在播放」（与本机播放栏点封面打开正在播放一致）
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => layout == null ? LyricsSheet.show(context) : layout.showTab(NowPlayingTab.details),
-          child: CoverImage(url: track?.coverUrl ?? player.imageUrl, size: 56, borderRadius: BorderRadius.circular(8)),
+        // 点封面：右栏关着时打开「正在播放」；没有三栏框架时打开底部歌词面板
+        PlayerBarCover(
+          url: track?.coverUrl ?? player.imageUrl,
+          layout: layout,
+          onOpenFallback: layout == null ? () => LyricsSheet.show(context) : null,
         ),
         const SizedBox(width: 12),
         Expanded(

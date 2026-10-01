@@ -13,9 +13,9 @@ import '../screens/player/queue_sheet.dart';
 import '../shell/shell_layout_controller.dart';
 import 'connect/connect_actions.dart';
 import 'connect/remote_player_bar.dart';
-import 'cover_image.dart';
 import 'playback_scrubber.dart';
 import 'playback_status_button.dart';
+import 'player_bar_cover.dart';
 import 'player_controls.dart';
 
 /// 桌面端底部通栏播放器（Spotify PC 风格）。
@@ -145,13 +145,10 @@ class _NowPlayingInfo extends StatelessWidget {
 
     return Row(
       children: [
-        Tooltip(
-          message: context.l10n.openNowPlaying,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => FullPlayerSheet.show(context),
-            child: CoverImage(url: track.coverUrl, size: 56, borderRadius: BorderRadius.circular(8.0)),
-          ),
+        PlayerBarCover(
+          url: track.coverUrl,
+          layout: context.watch<ShellLayoutController?>(),
+          onOpenFallback: () => FullPlayerSheet.show(context),
         ),
         const SizedBox(width: 12),
         Expanded(
