@@ -1148,6 +1148,42 @@ abstract class AppLocalizations {
   /// **'前往专辑'**
   String get trackGoToAlbum;
 
+  /// No description provided for @trackGoToRadio.
+  ///
+  /// In zh, this message translates to:
+  /// **'前往歌曲电台'**
+  String get trackGoToRadio;
+
+  /// No description provided for @trackViewCredits.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看制作人员'**
+  String get trackViewCredits;
+
+  /// No description provided for @creditsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'制作人员'**
+  String get creditsTitle;
+
+  /// No description provided for @creditsSources.
+  ///
+  /// In zh, this message translates to:
+  /// **'来源'**
+  String get creditsSources;
+
+  /// No description provided for @creditsEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'这首歌暂时没有制作人员信息'**
+  String get creditsEmpty;
+
+  /// No description provided for @radioUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'这首歌暂时没有歌曲电台'**
+  String get radioUnavailable;
+
   /// No description provided for @trackGoToArtist.
   ///
   /// In zh, this message translates to:

@@ -594,6 +594,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trackGoToAlbum => 'Go to album';
 
   @override
+  String get trackGoToRadio => 'Go to song radio';
+
+  @override
+  String get trackViewCredits => 'View credits';
+
+  @override
+  String get creditsTitle => 'Credits';
+
+  @override
+  String get creditsSources => 'Sources';
+
+  @override
+  String get creditsEmpty => 'No credits available for this song';
+
+  @override
+  String get radioUnavailable => 'No song radio available for this song';
+
+  @override
   String trackGoToArtist(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

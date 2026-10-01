@@ -255,6 +255,12 @@
   "trackAddToPlaylist": "添加到歌单",
   "trackAddToQueue": "添加到播放队列",
   "trackGoToAlbum": "前往专辑",
+  "trackGoToRadio": "前往歌曲电台",
+  "trackViewCredits": "查看制作人员",
+  "creditsTitle": "制作人员",
+  "creditsSources": "来源",
+  "creditsEmpty": "这首歌暂时没有制作人员信息",
+  "radioUnavailable": "这首歌暂时没有歌曲电台",
   "trackGoToArtist": "{count, plural, other{前往艺人}}",
   "@trackGoToArtist": {
     "placeholders": { "count": { "type": "int" } }

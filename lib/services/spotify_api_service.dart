@@ -11,6 +11,7 @@ import '../models/image.dart';
 import '../models/lyrics.dart';
 import '../models/playlist.dart';
 import '../models/track.dart';
+import '../models/track_credits.dart';
 import '../models/user_profile.dart';
 import 'auth/spotify_auth_service.dart';
 import 'connect/connect_service.dart';
@@ -269,6 +270,20 @@ class SpotifyApiService {
     } catch (_) {
       return const [];
     }
+  }
+
+  /// 曲目制作人员。只有桌面版会话可用（公开 Web API 没有对应接口）。
+  Future<TrackCredits> getTrackCredits(String trackId) async {
+    if (!isConfigured || !_useDesktop) throw SpotifyDataException.notSignedIn;
+    return _desktopLoad(() => _desktop.trackCredits(trackId));
+  }
+
+  /// 以曲目为种子的「歌曲电台」歌单（只含 id 与占位名称，详情页会按 id 加载完整歌单）。
+  /// 该曲目没有电台时抛 [SpotifyDataException]。
+  Future<SpotifyPlaylist> getSongRadio(SpotifyTrack track) async {
+    if (!isConfigured || !_useDesktop) throw SpotifyDataException.notSignedIn;
+    final id = await _desktopLoad(() => _desktop.songRadioPlaylistId(track.id));
+    return SpotifyPlaylist(id: id, name: track.name);
   }
 
   /// 按 URI 取单曲完整信息（Connect 远程曲目补全艺人 / 封面用）。

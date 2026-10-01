@@ -71,7 +71,10 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 大头图（`CollectionHero`）：封面主色铺满头部并一直渐隐到操作行，没有硬边；宽屏为 232px 封面 + 自适应字号大标题（放不下时逐档缩小），手机为居中封面。
   - 向上滚动后收起为吸顶标题栏，带小号播放键。
   - 拿不到数据时显示「登录后即可查看」或「暂时无法加载」，带登录 / 重试按钮，不会一直转圈。
-* **悬停与右键（桌面端）**：卡片悬停浮出绿色播放键（按下时由圆变圆角方形）；曲目行悬停时序号变 ▶、露出收藏与「⋯」；右键曲目弹出上下文菜单（加入歌单[二级菜单] / 收藏 / 加入队列 / 前往艺人 / 前往专辑 / 分享）。移动端长按曲目打开底部菜单。
+* **悬停与右键（桌面端）**：卡片悬停浮出绿色播放键（按下时由圆变圆角方形）；曲目行悬停时序号变 ▶、露出收藏与「⋯」；右键曲目弹出上下文菜单（加入歌单[二级菜单] / 收藏 / 加入队列 / 前往歌曲电台 / 前往艺人 / 前往专辑 / 查看制作人员 / 分享）。移动端长按曲目打开底部菜单（另含睡眠定时器）。
+  - **歌曲电台**（`widgets/track_actions/song_radio.dart`）：spclient `inspiredby-mix/v2/seed_to_playlist` 取以该曲为种子的电台歌单，打开歌单详情页；没有电台时提示。
+  - **制作人员**（`widgets/track_actions/track_credits_view.dart`）：Pathfinder `queryTrackCreditsGroupedModal`，按「艺人 / 作曲和作词 / 制作兼工程」等分组（分组与角色名由服务端按界面语言返回），同一人多个角色合并一行，有艺人页的可点进；桌面为对话框，移动端为底部面板。
+  - 「从个人喜好资料中移除」暂未实现：未找到可靠的接口证据，不对账号做猜测性的写操作。
 * **分享面板**（`ui/widgets/share/`）：曲目、歌单、专辑、艺人共用；桌面端为居中对话框，移动端为底部面板。
   快捷操作：复制网页链接、复制 Spotify URI、网页打开（失败时退回复制链接）；嵌入代码：标准 352 / 紧凑 152 高度、深色主题，
   预览为真实嵌入页（`embed_web_view.dart`，flutter_inappwebview；Windows 用 WebView2，缺运行时 / 加载失败 / 测试中退回示意预览），
@@ -258,6 +261,7 @@ d:/Flutify/app/
 │   │                                     # PlayerControls、TrackOptionsSheet、CreatePlaylistDialog 等；
 │   │                                     # track_menu（桌面右键菜单 / 移动端底部菜单）、hover_builder、
 │   │                                     # playback_error_listener（播放失败提示）、toast/app_toast（统一提示）、content_bottom_spacer；
+│   │                                     # track_actions/（歌曲电台、制作人员面板）；
 │   │                                     # share/（分享面板、快捷操作卡片、嵌入代码区与预览、分享按钮）；
 │   │                                     # connect/（远程播放栏、远程迷你播放器、进度推算、音柱、设备图标、本机 ↔ 远程协调）
 │   └── main.dart

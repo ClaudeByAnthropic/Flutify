@@ -22,6 +22,10 @@ class PathfinderOperation {
       PathfinderOperation('searchDesktop', 'db61238974d27839a136c9dc02bfdbe3fab7635f21cf85976ebff9a1ee281345');
   static const decorateContextTracks =
       PathfinderOperation('decorateContextTracks', '383de00240775c39a6afe0b1055dc562b2a3930894201f9762f3fc32a74971c7');
+
+  /// 「查看制作人员」弹窗：按角色分组的参与者与版权来源。
+  static const queryTrackCreditsGroupedModal = PathfinderOperation(
+      'queryTrackCreditsGroupedModal', 'f135fb9be58a72d041ab5d214d817021a272405d883860468e2627afb01a3ca9');
 }
 
 /// 桌面版在 home / browse 类查询中声明的终端类型（xpui 中 IntegrationDesktop）。

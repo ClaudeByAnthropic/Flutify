@@ -15,8 +15,10 @@ import 'create_playlist_dialog.dart';
 import 'menu/desktop_menu.dart';
 import 'share/share_sheet.dart';
 import 'sleep_timer/sleep_timer_menu.dart';
-import 'track_options_sheet.dart';
 import 'toast/app_toast.dart';
+import 'track_actions/song_radio.dart';
+import 'track_actions/track_credits_view.dart';
+import 'track_options_sheet.dart';
 
 /// 曲目操作（菜单项与悬停快捷键共用）。
 enum TrackAction {
@@ -26,6 +28,8 @@ enum TrackAction {
   sleepTimer(null, null),
   artist(SingleActivator(LogicalKeyboardKey.keyA, alt: true), 'Alt+A'),
   album(SingleActivator(LogicalKeyboardKey.keyA), 'A'),
+  radio(SingleActivator(LogicalKeyboardKey.keyR), 'R'),
+  credits(null, null),
   share(SingleActivator(LogicalKeyboardKey.keyS), 'S');
 
   /// 悬停在曲目行上时的快捷键；null 表示没有。
@@ -96,9 +100,11 @@ class TrackMenu {
           sub: true,
         ),
       DesktopMenu.divider,
+      item(TrackAction.radio, Icons.sensors_rounded, l10n.trackGoToRadio),
       if (has(TrackAction.artist))
         item(TrackAction.artist, Icons.person_outline_rounded, l10n.trackGoToArtist(track.artists.length)),
       if (has(TrackAction.album)) item(TrackAction.album, Icons.album_outlined, l10n.trackGoToAlbum),
+      item(TrackAction.credits, Icons.groups_outlined, l10n.trackViewCredits),
       if (has(TrackAction.share)) ...[
         DesktopMenu.divider,
         item(TrackAction.share, Icons.ios_share_rounded, l10n.commonShare),
@@ -134,6 +140,10 @@ class TrackMenu {
         await _goToArtist(context, track, anchor);
       case TrackAction.addToPlaylist:
         await _addToPlaylist(context, track, anchor);
+      case TrackAction.radio:
+        await SongRadio.open(context, track);
+      case TrackAction.credits:
+        await TrackCreditsView.show(context, track);
       case TrackAction.share:
         await ShareSheet.show(context, ShareTarget.track(track));
     }

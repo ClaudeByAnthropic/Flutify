@@ -10,7 +10,9 @@ import '../../models/home_feed.dart';
 import '../../models/image.dart';
 import '../../models/playlist.dart';
 import '../../models/track.dart';
+import '../../models/track_credits.dart';
 import '../library/playlist_cover.dart';
+import 'credits_parser.dart';
 import 'home_parser.dart';
 import 'pathfinder_client.dart';
 import 'pathfinder_operations.dart';
@@ -253,6 +255,41 @@ class DesktopDataSource {
     );
     if (res.statusCode != 200) return null;
     return PathfinderParsers.playlistV2(id, jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>)?.playlist;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 曲目：制作人员 / 歌曲电台
+  // ---------------------------------------------------------------------------
+
+  /// 「查看制作人员」（与官方桌面端同一查询）；曲目不存在时返回 null。
+  Future<TrackCredits?> trackCredits(String trackId) async {
+    final data = await _query(PathfinderOperation.queryTrackCreditsGroupedModal, {
+      'trackUri': 'spotify:track:$trackId',
+      'contributorsLimit': 100,
+      'contributorsOffset': 0,
+    });
+    return CreditsParser.parse(data);
+  }
+
+  /// 「转至歌曲电台」：以曲目为种子取电台歌单 id（spclient inspiredby-mix，官方桌面端同一接口）。
+  /// 服务端没有为该曲目生成电台时返回 null。
+  Future<String?> songRadioPlaylistId(String trackId) async {
+    final res = await _client.get(
+      Uri.parse(
+        '${SpotifyEndpoints.defaultSpClientBase}/inspiredby-mix/v2/seed_to_playlist/'
+        'spotify:track:$trackId?response-format=json',
+      ),
+      headers: await _headers(),
+    );
+    if (res.statusCode == 404) return null;
+    if (res.statusCode != 200) throw http.ClientException('seed_to_playlist HTTP ${res.statusCode}', res.request?.url);
+    final items = (jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>)['mediaItems'];
+    if (items is! List) return null;
+    for (final item in items.whereType<Map>()) {
+      final uri = item['uri'] as String? ?? '';
+      if (uri.startsWith('spotify:playlist:')) return uri.substring('spotify:playlist:'.length);
+    }
+    return null;
   }
 
   /// home 查询需要 IANA 时区名；Dart 只能拿到 UTC 偏移，整点偏移用 `Etc/GMT∓N` 表示（符号与习惯相反）。

@@ -579,6 +579,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get trackGoToAlbum => '前往专辑';
 
   @override
+  String get trackGoToRadio => '前往歌曲电台';
+
+  @override
+  String get trackViewCredits => '查看制作人员';
+
+  @override
+  String get creditsTitle => '制作人员';
+
+  @override
+  String get creditsSources => '来源';
+
+  @override
+  String get creditsEmpty => '这首歌暂时没有制作人员信息';
+
+  @override
+  String get radioUnavailable => '这首歌暂时没有歌曲电台';
+
+  @override
   String trackGoToArtist(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

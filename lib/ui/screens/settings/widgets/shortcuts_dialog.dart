@@ -40,6 +40,8 @@ class ShortcutsDialog extends StatelessWidget {
     TrackAction.sleepTimer => l10n.sleepTimer,
     TrackAction.artist => l10n.trackGoToArtist(1),
     TrackAction.album => l10n.trackGoToAlbum,
+    TrackAction.radio => l10n.trackGoToRadio,
+    TrackAction.credits => l10n.trackViewCredits,
     TrackAction.share => l10n.commonShare,
   };
 

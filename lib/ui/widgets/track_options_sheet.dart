@@ -14,6 +14,8 @@ import 'create_playlist_dialog.dart';
 import 'share/share_sheet.dart';
 import 'sleep_timer/sleep_timer_menu.dart';
 import 'toast/app_toast.dart';
+import 'track_actions/song_radio.dart';
+import 'track_actions/track_credits_view.dart';
 
 /// 曲目「更多」操作面板（Spotify 长按 / ⋮ 菜单）。
 class TrackOptionsSheet extends StatelessWidget {
@@ -97,6 +99,14 @@ class TrackOptionsSheet extends StatelessWidget {
                   if (hostContext.mounted) SleepTimerMenu.show(hostContext);
                 },
               ),
+            ListTile(
+              leading: const Icon(Icons.sensors_rounded),
+              title: Text(l10n.trackGoToRadio),
+              onTap: () {
+                Navigator.pop(context);
+                if (hostContext.mounted) SongRadio.open(hostContext, track);
+              },
+            ),
             if (album != null && album.id.isNotEmpty)
               ListTile(
                 leading: const Icon(Icons.album_rounded),
@@ -109,6 +119,14 @@ class TrackOptionsSheet extends StatelessWidget {
                 title: Text(l10n.trackGoToArtist(track.artists.length)),
                 onTap: () => _goToArtist(context),
               ),
+            ListTile(
+              leading: const Icon(Icons.groups_outlined),
+              title: Text(l10n.trackViewCredits),
+              onTap: () {
+                Navigator.pop(context);
+                if (hostContext.mounted) TrackCreditsView.show(hostContext, track);
+              },
+            ),
             if (_share.isShareable)
               ListTile(
                 leading: const Icon(Icons.ios_share_rounded),
