@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/l10n.dart';
@@ -6,17 +7,40 @@ import '../../models/share_target.dart';
 import '../../models/track.dart';
 import '../../providers/library_provider.dart';
 import '../../providers/playback_provider.dart';
+import '../../providers/sleep_timer_provider.dart';
 import '../navigation/app_routes.dart';
 import '../shell/shell_breakpoints.dart';
 import 'cover_image.dart';
 import 'create_playlist_dialog.dart';
+import 'menu/desktop_menu.dart';
 import 'share/share_sheet.dart';
+import 'sleep_timer/sleep_timer_menu.dart';
 import 'track_options_sheet.dart';
+
+/// 曲目操作（菜单项与悬停快捷键共用）。
+enum TrackAction {
+  addToPlaylist(SingleActivator(LogicalKeyboardKey.keyP), 'P'),
+  like(SingleActivator(LogicalKeyboardKey.keyB, alt: true, shift: true), 'Alt+Shift+B'),
+  queue(SingleActivator(LogicalKeyboardKey.keyQ), 'Q'),
+  sleepTimer(null, null),
+  artist(SingleActivator(LogicalKeyboardKey.keyA, alt: true), 'Alt+A'),
+  album(SingleActivator(LogicalKeyboardKey.keyA), 'A'),
+  share(SingleActivator(LogicalKeyboardKey.keyS), 'S');
+
+  /// 悬停在曲目行上时的快捷键；null 表示没有。
+  final SingleActivator? activator;
+
+  /// 菜单右侧的快捷键提示。
+  final String? hint;
+
+  const TrackAction(this.activator, this.hint);
+}
 
 /// 曲目操作统一入口。
 ///
 /// - 桌面端：在鼠标位置（右键）或按钮下方（⋯）弹出菜单，与 Spotify 桌面端一致；
-///   「添加到歌单」「前往艺人（多位）」在同一位置弹出二级菜单；
+///   「加入歌单」「睡眠定时器」「前往艺人（多位）」在同一位置弹出二级菜单；菜单项右侧标出快捷键
+///   （鼠标悬停在曲目行上按键即可，见 [TrackHotkeys]）；
 /// - 移动端：底部操作面板 [TrackOptionsSheet]。
 class TrackMenu {
   TrackMenu._();
@@ -26,45 +50,7 @@ class TrackMenu {
     if (!ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)) {
       return TrackOptionsSheet.show(context, track);
     }
-    return _showDesktop(context, track, position ?? _anchorOf(context));
-  }
-
-  static Offset _anchorOf(BuildContext context) {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) return Offset.zero;
-    return box.localToGlobal(box.size.bottomLeft(Offset.zero));
-  }
-
-  static Future<T?> _menu<T>(BuildContext context, Offset position, List<PopupMenuEntry<T>> items) {
-    // 菜单显示在根 Navigator 的 Overlay 里：全局坐标需换算到它的本地坐标
-    // （桌面窄窗口时它在标题条之下，并不从窗口原点开始）
-    final overlay = Navigator.of(context, rootNavigator: true).overlay!.context.findRenderObject()! as RenderBox;
-    final local = overlay.globalToLocal(position);
-    final colorScheme = Theme.of(context).colorScheme;
-    return showMenu<T>(
-      context: context,
-      useRootNavigator: true,
-      position: RelativeRect.fromRect(local & const Size(1, 1), Offset.zero & overlay.size),
-      color: colorScheme.surfaceContainerHigh,
-      elevation: 8,
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      items: items,
-    );
-  }
-
-  static PopupMenuItem<T> _item<T>(T value, IconData icon, String label, {Color? iconColor}) {
-    return PopupMenuItem<T>(
-      value: value,
-      height: 40,
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: iconColor),
-          const SizedBox(width: 12),
-          Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
-        ],
-      ),
-    );
+    return _showDesktop(context, track, position ?? DesktopMenu.anchorOf(context));
   }
 
   static void _toast(BuildContext context, String message) {
@@ -74,49 +60,79 @@ class TrackMenu {
     )?.showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, width: 360));
   }
 
+  /// 当前情境下可用的操作（菜单与快捷键共用同一判断）。
+  static bool isAvailable(BuildContext context, SpotifyTrack track, TrackAction action) => switch (action) {
+    TrackAction.artist => track.artists.isNotEmpty,
+    TrackAction.album => track.album != null && track.album!.id.isNotEmpty,
+    TrackAction.share => ShareTarget.track(track).isShareable,
+    TrackAction.sleepTimer => context.read<SleepTimerProvider?>() != null,
+    _ => true,
+  };
+
   static Future<void> _showDesktop(BuildContext context, SpotifyTrack track, Offset position) async {
     final l10n = context.l10n;
-    final library = context.read<LibraryProvider>();
-    final playback = context.read<PlaybackProvider>();
-    final liked = library.isLiked(track.id);
-    final album = track.album;
-    final share = ShareTarget.track(track);
+    final liked = context.read<LibraryProvider>().isLiked(track.id);
+    final timerOn = context.read<SleepTimerProvider?>()?.active ?? false;
+    final primary = Theme.of(context).colorScheme.primary;
 
-    final action = await _menu<_Action>(context, position, [
-      _item(_Action.addToPlaylist, Icons.playlist_add_rounded, l10n.trackAddToPlaylist),
-      _item(
-        _Action.like,
+    PopupMenuItem<TrackAction> item(TrackAction action, IconData icon, String label, {Color? color, bool sub = false}) =>
+        DesktopMenu.item(action, icon, label, iconColor: color, shortcut: action.hint, submenu: sub);
+    bool has(TrackAction a) => isAvailable(context, track, a);
+
+    final action = await DesktopMenu.show<TrackAction>(context, position, [
+      item(TrackAction.addToPlaylist, Icons.add_rounded, l10n.trackAddToPlaylist, sub: true),
+      item(
+        TrackAction.like,
         liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
         liked ? l10n.likeRemove : l10n.likeAdd,
-        iconColor: liked ? Theme.of(context).colorScheme.primary : null,
+        color: liked ? primary : null,
       ),
-      _item(_Action.queue, Icons.queue_music_rounded, l10n.trackAddToQueue),
-      const PopupMenuDivider(height: 8),
-      if (track.artists.isNotEmpty)
-        _item(_Action.artist, Icons.person_rounded, l10n.trackGoToArtist(track.artists.length)),
-      if (album != null && album.id.isNotEmpty) _item(_Action.album, Icons.album_rounded, l10n.trackGoToAlbum),
-      if (share.isShareable) ...[
-        const PopupMenuDivider(height: 8),
-        _item(_Action.share, Icons.ios_share_rounded, l10n.commonShare),
+      item(TrackAction.queue, Icons.queue_music_rounded, l10n.trackAddToQueue),
+      if (has(TrackAction.sleepTimer))
+        item(
+          TrackAction.sleepTimer,
+          timerOn ? Icons.bedtime_rounded : Icons.bedtime_outlined,
+          l10n.sleepTimer,
+          color: timerOn ? primary : null,
+          sub: true,
+        ),
+      DesktopMenu.divider,
+      if (has(TrackAction.artist))
+        item(TrackAction.artist, Icons.person_outline_rounded, l10n.trackGoToArtist(track.artists.length)),
+      if (has(TrackAction.album)) item(TrackAction.album, Icons.album_outlined, l10n.trackGoToAlbum),
+      if (has(TrackAction.share)) ...[
+        DesktopMenu.divider,
+        item(TrackAction.share, Icons.ios_share_rounded, l10n.commonShare),
       ],
     ]);
     if (action == null || !context.mounted) return;
+    await perform(context, track, action, position: position);
+  }
 
+  /// 执行操作；[position] 为二级菜单弹出位置（快捷键触发时为鼠标位置）。
+  static Future<void> perform(BuildContext context, SpotifyTrack track, TrackAction action, {Offset? position}) async {
+    if (!isAvailable(context, track, action)) return;
+    final l10n = context.l10n;
+    final anchor = position ?? DesktopMenu.anchorOf(context);
     switch (action) {
-      case _Action.like:
+      case TrackAction.like:
+        final library = context.read<LibraryProvider>();
+        final liked = library.isLiked(track.id);
         library.toggleLike(track);
         _toast(context, liked ? l10n.toastLikeRemoved : l10n.toastLikeAdded);
-      case _Action.queue:
-        playback.addToQueue(track);
+      case TrackAction.queue:
+        context.read<PlaybackProvider>().addToQueue(track);
         _toast(context, l10n.toastAddedToQueue);
-      case _Action.album:
-        AppRoutes.openAlbum(context, album!);
-      case _Action.artist:
-        await _goToArtist(context, track, position);
-      case _Action.addToPlaylist:
-        await _addToPlaylist(context, track, position);
-      case _Action.share:
-        await ShareSheet.show(context, share);
+      case TrackAction.sleepTimer:
+        await SleepTimerMenu.show(context, position: anchor);
+      case TrackAction.album:
+        AppRoutes.openAlbum(context, track.album!);
+      case TrackAction.artist:
+        await _goToArtist(context, track, anchor);
+      case TrackAction.addToPlaylist:
+        await _addToPlaylist(context, track, anchor);
+      case TrackAction.share:
+        await ShareSheet.show(context, ShareTarget.track(track));
     }
   }
 
@@ -125,7 +141,7 @@ class TrackMenu {
       AppRoutes.openArtist(context, track.artists.first);
       return;
     }
-    final picked = await _menu<int>(context, position, [
+    final picked = await DesktopMenu.show<int>(context, position, [
       for (var i = 0; i < track.artists.length; i++)
         PopupMenuItem<int>(
           value: i,
@@ -154,11 +170,11 @@ class TrackMenu {
     final primary = Theme.of(context).colorScheme.primary;
     const createId = '\u0000new';
 
-    final id = await _menu<String>(context, position, [
-      _item(createId, Icons.add_rounded, l10n.trackNewPlaylist),
-      if (library.ownPlaylists.isNotEmpty) const PopupMenuDivider(height: 8),
+    final id = await DesktopMenu.show<String>(context, position, [
+      DesktopMenu.item(createId, Icons.add_rounded, l10n.trackNewPlaylist),
+      if (library.ownPlaylists.isNotEmpty) DesktopMenu.divider,
       for (final playlist in library.ownPlaylists)
-        _item(
+        DesktopMenu.item(
           playlist.id,
           playlist.tracks.any((t) => t.id == track.id) ? Icons.check_circle_rounded : Icons.queue_music_rounded,
           playlist.name,
@@ -181,5 +197,3 @@ class TrackMenu {
     _toast(context, added ? l10n.toastAddedTo(playlist.name) : l10n.toastAlreadyIn(playlist.name));
   }
 }
-
-enum _Action { like, addToPlaylist, queue, album, artist, share }

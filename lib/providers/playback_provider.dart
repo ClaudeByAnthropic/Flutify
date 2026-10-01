@@ -180,6 +180,21 @@ class PlaybackProvider extends ChangeNotifier {
     return [for (final i in _order.sublist(_orderPos + 1)) QueueEntry(i, _contextTracks[i])];
   }
 
+  /// 当前曲目播完后暂停、不接下一首（睡眠定时器「本首结束时」）；生效一次后自动复位。
+  bool get stopAfterCurrent => _stopAfterCurrent;
+  bool _stopAfterCurrent = false;
+
+  set stopAfterCurrent(bool value) {
+    if (value == _stopAfterCurrent) return;
+    _stopAfterCurrent = value;
+    notifyListeners();
+  }
+
+  /// 暂停（已暂停时什么也不做）。
+  Future<void> pause() async {
+    if (_isPlaying) await _audio.pause();
+  }
+
   bool isCurrent(String trackId) => _currentTrack?.id == trackId;
 
   /// 当前是否正在播放给定上下文（用于详情页大播放按钮的 播放/暂停 状态）。
@@ -226,6 +241,14 @@ class PlaybackProvider extends ChangeNotifier {
   }
 
   void _handleTrackEnded() {
+    if (_stopAfterCurrent) {
+      // 睡眠定时器「本首结束时」：停在本首开头，不接下一首（单曲循环也停）
+      _stopAfterCurrent = false;
+      unawaited(_audio.pause());
+      seekTo(Duration.zero);
+      notifyListeners();
+      return;
+    }
     if (_repeatMode == SpotifyRepeatMode.track) {
       seekTo(Duration.zero);
       unawaited(_audio.play());

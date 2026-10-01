@@ -957,4 +957,42 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountSignOutConfirm => '退出';
+
+  @override
+  String get sleepTimer => '睡眠定时器';
+
+  @override
+  String sleepTimerMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get sleepTimerHour => '1 小时';
+
+  @override
+  String get sleepTimerEndOfTrack => '本首结束时';
+
+  @override
+  String get sleepTimerOff => '关闭定时器';
+
+  @override
+  String sleepTimerRemaining(String time) {
+    return '睡眠定时器：剩余 $time';
+  }
+
+  @override
+  String get sleepTimerEndOfTrackActive => '睡眠定时器：本首结束时暂停';
+
+  @override
+  String toastSleepTimerSet(String label) {
+    return '睡眠定时器已设为「$label」';
+  }
+
+  @override
+  String get toastSleepTimerOff => '睡眠定时器已关闭';
+
+  @override
+  String shortcutOnHoveredTrack(String action) {
+    return '悬停曲目时：$action';
+  }
 }

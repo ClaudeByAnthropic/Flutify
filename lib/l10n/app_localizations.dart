@@ -1867,6 +1867,66 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'退出'**
   String get accountSignOutConfirm;
+
+  /// No description provided for @sleepTimer.
+  ///
+  /// In zh, this message translates to:
+  /// **'睡眠定时器'**
+  String get sleepTimer;
+
+  /// No description provided for @sleepTimerMinutes.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 分钟'**
+  String sleepTimerMinutes(int count);
+
+  /// No description provided for @sleepTimerHour.
+  ///
+  /// In zh, this message translates to:
+  /// **'1 小时'**
+  String get sleepTimerHour;
+
+  /// No description provided for @sleepTimerEndOfTrack.
+  ///
+  /// In zh, this message translates to:
+  /// **'本首结束时'**
+  String get sleepTimerEndOfTrack;
+
+  /// No description provided for @sleepTimerOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭定时器'**
+  String get sleepTimerOff;
+
+  /// No description provided for @sleepTimerRemaining.
+  ///
+  /// In zh, this message translates to:
+  /// **'睡眠定时器：剩余 {time}'**
+  String sleepTimerRemaining(String time);
+
+  /// No description provided for @sleepTimerEndOfTrackActive.
+  ///
+  /// In zh, this message translates to:
+  /// **'睡眠定时器：本首结束时暂停'**
+  String get sleepTimerEndOfTrackActive;
+
+  /// No description provided for @toastSleepTimerSet.
+  ///
+  /// In zh, this message translates to:
+  /// **'睡眠定时器已设为「{label}」'**
+  String toastSleepTimerSet(String label);
+
+  /// No description provided for @toastSleepTimerOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'睡眠定时器已关闭'**
+  String get toastSleepTimerOff;
+
+  /// No description provided for @shortcutOnHoveredTrack.
+  ///
+  /// In zh, this message translates to:
+  /// **'悬停曲目时：{action}'**
+  String shortcutOnHoveredTrack(String action);
 }
 
 class _AppLocalizationsDelegate

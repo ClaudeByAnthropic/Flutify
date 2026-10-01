@@ -369,10 +369,62 @@ static bool decrypt_samples(cdm::ContentDecryptionModule_10* cdm, Host& host,
 }
 
 // ---------------------------------------------------------------------------
+// 内存扫描：用 CDM 自己算出的 AES_K(0^16) 指纹，在进程内存里反查 16B 密钥。
+// （license 下发的 content key 必然以明文/弱混淆驻留在 CDM 堆里供 Decrypt 使用）
+// ---------------------------------------------------------------------------
+
+#include <bcrypt.h>
+#pragma comment(lib, "bcrypt.lib")
+
+static bool aes_ecb_128(const uint8_t key[16], const uint8_t in[16], uint8_t out[16]) {
+  BCRYPT_ALG_HANDLE alg = nullptr;
+  BCRYPT_KEY_HANDLE h = nullptr;
+  if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_AES_ALGORITHM, nullptr, 0) != 0) return false;
+  if (BCryptSetProperty(alg, BCRYPT_CHAINING_MODE, (PUCHAR)BCRYPT_CHAIN_MODE_ECB,
+                        sizeof(BCRYPT_CHAIN_MODE_ECB), 0) != 0) return false;
+  bool ok = false;
+  if (BCryptGenerateSymmetricKey(alg, &h, nullptr, 0, (PUCHAR)key, 16, 0) == 0) {
+    ULONG outlen = 0;
+    ok = BCryptEncrypt(h, (PUCHAR)in, 16, nullptr, nullptr, 0, out, 16, &outlen, 0) == 0 && outlen == 16;
+  }
+  if (h) BCryptDestroyKey(h);
+  if (alg) BCryptCloseAlgorithmProvider(alg, 0);
+  return ok;
+}
+
+static int find_key_in_memory(const uint8_t fingerprint[16]) {
+  uint8_t zero[16] = {0}, probe[16];
+  MEMORY_BASIC_INFORMATION mbi;
+  uint8_t* p = nullptr;
+  size_t scanned = 0, found = 0;
+  while (VirtualQuery(p, &mbi, sizeof(mbi)) == sizeof(mbi)) {
+    if (mbi.State == MEM_COMMIT &&
+        (mbi.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_READONLY | PAGE_EXECUTE_READ)) &&
+        !(mbi.Protect & PAGE_GUARD)) {
+      uint8_t* base = (uint8_t*)mbi.BaseAddress;
+      size_t size = mbi.RegionSize;
+      // 8 字节步进扫描（密钥通常在 8/16 对齐的堆分配里）
+      for (size_t off = 0; off + 16 <= size; off += 8) {
+        if (aes_ecb_128(base + off, zero, probe) && memcmp(probe, fingerprint, 16) == 0) {
+          fprintf(stderr, "[keyscan] 命中! addr=%p : ", base + off);
+          for (int i = 0; i < 16; i++) fprintf(stderr, "%02x", base[off + i]);
+          fprintf(stderr, "\n");
+          found++;
+        }
+        scanned++;
+      }
+    }
+    p += mbi.RegionSize;
+  }
+  fprintf(stderr, "[keyscan] 扫描 %zu 个候选，命中 %zu 个\n", scanned, found);
+  return found > 0 ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------------
 
 int wmain(int argc, wchar_t** argv) {
   std::string dll, pssh, cert, license_url, auth, client_token, samples, out, scheme = "cenc", kid_hex;
-  bool allow_distinctive = false, allow_persistent = false;
+  bool allow_distinctive = false, allow_persistent = false, find_key = false;
   for (int i = 1; i < argc - 1; i++) {
     auto val = [&]() { return std::string(); };
     std::wstring a = argv[i];
@@ -390,6 +442,7 @@ int wmain(int argc, wchar_t** argv) {
     else if (a == L"--kid") kid_hex = tos(v);
     else if (a == L"--distinctive") { allow_distinctive = (v == L"1" || v == L"true"); }
     else if (a == L"--persistent") { allow_persistent = (v == L"1" || v == L"true"); }
+    else if (a == L"--find-key") { find_key = (v == L"1" || v == L"true"); }
     else continue;
     i++;
   }
@@ -487,6 +540,10 @@ int wmain(int argc, wchar_t** argv) {
   int status = 0;
   auto resp = http_post(wurl, auth, client_token, g_host.license_request, &status);
   fprintf(stderr, "[cdm] license HTTP %d %zu B\n", status, resp.size());
+  if (!resp.empty()) {
+    std::ofstream rf("D:\\tmp\\license_resp.bin", std::ios::binary);
+    rf.write((const char*)resp.data(), resp.size());
+  }
   if (status != 200) {
     if (!resp.empty()) {
       fprintf(stderr, "[cdm] license 错误返回: %.*s\n",
@@ -502,6 +559,36 @@ int wmain(int argc, wchar_t** argv) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   fprintf(stderr, "[cdm] keys_usable=%d\n", g_host.keys_usable);
   if (!g_host.keys_usable) return 4;
+
+  if (find_key) {
+    // 先用 CDM 作为 AES-CTR 预言机取指纹：AES_K(0^16) || AES_K(1^16)...
+    std::vector<uint8_t> kid;
+    for (size_t i = 0; i + 1 < kid_hex.size(); i += 2)
+      kid.push_back((uint8_t)strtol(kid_hex.substr(i, 2).c_str(), nullptr, 16));
+    uint8_t z[32] = {0}, iv[8] = {0};
+    cdm::InputBuffer_2 ib{};
+    ib.data = z; ib.data_size = 32;
+    ib.encryption_scheme = cdm::EncryptionScheme::kCenc;
+    ib.key_id = kid.data(); ib.key_id_size = (uint32_t)kid.size();
+    ib.iv = iv; ib.iv_size = 8;
+    ib.pattern = {0, 0}; ib.timestamp = 0;
+    HostDecryptedBlock blk;
+    if (cdm->Decrypt(ib, &blk) != cdm::kSuccess || !blk.DecryptedBuffer()) {
+      fprintf(stderr, "[keyscan] 预言机 Decrypt 失败\n");
+      return 6;
+    }
+    uint8_t fp[16];
+    memcpy(fp, blk.DecryptedBuffer()->Data(), 16);
+    fprintf(stderr, "[keyscan] 指纹 AES_K(0^16) = ");
+    for (int i = 0; i < 16; i++) fprintf(stderr, "%02x", fp[i]);
+    fprintf(stderr, "\n");
+    blk.DecryptedBuffer()->Destroy();
+    int rc = find_key_in_memory(fp);
+    cdm->Destroy();
+    if (deinit) deinit();
+    FreeLibrary(mod);
+    return rc == 0 ? 0 : 7;
+  }
 
   // 4) 逐样本解密
   std::vector<uint8_t> kid;

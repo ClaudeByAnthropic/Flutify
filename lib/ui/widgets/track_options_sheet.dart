@@ -7,10 +7,12 @@ import '../../models/share_target.dart';
 import '../../models/track.dart';
 import '../../providers/library_provider.dart';
 import '../../providers/playback_provider.dart';
+import '../../providers/sleep_timer_provider.dart';
 import '../navigation/app_routes.dart';
 import 'cover_image.dart';
 import 'create_playlist_dialog.dart';
 import 'share/share_sheet.dart';
+import 'sleep_timer/sleep_timer_menu.dart';
 
 /// 曲目「更多」操作面板（Spotify 长按 / ⋮ 菜单）。
 class TrackOptionsSheet extends StatelessWidget {
@@ -84,6 +86,15 @@ class TrackOptionsSheet extends StatelessWidget {
                 _toast(l10n.toastAddedToQueue);
               },
             ),
+            if (context.read<SleepTimerProvider?>() != null)
+              ListTile(
+                leading: const Icon(Icons.bedtime_outlined),
+                title: Text(l10n.sleepTimer),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (hostContext.mounted) SleepTimerMenu.show(hostContext);
+                },
+              ),
             if (album != null && album.id.isNotEmpty)
               ListTile(
                 leading: const Icon(Icons.album_rounded),

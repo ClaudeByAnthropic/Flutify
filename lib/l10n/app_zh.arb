@@ -405,5 +405,28 @@
   "accountSignOut": "退出登录",
   "accountSignOutTitle": "退出登录？",
   "accountSignOutMessage": "将清除本机保存的登录信息与媒体库缓存，退出后需重新登录才能播放和查看媒体库。",
-  "accountSignOutConfirm": "退出"
+  "accountSignOutConfirm": "退出",
+
+  "sleepTimer": "睡眠定时器",
+  "sleepTimerMinutes": "{count} 分钟",
+  "@sleepTimerMinutes": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "sleepTimerHour": "1 小时",
+  "sleepTimerEndOfTrack": "本首结束时",
+  "sleepTimerOff": "关闭定时器",
+  "sleepTimerRemaining": "睡眠定时器：剩余 {time}",
+  "@sleepTimerRemaining": {
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "sleepTimerEndOfTrackActive": "睡眠定时器：本首结束时暂停",
+  "toastSleepTimerSet": "睡眠定时器已设为「{label}」",
+  "@toastSleepTimerSet": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+  "toastSleepTimerOff": "睡眠定时器已关闭",
+  "shortcutOnHoveredTrack": "悬停曲目时：{action}",
+  "@shortcutOnHoveredTrack": {
+    "placeholders": { "action": { "type": "String" } }
+  }
 }

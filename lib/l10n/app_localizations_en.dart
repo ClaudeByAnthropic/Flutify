@@ -994,4 +994,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountSignOutConfirm => 'Sign out';
+
+  @override
+  String get sleepTimer => 'Sleep timer';
+
+  @override
+  String sleepTimerMinutes(int count) {
+    return '$count minutes';
+  }
+
+  @override
+  String get sleepTimerHour => '1 hour';
+
+  @override
+  String get sleepTimerEndOfTrack => 'End of track';
+
+  @override
+  String get sleepTimerOff => 'Turn off timer';
+
+  @override
+  String sleepTimerRemaining(String time) {
+    return 'Sleep timer: $time left';
+  }
+
+  @override
+  String get sleepTimerEndOfTrackActive =>
+      'Sleep timer: pausing at end of track';
+
+  @override
+  String toastSleepTimerSet(String label) {
+    return 'Sleep timer set: $label';
+  }
+
+  @override
+  String get toastSleepTimerOff => 'Sleep timer turned off';
+
+  @override
+  String shortcutOnHoveredTrack(String action) {
+    return 'Hovered track: $action';
+  }
 }

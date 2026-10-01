@@ -324,5 +324,16 @@
   "accountSignOut": "Sign out",
   "accountSignOutTitle": "Sign out?",
   "accountSignOutMessage": "Your saved sign-in and library cache will be removed from this device. You'll need to sign in again to play music and view your library.",
-  "accountSignOutConfirm": "Sign out"
+  "accountSignOutConfirm": "Sign out",
+
+  "sleepTimer": "Sleep timer",
+  "sleepTimerMinutes": "{count} minutes",
+  "sleepTimerHour": "1 hour",
+  "sleepTimerEndOfTrack": "End of track",
+  "sleepTimerOff": "Turn off timer",
+  "sleepTimerRemaining": "Sleep timer: {time} left",
+  "sleepTimerEndOfTrackActive": "Sleep timer: pausing at end of track",
+  "toastSleepTimerSet": "Sleep timer set: {label}",
+  "toastSleepTimerOff": "Sleep timer turned off",
+  "shortcutOnHoveredTrack": "Hovered track: {action}"
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../l10n/l10n.dart';
+import '../../../widgets/track_menu.dart';
 
 /// 键盘快捷键一览（设置页「关于」）。
 ///
@@ -27,7 +28,20 @@ class ShortcutsDialog extends StatelessWidget {
     (['F11'], l10n.shortcutImmersive),
     (['F11'], l10n.shortcutImmersiveMode),
     (['Esc'], l10n.shortcutExitImmersive),
+    // 曲目快捷键（TrackHotkeys）：鼠标悬停在曲目行上按键
+    for (final action in TrackAction.values)
+      if (action.hint != null) (action.hint!.split('+'), l10n.shortcutOnHoveredTrack(_trackLabel(l10n, action))),
   ];
+
+  static String _trackLabel(AppLocalizations l10n, TrackAction action) => switch (action) {
+    TrackAction.addToPlaylist => l10n.trackAddToPlaylist,
+    TrackAction.like => l10n.likeAdd,
+    TrackAction.queue => l10n.trackAddToQueue,
+    TrackAction.sleepTimer => l10n.sleepTimer,
+    TrackAction.artist => l10n.trackGoToArtist(1),
+    TrackAction.album => l10n.trackGoToAlbum,
+    TrackAction.share => l10n.commonShare,
+  };
 
   @override
   Widget build(BuildContext context) {

@@ -16,6 +16,7 @@ import 'connect/remote_player_bar.dart';
 import 'playback_scrubber.dart';
 import 'playback_status_button.dart';
 import 'player_bar_cover.dart';
+import 'sleep_timer/sleep_timer_indicator.dart';
 import 'player_controls.dart';
 
 /// 桌面端底部通栏播放器（Spotify PC 风格）。
@@ -242,6 +243,7 @@ class _RightControls extends StatelessWidget {
     final layout = context.watch<ShellLayoutController?>();
 
     final buttons = <Widget>[
+      if (SleepTimerIndicator.isActive(context)) SleepTimerIndicator(style: _barIconStyle),
       PlaybackStatusButton(layout: layout, style: _barIconStyle),
       IconButton(
         icon: const Icon(Icons.queue_music_rounded, size: 20),

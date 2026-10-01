@@ -16,6 +16,7 @@ import '../shell/shell_breakpoints.dart';
 import '../shell/mobile/mobile_bottom_bar.dart';
 import '../shell/shell_layout_controller.dart';
 import '../widgets/playback_error_listener.dart';
+import '../widgets/track_hotkeys.dart';
 import 'home/home_screen.dart';
 import 'library/library_screen.dart';
 import 'player/immersive_lyrics_screen.dart';
@@ -184,7 +185,9 @@ class _MainShellState extends State<MainShell> {
       _layout.docked = width >= ShellBreakpoints.threeColumn;
       return ChangeNotifierProvider<ShellLayoutController>.value(
         value: _layout,
-        child: CallbackShortcuts(
+        // 曲目快捷键在外层：全局快捷键（Ctrl+S 等）先匹配，字母键再交给悬停的曲目行
+        child: TrackHotkeys(
+          child: CallbackShortcuts(
           bindings: _shortcuts(context.read<PlaybackProvider>()),
           child: Focus(
             autofocus: true,
@@ -203,6 +206,7 @@ class _MainShellState extends State<MainShell> {
               ),
             ),
           ),
+        ),
         ),
       );
     }

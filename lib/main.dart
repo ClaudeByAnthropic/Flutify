@@ -18,6 +18,7 @@ import 'providers/connect_provider.dart';
 import 'providers/library_provider.dart';
 import 'providers/playback_provider.dart';
 import 'providers/preferences_provider.dart';
+import 'providers/sleep_timer_provider.dart';
 import 'providers/spotify_provider.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
@@ -157,6 +158,7 @@ class FlutifyApp extends StatelessWidget {
             return playback;
           },
         ),
+        ChangeNotifierProvider(create: (ctx) => SleepTimerProvider(ctx.read<PlaybackProvider>())),
         ChangeNotifierProvider(create: (_) => LibraryProvider(storageService, source: spotifyApiService.library)),
         ChangeNotifierProvider(create: (_) => SpotifyProvider(spotifyApiService, storageService)),
         ChangeNotifierProvider(create: (_) => AppearanceProvider(storageService)),

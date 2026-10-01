@@ -15,6 +15,7 @@ import 'connect/connect_actions.dart';
 import 'connect/now_playing_source.dart';
 import 'cover_image.dart';
 import 'hover_builder.dart';
+import 'track_hotkeys.dart';
 import 'track_menu.dart';
 import 'waveform_visualizer.dart';
 
@@ -76,7 +77,7 @@ class TrackTile extends StatelessWidget {
         final revealed = hovered || !hoverCapable;
         final playIcon = isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded;
 
-        return InkWell(
+        final row = InkWell(
           onTap: onTap ?? () => _play(context),
           onLongPress: () => TrackMenu.show(context, track),
           onSecondaryTapUp: (details) => TrackMenu.show(context, track, position: details.globalPosition),
@@ -208,6 +209,13 @@ class TrackTile extends StatelessWidget {
               ],
             ),
           ),
+        );
+        if (!hoverCapable) return row;
+        // 悬停行接收曲目快捷键（Q 加入队列、P 加入歌单…）
+        return MouseRegion(
+          onHover: (e) => TrackHotkeys.hover(context, track, e.position),
+          onExit: (_) => TrackHotkeys.leave(context),
+          child: row,
         );
       },
     );
