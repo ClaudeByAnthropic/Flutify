@@ -27,13 +27,21 @@ class DesktopWindow {
   /// 当前是否处于系统全屏（沉浸式歌词）；全屏时 `WindowFrame` 隐藏窗口按钮与标题条。
   static final ValueNotifier<bool> fullScreen = ValueNotifier(false);
 
+  /// 系统全屏切换进行中（含退出后的尺寸刷新）。
+  ///
+  /// 在此期间渲染 BackdropFilter 会让引擎合成器在窗口尺寸重排时访问冲突
+  /// （flutter_windows.dll 0xc0000005，WER dump 确认栈全在引擎内），
+  /// `LiquidGlass` 监听它，在切换窗口期暂时退化为无模糊的玻璃。
+  static final ValueNotifier<bool> fullscreenTransition = ValueNotifier(false);
+
   /// 沉浸式歌词正以「仅铺满窗口」方式显示：`WindowFrame` 不加窄窗口标题条，
   /// 窗口按钮以深色样式浮在右上角（沉浸式背景始终是深色）。
   static final ValueNotifier<bool> immersiveWindow = ValueNotifier(false);
 
   /// 在 runApp 之前调用。开启「记住窗口大小和位置」时，在窗口显示前就放到上次的位置（不闪一下再跳）。
   static Future<void> init(StorageService storage) async {
-    if (kIsWeb || !(Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+    if (kIsWeb ||
+        !(Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
       return;
     }
     await windowManager.ensureInitialized();
@@ -112,8 +120,15 @@ class DesktopWindow {
     if (!_enabled) return;
     fullScreen.value = value;
     if (await windowManager.isFullScreen() == value) return;
+    // 切换期间（含退出后的两次 setSize 刷新）暂停所有背景模糊，避开引擎合成器崩溃
+    fullscreenTransition.value = true;
     await windowManager.setFullScreen(value);
     if (!value) await _refreshFrame();
+    // 等原生尺寸与最后一帧落定再恢复模糊
+    Future<void>.delayed(
+      const Duration(milliseconds: 300),
+      () => fullscreenTransition.value = false,
+    );
   }
 
   /// 退出全屏后强制原生窗口重算边框、重排 Flutter 视图。
@@ -126,7 +141,8 @@ class DesktopWindow {
     if (!Platform.isWindows) return;
     // 等原生还原落定：进入全屏前若是最大化，插件会异步再发一次 SC_MAXIMIZE
     await Future<void>.delayed(const Duration(milliseconds: 80));
-    if (await windowManager.isFullScreen() || await windowManager.isMaximized()) {
+    if (await windowManager.isFullScreen() ||
+        await windowManager.isMaximized()) {
       return;
     }
     final size = await windowManager.getSize();

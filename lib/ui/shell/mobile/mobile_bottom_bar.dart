@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../widgets/mini_player.dart';
+import '../desktop/desktop_window.dart';
 
 /// 移动端底部区域：悬浮胶囊迷你播放器 + 悬浮药丸式液态玻璃底部导航（iOS 风格）。
 ///
@@ -78,6 +79,33 @@ class _GlassNavigationPill extends StatelessWidget {
     final sigma = tokens.glassSigma * 0.8;
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
 
+    final nav = NavigationBar(
+      height: 64,
+      selectedIndex: selectedIndex,
+      onDestinationSelected: onSelected,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: Colors.transparent,
+      elevation: 0,
+      destinations: [
+        NavigationDestination(
+          icon: const Icon(Icons.home_outlined),
+          selectedIcon: const Icon(Icons.home_filled),
+          label: l10n.navHome,
+        ),
+        NavigationDestination(
+          icon: const Icon(Icons.search_rounded),
+          selectedIcon: const Icon(Icons.search_rounded),
+          label: l10n.navSearch,
+        ),
+        NavigationDestination(
+          icon: const Icon(Icons.library_music_outlined),
+          selectedIcon: const Icon(Icons.library_music_rounded),
+          label: l10n.navLibrary,
+        ),
+      ],
+    );
+
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 0, 20, bottomSafe + 12),
       child: DecoratedBox(
@@ -93,44 +121,27 @@ class _GlassNavigationPill extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(999),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colorScheme.surface.withAlpha(alpha),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withAlpha(110),
-                  width: 0.5,
+          // 窄窗口桌面模式下同样受全屏切换崩溃影响，过渡期间暂停模糊（同 LiquidGlass）
+          child: ValueListenableBuilder<bool>(
+            valueListenable: DesktopWindow.fullscreenTransition,
+            builder: (context, transitioning, _) {
+              final fill = DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface.withAlpha(alpha),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withAlpha(110),
+                    width: 0.5,
+                  ),
                 ),
-              ),
-              child: NavigationBar(
-                height: 64,
-                selectedIndex: selectedIndex,
-                onDestinationSelected: onSelected,
-                backgroundColor: Colors.transparent,
-                surfaceTintColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                elevation: 0,
-                destinations: [
-                  NavigationDestination(
-                    icon: const Icon(Icons.home_outlined),
-                    selectedIcon: const Icon(Icons.home_filled),
-                    label: l10n.navHome,
-                  ),
-                  NavigationDestination(
-                    icon: const Icon(Icons.search_rounded),
-                    selectedIcon: const Icon(Icons.search_rounded),
-                    label: l10n.navSearch,
-                  ),
-                  NavigationDestination(
-                    icon: const Icon(Icons.library_music_outlined),
-                    selectedIcon: const Icon(Icons.library_music_rounded),
-                    label: l10n.navLibrary,
-                  ),
-                ],
-              ),
-            ),
+                child: nav,
+              );
+              if (transitioning) return fill;
+              return BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                child: fill,
+              );
+            },
           ),
         ),
       ),

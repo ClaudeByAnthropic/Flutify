@@ -81,9 +81,10 @@ int wmain(int argc, wchar_t** argv) {
                         i = off + 4;
                         if (hits > 40) break;
                     }
-                    // 2) R1 邻域
+                    // 2) R1 邻域：打印前后 + 落盘前后各2KB供离线分析
                     if (!r1.empty()) {
                         i = 0;
+                        int ndump = 0;
                         while (i + r1.size() < got) {
                             uint8_t* f3 = (uint8_t*)memmem(buf.data() + i, got - i, r1.data(), r1.size());
                             if (!f3) break;
@@ -93,6 +94,12 @@ int wmain(int argc, wchar_t** argv) {
                             printf("\n     R1本身+后64B:");
                             for (size_t k = 0; k < r1.size() + 64 && off + k < got; k++) printf(" %02x", buf[off + k]);
                             printf("\n");
+                            size_t lo = off > 2048 ? off - 2048 : 0;
+                            size_t hi = off + r1.size() + 2048 < got ? off + r1.size() + 2048 : got;
+                            char name[256];
+                            sprintf(name, "%s\\keyctx_%p_%zx.bin", dumpdir.c_str(), mbi.BaseAddress, off);
+                            FILE* f = fopen(name, "wb");
+                            if (f && ndump < 12) { fwrite(buf.data() + lo, 1, hi - lo, f); fclose(f); printf("    keyctx -> %s (%zu bytes)\n", name, hi - lo); ndump++; }
                             i = off + r1.size();
                         }
                     }

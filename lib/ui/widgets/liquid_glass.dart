@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/flutify_tokens.dart';
+import '../shell/desktop/desktop_window.dart';
 
 /// iOS 风格的克制型玻璃容器。
 ///
@@ -48,20 +49,33 @@ class LiquidGlass extends StatelessWidget {
     final tokens = context.tokens;
     final radius = borderRadius ?? tokens.radius(28);
     final sigma = blur ?? tokens.glassSigma;
+    final body = CustomPaint(
+      foregroundPainter: _HairlinePainter(radius),
+      child: ColoredBox(
+        color: Colors.white.withValues(alpha: tint ?? tokens.glassTint),
+        child: Padding(padding: padding, child: child),
+      ),
+    );
     return ClipRRect(
       borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.compose(
-          outer: _saturate,
-          inner: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.mirror),
-        ),
-        child: CustomPaint(
-          foregroundPainter: _HairlinePainter(radius),
-          child: ColoredBox(
-            color: Colors.white.withValues(alpha: tint ?? tokens.glassTint),
-            child: Padding(padding: padding, child: child),
-          ),
-        ),
+      // 系统全屏切换期间引擎合成器对 BackdropFilter 会访问冲突（详见 DesktopWindow.fullscreenTransition），
+      // 这约 300ms 内退化为无模糊玻璃，肉眼几乎不可辨
+      child: ValueListenableBuilder<bool>(
+        valueListenable: DesktopWindow.fullscreenTransition,
+        builder: (context, transitioning, _) {
+          if (transitioning) return body;
+          return BackdropFilter(
+            filter: ImageFilter.compose(
+              outer: _saturate,
+              inner: ImageFilter.blur(
+                sigmaX: sigma,
+                sigmaY: sigma,
+                tileMode: TileMode.mirror,
+              ),
+            ),
+            child: body,
+          );
+        },
       ),
     );
   }
@@ -82,11 +96,15 @@ class _HairlinePainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Colors.white.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0.04)],
+        colors: [
+          Colors.white.withValues(alpha: 0.14),
+          Colors.white.withValues(alpha: 0.04),
+        ],
       ).createShader(rect);
     canvas.drawRRect(borderRadius.toRRect(rect).deflate(0.3), paint);
   }
 
   @override
-  bool shouldRepaint(_HairlinePainter oldDelegate) => oldDelegate.borderRadius != borderRadius;
+  bool shouldRepaint(_HairlinePainter oldDelegate) =>
+      oldDelegate.borderRadius != borderRadius;
 }
