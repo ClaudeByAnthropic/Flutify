@@ -1,7 +1,7 @@
 """Flutify 品牌标生成器：一套几何参数 → SVG 母版 + 各平台图标。
 
-设计：连续曲率圆角方块（superellipse，n=5，接近 iOS 图标轮廓）+ 品牌绿对角渐变；
-白色字形为「F」——竖笔 + 一长一短两道横笔（像递减的音量电平），第三行收成圆点（音符 / 播放头）。
+设计：连续曲率圆角方块（superellipse，n=5，接近 iOS 图标轮廓）+ 薄荷 → 品牌绿 → 深青绿三段对角渐变
+（叠左上径向光泽）；白色字形为三条全圆角均衡器声波（中条最高，左右起伏）。
 App 内的 `FlutifyMark`（lib/ui/screens/auth/widgets/flutify_mark.dart）按同一组比例绘制，改这里要同步改那里。
 
 用法（在 app 目录）：python tool/brand/generate_logo.py
@@ -22,24 +22,22 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 # ---------------------------------------------------------------------------
 # 几何（以边长 1 为单位）
 # ---------------------------------------------------------------------------
-GREEN_LIGHT = (0x3B, 0xE4, 0x77)  # 左上
-GREEN_DEEP = (0x12, 0x9A, 0x48)  # 右下：比品牌绿更深，白字对比更足
+# 三段对角渐变：薄荷（左上）→ 品牌绿（中段）→ 深青绿（右下），
+# 再叠一层左上径向光泽，图标在任务栏小尺寸下也有立体感
+GREEN_MINT = (0x63, 0xEA, 0x8E)  # 左上
+GREEN_BRAND = (0x1E, 0xD7, 0x60)  # 中段：品牌绿
+GREEN_DEEP = (0x0B, 0x7A, 0x3E)  # 右下：偏青的深绿，白字对比更足
+SHEEN_ALPHA = 0.16  # 左上径向光泽强度
 SUPERELLIPSE_N = 5.0
 
-T = 0.118  # 笔画粗细
-X0 = 0.300  # 竖笔左缘
-Y0 = 0.250  # 顶部
-Y1 = 0.750  # 底部
-TOP_BAR_RIGHT = 0.720
-MID_BAR_RIGHT = 0.600
-DOT_GAP = 0.062  # 圆点与竖笔的间距
+T = 0.105  # 声波条粗细（全圆角，半径 T/2）
+BAR_XS = (0.32, 0.50, 0.68)  # 三条声波的圆心 x
+BAR_TOPS = (0.355, 0.240, 0.320)  # 各条顶缘（中条最高，节奏感）
+BAR_BOTS = (0.645, 0.760, 0.680)  # 各条底缘
 
 # 字形元素：(类型, 参数)，矩形均为全圆角（半径 T/2）
 GLYPH = [
-    ('rect', (X0, Y0, X0 + T, Y1)),  # 竖笔
-    ('rect', (X0, Y0, TOP_BAR_RIGHT, Y0 + T)),  # 上横（长）
-    ('rect', (X0, 0.5 - T / 2, MID_BAR_RIGHT, 0.5 + T / 2)),  # 中横（短）
-    ('circle', (X0 + T + DOT_GAP + T / 2, Y1 - T / 2, T / 2)),  # 圆点
+    ('rect', (x - T / 2, t, x + T / 2, b)) for x, t, b in zip(BAR_XS, BAR_TOPS, BAR_BOTS)
 ]
 
 
@@ -84,11 +82,17 @@ def write_svgs():
   <!-- Flutify 品牌标（由 tool/brand/generate_logo.py 生成，勿手改） -->
   <defs>
     <linearGradient id="plate" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="{hex_(GREEN_LIGHT)}"/>
+      <stop offset="0" stop-color="{hex_(GREEN_MINT)}"/>
+      <stop offset="0.52" stop-color="{hex_(GREEN_BRAND)}"/>
       <stop offset="1" stop-color="{hex_(GREEN_DEEP)}"/>
     </linearGradient>
+    <radialGradient id="sheen" cx="0.18" cy="0.10" r="0.9">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="{SHEEN_ALPHA}"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
   </defs>
   <path d="{path}" fill="url(#plate)"/>
+  <path d="{path}" fill="url(#sheen)"/>
   {glyph_svg(s)}
 </svg>
 '''
@@ -111,8 +115,9 @@ def write_svgs():
 SS = 4
 
 
-def draw_glyph(draw, size, scale=1.0, offset=(0.0, 0.0), fill=(255, 255, 255, 255)):
-    """在 size 画布上绘制字形；scale / offset 用于自适应图标把字形缩进安全区。"""
+def draw_glyph(img, size, scale=1.0, offset=(0.0, 0.0), fill=(255, 255, 255, 255)):
+    """在 size 画布上绘制声波字形；scale / offset 用于自适应图标把字形缩进安全区。"""
+    draw = ImageDraw.Draw(img)
     ox, oy = offset
     r = T / 2 * size * scale
     tf = lambda v, o: (v * scale) * size + o
@@ -127,14 +132,22 @@ def draw_glyph(draw, size, scale=1.0, offset=(0.0, 0.0), fill=(255, 255, 255, 25
 
 
 def gradient(size):
-    """左上 → 右下的对角渐变。"""
+    """左上 → 右下的三段对角渐变 + 左上径向光泽。"""
     small = 256
     img = Image.new('RGB', (small, small))
     px = img.load()
     for y in range(small):
         for x in range(small):
             t = (x + y) / (2 * (small - 1))
-            px[x, y] = tuple(round(a + (b - a) * t) for a, b in zip(GREEN_LIGHT, GREEN_DEEP))
+            if t < 0.52:  # 薄荷 → 品牌绿
+                a, b, u = GREEN_MINT, GREEN_BRAND, t / 0.52
+            else:  # 品牌绿 → 深青绿
+                a, b, u = GREEN_BRAND, GREEN_DEEP, (t - 0.52) / 0.48
+            base = [aa + (bb - aa) * u for aa, bb in zip(a, b)]
+            # 径向光泽：左上方一团柔光，按距离平方衰减
+            d = math.hypot(x / small - 0.18, y / small - 0.10) / 0.9
+            sheen = SHEEN_ALPHA * max(0.0, 1 - d) ** 2 * 255
+            px[x, y] = tuple(round(c + (255 - c) * sheen / 255) for c in base)
     return img.resize((size, size), Image.BICUBIC)
 
 
@@ -147,7 +160,7 @@ def render_logo(px, inset=0.0):
     img.paste(gradient(s), (0, 0), mask)
     # 字形随底板一起缩进
     inner = 1 - 2 * inset
-    draw_glyph(ImageDraw.Draw(img), s, scale=inner, offset=(s * inset, s * inset))
+    draw_glyph(img, s, scale=inner, offset=(s * inset, s * inset))
     return img.resize((px, px), Image.LANCZOS)
 
 
@@ -157,7 +170,7 @@ def render_foreground(px):
     img = Image.new('RGBA', (s, s), (0, 0, 0, 0))
     scale = 72 / 108
     off = s * (1 - scale) / 2
-    draw_glyph(ImageDraw.Draw(img), s, scale=scale, offset=(off, off))
+    draw_glyph(img, s, scale=scale, offset=(off, off))
     return img.resize((px, px), Image.LANCZOS)
 
 
@@ -200,7 +213,8 @@ def write_rasters():
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <gradient
         android:angle="315"
-        android:startColor="{hex_(GREEN_LIGHT)}"
+        android:startColor="{hex_(GREEN_MINT)}"
+        android:centerColor="{hex_(GREEN_BRAND)}"
         android:endColor="{hex_(GREEN_DEEP)}"/>
 </shape>
 ''')

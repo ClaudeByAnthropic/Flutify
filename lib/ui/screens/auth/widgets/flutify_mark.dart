@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/md3e_colors.dart';
 
-/// Flutify 品牌标：连续曲率圆角方块（superellipse）+ 品牌绿对角渐变 + 白色「F」字形
-/// （竖笔 + 一长一短两道横笔，第三行收成圆点）。
+/// Flutify 品牌标：连续曲率圆角方块（superellipse）+ 薄荷 → 品牌绿 → 深青绿三段对角渐变
+/// （叠左上径向光泽）+ 白色均衡器声波字形（三条全圆角竖波，中条最高）。
 ///
 /// 与应用图标同一套比例：母版见 `tool/brand/generate_logo.py`（生成 `assets/brand/flutify_logo.svg`
 /// 及各平台图标），改几何时两处一起改。纯矢量绘制，任意尺寸清晰；[glow] 为登录页添加柔和的品牌色光晕。
@@ -40,16 +40,14 @@ class FlutifyMark extends StatelessWidget {
 
 class _MarkPainter extends CustomPainter {
   // 与 generate_logo.py 保持一致的几何（边长为 1）
-  static const _greenLight = Color(0xFF3BE477);
-  static const _greenDeep = Color(0xFF129A48);
+  static const _greenMint = Color(0xFF63EA8E);
+  static const _greenBrand = Color(0xFF1ED760);
+  static const _greenDeep = Color(0xFF0B7A3E);
   static const _n = 5.0;
-  static const _t = 0.118;
-  static const _x0 = 0.300;
-  static const _y0 = 0.250;
-  static const _y1 = 0.750;
-  static const _topRight = 0.720;
-  static const _midRight = 0.600;
-  static const _dotGap = 0.062;
+  static const _t = 0.105;
+  static const _barXs = [0.32, 0.50, 0.68];
+  static const _barTops = [0.355, 0.240, 0.320];
+  static const _barBots = [0.645, 0.760, 0.680];
 
   /// superellipse |x|^n + |y|^n = 1 的轮廓（n = 5，接近 iOS 图标的连续曲率圆角）。
   static Path _plate(double s) {
@@ -78,11 +76,21 @@ class _MarkPainter extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [_greenLight, _greenDeep],
+          colors: [_greenMint, _greenBrand, _greenDeep],
+          stops: [0.0, 0.52, 1.0],
         ).createShader(rect),
     );
 
-    // 顶部高光：极淡的白色描边，增加玻璃质感
+    // 左上径向光泽 + 顶部高光描边，增加立体感
+    canvas.drawPath(
+      plate,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.64, -0.8),
+          radius: 0.9,
+          colors: [Colors.white.withAlpha(41), Colors.white.withAlpha(0)],
+        ).createShader(rect),
+    );
     canvas.drawPath(
       plate,
       Paint()
@@ -95,14 +103,21 @@ class _MarkPainter extends CustomPainter {
         ).createShader(rect),
     );
 
-    // 字形：全圆角笔画 + 圆点
+    // 字形：三条全圆角均衡器声波（中条最高，左右起伏）
     final ink = Paint()..color = Colors.white;
     final r = Radius.circular(_t / 2 * s);
-    RRect bar(double l, double t, double rt, double b) => RRect.fromLTRBR(l * s, t * s, rt * s, b * s, r);
-    canvas.drawRRect(bar(_x0, _y0, _x0 + _t, _y1), ink); // 竖笔
-    canvas.drawRRect(bar(_x0, _y0, _topRight, _y0 + _t), ink); // 上横（长）
-    canvas.drawRRect(bar(_x0, 0.5 - _t / 2, _midRight, 0.5 + _t / 2), ink); // 中横（短）
-    canvas.drawCircle(Offset((_x0 + _t + _dotGap + _t / 2) * s, (_y1 - _t / 2) * s), _t / 2 * s, ink); // 圆点
+    for (var i = 0; i < 3; i++) {
+      canvas.drawRRect(
+        RRect.fromLTRBR(
+          (_barXs[i] - _t / 2) * s,
+          _barTops[i] * s,
+          (_barXs[i] + _t / 2) * s,
+          _barBots[i] * s,
+          r,
+        ),
+        ink,
+      );
+    }
   }
 
   @override

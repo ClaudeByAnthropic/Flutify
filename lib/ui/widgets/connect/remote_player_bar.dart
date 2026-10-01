@@ -7,6 +7,7 @@ import '../../../providers/connect_provider.dart';
 import '../../screens/player/device_picker_sheet.dart';
 import '../../screens/player/lyrics_sheet.dart';
 import '../../shell/shell_layout_controller.dart';
+import '../desktop_player_bar.dart';
 import '../playback_status_button.dart';
 import '../player_bar_cover.dart';
 import 'connect_device_icon.dart';
@@ -15,54 +16,58 @@ import 'remote_transport_controls.dart';
 
 /// 桌面端播放栏的远程模式：内容与按钮作用于正在使用的远程设备。
 ///
-/// 布局与本机播放栏一致（左曲目 / 中控制 + 进度 / 右设备与音量），
-/// 下方多一条强调色细条「正在 {设备} 上播放」，与官方桌面端相同；点细条或设备键打开设备面板。
+/// 与本机播放栏相同的悬浮液态玻璃胶囊（左曲目 / 中控制 + 进度 / 右设备与音量），
+/// 胶囊右下方多一颗强调色药丸「正在 {设备} 上播放」；点药丸或设备键打开设备面板。
 class RemotePlayerBar extends StatelessWidget {
   const RemotePlayerBar({super.key});
 
-  /// 主体高度与本机播放栏相同；细条另计。
-  static const double barHeight = 90;
+  /// 药丸高度与其和胶囊的间距；总占位另计（见 [reservedHeight]）。
   static const double stripHeight = 26;
+  static const double stripGap = 6;
+  static const double reservedHeight =
+      DesktopPlayerBar.reservedHeight + stripGap + stripHeight;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return ColoredBox(
-      color: colorScheme.surfaceContainerLowest,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: barHeight,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final sideWidth = (constraints.maxWidth * 0.28).clamp(160.0, 300.0);
-                  return Row(
-                    children: [
-                      SizedBox(width: sideWidth, child: const _RemoteTrackInfo()),
-                      Expanded(
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 620),
-                            child: const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [RemoteTransportControls(), RemoteScrubber()],
-                            ),
-                          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PlayerBarGlassCapsule(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final sideWidth = (constraints.maxWidth * 0.28).clamp(
+                160.0,
+                300.0,
+              );
+              return Row(
+                children: [
+                  SizedBox(width: sideWidth, child: const _RemoteTrackInfo()),
+                  Expanded(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 620),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            RemoteTransportControls(),
+                            RemoteScrubber(),
+                          ],
                         ),
                       ),
-                      SizedBox(width: sideWidth, child: const _RemoteRightControls()),
-                    ],
-                  );
-                },
-              ),
-            ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: sideWidth,
+                    child: const _RemoteRightControls(),
+                  ),
+                ],
+              );
+            },
           ),
-          const RemotePlayingStrip(height: stripHeight),
-        ],
-      ),
+        ),
+        const SizedBox(height: stripGap),
+        const RemotePlayingStrip(height: stripHeight),
+      ],
     );
   }
 }
@@ -86,7 +91,9 @@ class _RemoteTrackInfo extends StatelessWidget {
         PlayerBarCover(
           url: track?.coverUrl ?? player.imageUrl,
           layout: layout,
-          onOpenFallback: layout == null ? () => LyricsSheet.show(context) : null,
+          onOpenFallback: layout == null
+              ? () => LyricsSheet.show(context)
+              : null,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -98,14 +105,18 @@ class _RemoteTrackInfo extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -140,13 +151,21 @@ class _RemoteRightControls extends StatelessWidget {
       builder: (context, constraints) {
         final showPanels = constraints.maxWidth >= 2 * _buttonSize;
         final used = (showPanels ? 2 : 1) * _buttonSize;
-        final showSlider = device != null && device.supportsVolume && constraints.maxWidth >= used + _sliderWidth + 8;
+        final showSlider =
+            device != null &&
+            device.supportsVolume &&
+            constraints.maxWidth >= used + _sliderWidth + 8;
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             if (showPanels) PlaybackStatusButton(layout: layout, style: _style),
             IconButton(
-              icon: Icon(device == null ? Icons.devices_rounded : connectDeviceIcon(device.type), size: 20),
+              icon: Icon(
+                device == null
+                    ? Icons.devices_rounded
+                    : connectDeviceIcon(device.type),
+                size: 20,
+              ),
               color: tokens.accent,
               tooltip: context.l10n.deviceConnectTitle,
               style: _style,
@@ -158,10 +177,17 @@ class _RemoteRightControls extends StatelessWidget {
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 3.0,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 4,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 8,
+                    ),
                   ),
-                  child: Slider(value: connect.volume, onChanged: connect.setVolume),
+                  child: Slider(
+                    value: connect.volume,
+                    onChanged: connect.setVolume,
+                  ),
                 ),
               ),
           ],
@@ -171,7 +197,7 @@ class _RemoteRightControls extends StatelessWidget {
   }
 }
 
-/// 「正在 {设备} 上播放」强调色细条；点按打开设备面板。
+/// 「正在 {设备} 上播放」强调色药丸，悬浮在玻璃胶囊右下方；点按打开设备面板。
 class RemotePlayingStrip extends StatelessWidget {
   final double height;
 
@@ -185,31 +211,42 @@ class RemotePlayingStrip extends StatelessWidget {
       return d == null ? null : (d.name, connectDeviceIcon(d.type));
     });
     if (device == null) return const SizedBox.shrink();
-    final style = Theme.of(
-      context,
-    ).textTheme.labelMedium?.copyWith(color: tokens.onAccent, fontWeight: FontWeight.w700);
-    return Material(
-      color: tokens.accent,
-      child: InkWell(
-        onTap: () => DevicePickerSheet.show(context),
-        child: SizedBox(
-          height: height,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Icon(device.$2, size: 14, color: tokens.onAccent),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    context.l10n.connectPlayingOn(device.$1),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: style,
-                  ),
+    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
+      color: tokens.onAccent,
+      fontWeight: FontWeight.w700,
+    );
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        // 与胶囊右边距对齐，再内收一点落在胶囊投影范围内
+        padding: const EdgeInsets.only(right: DesktopPlayerBar.marginSide + 8),
+        child: Material(
+          color: tokens.accent,
+          borderRadius: BorderRadius.circular(999),
+          elevation: 0,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () => DevicePickerSheet.show(context),
+            child: SizedBox(
+              height: height,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(device.$2, size: 14, color: tokens.onAccent),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        context.l10n.connectPlayingOn(device.$1),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: style,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

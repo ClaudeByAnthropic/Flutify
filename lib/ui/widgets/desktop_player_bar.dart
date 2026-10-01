@@ -7,47 +7,52 @@ import '../../providers/connect_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../navigation/app_routes.dart';
 import '../screens/player/device_picker_sheet.dart';
+import '../../core/theme/flutify_tokens.dart';
 import '../screens/player/full_player_sheet.dart';
 import '../screens/player/immersive_lyrics_screen.dart';
 import '../screens/player/queue_sheet.dart';
 import '../shell/shell_layout_controller.dart';
 import 'connect/connect_actions.dart';
 import 'connect/remote_player_bar.dart';
+import 'liquid_glass.dart';
 import 'playback_scrubber.dart';
 import 'playback_status_button.dart';
 import 'player_bar_cover.dart';
 import 'sleep_timer/sleep_timer_indicator.dart';
 import 'player_controls.dart';
 
-/// 桌面端底部通栏播放器（Spotify PC 风格）。
+/// 桌面端底部悬浮播放器：iOS 液态玻璃风格的悬浮胶囊。
+///
+/// 配合 `Scaffold(extendBody: true)` 使用：三栏内容铺到窗口底部，
+/// 胶囊透过模糊看到身后的内容；占位总高（[reservedHeight]）经
+/// MediaQuery 底部 padding 传给页面（见 ContentBottomSpacer）。
 ///
 /// 本组件只在切歌时重建；控制按钮、进度条、音量各自局部订阅。
 class DesktopPlayerBar extends StatelessWidget {
   const DesktopPlayerBar({super.key});
+
+  /// 玻璃胶囊高度与四周留白；总占位 = 胶囊 + 上间隙 + 下边距。
+  static const double capsuleHeight = 90;
+  static const double marginTop = 6;
+  static const double marginBottom = 12;
+  static const double marginSide = 16;
+  static const double reservedHeight = capsuleHeight + marginTop + marginBottom;
 
   @override
   Widget build(BuildContext context) {
     // 正在遥控其他设备时整条换成远程播放栏
     if (ConnectActions.showRemote(context)) return const RemotePlayerBar();
     final colorScheme = Theme.of(context).colorScheme;
-    final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
-    // 与窗口底色相同、无分隔线：播放栏与三栏面板靠色阶区分（Spotify 新版桌面端）
-    final decoration = BoxDecoration(color: colorScheme.surfaceContainerLowest);
+    final track = context.select<PlaybackProvider, SpotifyTrack?>(
+      (p) => p.currentTrack,
+    );
 
-    // 无曲目时保留 90dp 通栏高度并显示占位，避免内容区高度跳变
+    // 无曲目时保留同样的悬浮胶囊并显示占位，避免内容区高度跳变
     if (track == null) {
-      return Container(
-        height: 90,
-        decoration: decoration,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: const _IdleBar(),
-      );
+      return const PlayerBarGlassCapsule(child: _IdleBar());
     }
 
-    return Container(
-      height: 90,
-      decoration: decoration,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+    return PlayerBarGlassCapsule(
       child: LayoutBuilder(
         builder: (context, constraints) {
           final totalWidth = constraints.maxWidth;
@@ -69,9 +74,18 @@ class DesktopPlayerBar extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            ShuffleButton(size: 18, inactiveColor: colorScheme.onSurfaceVariant, constraints: _small),
+                            ShuffleButton(
+                              size: 18,
+                              inactiveColor: colorScheme.onSurfaceVariant,
+                              constraints: _small,
+                            ),
                             const SizedBox(width: 8),
-                            SkipButton(next: false, size: 22, color: colorScheme.onSurface, constraints: _small),
+                            SkipButton(
+                              next: false,
+                              size: 22,
+                              color: colorScheme.onSurface,
+                              constraints: _small,
+                            ),
                             const SizedBox(width: 10),
                             // 深色：白底黑图标；浅色：黑底白图标
                             PlayPauseButton(
@@ -81,9 +95,18 @@ class DesktopPlayerBar extends StatelessWidget {
                               foreground: colorScheme.surface,
                             ),
                             const SizedBox(width: 10),
-                            SkipButton(next: true, size: 22, color: colorScheme.onSurface, constraints: _small),
+                            SkipButton(
+                              next: true,
+                              size: 22,
+                              color: colorScheme.onSurface,
+                              constraints: _small,
+                            ),
                             const SizedBox(width: 8),
-                            RepeatButton(size: 18, inactiveColor: colorScheme.onSurfaceVariant, constraints: _small),
+                            RepeatButton(
+                              size: 18,
+                              inactiveColor: colorScheme.onSurfaceVariant,
+                              constraints: _small,
+                            ),
                           ],
                         ),
                         const PlaybackScrubber(compact: true),
@@ -100,7 +123,59 @@ class DesktopPlayerBar extends StatelessWidget {
     );
   }
 
-  static const BoxConstraints _small = BoxConstraints(minWidth: 32, minHeight: 32);
+  static const BoxConstraints _small = BoxConstraints(
+    minWidth: 32,
+    minHeight: 32,
+  );
+}
+
+/// 桌面播放栏的悬浮液态玻璃胶囊（本机 / 远程两种播放栏共用）。
+///
+/// 三层观感：柔和投影（浮起）→ 背景模糊 + 提饱和（[LiquidGlass]）→
+/// 极淡的表面色填充（保证文字在繁杂内容上可读）。模糊与不透明度跟随设置页「液态玻璃」。
+class PlayerBarGlassCapsule extends StatelessWidget {
+  final Widget child;
+
+  const PlayerBarGlassCapsule({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = colorScheme.brightness == Brightness.dark;
+    final tokens = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DesktopPlayerBar.marginSide,
+        DesktopPlayerBar.marginTop,
+        DesktopPlayerBar.marginSide,
+        DesktopPlayerBar.marginBottom,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: tokens.radius(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isDark ? 70 : 36),
+              blurRadius: 28,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: LiquidGlass(
+          borderRadius: tokens.radius(28),
+          child: Container(
+            height: DesktopPlayerBar.capsuleHeight,
+            // 玻璃之上再罩一层极淡的表面色：深色压暗、浅色提亮，保证控件可读
+            color: colorScheme.surfaceContainerLowest.withAlpha(
+              isDark ? 72 : 104,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 空闲状态：灰色封面占位 + 提示文字 + 禁用的播放键。
@@ -115,19 +190,32 @@ class _IdleBar extends StatelessWidget {
         Container(
           width: 56,
           height: 56,
-          decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(8)),
-          child: Icon(Icons.music_note_rounded, color: colorScheme.onSurfaceVariant.withAlpha(140)),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.music_note_rounded,
+            color: colorScheme.onSurfaceVariant.withAlpha(140),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             context.l10n.playerIdleHint,
-            style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        Icon(Icons.play_circle_fill_rounded, size: 40, color: colorScheme.onSurfaceVariant.withAlpha(80)),
+        Icon(
+          Icons.play_circle_fill_rounded,
+          size: 40,
+          color: colorScheme.onSurfaceVariant.withAlpha(80),
+        ),
         const Spacer(),
       ],
     );
@@ -159,13 +247,20 @@ class _NowPlayingInfo extends StatelessWidget {
             children: [
               _HoverLink(
                 text: track.name,
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700, color: colorScheme.onSurface),
-                onTap: track.album == null ? null : () => AppRoutes.openAlbum(context, track.album!),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
+                ),
+                onTap: track.album == null
+                    ? null
+                    : () => AppRoutes.openAlbum(context, track.album!),
               ),
               const SizedBox(height: 2),
               _HoverLink(
                 text: track.artistNames,
-                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
                 onTap: track.artists.isEmpty
                     ? null
                     : () {
@@ -176,7 +271,11 @@ class _NowPlayingInfo extends StatelessWidget {
             ],
           ),
         ),
-        LikeButton(track: track, size: 20, inactiveColor: colorScheme.onSurfaceVariant),
+        LikeButton(
+          track: track,
+          size: 20,
+          inactiveColor: colorScheme.onSurfaceVariant,
+        ),
       ],
     );
   }
@@ -200,14 +299,20 @@ class _HoverLinkState extends State<_HoverLink> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      cursor: widget.onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : MouseCursor.defer,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         onTap: widget.onTap,
         child: Text(
           widget.text,
-          style: widget.style?.copyWith(decoration: _hover && widget.onTap != null ? TextDecoration.underline : null),
+          style: widget.style?.copyWith(
+            decoration: _hover && widget.onTap != null
+                ? TextDecoration.underline
+                : null,
+          ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -237,20 +342,27 @@ class _RightControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     // 远程设备有会话（已暂停）时设备键高亮，提示可以转回去
-    final hasDevice = context.select<ConnectProvider?, bool>((c) => c?.hasRemoteSession ?? false);
+    final hasDevice = context.select<ConnectProvider?, bool>(
+      (c) => c?.hasRemoteSession ?? false,
+    );
     // 三栏框架下：「播放状态」开关右栏的「正在播放」面板（含歌词），队列键开关独立的「播放队列」面板；
     // 没有框架（单独使用播放栏）时回退为底部面板
     final layout = context.watch<ShellLayoutController?>();
 
     final buttons = <Widget>[
-      if (SleepTimerIndicator.isActive(context)) SleepTimerIndicator(style: _barIconStyle),
+      if (SleepTimerIndicator.isActive(context))
+        SleepTimerIndicator(style: _barIconStyle),
       PlaybackStatusButton(layout: layout, style: _barIconStyle),
       IconButton(
         icon: const Icon(Icons.queue_music_rounded, size: 20),
-        color: layout?.isShowing(RightPanel.queue) ?? false ? colorScheme.primary : colorScheme.onSurfaceVariant,
+        color: layout?.isShowing(RightPanel.queue) ?? false
+            ? colorScheme.primary
+            : colorScheme.onSurfaceVariant,
         tooltip: context.l10n.queueTitle,
         style: _barIconStyle,
-        onPressed: layout == null ? () => QueueSheet.show(context) : () => layout.togglePanel(RightPanel.queue),
+        onPressed: layout == null
+            ? () => QueueSheet.show(context)
+            : () => layout.togglePanel(RightPanel.queue),
       ),
       IconButton(
         icon: Icon(
@@ -276,12 +388,15 @@ class _RightControls extends StatelessWidget {
       builder: (context, constraints) {
         final base = buttons.length * (buttonSize + 4);
         final showVolume = constraints.maxWidth >= base + buttonSize;
-        final showSlider = constraints.maxWidth >= base + buttonSize + _sliderWidth + 8;
+        final showSlider =
+            constraints.maxWidth >= base + buttonSize + _sliderWidth + 8;
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            for (final b in buttons) Padding(padding: const EdgeInsets.only(left: 4), child: b),
-            if (showVolume) _VolumeControl(showSlider: showSlider, sliderWidth: _sliderWidth),
+            for (final b in buttons)
+              Padding(padding: const EdgeInsets.only(left: 4), child: b),
+            if (showVolume)
+              _VolumeControl(showSlider: showSlider, sliderWidth: _sliderWidth),
           ],
         );
       },
@@ -314,7 +429,9 @@ class _VolumeControl extends StatelessWidget {
         IconButton(
           icon: Icon(icon, size: 18),
           color: colorScheme.onSurfaceVariant,
-          tooltip: volume == 0 ? context.l10n.playerUnmute : context.l10n.playerMute,
+          tooltip: volume == 0
+              ? context.l10n.playerUnmute
+              : context.l10n.playerMute,
           style: _barIconStyle,
           onPressed: playback.toggleMute,
         ),

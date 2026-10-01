@@ -303,8 +303,8 @@ d:/Flutify/app/
 
 ## 🎨 品牌标识
 
-连续曲率圆角方块（superellipse，n = 5）+ 品牌绿对角渐变 + 白色「F」：竖笔加一长一短两道横笔（递减的音量电平），
-第三行收成圆点（音符 / 播放头）。`tool/brand/generate_logo.py` 是唯一母版，运行 `python tool/brand/generate_logo.py`
+连续曲率圆角方块（superellipse，n = 5）+ 薄荷 → 品牌绿 → 深青绿三段对角渐变（叠左上径向光泽）+
+白色均衡器声波：三条全圆角竖波，中条最高、左右起伏。`tool/brand/generate_logo.py` 是唯一母版，运行 `python tool/brand/generate_logo.py`
 （需要 Pillow）生成：
 
 * `assets/brand/flutify_logo.svg`（矢量母版）、`flutify_glyph.svg`（单色字形）、`flutify_logo_1024.png`
