@@ -22,7 +22,7 @@ class RemotePlayerBar extends StatelessWidget {
   const RemotePlayerBar({super.key});
 
   /// 细条露出高度（含在胶囊内）；总占位另计（见 [reservedHeight]）。
-  static const double stripHeight = 18;
+  static const double stripHeight = 21;
   static const double reservedHeight =
       DesktopPlayerBar.reservedHeight + stripHeight;
 
