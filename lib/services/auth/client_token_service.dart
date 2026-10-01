@@ -21,7 +21,7 @@ class ClientTokenService {
   ClientTokenService(this._client);
 
   /// 以 [profile] 的客户端身份申请 client-token。失败抛异常。
-  Future<GrantedClientToken> request(String deviceId, [SpotifyClientProfile profile = SpotifyClientProfile.android]) async {
+  Future<GrantedClientToken> request(String deviceId, [SpotifyClientProfile profile = SpotifyClientProfile.desktop]) async {
     final body = _buildClientDataRequest(deviceId, profile);
     var response = await _post(body, profile);
 
@@ -66,7 +66,7 @@ class ClientTokenService {
 
   /// ClientTokenRequest{ request_type=1(CLIENT_DATA), client_data=2 }
   Uint8List _buildClientDataRequest(String deviceId, SpotifyClientProfile profile) {
-    // ConnectivitySdkData{ platform_specific_data=1{ android=1 | desktop_windows=4 }, device_id=2 }
+    // ConnectivitySdkData{ platform_specific_data=1{ desktop_windows=4 }, device_id=2 }
     final connectivity = ProtoWriter()
       ..message(1, profile.platformData()) // platform_specific_data=1
       ..string(2, deviceId); // device_id=2

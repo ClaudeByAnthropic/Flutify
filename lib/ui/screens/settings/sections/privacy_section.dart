@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../providers/spotify_provider.dart';
 import '../widgets/settings_section.dart';
+import '../../../widgets/toast/app_toast.dart';
 
 /// 隐私：清除搜索记录、清除歌词缓存。
 ///
@@ -12,7 +13,7 @@ class PrivacySection extends StatelessWidget {
   const PrivacySection({super.key});
 
   void _done(BuildContext context) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(context.l10n.settingsCleared)));
+    AppToast.show(context, context.l10n.settingsCleared, icon: Icons.delete_sweep_rounded, tone: ToastTone.success);
   }
 
   @override

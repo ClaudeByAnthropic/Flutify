@@ -220,6 +220,8 @@
   "lyricsUnavailableMessage": "这首歌还没有歌词。\n尽情享受音乐吧！",
   "lyricsUnsynced": "这些歌词尚未与歌曲同步。",
   "lyricsImmersive": "沉浸式歌词",
+  "lyricsExpand": "放大歌词",
+  "lyricsCollapse": "收起歌词",
   "lyricsExitImmersive": "退出全屏歌词（Esc）",
   "lyricsFillScreen": "铺满整个屏幕（F11）",
   "lyricsFillWindow": "只铺满窗口（F11）",

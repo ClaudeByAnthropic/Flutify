@@ -35,7 +35,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - **Mini Player (悬浮胶囊)**：悬浮在毛玻璃底部导航之上，底色取封面主色，圆形封面 + 歌名 / 艺人 + 收藏与播放键，胶囊底边一条细进度线。
   - **Full Screen Player (全屏播放器)**：下拉手势抽屉、封面主色渐变（始终深色，状态栏浅色图标）、高灵敏度滑动进度条（Scrubber）、随机/单曲/列表循环三态切换。
     中间区域可在「封面 / 歌词 / 播放队列」间切换（底部按钮，再点一次回到封面）；**左右滑动封面切歌**，小幅拖动松手回弹；内嵌歌词右上角可进入全屏歌词。
-  - **播放失败提示**：未登录（带「登录」按钮）、曲目不可播放（说明已自动跳过）、网络错误（带「重试」按钮）均以 MD3E 悬浮提示卡告知（反色表面、大圆角、左侧错误类型图标、胶囊操作键；桌面端居中显示在播放栏之上），连续失败只保留最新一条。
+  - **播放失败提示**：未登录（带「登录」按钮）、曲目不可播放（说明已自动跳过）、网络错误（带「重试」按钮）均以统一的 MD3E 悬浮提示（`AppToast`，见下）告知，连续失败只保留最新一条。
     连续 3 首无法播放时自动暂停、不再跳过（设置 →「播放」可关闭），提示带「下一首」按钮。
   - **Spotify Connect 遥控**（桌面版会话，免费账号可用的部分）：本机以隐藏观察者身份接入账号的 Connect 网络
     （dealer 长连接 + connect-state，`services/connect/`），不会出现在别人的设备列表里。
@@ -45,7 +45,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
     - 别的设备在出声（或远程已暂停而本机没有曲目）时，桌面播放栏与手机迷你播放器切换为远程模式
       （`widgets/connect/`）：曲目、进度按服务端快照推算、播放暂停 / 切歌 / 拖动进度 / 随机 / 循环 / 音量都发给远程设备；
       桌面播放栏下方多一条强调色「正在 {设备} 上播放」。
-    - 远程模式下歌词照常可用：右栏「正在播放 / 歌词」、手机歌词面板（点远程迷你播放器打开）、沉浸式歌词都展示远程曲目，
+    - 远程模式下歌词照常可用：右栏「正在播放」与其中的歌词卡、手机歌词面板（点远程迷你播放器打开）、沉浸式歌词都展示远程曲目，
       歌词按远程进度滚动（`ConnectProvider.position`），点行跳转与玻璃控制台作用于远程设备（`widgets/connect/now_playing_source.dart`）。
     - 命令被拒（免费账号部分操作）时弹出提示；Jam（一起听）需要 Premium，未实现。
     - 快捷键（空格、Ctrl+← / → / ↑ / ↓ / S / R）、键盘媒体键与系统媒体卡片（任务栏 / 锁屏 / 通知栏）同样跟随远程模式：
@@ -110,7 +110,11 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   runner 编译带 `/utf-8`，避免中文注释在 GBK 代码页下报 C4819。
 * **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：顶栏与标题栏合一（空白处拖动 / 双击最大化，右侧为窗口按钮留位）+ 后退前进、主页、居中搜索、头像；
   左栏音乐库（筛选、库内搜索、排序，可拖宽，窄于 280px 或手动收起时变为 72px 图标栏；未登录显示登录引导）；
-  右栏「正在播放 / 播放队列 / 歌词」；底部播放栏（窗口变窄时依次隐藏音量条、音量键，不溢出）。
+  右栏没有标签切换，分为两个面板：播放栏「播放状态」键打开「正在播放」（大封面、歌名、内嵌歌词卡、关于艺人、接下来播放；
+  歌词卡右上角「放大」后撑满整个面板，偏好会记住，旁边是沉浸式歌词入口），队列键打开独立的「播放队列」面板；
+  底部播放栏（窗口变窄时依次隐藏音量条、音量键，不溢出）。
+* **统一提示**（`ui/widgets/toast/app_toast.dart`）：全 App 的底部提示都走 `AppToast`——反色悬浮胶囊、左侧按语气（信息 / 成功 / 注意 / 错误）
+  区分的 MD3E 表现力形状图标块（入场弹簧缩放）、最多两行文字、胶囊操作键；新提示替换旧提示，带按钮的到时也会自动收起；桌面端居中显示在播放栏之上。
 * **右栏形态**：≥ 1280px 停靠在内容右侧（开关状态持久化）；1100 – 1280px 为浮层，默认关闭，点空白处或 Esc 关闭，不遮挡内容。
 * **< 800px 移动端**（`ui/shell/mobile/`）：内容铺到底部之下，毛玻璃底部导航 + 悬浮胶囊迷你播放器；页面底部留白按实际遮挡高度计算（`ContentBottomSpacer`）。
   手机（屏幕最短边 < 600）锁定竖屏，平板不限制（`core/utils/orientation_policy.dart`）。
@@ -151,10 +155,10 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 | **数据模型层** | `lib/models/` | `SpotifyTrack`, `SpotifyAlbum`, `SpotifyArtist`, `SpotifyPlaylist`, `SpotifyLyrics`, `SpotifyDevice` 均严格遵循 Spotify JSON 字段结构 |
 | **API 服务层** | `lib/services/spotify_api_service.dart` | 支持带 `Bearer Token` 的网络请求，支持配置自定义代理或逆向服务。**不含任何示例 / Mock 数据**：未登录时搜索、媒体库等返回空结果，实体详情（歌单 / 专辑 / 艺人）失败时抛 `SpotifyDataException`，由界面展示错误与重试 |
 | **完整曲目播放** | `lib/services/protocol/` + `audio_player_service.dart` | 纯逆向协议链路：extended-metadata（TRACK_V4）→ storage-resolve → AP 音频密钥（DH + Shannon 握手，`0xab` 令牌登录、`0x0c` 取密钥）→ CDN 下载 + AES-128-CTR 解密（边下边播，见「性能架构」）→ 去掉 Spotify 头部后交给 just_audio，下载完成后写入本地缓存。仅支持 OGG Vorbis / MP3；FLAC / AAC 属 Widevine DRM，会抛 `TrackPlaybackException`。`PlaybackProvider.playbackError` / `playbackErrors` 暴露错误，「不可播放」类自动跳下一首（有上限）；AP 连接会记住上次可用的接入点并重试多个候选 |
-| **媒体库** | `lib/services/library/` | `LibrarySource` 抽象：桌面会话走 spclient `collection/v2/paging`（protobuf，已点赞歌曲 / 专辑 / 艺人）+ `playlist/v2/user/{u}/rootlist`（歌单）+ Pathfinder 补全曲目与实体；其他登录方式走 Web API。点赞 / 收藏 / 关注乐观更新并尽力同步到账号（失败记入 `syncError`）；自建歌单仅保存在本机。未登录时媒体库为空 |
+| **媒体库** | `lib/services/library/` | `LibrarySource` 抽象：桌面会话走 spclient `collection/v2/paging`（protobuf，已点赞歌曲 / 专辑 / 艺人）+ `playlist/v2/user/{u}/rootlist`（歌单）+ Pathfinder 补全曲目与实体；无桌面会话时走 Web API。点赞 / 收藏 / 关注乐观更新并尽力同步到账号（失败记入 `syncError`）；自建歌单仅保存在本机。未登录时媒体库为空 |
 | **歌词** | `lib/services/lyrics_service.dart` | spclient `GET /color-lyrics/v2/track/{id}`，请求头沿用会话身份（桌面会话即桌面端头）；404 = 无歌词（可缓存），其他错误不缓存 |
-| **协议登录** | `lib/services/auth/` | **桌面版 OAuth（默认）**：与官方桌面版相同的 client_id，系统浏览器打开 accounts.spotify.com 登录，本机回环 `127.0.0.1:8898/login` 接收授权码，PKCE 换令牌、refresh_token 续期，并以 Windows 桌面身份申请 `client-token`；**Login5**：密码（自动 Hashcash + 短信验证码，可重新发送）、手机号短信、登录链接 / 一次性令牌、导入 StoredCredential；**开发者应用 OAuth**：自己的 Client ID。会话的 client_id、client-token 平台数据、User-Agent 与 `app-platform` 请求头始终来自同一种客户端身份（`client_profile.dart`）；登出调用 `/api/logout/v1` |
-| **桌面端数据层** | `lib/services/pathfinder/` | 桌面版 OAuth 会话下，公开 Web API（api.spotify.com）会因共享 client_id 频繁 429，因此改走官方桌面端自己的内部接口：Pathfinder GraphQL（`api-partner.spotify.com/pathfinder/v2/query`，持久化查询 hash 取自本机 `xpui.spa` 1.3.1.234）负责主页、分类、搜索、专辑、艺人、唱片目录与曲目补全；spclient `playlist/v2` 负责歌单（封面依次取 `pictureSize`、上传封面 `picture`、前几首曲目专辑封面拼的 `mosaic.scdn.co` 四宫格，见 `services/library/playlist_cover.dart`）、`user-profile-view/v3/profile/{用户名}` 负责昵称头像。桌面版令牌不含用户名，登录后用令牌登录一次 AP 取 canonical username（歌单根列表、收藏分页都按用户名寻址；注意 `profile/me` 是用户名为 "me" 的另一个账号，不能用）；旧版本缺用户名的会话启动时自动补齐并重新加载媒体库。其余登录方式仍走 Web API |
+| **协议登录** | `lib/services/auth/` | 只有**桌面版 OAuth**：与官方桌面版相同的 client_id，系统浏览器打开 accounts.spotify.com 登录，本机回环 `127.0.0.1:8898/login` 接收授权码，PKCE 换令牌、refresh_token 续期（被吊销时标记「登录已过期」），并以 Windows 桌面身份申请 `client-token`；旧版本其他登录方式留下的会话启动时清除。会话的 client_id、client-token 平台数据、User-Agent 与 `app-platform` 请求头始终来自同一种客户端身份（`client_profile.dart`）；登出调用 `/api/logout/v1` |
+| **桌面端数据层** | `lib/services/pathfinder/` | 桌面版 OAuth 会话下，公开 Web API（api.spotify.com）会因共享 client_id 频繁 429，因此改走官方桌面端自己的内部接口：Pathfinder GraphQL（`api-partner.spotify.com/pathfinder/v2/query`，持久化查询 hash 取自本机 `xpui.spa` 1.3.1.234）负责主页、分类、搜索、专辑、艺人、唱片目录与曲目补全；spclient `playlist/v2` 负责歌单（封面依次取 `pictureSize`、上传封面 `picture`、前几首曲目专辑封面拼的 `mosaic.scdn.co` 四宫格，见 `services/library/playlist_cover.dart`）、`user-profile-view/v3/profile/{用户名}` 负责昵称头像。桌面版令牌不含用户名，登录后用令牌登录一次 AP 取 canonical username（歌单根列表、收藏分页都按用户名寻址；注意 `profile/me` 是用户名为 "me" 的另一个账号，不能用）；旧版本缺用户名的会话启动时自动补齐并重新加载媒体库 |
 | **探测脚本** | `tool/` | 纯 Dart 命令行探针（不属于 App）：`protocol_probe.dart`（播放链路端到端）、`live_probe.dart`（用本机已保存会话实测播放 / 媒体库 / 歌词）、`pathfinder_probe.dart`（Pathfinder 入参探测）、`ap_ports_probe.dart`（AP 网络可达性）。输出只写入 `tool/probe_out/`（已 gitignore，含账号数据，不得进入测试或文档） |
 
 ---
@@ -191,18 +195,16 @@ d:/Flutify/app/
 │   │   └── user_profile.dart, playback_state.dart
 │   ├── services/
 │   │   ├── auth/                         # Spotify 协议登录（对应 SpotifyApi/api-docs/01-认证与账号）
-│   │   │   ├── spotify_auth_service.dart # 登录总控：全部登录方式、令牌持久化与并发合并续期、登出
-│   │   │   ├── login5_service.dart       # Login5 v3：密码/手机号/一次性令牌/StoredCredential，挑战轮次
+│   │   │   ├── spotify_auth_service.dart # 登录总控：浏览器授权、令牌持久化与并发合并续期、资料、登出
 │   │   │   ├── oauth_pkce_service.dart   # OAuth 授权码 + PKCE（accounts.spotify.com）
-│   │   │   ├── oauth_client_config.dart  # OAuth 客户端配置：桌面版（/login）/ 开发者应用（/callback）
+│   │   │   ├── oauth_client_config.dart  # OAuth 客户端配置：桌面版 client_id、/login 回调与权限
 │   │   │   ├── oauth_loopback_server.dart# 127.0.0.1:8898 回环接收授权回调
-│   │   │   ├── client_profile.dart       # 客户端身份（Android / Windows 桌面）：UA、平台头、client-token 平台数据
-│   │   │   ├── account_profile_service.dart # identity/v3 与 /v1/me 昵称头像
-│   │   │   ├── credential_parsers.dart   # credentials.json / Base64 / 登录链接解析
+│   │   │   ├── client_profile.dart       # 客户端身份（Windows 桌面）：UA、平台头、client-token 平台数据
+│   │   │   ├── account_profile_service.dart # profile-view/{用户名} 与 /v1/me 昵称头像
 │   │   │   ├── client_token_service.dart # clienttoken.spotify.com 设备令牌申请
-│   │   │   ├── hashcash.dart             # 工作量证明求解（后台 Isolate）
+│   │   │   ├── hashcash.dart             # client-token 挑战的工作量证明求解（后台 Isolate）
 │   │   │   ├── proto_codec.dart          # 无代码生成的极简 protobuf 编解码
-│   │   │   └── auth_constants.dart       # client_id / 版本 / 设备伪装 / 错误码
+│   │   │   └── auth_constants.dart       # 桌面版 client_id / 版本 / UA / 设备 ID
 │   │   ├── pathfinder/                   # 桌面端内部接口数据层（桌面版 OAuth 会话使用）
 │   │   │   ├── pathfinder_operations.dart# 持久化查询名 + sha256 hash（随桌面版升级需重新提取）
 │   │   │   ├── pathfinder_client.dart    # GraphQL v2 请求与错误处理
@@ -222,7 +224,7 @@ d:/Flutify/app/
 │   │   ├── spotify_api_service.dart      # 主页 / 搜索 / 实体详情（无 Mock；失败抛 SpotifyDataException）
 │   │   └── storage_service.dart          # SharedPreferences 本地凭证持久化
 │   ├── providers/
-│   │   ├── auth_provider.dart            # 登录态：表单 → 验证码 → 已登录，错误中文化
+│   │   ├── auth_provider.dart            # 登录态：未登录 → 等待浏览器授权 → 已登录，错误中文化
 │   │   ├── playback_provider.dart        # 播放状态、上下文、双层队列、随机/循环、音量
 │   │   ├── library_provider.dart         # 收藏歌曲、歌单、关注艺人、收藏专辑（持久化）
 │   │   ├── spotify_provider.dart         # 主页数据、防抖搜索、搜索历史、歌词缓存
@@ -233,7 +235,7 @@ d:/Flutify/app/
 │   │   ├── navigation/                   # Tab 内嵌 Navigator、统一跳转 AppRoutes、后退 / 前进历史 content_history
 │   │   ├── shell/
 │   │   │   ├── shell_breakpoints.dart    # 800 / 1100 / 1280 分档
-│   │   │   ├── shell_layout_controller.dart # 左栏宽度 / 收起、右栏停靠与浮层开关、当前标签
+│   │   │   ├── shell_layout_controller.dart # 左栏宽度 / 收起、右栏停靠与浮层开关、当前面板、歌词卡放大
 │   │   │   ├── panel_surface.dart        # 三栏共用的圆角面板
 │   │   │   ├── desktop/                  # 三栏总布局、顶栏、自绘标题栏与窗口按钮、音乐库左栏、右栏、拖宽手柄
 │   │   │   └── mobile/mobile_bottom_bar.dart # 毛玻璃底部导航 + 悬浮迷你播放器
@@ -247,15 +249,15 @@ d:/Flutify/app/
 │   │   │   ├── player/                   # 全屏播放器、全屏歌词、桌面沉浸式歌词、队列列表 queue_list 与设备列表
 │   │   │   │   ├── lyrics/               # 歌词滚动区、单行、液态背景、玻璃控制台、玻璃圆按钮
 │   │   │   │   └── widgets/swipeable_artwork.dart # 左右滑动切歌的封面
-│   │   │   ├── auth/                     # 登录页外壳 login_screen.dart + stages/（浏览器登录[默认]、密码、手机号、
-│   │   │   │                             #   链接、导入凭据、开发者应用授权、验证码）+ widgets/（品牌标、授权等待页等）
+│   │   │   ├── auth/                     # 登录页 login_screen.dart（介绍 ↔ 等待授权两态）+ widgets/（主视觉 login_hero、
+│   │   │   │                             #   介绍页、授权等待页、错误条、品牌标）
 │   │   │   └── settings/                 # 设置页：账号卡片 + sections/（外观、强调色、液态玻璃、文字与形状、动效、
 │   │   │                                 #   语言、歌词、播放、启动、Connect、网络、存储、隐私、关于）
 │   │   │                                 #   + widgets/（分组、分段控件、滑杆行、色板、自定义取色、玻璃预览）
 │   │   └── widgets/                      # MiniPlayer、TrackTile、CoverImage、PlaybackScrubber、
 │   │                                     # PlayerControls、TrackOptionsSheet、CreatePlaylistDialog 等；
 │   │                                     # track_menu（桌面右键菜单 / 移动端底部菜单）、hover_builder、
-│   │                                     # playback_error_listener（播放失败提示）、content_bottom_spacer；
+│   │                                     # playback_error_listener（播放失败提示）、toast/app_toast（统一提示）、content_bottom_spacer；
 │   │                                     # share/（分享面板、快捷操作卡片、嵌入代码区与预览、分享按钮）；
 │   │                                     # connect/（远程播放栏、远程迷你播放器、进度推算、音柱、设备图标、本机 ↔ 远程协调）
 │   └── main.dart
@@ -326,24 +328,23 @@ cd d:\Flutify\app
 ### 3. 登录 Spotify 账号
 设置（主页头像 / 桌面端侧栏底部）→ 顶部账号卡片 →「登录」。登录成功后 App 自动切到真实数据，之后令牌过期会静默续期。
 
-| 方式 | 入口 | 说明 |
-| :--- | :--- | :--- |
-| 在浏览器中登录 | 默认 | 桌面版 OAuth：打开官方登录页，完成后自动回到 App。人机验证、两步验证、Passkey、Google/Apple 等第三方登录均由官方页面处理；需要本机 8898 端口空闲 |
-| 账号密码 | 「账号密码」 | Login5：自动完成 client-token 与 Hashcash；需要时进入短信验证码页（60 秒后可重新发送） |
-| 手机号 | 更多方式 | 选择地区 → 获取短信验证码 |
-| 登录链接 | 更多方式 | 粘贴 Spotify 邮件中的登录链接或一次性令牌 |
-| 导入凭据 | 更多方式 | librespot `credentials.json`，或用户名 + Base64 凭据（+ 原设备 ID） |
-| 开发者应用授权 | 更多方式 | 在 developer.spotify.com 创建应用，登记 Redirect URI `http://127.0.0.1:8898/callback`，填入 Client ID；仅公开 Web API |
+唯一的登录方式是**在浏览器中登录**（桌面版 OAuth）：登录页只有一个按钮，打开官方登录页，完成后自动回到 App。
+人机验证、两步验证、Passkey、Google/Apple 等第三方登录均由官方页面处理；需要本机 8898 端口空闲。
+等待授权时可重新打开浏览器、复制登录链接或取消。旧版本用账号密码 / 短信 / 一次性令牌 / 导入凭据 / 开发者应用登录的会话，
+升级后视为未登录（残留凭据会被清除），需要重新在浏览器中登录一次。
 
-**降低风控的做法**（均已实现）：默认走与官方桌面版相同的浏览器授权，App 不接触密码、不做 Hashcash；
+登录页为 MD3E 表现力设计：主视觉是坐落在缓慢自转的十二瓣曲奇形与柔和爆裂形上的品牌标，三条安心说明放在大圆角卡片里，
+等待授权时显示形状变换的加载指示器（`M3ELoadingIndicator`）；减弱动效时形状静止。
+
+**降低风控的做法**（均已实现）：与官方桌面版相同的浏览器授权，App 不接触密码；
 会话内 client_id、client-token 平台数据（`desktop_windows`）、User-Agent、`app-platform` / `spotify-app-version`
 来自同一客户端身份，避免"桌面令牌 + 安卓设备"的混搭特征；令牌只在临近过期时续期，并发续期合并为一次请求；device_id 固定不变。
 
 桌面版 OAuth 登录后，数据走桌面端内部接口（见上表「桌面端数据层」），Spotify Connect 遥控也只在这种会话下可用（dealer / connect-state）。
 桌面客户端升级后若出现 `PersistedQueryNotFound`，可用 `tool/pathfinder_probe.dart` 探测并从新的 `xpui.spa` 重新提取 hash。
 
-未实现：魔法链接的发送请求（可用「登录链接」代替）、Login5 下的 reCAPTCHA 挑战（会提示改用浏览器登录）、家庭儿童账号切换。
-> 以官方客户端身份登录（桌面版 OAuth / Login5）均违反 Spotify 服务条款，仍存在风控可能，建议使用测试账号；其中 Login5 密码登录风险最高。
+未实现：家庭儿童账号切换。
+> 以官方客户端身份登录违反 Spotify 服务条款，仍存在风控可能，建议使用测试账号。
 
 ### 4. 代码分析与自动化测试
 ```powershell

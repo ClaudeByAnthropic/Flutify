@@ -5,6 +5,7 @@ import '../../../l10n/l10n.dart';
 import '../../../models/connect_cluster.dart';
 import '../../../providers/connect_provider.dart';
 import '../../../providers/playback_provider.dart';
+import '../toast/app_toast.dart';
 
 /// 本机播放与远程设备之间的协调（涉及两个 Provider，放在 UI 层）。
 ///
@@ -63,7 +64,7 @@ class ConnectActions {
   static VoidCallback _reporter(BuildContext context) {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final message = context.l10n.connectCommandFailed;
-    return () => messenger?.showSnackBar(SnackBar(content: Text(message)));
+    return () => AppToast.showOn(messenger, message, icon: Icons.cast_rounded, tone: ToastTone.error);
   }
 
   static Future<void> _guard(VoidCallback report, Future<void> Function() action) async {

@@ -1,19 +1,17 @@
 // 开发工具：完整曲目协议链路端到端探测（纯 Dart，无需运行 App；需要自行提供账号或令牌）。
 //
-// 用途：验证 Login5 → 音频密钥 → CDN 解密整条播放链路；`--ap-check` 只做 AP 握手自检（无需凭据）。
+// 用途：验证 access_token → 音频密钥 → CDN 解密整条播放链路；`--ap-check` 只做 AP 握手自检（无需凭据）。
 // 用法（在 app/ 目录下）：
 //   dart run tool/protocol_probe.dart --ap-check
-//   dart run tool/protocol_probe.dart --user <邮箱> --password <密码> --track 0VjIjW4GlUZAMYd2vXMi3b
 //   dart run tool/protocol_probe.dart --token <access_token> --track spotify:track:0VjIjW4GlUZAMYd2vXMi3b --out D:\tmp
 //
-// 流程只走逆向协议：Login5 → metadata/4 → storage-resolve → AP(RequestKey) → CDN 下载解密。
+// 流程只走逆向协议：metadata/4 → storage-resolve → AP(RequestKey) → CDN 下载解密。
 // 输出本地已解密的完整曲目（OGG/MP3/FLAC），并校验文件头（如 OggS）。
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutify_app/services/auth/auth_constants.dart';
 import 'package:flutify_app/services/auth/client_token_service.dart';
-import 'package:flutify_app/services/auth/login5_service.dart';
 import 'package:flutify_app/services/protocol/access_point.dart';
 import 'package:flutify_app/services/protocol/aes.dart';
 import 'package:flutify_app/services/protocol/spotify_id.dart';
@@ -39,39 +37,17 @@ Future<void> main(List<String> args) async {
 
   final client = http.Client();
   try {
-    // ---- 1) access_token：直接给定或 Login5 密码登录 ----
-    var accessToken = opts['token'] ?? '';
+    // ---- 1) access_token：由调用方给定（可从 App 设置页「复制令牌」取得） ----
+    final accessToken = opts['token'] ?? '';
     String? clientTokenValue = opts['client-token'];
     final deviceId = SpotifyAuthConstants.generateDeviceId();
 
     if (accessToken.isEmpty) {
-      final user = opts['user'];
-      final password = opts['password'];
-      if (user == null || password == null) {
-        stderr.writeln('需要 --token <access_token> 或 --user/--password');
-        exit(2);
-      }
-      stdout.writeln('[1/6] client-token + Login5 密码登录 ...');
-      final clientTokens = ClientTokenService(client);
-      final granted = await clientTokens.request(deviceId);
-      clientTokenValue ??= granted.token;
-      final login5 = Login5Service(client);
-      final result = await login5.loginWithPassword(
-        clientToken: granted.token,
-        deviceId: deviceId,
-        username: user,
-        password: password,
-      );
-      if (result is! Login5Success) {
-        stderr.writeln('Login5 登录未成功：$result');
-        exit(1);
-      }
-      accessToken = result.ok.accessToken;
-      stdout.writeln('      登录成功 user=${result.ok.username} token=${accessToken.substring(0, 12)}...');
-    } else {
-      stdout.writeln('[1/6] 使用给定 access_token');
+      stderr.writeln('需要 --token <access_token>');
+      exit(2);
     }
-    if (clientTokenValue == null && opts['client-token'] == null) {
+    stdout.writeln('[1/6] 使用给定 access_token');
+    if (clientTokenValue == null) {
       try {
         clientTokenValue = await ClientTokenService(client).request(deviceId).then((t) => t.token);
       } catch (e) {

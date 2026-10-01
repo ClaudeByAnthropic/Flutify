@@ -9,6 +9,7 @@ import '../../../providers/library_provider.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../services/spotify_api_service.dart';
 import '../../navigation/app_routes.dart';
+import '../../widgets/toast/app_toast.dart';
 
 /// 主页条目（卡片 / 快捷入口 / 推荐流）的点击与播放。
 ///
@@ -28,9 +29,12 @@ class HomeItemActions {
       case HomeItemKind.artist:
         AppRoutes.openArtist(context, item.artist!);
       case HomeItemKind.podcast || HomeItemKind.episode:
-        ScaffoldMessenger.maybeOf(context)
-          ?..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(context.l10n.homePodcastUnsupported)));
+        AppToast.show(
+          context,
+          context.l10n.homePodcastUnsupported,
+          icon: Icons.podcasts_rounded,
+          tone: ToastTone.warning,
+        );
     }
   }
 

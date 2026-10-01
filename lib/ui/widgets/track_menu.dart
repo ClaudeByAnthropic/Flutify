@@ -16,6 +16,7 @@ import 'menu/desktop_menu.dart';
 import 'share/share_sheet.dart';
 import 'sleep_timer/sleep_timer_menu.dart';
 import 'track_options_sheet.dart';
+import 'toast/app_toast.dart';
 
 /// 曲目操作（菜单项与悬停快捷键共用）。
 enum TrackAction {
@@ -53,11 +54,9 @@ class TrackMenu {
     return _showDesktop(context, track, position ?? DesktopMenu.anchorOf(context));
   }
 
-  static void _toast(BuildContext context, String message) {
+  static void _toast(BuildContext context, String message, IconData icon) {
     if (!context.mounted) return;
-    ScaffoldMessenger.maybeOf(
-      context,
-    )?.showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, width: 360));
+    AppToast.show(context, message, icon: icon, tone: ToastTone.success);
   }
 
   /// 当前情境下可用的操作（菜单与快捷键共用同一判断）。
@@ -119,10 +118,14 @@ class TrackMenu {
         final library = context.read<LibraryProvider>();
         final liked = library.isLiked(track.id);
         library.toggleLike(track);
-        _toast(context, liked ? l10n.toastLikeRemoved : l10n.toastLikeAdded);
+        _toast(
+          context,
+          liked ? l10n.toastLikeRemoved : l10n.toastLikeAdded,
+          liked ? Icons.heart_broken_rounded : Icons.favorite_rounded,
+        );
       case TrackAction.queue:
         context.read<PlaybackProvider>().addToQueue(track);
-        _toast(context, l10n.toastAddedToQueue);
+        _toast(context, l10n.toastAddedToQueue, Icons.queue_music_rounded);
       case TrackAction.sleepTimer:
         await SleepTimerMenu.show(context, position: anchor);
       case TrackAction.album:
@@ -188,12 +191,16 @@ class TrackMenu {
       if (name == null || !context.mounted) return;
       final created = library.createPlaylist(name);
       library.addTrackToPlaylist(created.id, track);
-      _toast(context, l10n.toastAddedTo(created.name));
+      _toast(context, l10n.toastAddedTo(created.name), Icons.playlist_add_check_rounded);
       return;
     }
     final playlist = library.findPlaylist(id);
     if (playlist == null) return;
     final added = library.addTrackToPlaylist(id, track);
-    _toast(context, added ? l10n.toastAddedTo(playlist.name) : l10n.toastAlreadyIn(playlist.name));
+    _toast(
+      context,
+      added ? l10n.toastAddedTo(playlist.name) : l10n.toastAlreadyIn(playlist.name),
+      added ? Icons.playlist_add_check_rounded : Icons.playlist_play_rounded,
+    );
   }
 }

@@ -13,12 +13,13 @@ import 'cover_image.dart';
 import 'create_playlist_dialog.dart';
 import 'share/share_sheet.dart';
 import 'sleep_timer/sleep_timer_menu.dart';
+import 'toast/app_toast.dart';
 
 /// 曲目「更多」操作面板（Spotify 长按 / ⋮ 菜单）。
 class TrackOptionsSheet extends StatelessWidget {
   final SpotifyTrack track;
 
-  /// 打开面板前的页面 context，用于关闭面板后展示 SnackBar 与导航。
+  /// 打开面板前的页面 context，用于关闭面板后展示提示与导航。
   final BuildContext hostContext;
 
   const TrackOptionsSheet({super.key, required this.track, required this.hostContext});
@@ -32,11 +33,9 @@ class TrackOptionsSheet extends StatelessWidget {
     );
   }
 
-  void _toast(String message) {
+  void _toast(String message, IconData icon) {
     if (!hostContext.mounted) return;
-    ScaffoldMessenger.maybeOf(
-      hostContext,
-    )?.showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
+    AppToast.show(hostContext, message, icon: icon, tone: ToastTone.success);
   }
 
   @override
@@ -66,7 +65,10 @@ class TrackOptionsSheet extends StatelessWidget {
               onTap: () {
                 library.toggleLike(track);
                 Navigator.pop(context);
-                _toast(isLiked ? l10n.toastLikeRemoved : l10n.toastLikeAdded);
+                _toast(
+                  isLiked ? l10n.toastLikeRemoved : l10n.toastLikeAdded,
+                  isLiked ? Icons.heart_broken_rounded : Icons.favorite_rounded,
+                );
               },
             ),
             ListTile(
@@ -83,7 +85,7 @@ class TrackOptionsSheet extends StatelessWidget {
               onTap: () {
                 context.read<PlaybackProvider>().addToQueue(track);
                 Navigator.pop(context);
-                _toast(l10n.toastAddedToQueue);
+                _toast(l10n.toastAddedToQueue, Icons.queue_music_rounded);
               },
             ),
             if (context.read<SleepTimerProvider?>() != null)
@@ -196,7 +198,7 @@ class TrackOptionsSheet extends StatelessWidget {
                     final created = library.createPlaylist(name);
                     library.addTrackToPlaylist(created.id, track);
                     if (ctx.mounted) Navigator.pop(ctx);
-                    _toast(l10n.toastAddedTo(created.name));
+                    _toast(l10n.toastAddedTo(created.name), Icons.playlist_add_check_rounded);
                   },
                 ),
                 for (final id in own)
@@ -214,7 +216,10 @@ class TrackOptionsSheet extends StatelessWidget {
                         onTap: () {
                           final added = library.addTrackToPlaylist(id, track);
                           Navigator.pop(ctx);
-                          _toast(added ? l10n.toastAddedTo(playlist.name) : l10n.toastAlreadyIn(playlist.name));
+                          _toast(
+                            added ? l10n.toastAddedTo(playlist.name) : l10n.toastAlreadyIn(playlist.name),
+                            added ? Icons.playlist_add_check_rounded : Icons.playlist_play_rounded,
+                          );
                         },
                       );
                     },

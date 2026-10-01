@@ -90,7 +90,7 @@ class SpotifyApiService {
   void attachAuth(SpotifyAuthService auth) => _auth = auth;
 
   /// 当前是否走桌面端内部接口。
-  bool get _useDesktop => isConfigured && _auth?.isLoggedIn == true && _auth?.method == AuthMethod.desktop;
+  bool get _useDesktop => isConfigured && _auth?.isLoggedIn == true;
 
   /// 是否支持 Spotify Connect 遥控：dealer / connect-state 只接受桌面版会话的令牌与客户端身份。
   bool get supportsConnect => _useDesktop;

@@ -200,7 +200,8 @@ class MD3ETheme {
         ),
         actionTextColor: colorScheme.inversePrimary,
         actionBackgroundColor: colorScheme.inversePrimary.withAlpha(36),
-        shape: RoundedRectangleBorder(borderRadius: tokens.radius(20)),
+        // 单行提示（38 图标块 + 上下 10 内边距）约 58 高：28 圆角即为完整胶囊，两行时为大圆角卡片
+        shape: RoundedRectangleBorder(borderRadius: tokens.radius(28)),
         elevation: 6,
         insetPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       ),

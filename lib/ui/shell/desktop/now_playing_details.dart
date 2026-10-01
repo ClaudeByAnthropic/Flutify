@@ -11,17 +11,21 @@ import '../../navigation/app_routes.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/player_controls.dart';
 import '../shell_layout_controller.dart';
+import 'panel_lyrics_card.dart';
 
-/// 右栏「正在播放」标签：大封面 → 歌名 / 艺人 / 点赞 → 关于艺人 → 接下来播放。
+/// 右栏「正在播放」面板（歌词卡未放大时）：大封面 → 歌名 / 艺人 / 点赞 → 歌词卡 → 关于艺人 → 接下来播放。
 ///
 /// 艺人详情（头像、粉丝数）按需请求，同一艺人只请求一次（Future 按 id 记忆）。
 class NowPlayingDetails extends StatelessWidget {
   final SpotifyTrack track;
 
-  /// 「接下来播放」取自本机队列；展示远程曲目时关闭。
-  final bool showNextUp;
+  /// 展示的是遥控中的远程曲目：歌词按远程进度滚动，且不显示「接下来播放」（那是本机队列）。
+  final bool remote;
 
-  const NowPlayingDetails({super.key, required this.track, this.showNextUp = true});
+  /// 内嵌歌词卡的高度：约能看到 6～7 行，又不至于把下面的卡片挤出视野。
+  static const double lyricsCardHeight = 340;
+
+  const NowPlayingDetails({super.key, required this.track, this.remote = false});
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +76,13 @@ class NowPlayingDetails extends StatelessWidget {
             LikeButton(track: track, size: 22, inactiveColor: colorScheme.onSurfaceVariant),
           ],
         ),
-        if (track.artists.isNotEmpty) ...[const SizedBox(height: 20), _AboutArtistCard(artist: track.artists.first)],
-        if (showNextUp) ...[const SizedBox(height: 16), const _NextUpCard()],
+        const SizedBox(height: 20),
+        SizedBox(
+          height: lyricsCardHeight,
+          child: PanelLyricsCard(track: track, remote: remote, expanded: false),
+        ),
+        if (track.artists.isNotEmpty) ...[const SizedBox(height: 16), _AboutArtistCard(artist: track.artists.first)],
+        if (!remote) ...[const SizedBox(height: 16), const _NextUpCard()],
       ],
     );
   }
@@ -223,7 +232,7 @@ class _NextUpCard extends StatelessWidget {
                 child: Text(l10n.queueNextUp, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
               ),
               TextButton(
-                onPressed: () => context.read<ShellLayoutController>().selectTab(NowPlayingTab.queue),
+                onPressed: () => context.read<ShellLayoutController>().switchPanel(RightPanel.queue),
                 child: Text(l10n.queueTitle),
               ),
             ],

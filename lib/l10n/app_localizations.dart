@@ -998,6 +998,18 @@ abstract class AppLocalizations {
   /// **'沉浸式歌词'**
   String get lyricsImmersive;
 
+  /// No description provided for @lyricsExpand.
+  ///
+  /// In zh, this message translates to:
+  /// **'放大歌词'**
+  String get lyricsExpand;
+
+  /// No description provided for @lyricsCollapse.
+  ///
+  /// In zh, this message translates to:
+  /// **'收起歌词'**
+  String get lyricsCollapse;
+
   /// No description provided for @lyricsExitImmersive.
   ///
   /// In zh, this message translates to:

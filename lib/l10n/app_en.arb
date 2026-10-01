@@ -166,6 +166,8 @@
   "lyricsUnavailableMessage": "We don't have lyrics for this song yet.\nEnjoy the music!",
   "lyricsUnsynced": "These lyrics aren't synced to the song yet.",
   "lyricsImmersive": "Immersive lyrics",
+  "lyricsExpand": "Expand lyrics",
+  "lyricsCollapse": "Collapse lyrics",
   "lyricsExitImmersive": "Exit lyrics (Esc)",
   "lyricsFillScreen": "Fill the screen (F11)",
   "lyricsFillWindow": "Fit to window (F11)",

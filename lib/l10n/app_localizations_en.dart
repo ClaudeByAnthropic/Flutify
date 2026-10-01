@@ -511,6 +511,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lyricsImmersive => 'Immersive lyrics';
 
   @override
+  String get lyricsExpand => 'Expand lyrics';
+
+  @override
+  String get lyricsCollapse => 'Collapse lyrics';
+
+  @override
   String get lyricsExitImmersive => 'Exit lyrics (Esc)';
 
   @override

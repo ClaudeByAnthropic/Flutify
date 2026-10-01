@@ -11,7 +11,10 @@ import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/lyrics_backdrop.dart';
 import 'package:flutify_app/ui/screens/player/lyrics_sheet.dart';
 import 'package:flutify_app/ui/screens/player/queue_list.dart';
+import 'package:flutify_app/ui/shell/desktop/now_playing_details.dart';
 import 'package:flutify_app/ui/shell/desktop/now_playing_panel.dart';
+import 'package:flutify_app/ui/shell/desktop/panel_lyrics_card.dart';
+import 'package:flutify_app/ui/shell/shell_layout_controller.dart';
 import 'package:flutify_app/ui/widgets/filter_pill.dart';
 import 'package:flutify_app/ui/widgets/liquid_glass.dart';
 import 'package:flutify_app/ui/widgets/mini_player.dart';
@@ -165,12 +168,50 @@ void main() {
     await settle(tester);
     expect(find.byTooltip('收起音乐库'), findsOneWidget);
 
-    // ≥ 1280：右栏默认停靠；切到「播放队列」标签，再隐藏
+    // ≥ 1280：右栏默认停靠在「正在播放」，没有标签切换；播放栏队列键切到独立的「播放队列」面板，再隐藏
     expect(find.byType(NowPlayingPanel), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilterPill, '播放队列'));
+    expect(find.widgetWithText(FilterPill, '播放队列'), findsNothing);
+    // 无曲目时播放栏只有占位，直接调用队列键对应的操作
+    tester.element(find.byType(NowPlayingPanel)).read<ShellLayoutController>().togglePanel(RightPanel.queue);
     await settle(tester);
+    expect(find.text('播放队列'), findsWidgets, reason: '面板标题随之切换');
     expect(find.byType(QueueList), findsOneWidget);
     await tester.tap(find.byTooltip('隐藏'));
+    await settle(tester);
+    expect(find.byType(NowPlayingPanel), findsNothing);
+  });
+
+  testWidgets('desktop: now-playing panel embeds lyrics that expand to fill the panel', (tester) async {
+    await pumpApp(tester, const Size(1440, 900), lyrics: {
+      SampleCatalog.track1.id: const SpotifyLyrics(lines: [
+        LyricLine(startTimeMs: 0, words: 'First synthetic line'),
+        LyricLine(startTimeMs: 4000, words: 'Second synthetic line'),
+      ]),
+    });
+    await playMix(tester);
+
+    // 内嵌：歌词卡与「关于艺人」同在详情列表里
+    expect(find.byType(NowPlayingDetails), findsOneWidget);
+    expect(find.byType(PanelLyricsCard), findsOneWidget);
+    expect(find.text('First synthetic line'), findsOneWidget);
+
+    // 放大：歌词卡撑满面板，详情列表让位；再点收起回到详情
+    await tester.tap(find.byTooltip('放大歌词'));
+    await settle(tester);
+    expect(find.byType(NowPlayingDetails), findsNothing);
+    expect(find.byType(PanelLyricsCard), findsOneWidget);
+    expect(find.text('First synthetic line'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('收起歌词'));
+    await settle(tester);
+    expect(find.byType(NowPlayingDetails), findsOneWidget);
+
+    // 播放栏队列键：切到独立的队列面板；再按一次关闭
+    await tester.tap(find.byTooltip('播放队列'));
+    await settle(tester);
+    expect(find.byType(QueueList), findsOneWidget);
+    expect(find.byType(PanelLyricsCard), findsNothing);
+    await tester.tap(find.byTooltip('播放队列'));
     await settle(tester);
     expect(find.byType(NowPlayingPanel), findsNothing);
   });

@@ -3,10 +3,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'shell_breakpoints.dart';
 
-/// 右侧面板当前显示的内容。
-enum NowPlayingTab { details, queue, lyrics }
+/// 右栏当前显示的面板。没有标签切换：两个面板分别由播放栏上各自的按钮打开。
+enum RightPanel {
+  /// 正在播放：封面、歌名、内嵌歌词卡（可放大撑满面板）、关于艺人、接下来播放。
+  nowPlaying,
 
-/// 桌面端布局状态：音乐库栏宽度 / 是否收起、右栏是否打开及当前标签。
+  /// 播放队列。
+  queue,
+}
+
+/// 桌面端布局状态：音乐库栏宽度 / 是否收起、右栏是否打开、显示哪个面板，以及歌词卡是否放大。
 ///
 /// 右栏有两种形态，开关状态分开记：
 /// - 停靠（窗口 ≥ [ShellBreakpoints.threeColumn]）：用户的开关偏好写入 SharedPreferences，下次启动恢复；
@@ -18,6 +24,7 @@ class ShellLayoutController extends ChangeNotifier {
   static const String _keySidebarWidth = 'shell_sidebar_width';
   static const String _keySidebarCollapsed = 'shell_sidebar_collapsed';
   static const String _keyRightPanelOpen = 'shell_right_panel_open';
+  static const String _keyLyricsExpanded = 'shell_lyrics_expanded';
 
   SharedPreferences? _prefs;
 
@@ -26,7 +33,8 @@ class ShellLayoutController extends ChangeNotifier {
   bool _dockedOpen = true;
   bool _overlayOpen = false;
   bool _docked = true;
-  NowPlayingTab _tab = NowPlayingTab.details;
+  RightPanel _panel = RightPanel.nowPlaying;
+  bool _lyricsExpanded = false;
 
   ShellLayoutController() {
     _restore();
@@ -34,7 +42,10 @@ class ShellLayoutController extends ChangeNotifier {
 
   double get sidebarWidth => _sidebarWidth;
   bool get sidebarCollapsed => _sidebarCollapsed;
-  NowPlayingTab get tab => _tab;
+  RightPanel get panel => _panel;
+
+  /// 「正在播放」面板里的歌词卡是否放大撑满面板（记住偏好，下次启动沿用）。
+  bool get lyricsExpanded => _lyricsExpanded;
 
   /// 右栏是否停靠为第三栏（否则以浮层显示）。
   bool get docked => _docked;
@@ -51,10 +62,13 @@ class ShellLayoutController extends ChangeNotifier {
 
   Future<void> _restore() async {
     final prefs = _prefs = await SharedPreferences.getInstance();
-    _sidebarWidth = (prefs.getDouble(_keySidebarWidth) ?? _sidebarWidth)
-        .clamp(ShellBreakpoints.sidebarMin, ShellBreakpoints.sidebarMax);
+    _sidebarWidth = (prefs.getDouble(_keySidebarWidth) ?? _sidebarWidth).clamp(
+      ShellBreakpoints.sidebarMin,
+      ShellBreakpoints.sidebarMax,
+    );
     _sidebarCollapsed = prefs.getBool(_keySidebarCollapsed) ?? _sidebarCollapsed;
     _dockedOpen = prefs.getBool(_keyRightPanelOpen) ?? _dockedOpen;
+    _lyricsExpanded = prefs.getBool(_keyLyricsExpanded) ?? _lyricsExpanded;
     notifyListeners();
   }
 
@@ -71,30 +85,33 @@ class ShellLayoutController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 点击播放栏上的面板按钮：同一标签再点一次关闭，不同标签则切换过去。
-  void showTab(NowPlayingTab tab) {
-    final open = !(rightPanelVisible && _tab == tab);
-    _tab = tab;
+  /// 指定面板当前是否正显示。
+  bool isShowing(RightPanel panel) => rightPanelVisible && _panel == panel;
+
+  /// 播放栏上的面板按钮：该面板正显示时再点关闭；否则打开右栏并切到该面板。
+  void togglePanel(RightPanel panel) {
+    final open = !isShowing(panel);
+    _panel = panel;
     _setVisible(open);
   }
 
-  /// 右栏是否正显示「播放状态」（正在播放 / 歌词，不含播放队列）。
-  bool get playbackStatusVisible => rightPanelVisible && _tab != NowPlayingTab.queue;
+  /// 「正在播放」面板是否正显示（播放栏「播放状态」键与封面的高亮依据）。
+  bool get playbackStatusVisible => isShowing(RightPanel.nowPlaying);
 
-  /// 播放栏「播放状态」键：显示中再点关闭；否则打开右栏，
-  /// 停在上次看的「正在播放」或「歌词」（上次是队列时回到「正在播放」）。
-  void togglePlaybackStatus() {
-    if (playbackStatusVisible) {
-      _setVisible(false);
-      return;
-    }
-    if (_tab == NowPlayingTab.queue) _tab = NowPlayingTab.details;
+  /// 播放栏「播放状态」键 / 点击封面：开关「正在播放」面板（队列显示中时切过去而不是关闭）。
+  void togglePlaybackStatus() => togglePanel(RightPanel.nowPlaying);
+
+  /// 在右栏内部切换面板（如「接下来播放」卡片上的「播放队列」入口），右栏保持打开。
+  void switchPanel(RightPanel panel) {
+    if (_panel == panel && rightPanelVisible) return;
+    _panel = panel;
     _setVisible(true);
   }
 
-  void selectTab(NowPlayingTab tab) {
-    if (_tab == tab) return;
-    _tab = tab;
+  /// 歌词卡放大 / 收起。
+  void toggleLyricsExpanded() {
+    _lyricsExpanded = !_lyricsExpanded;
+    _prefs?.setBool(_keyLyricsExpanded, _lyricsExpanded);
     notifyListeners();
   }
 

@@ -238,7 +238,7 @@ class _RightControls extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     // 远程设备有会话（已暂停）时设备键高亮，提示可以转回去
     final hasDevice = context.select<ConnectProvider?, bool>((c) => c?.hasRemoteSession ?? false);
-    // 三栏框架下：「播放状态」开关右栏（正在播放 / 歌词在右栏里切换），队列直达队列标签；
+    // 三栏框架下：「播放状态」开关右栏的「正在播放」面板（含歌词），队列键开关独立的「播放队列」面板；
     // 没有框架（单独使用播放栏）时回退为底部面板
     final layout = context.watch<ShellLayoutController?>();
 
@@ -247,12 +247,10 @@ class _RightControls extends StatelessWidget {
       PlaybackStatusButton(layout: layout, style: _barIconStyle),
       IconButton(
         icon: const Icon(Icons.queue_music_rounded, size: 20),
-        color: layout != null && layout.rightPanelVisible && layout.tab == NowPlayingTab.queue
-            ? colorScheme.primary
-            : colorScheme.onSurfaceVariant,
+        color: layout?.isShowing(RightPanel.queue) ?? false ? colorScheme.primary : colorScheme.onSurfaceVariant,
         tooltip: context.l10n.queueTitle,
         style: _barIconStyle,
-        onPressed: layout == null ? () => QueueSheet.show(context) : () => layout.showTab(NowPlayingTab.queue),
+        onPressed: layout == null ? () => QueueSheet.show(context) : () => layout.togglePanel(RightPanel.queue),
       ),
       IconButton(
         icon: Icon(

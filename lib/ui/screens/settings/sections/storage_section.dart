@@ -7,6 +7,7 @@ import '../../../../services/protocol/audio_cache_store.dart';
 import '../../../../services/storage_service.dart';
 import '../widgets/settings_section.dart';
 import '../widgets/settings_segmented.dart';
+import '../../../widgets/toast/app_toast.dart';
 
 /// 存储：音频缓存占用、缓存上限、一键清除。
 ///
@@ -71,9 +72,12 @@ class _StorageSectionState extends State<StorageSection> {
     final freed = await _store!.clear();
     if (!mounted) return;
     setState(() => _clearing = false);
-    ScaffoldMessenger.maybeOf(
+    AppToast.show(
       context,
-    )?.showSnackBar(SnackBar(content: Text(l10n.settingsAudioCacheCleared(ByteSize.format(freed)))));
+      l10n.settingsAudioCacheCleared(ByteSize.format(freed)),
+      icon: Icons.cleaning_services_rounded,
+      tone: ToastTone.success,
+    );
     _refreshUsage();
   }
 

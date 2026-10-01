@@ -10,14 +10,14 @@ import 'oauth_client_config.dart';
 ///
 /// 用户在系统浏览器里的 Spotify 官方登录页完成登录（人机验证、两步验证、Passkey 均由官方页面处理），
 /// App 不接触密码，只用授权码换取 access_token / refresh_token。
-/// client_id、回调地址与权限范围由 [OAuthClientConfig] 决定（桌面版或开发者应用）。
+/// client_id、回调地址与权限范围由 [OAuthClientConfig] 决定。
 class OAuthPkceService {
   static const String authorizeEndpoint = 'https://accounts.spotify.com/authorize';
   static const String tokenEndpoint = 'https://accounts.spotify.com/api/token';
 
   final http.Client _client;
 
-  /// 令牌请求的 User-Agent；为空时使用 http 默认 UA（开发者应用场景）。
+  /// 令牌请求的 User-Agent；为空时使用 http 默认 UA。
   final String? userAgent;
 
   OAuthPkceService(this._client, {this.userAgent});
@@ -133,7 +133,7 @@ class OAuthTokens {
       OAuthTokens(accessToken: accessToken, refreshToken: value, expiresIn: expiresIn, scope: scope);
 }
 
-/// OAuth 流程错误（用户拒绝、client_id 无效、回调地址未登记等）。
+/// OAuth 流程错误（用户拒绝授权、授权失效等）。
 class OAuthException implements Exception {
   final String message;
 
@@ -148,10 +148,7 @@ class OAuthException implements Exception {
   factory OAuthException.fromError(String error, [String? description]) {
     final text = switch (error) {
       'access_denied' => '你在授权页取消了授权',
-      'invalid_client' => 'client_id 无效，请检查开发者后台中的 Client ID',
       'invalid_grant' => '授权已失效，请重新登录',
-      'invalid_request' when (description ?? '').contains('redirect') =>
-        '回调地址不匹配，请在开发者后台登记 ${OAuthClientConfig.developerRedirectUri}',
       _ => description?.isNotEmpty == true ? '授权失败：$description' : '授权失败（$error）',
     };
     return OAuthException(text, error);

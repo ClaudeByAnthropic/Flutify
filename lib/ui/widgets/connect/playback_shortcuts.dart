@@ -6,6 +6,7 @@ import '../../../l10n/l10n.dart';
 import '../../../providers/connect_provider.dart';
 import '../../../providers/playback_provider.dart';
 import 'connect_actions.dart';
+import '../toast/app_toast.dart';
 
 /// 播放类键盘快捷键（主窗口与沉浸式歌词共用，与 Spotify 桌面端一致）。
 ///
@@ -34,10 +35,13 @@ class PlaybackShortcuts {
         if (device.supportsVolume) {
           connect.setVolume(connect.volume + delta);
         } else {
-          // 连按时只保留一条提示
-          ScaffoldMessenger.maybeOf(context)
-            ?..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text(context.l10n.connectVolumeUnsupported(device.name))));
+          // 连按时只保留一条提示（AppToast 默认替换当前提示）
+          AppToast.show(
+            context,
+            context.l10n.connectVolumeUnsupported(device.name),
+            icon: Icons.volume_off_rounded,
+            tone: ToastTone.warning,
+          );
         }
       } else {
         final playback = context.read<PlaybackProvider>();

@@ -3,23 +3,21 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
-import '../../../models/track.dart';
-import '../../screens/player/immersive_lyrics_screen.dart';
-import '../../screens/player/lyrics/glass_icon_button.dart';
-import '../../screens/player/lyrics/lyrics_backdrop.dart';
-import '../../screens/player/lyrics/lyrics_view.dart';
 import '../../screens/player/queue_list.dart';
 import '../../widgets/connect/now_playing_source.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/filter_pill.dart';
 import '../panel_surface.dart';
 import '../shell_layout_controller.dart';
 import 'now_playing_details.dart';
+import 'panel_lyrics_card.dart';
 
-/// 桌面端右栏：「正在播放 / 播放队列 / 歌词」三个标签 + 关闭按钮。
+/// 桌面端右栏：顶部是当前面板的标题 + 关闭按钮，下面是面板内容。没有标签切换——
+/// 「正在播放」与「播放队列」分别由播放栏上的「播放状态」键和队列键打开（见 [ShellLayoutController]）。
 ///
-/// 标签由 [ShellLayoutController] 管理，播放栏上的按钮与这里的胶囊共用同一状态；
-/// 无播放内容时「正在播放」与「歌词」显示空状态，「播放队列」照常可用。
+/// - 正在播放：详情列表里内嵌歌词卡；歌词卡放大后撑满整个面板，再点收起回到详情；
+/// - 播放队列：完整队列。
+///
+/// 无播放内容时「正在播放」显示空状态，「播放队列」照常可用。
 class NowPlayingPanel extends StatelessWidget {
   const NowPlayingPanel({super.key});
 
@@ -31,66 +29,54 @@ class NowPlayingPanel extends StatelessWidget {
     final track = NowPlayingSource.track(context);
     final l10n = context.l10n;
 
-    final labels = {
-      NowPlayingTab.details: l10n.nowPlaying,
-      NowPlayingTab.queue: l10n.queueTitle,
-      NowPlayingTab.lyrics: l10n.lyricsTitle,
-    };
+    final isQueue = layout.panel == RightPanel.queue;
+    final expanded = !isQueue && track != null && layout.lyricsExpanded;
+
+    final Widget body;
+    if (isQueue) {
+      body = const QueueList(horizontalPadding: 16);
+    } else if (track == null) {
+      body = Center(
+        child: EmptyState(
+          icon: Icons.music_note_rounded,
+          title: l10n.playerNothingPlayingTitle,
+          message: l10n.playerNothingPlayingMessage,
+        ),
+      );
+    } else if (expanded) {
+      body = Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: PanelLyricsCard(track: track, remote: remote, expanded: true),
+      );
+    } else {
+      body = NowPlayingDetails(track: track, remote: remote);
+    }
 
     return PanelSurface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final entry in labels.entries)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: FilterPill(
-                              label: entry.value,
-                              isSelected: layout.tab == entry.key,
-                              onTap: () => layout.selectTab(entry.key),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20),
-                  tooltip: l10n.shellHidePanel,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  onPressed: layout.closeRightPanel,
-                ),
-              ],
-            ),
+          _PanelHeader(
+            title: isQueue ? l10n.queueTitle : l10n.nowPlaying,
+            closeTooltip: l10n.shellHidePanel,
+            onClose: layout.closeRightPanel,
           ),
           Expanded(
             child: AnimatedSwitcher(
-              duration: context.motion(const Duration(milliseconds: 220)),
+              duration: context.motion(const Duration(milliseconds: 320)),
+              reverseDuration: context.motion(const Duration(milliseconds: 160)),
               switchInCurve: Curves.easeOutCubic,
-              child: KeyedSubtree(
-                key: ValueKey(layout.tab),
-                child: switch (layout.tab) {
-                  NowPlayingTab.queue => const QueueList(horizontalPadding: 16),
-                  NowPlayingTab.details =>
-                    track == null
-                        ? _Nothing(title: l10n.playerNothingPlayingTitle, message: l10n.playerNothingPlayingMessage)
-                        // 「接下来播放」是本机队列，远程时不显示
-                        : NowPlayingDetails(track: track, showNextUp: !remote),
-                  NowPlayingTab.lyrics =>
-                    track == null
-                        ? _Nothing(title: l10n.lyricsNotPlaying, message: l10n.lyricsNothingPlayingMessage)
-                        : _LyricsCard(track: track, remote: remote),
-                },
+              switchOutCurve: Curves.easeInCubic,
+              // 歌词放大 / 收起：从顶部轻微放大淡入，像卡片「长」满面板
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  alignment: Alignment.topCenter,
+                  scale: Tween(begin: 0.96, end: 1.0).animate(animation),
+                  child: child,
+                ),
               ),
+              child: KeyedSubtree(key: ValueKey((layout.panel, expanded)), child: body),
             ),
           ),
         ],
@@ -99,60 +85,43 @@ class NowPlayingPanel extends StatelessWidget {
   }
 }
 
-/// 歌词卡片：与全屏歌词同一套液态玻璃观感（流动封面背景 + 白色对焦歌词），
-/// 右上角玻璃按钮进入桌面沉浸式歌词。
-class _LyricsCard extends StatelessWidget {
-  final SpotifyTrack track;
-  final bool remote;
+/// 面板标题栏：粗体标题（随面板切换淡入淡出）+ 右侧关闭按钮。
+class _PanelHeader extends StatelessWidget {
+  final String title;
+  final String closeTooltip;
+  final VoidCallback onClose;
 
-  const _LyricsCard({required this.track, required this.remote});
+  const _PanelHeader({required this.title, required this.closeTooltip, required this.onClose});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: ClipRRect(
-        borderRadius: context.tokens.radius(12),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            LyricsBackdrop(imageUrl: track.coverUrl),
-            LyricsView(
-              key: ValueKey((track.id, remote)),
-              trackId: track.id,
-              remote: remote,
-              topInset: 56,
-              bottomInset: 16,
-              fontSize: 24,
-              horizontalPadding: 20,
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: GlassIconButton(
-                icon: Icons.open_in_full_rounded,
-                tooltip: context.l10n.lyricsImmersive,
-                size: 36,
-                onPressed: () => ImmersiveLyricsScreen.open(context),
+      padding: const EdgeInsets.fromLTRB(20, 10, 8, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: context.motion(const Duration(milliseconds: 200)),
+              layoutBuilder: (current, previous) =>
+                  Stack(alignment: Alignment.centerLeft, children: [...previous, ?current]),
+              child: Text(
+                title,
+                key: ValueKey(title),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.2),
               ),
             ),
-          ],
-        ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 20),
+            tooltip: closeTooltip,
+            color: theme.colorScheme.onSurfaceVariant,
+            onPressed: onClose,
+          ),
+        ],
       ),
-    );
-  }
-}
-
-class _Nothing extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _Nothing({required this.title, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: EmptyState(icon: Icons.music_note_rounded, title: title, message: message),
     );
   }
 }

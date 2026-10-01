@@ -7,8 +7,9 @@ import '../../l10n/l10n.dart';
 import '../../providers/playback_provider.dart';
 import '../../services/protocol/track_playback_exception.dart';
 import '../screens/auth/login_screen.dart';
+import 'toast/app_toast.dart';
 
-/// 订阅 [PlaybackProvider.playbackErrors]，每次播放失败弹一条浮动提示。
+/// 订阅 [PlaybackProvider.playbackErrors]，每次播放失败弹一条 [AppToast]。
 ///
 /// - 未登录：提示登录，并带「登录」按钮；
 /// - 不可播放：说明哪首歌不能播放、是否已自动跳过；连续多首失败已自动暂停时带「下一首」；
@@ -40,93 +41,53 @@ class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
   }
 
   void _show(PlaybackError error) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (!mounted || messenger == null) return;
+    if (!mounted) return;
     final l10n = context.l10n;
     final track = error.track.name;
-
     final playback = context.read<PlaybackProvider>();
-    final (message, action) = switch (error.kind) {
+
+    final (
+      String message,
+      IconData icon,
+      ToastTone tone,
+      String? actionLabel,
+      VoidCallback? onAction,
+    ) = switch (error.kind) {
       // 连续多首不可播放、已按设置暂停：给「下一首」让用户手动继续
       TrackPlaybackFailure.unavailable when error.autoPaused => (
         l10n.playbackErrorAutoPaused(error.consecutiveFailures),
-        SnackBarAction(label: l10n.playerNext, onPressed: playback.nextTrack),
+        Icons.pause_circle_rounded,
+        ToastTone.warning,
+        l10n.playerNext,
+        playback.nextTrack,
       ),
       TrackPlaybackFailure.notSignedIn => (
         l10n.playbackErrorSignIn,
-        SnackBarAction(label: l10n.shellSignIn, onPressed: () => LoginScreen.open(context)),
+        Icons.lock_rounded,
+        ToastTone.info,
+        l10n.shellSignIn,
+        () => LoginScreen.open(context),
       ),
       TrackPlaybackFailure.unavailable => (
         error.skipped ? l10n.playbackErrorSkipped(track) : l10n.playbackErrorUnavailable(track),
+        Icons.music_off_rounded,
+        ToastTone.warning,
+        null,
         null,
       ),
       TrackPlaybackFailure.network => (
         l10n.playbackErrorNetwork(track),
-        SnackBarAction(label: l10n.commonRetry, onPressed: playback.togglePlayPause),
+        Icons.wifi_off_rounded,
+        ToastTone.error,
+        l10n.commonRetry,
+        playback.togglePlayPause,
       ),
     };
 
-    final icon = switch (error.kind) {
-      TrackPlaybackFailure.unavailable when error.autoPaused => Icons.pause_circle_outline_rounded,
-      TrackPlaybackFailure.notSignedIn => Icons.lock_outline_rounded,
-      TrackPlaybackFailure.unavailable => Icons.music_off_rounded,
-      TrackPlaybackFailure.network => Icons.wifi_off_rounded,
-    };
-
-    // 连续跳过多首时只保留最新一条，不排队刷屏
-    messenger.hideCurrentSnackBar();
-    // 外观与位置都交给主题和当前外壳（见 DesktopShell）：这里不传 margin / width，
-    // 否则弹出后再拖动窗口，按旧宽度算出的边距会把内容挤成 0 宽。
-    // 带按钮的提示在新版 Flutter 默认常驻不消失，这里显式设为到时自动收起。
-    messenger.showSnackBar(
-      SnackBar(
-        content: _ToastContent(icon: icon, message: message),
-        action: action,
-        persist: false,
-        duration: action == null ? _duration : _durationWithAction,
-        padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 10, 10),
-      ),
-    );
+    // 连续跳过多首时 AppToast 只保留最新一条，不排队刷屏
+    AppToast.show(context, message, icon: icon, tone: tone, actionLabel: actionLabel, onAction: onAction);
   }
-
-  /// 纯提示的停留时长；带按钮的多给几秒，留出点按的时间。
-  static const Duration _duration = Duration(seconds: 4);
-  static const Duration _durationWithAction = Duration(seconds: 7);
 
   @override
   Widget build(BuildContext context) => widget.child;
-}
-
-/// 提示内容：左侧浅色调圆形图标（表明错误类型）+ 最多两行说明。
-class _ToastContent extends StatelessWidget {
-  final IconData icon;
-  final String message;
-
-  const _ToastContent({required this.icon, required this.message});
-
-  /// 可用宽度低于此值时收起左侧图标，把空间全部留给文字（兜底，正常布局不会触发）。
-  static const double _iconMinWidth = 160;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final text = Text(message, maxLines: 2, overflow: TextOverflow.ellipsis);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < _iconMinWidth) return text;
-        return Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(color: colorScheme.inversePrimary.withAlpha(40), shape: BoxShape.circle),
-              child: Icon(icon, size: 20, color: colorScheme.inversePrimary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: text),
-          ],
-        );
-      },
-    );
-  }
 }

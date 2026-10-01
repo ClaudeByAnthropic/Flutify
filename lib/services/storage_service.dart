@@ -6,22 +6,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 class StorageService {
   static const String _keyAccessToken = 'sp_access_token';
   static const String _keyRefreshToken = 'sp_refresh_token';
-  static const String _keyClientId = 'sp_client_id';
-  static const String _keyClientSecret = 'sp_client_secret';
   static const String _keyApiBaseUrl = 'sp_api_base_url';
   static const String _keySpClientToken = 'sp_spclient_token';
 
-  // Login5 鉴权持久化
+  // 会话凭据
   static const String _keyDeviceId = 'sp_device_id';
   static const String _keyUsername = 'sp_username';
-  static const String _keyStoredCredential = 'sp_stored_credential'; // base64
   static const String _keyAccessTokenExpiry = 'sp_access_token_expiry'; // epoch ms
   static const String _keyClientToken = 'sp_client_token';
   static const String _keyClientTokenExpiry = 'sp_client_token_expiry'; // epoch ms
-  static const String _keyClientTokenProfile = 'sp_client_token_profile'; // 'android' | 'desktop'
+  static const String _keyClientTokenProfile = 'sp_client_token_profile';
 
-  // 登录方式与账号展示信息
-  static const String _keyAuthMethod = 'sp_auth_method'; // AuthMethod.name
+  // 会话类型与账号展示信息
+  static const String _keyAuthMethod = 'sp_auth_method';
+
+  /// 唯一支持的会话类型：桌面版浏览器 OAuth。
+  static const String _desktopSession = 'desktop';
+
+  /// 已移除的登录方式（Login5 密码 / 短信 / 凭据导入、开发者应用 OAuth）留下的键，启动时清理。
+  static const List<String> _legacyKeys = ['sp_stored_credential', 'sp_client_id', 'sp_client_secret'];
   static const String _keyDisplayName = 'sp_display_name';
   static const String _keyAvatarUrl = 'sp_avatar_url';
 
@@ -54,7 +57,21 @@ class StorageService {
 
   static Future<StorageService> init() async {
     final prefs = await SharedPreferences.getInstance();
-    return StorageService(prefs);
+    final storage = StorageService(prefs);
+    await storage.dropLegacySession();
+    return storage;
+  }
+
+  /// 旧版本的 Login5 / 开发者应用会话已不受支持：清掉其令牌（否则残留的 access_token 仍会被当作已配置），
+  /// 用户重新用浏览器登录即可。
+  Future<void> dropLegacySession() async {
+    final method = _prefs.getString(_keyAuthMethod);
+    final legacy = (method != null && method != _desktopSession) || _legacyKeys.any(_prefs.containsKey);
+    if (!legacy) return;
+    if (method != _desktopSession) await clearLogin();
+    for (final key in _legacyKeys) {
+      await _prefs.remove(key);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -66,12 +83,6 @@ class StorageService {
   String get refreshToken => _prefs.getString(_keyRefreshToken) ?? '';
   Future<bool> setRefreshToken(String value) => _prefs.setString(_keyRefreshToken, value);
 
-  String get clientId => _prefs.getString(_keyClientId) ?? '';
-  Future<bool> setClientId(String value) => _prefs.setString(_keyClientId, value);
-
-  String get clientSecret => _prefs.getString(_keyClientSecret) ?? '';
-  Future<bool> setClientSecret(String value) => _prefs.setString(_keyClientSecret, value);
-
   String get apiBaseUrl => _prefs.getString(_keyApiBaseUrl) ?? 'https://api.spotify.com/v1';
   Future<bool> setApiBaseUrl(String value) => _prefs.setString(_keyApiBaseUrl, value);
 
@@ -79,7 +90,7 @@ class StorageService {
   Future<bool> setSpClientToken(String value) => _prefs.setString(_keySpClientToken, value);
 
   // ---------------------------------------------------------------------------
-  // Login5 鉴权
+  // 会话
   // ---------------------------------------------------------------------------
   /// 设备 ID：首次访问时生成并持久化（由调用方传入生成器，避免此层依赖）。
   String get deviceId => _prefs.getString(_keyDeviceId) ?? '';
@@ -87,9 +98,6 @@ class StorageService {
 
   String get username => _prefs.getString(_keyUsername) ?? '';
   Future<bool> setUsername(String value) => _prefs.setString(_keyUsername, value);
-
-  String get storedCredential => _prefs.getString(_keyStoredCredential) ?? '';
-  Future<bool> setStoredCredential(String base64Value) => _prefs.setString(_keyStoredCredential, base64Value);
 
   int get accessTokenExpiry => _prefs.getInt(_keyAccessTokenExpiry) ?? 0;
   Future<bool> setAccessTokenExpiry(int epochMs) => _prefs.setInt(_keyAccessTokenExpiry, epochMs);
@@ -104,13 +112,8 @@ class StorageService {
   String get clientTokenProfile => _prefs.getString(_keyClientTokenProfile) ?? '';
   Future<bool> setClientTokenProfile(String value) => _prefs.setString(_keyClientTokenProfile, value);
 
-  /// 登录方式；未知或缺省值按 Login5 处理（兼容旧版本数据）。
-  AuthMethod get authMethod {
-    final name = _prefs.getString(_keyAuthMethod);
-    return AuthMethod.values.firstWhere((m) => m.name == name, orElse: () => AuthMethod.login5);
-  }
-
-  Future<bool> setAuthMethod(AuthMethod value) => _prefs.setString(_keyAuthMethod, value.name);
+  /// 标记当前凭据属于桌面版浏览器登录会话。
+  Future<bool> markDesktopSession() => _prefs.setString(_keyAuthMethod, _desktopSession);
 
   String get displayName => _prefs.getString(_keyDisplayName) ?? '';
   Future<bool> setDisplayName(String value) => _prefs.setString(_keyDisplayName, value);
@@ -118,21 +121,16 @@ class StorageService {
   String get avatarUrl => _prefs.getString(_keyAvatarUrl) ?? '';
   Future<bool> setAvatarUrl(String value) => _prefs.setString(_keyAvatarUrl, value);
 
-  /// 是否已登录：Login5 需要可复用凭据；OAuth 需要 refresh_token（开发者应用还需 client_id）。
-  bool get isLoggedIn => switch (authMethod) {
-    AuthMethod.login5 => storedCredential.isNotEmpty && username.isNotEmpty,
-    AuthMethod.oauth => refreshToken.isNotEmpty && clientId.isNotEmpty,
-    AuthMethod.desktop => refreshToken.isNotEmpty,
-  };
+  /// 是否已登录：桌面版会话且持有 refresh_token。
+  bool get isLoggedIn => _prefs.getString(_keyAuthMethod) == _desktopSession && refreshToken.isNotEmpty;
 
-  /// 清除全部登录态（登出）。device_id 与 OAuth client_id 保留，便于下次登录。
+  /// 清除全部登录态（登出）。device_id 保留（client-token 与之绑定）。
   Future<void> clearLogin() async {
     await _prefs.remove(_keyAuthMethod);
     await _prefs.remove(_keyDisplayName);
     await _prefs.remove(_keyAvatarUrl);
     await _prefs.remove(_keyRefreshToken);
     await _prefs.remove(_keyUsername);
-    await _prefs.remove(_keyStoredCredential);
     await _prefs.remove(_keyAccessToken);
     await _prefs.remove(_keyAccessTokenExpiry);
     await _prefs.remove(_keyClientToken);
@@ -236,16 +234,4 @@ class StorageService {
   }
 
   Future<bool> clearRecentSearches() => _prefs.remove(_keyRecentSearches);
-}
-
-/// 账号登录方式。
-enum AuthMethod {
-  /// Login5 直连（Android 身份）：密码 / 短信 / 一次性令牌 / 导入凭据。
-  login5,
-
-  /// 开发者应用 OAuth（用户自己的 client_id）。
-  oauth,
-
-  /// 桌面版 OAuth（官方桌面 client_id，默认登录方式）。
-  desktop,
 }

@@ -6,6 +6,7 @@ import '../../../l10n/l10n.dart';
 import '../../../providers/sleep_timer_provider.dart';
 import '../../shell/shell_breakpoints.dart';
 import '../menu/desktop_menu.dart';
+import '../toast/app_toast.dart';
 
 /// 睡眠定时器选择：桌面端在 [position] 弹出菜单，移动端底部面板。
 ///
@@ -53,10 +54,15 @@ class SleepTimerMenu {
     if (picked == null) return;
     if (identical(picked, _off)) {
       timer.cancel();
-      messenger?.showSnackBar(SnackBar(content: Text(l10n.toastSleepTimerOff)));
+      AppToast.showOn(messenger, l10n.toastSleepTimerOff, icon: Icons.bedtime_off_rounded);
     } else if (picked is SleepTimerPreset) {
       timer.start(picked);
-      messenger?.showSnackBar(SnackBar(content: Text(l10n.toastSleepTimerSet(presetLabel(l10n, picked)))));
+      AppToast.showOn(
+        messenger,
+        l10n.toastSleepTimerSet(presetLabel(l10n, picked)),
+        icon: Icons.bedtime_rounded,
+        tone: ToastTone.success,
+      );
     }
   }
 }

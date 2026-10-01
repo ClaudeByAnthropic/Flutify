@@ -499,6 +499,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lyricsImmersive => '沉浸式歌词';
 
   @override
+  String get lyricsExpand => '放大歌词';
+
+  @override
+  String get lyricsCollapse => '收起歌词';
+
+  @override
   String get lyricsExitImmersive => '退出全屏歌词（Esc）';
 
   @override
