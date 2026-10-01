@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/flutify_tokens.dart';
 import '../../../core/theme/md3e_shapes.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../l10n/l10n.dart';
@@ -255,7 +256,7 @@ class _QuickAccessGrid extends StatelessWidget {
               final playlist = isLiked ? null : playlists[index - 1];
               return Material(
                 color: colorScheme.surfaceContainerHigh,
-                borderRadius: MD3EShapes.roundedSmall,
+                borderRadius: context.tokens.radius(MD3EShapes.radiusSmall),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   onTap: () => AppRoutes.openPlaylist(

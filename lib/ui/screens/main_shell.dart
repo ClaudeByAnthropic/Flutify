@@ -15,6 +15,7 @@ import '../shell/shell_layout_controller.dart';
 import '../widgets/playback_error_listener.dart';
 import 'home/home_screen.dart';
 import 'library/library_screen.dart';
+import 'player/immersive_lyrics_screen.dart';
 import 'search/search_screen.dart';
 import 'settings/settings_screen.dart';
 
@@ -110,6 +111,7 @@ class _MainShellState extends State<MainShell> {
         const SingleActivator(LogicalKeyboardKey.keyL, control: true): _searchFocus.requestFocus,
         const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () => _histories[_currentIndex].back(),
         const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () => _histories[_currentIndex].forward(),
+        const SingleActivator(LogicalKeyboardKey.f11): () => ImmersiveLyricsScreen.open(context),
       };
 
   Widget _pages() => IndexedStack(

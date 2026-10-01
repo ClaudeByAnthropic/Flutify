@@ -1,26 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/theme/md3e_shapes.dart';
-import '../../../core/utils/artwork_palette.dart';
+import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/track.dart';
 import '../../../providers/playback_provider.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/liquid_artwork_background.dart';
 import '../../widgets/liquid_glass.dart';
-import '../../widgets/playback_scrubber.dart';
 import '../../widgets/player_controls.dart';
+import 'lyrics/lyrics_backdrop.dart';
+import 'lyrics/lyrics_glass_controls.dart';
 import 'lyrics/lyrics_view.dart';
 
-/// 同步歌词面板（Apple Music iOS 风格）。
+/// 同步歌词面板（Apple Music iOS 风格，手机 / 窄窗口使用）。
 ///
 /// 层级（自下而上）：
-/// 1. 流动封面背景 [LiquidArtworkBackground]；
+/// 1. 流动封面背景 [LyricsBackdrop]；
 /// 2. 歌词滚动区 [LyricsView]，可从上下两块玻璃下方滚过；
 /// 3. 顶部液态玻璃信息胶囊（封面 / 歌名 / 关闭）；
-/// 4. 底部液态玻璃控制台（进度条 / 切歌 / 播放暂停）。
+/// 4. 底部液态玻璃控制台 [LyricsGlassControls]。
 class LyricsSheet extends StatelessWidget {
   const LyricsSheet({super.key});
 
@@ -42,15 +41,16 @@ class LyricsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
+    final corner = Radius.circular(context.tokens.corner(32));
 
     return ClipRRect(
-      borderRadius: MD3EShapes.topSheet,
+      borderRadius: BorderRadius.vertical(top: corner),
       child: SizedBox(
         height: MediaQuery.sizeOf(context).height * 0.92,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _SheetBackground(imageUrl: track?.coverUrl ?? ''),
+            LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
             if (track == null)
               Center(
                 child: EmptyState(
@@ -73,31 +73,10 @@ class LyricsSheet extends StatelessWidget {
                 left: 16,
                 right: 16,
                 bottom: 16 + bottomSafe,
-                child: const _GlassControls(),
+                child: const LyricsGlassControls(),
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// 背景单独订阅播放状态：暂停时停止流动，且不牵连歌词重建。
-class _SheetBackground extends StatelessWidget {
-  final String imageUrl;
-
-  const _SheetBackground({required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    final isPlaying = context.select<PlaybackProvider, bool>((p) => p.isPlaying);
-    return ArtworkColorBuilder(
-      imageUrl: imageUrl,
-      fallback: const Color(0xFF1E2838),
-      builder: (context, artColor) => LiquidArtworkBackground(
-        imageUrl: imageUrl,
-        fallback: Color.lerp(artColor, Colors.black, 0.35)!,
-        animate: isPlaying,
       ),
     );
   }
@@ -111,6 +90,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Column(
@@ -122,15 +102,11 @@ class _Header extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           LiquidGlass(
-            borderRadius: const BorderRadius.all(Radius.circular(22)),
+            borderRadius: tokens.radius(22),
             padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
             child: Row(
               children: [
-                CoverImage(
-                  url: track?.coverUrl ?? '',
-                  size: 44,
-                  borderRadius: const BorderRadius.all(Radius.circular(10)),
-                ),
+                CoverImage(url: track?.coverUrl ?? '', size: 44, borderRadius: tokens.radius(10)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -163,46 +139,6 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 底部玻璃控制台：进度条 + 上一首 / 播放暂停 / 下一首。
-class _GlassControls extends StatelessWidget {
-  const _GlassControls();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: const LiquidGlass(
-          borderRadius: BorderRadius.all(Radius.circular(30)),
-          padding: EdgeInsets.fromLTRB(16, 6, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PlaybackScrubber(
-                compact: true,
-                activeColor: Colors.white,
-                inactiveColor: Colors.white24,
-                labelColor: Colors.white60,
-              ),
-              SizedBox(height: 2),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SkipButton(next: false, size: 32),
-                  SizedBox(width: 28),
-                  PlayPauseButton(size: 56, iconSize: 32),
-                  SizedBox(width: 28),
-                  SkipButton(next: true, size: 32),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -479,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeLoadFailedMessage.
   ///
   /// In zh, this message translates to:
-  /// **'请检查网络连接或 API 设置。'**
+  /// **'请检查网络连接后重试。'**
   String get homeLoadFailedMessage;
 
   /// No description provided for @homeMadeForYou.
@@ -557,7 +557,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchCategoriesFailedMessage.
   ///
   /// In zh, this message translates to:
-  /// **'请检查网络连接或 API 设置后重试。'**
+  /// **'请检查网络连接后重试。'**
   String get searchCategoriesFailedMessage;
 
   /// No description provided for @searchNoResultsTitle.
@@ -968,6 +968,18 @@ abstract class AppLocalizations {
   /// **'这些歌词尚未与歌曲同步。'**
   String get lyricsUnsynced;
 
+  /// No description provided for @lyricsImmersive.
+  ///
+  /// In zh, this message translates to:
+  /// **'沉浸式歌词'**
+  String get lyricsImmersive;
+
+  /// No description provided for @lyricsExitImmersive.
+  ///
+  /// In zh, this message translates to:
+  /// **'退出全屏（Esc）'**
+  String get lyricsExitImmersive;
+
   /// No description provided for @deviceConnectTitle.
   ///
   /// In zh, this message translates to:
@@ -1076,83 +1088,227 @@ abstract class AppLocalizations {
   /// **'我的歌单'**
   String get createPlaylistDefaultName;
 
-  /// No description provided for @settingsSave.
+  /// No description provided for @settingsAppearanceSection.
   ///
   /// In zh, this message translates to:
-  /// **'保存设置'**
-  String get settingsSave;
+  /// **'外观'**
+  String get settingsAppearanceSection;
 
-  /// No description provided for @settingsSaved.
+  /// No description provided for @settingsThemeMode.
   ///
   /// In zh, this message translates to:
-  /// **'Spotify API 配置已保存'**
-  String get settingsSaved;
+  /// **'主题'**
+  String get settingsThemeMode;
 
-  /// No description provided for @settingsBannerTitle.
+  /// No description provided for @settingsThemeSystem.
   ///
   /// In zh, this message translates to:
-  /// **'Spotify 逆向工程已就绪'**
-  String get settingsBannerTitle;
+  /// **'跟随系统'**
+  String get settingsThemeSystem;
 
-  /// No description provided for @settingsBannerMessage.
+  /// No description provided for @settingsThemeLight.
   ///
   /// In zh, this message translates to:
-  /// **'配置逆向获取的 SpClient 令牌、OAuth 密钥或本地 MITM 代理地址。'**
-  String get settingsBannerMessage;
+  /// **'浅色'**
+  String get settingsThemeLight;
 
-  /// No description provided for @settingsCredentialsSection.
+  /// No description provided for @settingsThemeDark.
   ///
   /// In zh, this message translates to:
-  /// **'API 凭据与代理'**
-  String get settingsCredentialsSection;
+  /// **'深色'**
+  String get settingsThemeDark;
 
-  /// No description provided for @settingsBaseUrlLabel.
+  /// No description provided for @settingsPureBlack.
   ///
   /// In zh, this message translates to:
-  /// **'API 基础地址'**
-  String get settingsBaseUrlLabel;
+  /// **'纯黑背景'**
+  String get settingsPureBlack;
 
-  /// No description provided for @settingsBaseUrlHint.
+  /// No description provided for @settingsPureBlackSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'https://api.spotify.com/v1 或 http://localhost:8080/v1'**
-  String get settingsBaseUrlHint;
+  /// **'深色模式下使用纯黑底色，OLED 屏幕更省电'**
+  String get settingsPureBlackSubtitle;
 
-  /// No description provided for @settingsTokenLabel.
+  /// No description provided for @settingsAccentSection.
   ///
   /// In zh, this message translates to:
-  /// **'Spotify 访问令牌（Bearer）'**
-  String get settingsTokenLabel;
+  /// **'强调色'**
+  String get settingsAccentSection;
 
-  /// No description provided for @settingsTokenHint.
+  /// No description provided for @settingsAccentCustom.
   ///
   /// In zh, this message translates to:
-  /// **'BQ…（OAuth 访问令牌）'**
-  String get settingsTokenHint;
+  /// **'自定义颜色'**
+  String get settingsAccentCustom;
 
-  /// No description provided for @settingsTokenManaged.
+  /// No description provided for @settingsDynamicAccent.
   ///
   /// In zh, this message translates to:
-  /// **'已登录：令牌由 Login5 自动获取与续期'**
-  String get settingsTokenManaged;
+  /// **'跟随封面取色'**
+  String get settingsDynamicAccent;
 
-  /// No description provided for @settingsPasteToken.
+  /// No description provided for @settingsDynamicAccentSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'粘贴令牌'**
-  String get settingsPasteToken;
+  /// **'强调色随正在播放的专辑封面变化'**
+  String get settingsDynamicAccentSubtitle;
 
-  /// No description provided for @settingsSpClientLabel.
+  /// No description provided for @settingsGlassSection.
   ///
   /// In zh, this message translates to:
-  /// **'SpClient Cookie（sp_dc / 内部令牌）'**
-  String get settingsSpClientLabel;
+  /// **'液态玻璃'**
+  String get settingsGlassSection;
 
-  /// No description provided for @settingsSpClientHint.
+  /// No description provided for @settingsGlassPreview.
   ///
   /// In zh, this message translates to:
-  /// **'从 Spotify 桌面端 / Android 客户端的 Cookie 中提取'**
-  String get settingsSpClientHint;
+  /// **'玻璃预览'**
+  String get settingsGlassPreview;
+
+  /// No description provided for @settingsGlassBlur.
+  ///
+  /// In zh, this message translates to:
+  /// **'模糊强度'**
+  String get settingsGlassBlur;
+
+  /// No description provided for @settingsGlassOpacity.
+  ///
+  /// In zh, this message translates to:
+  /// **'不透明度'**
+  String get settingsGlassOpacity;
+
+  /// No description provided for @settingsTextShapeSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'文字与形状'**
+  String get settingsTextShapeSection;
+
+  /// No description provided for @settingsFontScale.
+  ///
+  /// In zh, this message translates to:
+  /// **'字号'**
+  String get settingsFontScale;
+
+  /// No description provided for @settingsFontPreview.
+  ///
+  /// In zh, this message translates to:
+  /// **'夜空中最亮的星'**
+  String get settingsFontPreview;
+
+  /// No description provided for @settingsCornerStyle.
+  ///
+  /// In zh, this message translates to:
+  /// **'圆角'**
+  String get settingsCornerStyle;
+
+  /// No description provided for @settingsCornerRounded.
+  ///
+  /// In zh, this message translates to:
+  /// **'圆润'**
+  String get settingsCornerRounded;
+
+  /// No description provided for @settingsCornerStandard.
+  ///
+  /// In zh, this message translates to:
+  /// **'标准'**
+  String get settingsCornerStandard;
+
+  /// No description provided for @settingsCornerSquare.
+  ///
+  /// In zh, this message translates to:
+  /// **'方正'**
+  String get settingsCornerSquare;
+
+  /// No description provided for @settingsMotionSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'动效'**
+  String get settingsMotionSection;
+
+  /// No description provided for @settingsReduceMotion.
+  ///
+  /// In zh, this message translates to:
+  /// **'减弱动效'**
+  String get settingsReduceMotion;
+
+  /// No description provided for @settingsReduceMotionSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭流动背景、过渡与悬停等装饰性动画'**
+  String get settingsReduceMotionSubtitle;
+
+  /// No description provided for @settingsResetAppearance.
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复默认外观'**
+  String get settingsResetAppearance;
+
+  /// No description provided for @settingsCustomColorTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义强调色'**
+  String get settingsCustomColorTitle;
+
+  /// No description provided for @settingsHue.
+  ///
+  /// In zh, this message translates to:
+  /// **'色相'**
+  String get settingsHue;
+
+  /// No description provided for @settingsSaturation.
+  ///
+  /// In zh, this message translates to:
+  /// **'饱和度'**
+  String get settingsSaturation;
+
+  /// No description provided for @settingsBrightness.
+  ///
+  /// In zh, this message translates to:
+  /// **'亮度'**
+  String get settingsBrightness;
+
+  /// No description provided for @accountTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify 账号'**
+  String get accountTitle;
+
+  /// No description provided for @accountSignedOutMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录后同步你的音乐库'**
+  String get accountSignedOutMessage;
+
+  /// No description provided for @accountSignIn.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录'**
+  String get accountSignIn;
+
+  /// No description provided for @accountSignOut.
+  ///
+  /// In zh, this message translates to:
+  /// **'退出登录'**
+  String get accountSignOut;
+
+  /// No description provided for @accountSignOutTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'退出登录？'**
+  String get accountSignOutTitle;
+
+  /// No description provided for @accountSignOutMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'将清除本机保存的登录信息与媒体库缓存，退出后需重新登录才能播放和查看媒体库。'**
+  String get accountSignOutMessage;
+
+  /// No description provided for @accountSignOutConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'退出'**
+  String get accountSignOutConfirm;
 }
 
 class _AppLocalizationsDelegate

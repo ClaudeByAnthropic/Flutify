@@ -8,6 +8,7 @@ import '../../providers/spotify_provider.dart';
 import '../navigation/app_routes.dart';
 import '../screens/player/device_picker_sheet.dart';
 import '../screens/player/full_player_sheet.dart';
+import '../screens/player/immersive_lyrics_screen.dart';
 import '../screens/player/lyrics_sheet.dart';
 import '../screens/player/queue_sheet.dart';
 import '../shell/shell_layout_controller.dart';
@@ -270,6 +271,13 @@ class _RightControls extends StatelessWidget {
         tooltip: context.l10n.deviceConnectTitle,
         style: _barIconStyle,
         onPressed: () => DevicePickerSheet.show(context),
+      ),
+      IconButton(
+        icon: const Icon(Icons.open_in_full_rounded, size: 18),
+        color: colorScheme.onSurfaceVariant,
+        tooltip: context.l10n.lyricsImmersive,
+        style: _barIconStyle,
+        onPressed: () => ImmersiveLyricsScreen.open(context),
       ),
     ];
 

@@ -1,0 +1,55 @@
+import 'package:flutter/material.dart';
+
+import '../../../../core/theme/flutify_tokens.dart';
+import '../../../widgets/liquid_glass.dart';
+import '../../../widgets/playback_scrubber.dart';
+import '../../../widgets/player_controls.dart';
+
+/// 歌词界面底部的液态玻璃控制台：进度条 + 播放控件。
+///
+/// - 默认（手机全屏歌词）：上一首 / 播放暂停 / 下一首；
+/// - [full] 为 true（桌面沉浸式、全屏播放器歌词视图）：额外带随机与循环。
+class LyricsGlassControls extends StatelessWidget {
+  final bool full;
+  final double maxWidth;
+
+  const LyricsGlassControls({super.key, this.full = false, this.maxWidth = 520});
+
+  @override
+  Widget build(BuildContext context) {
+    final gap = full ? 20.0 : 28.0;
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: LiquidGlass(
+          borderRadius: context.tokens.radius(30),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const PlaybackScrubber(
+                compact: true,
+                activeColor: Colors.white,
+                inactiveColor: Colors.white24,
+                labelColor: Colors.white60,
+              ),
+              const SizedBox(height: 2),
+              Row(
+                mainAxisAlignment: full ? MainAxisAlignment.spaceEvenly : MainAxisAlignment.center,
+                children: [
+                  if (full) const ShuffleButton(),
+                  const SkipButton(next: false, size: 32),
+                  SizedBox(width: full ? 0 : gap),
+                  const PlayPauseButton(size: 56, iconSize: 32),
+                  SizedBox(width: full ? 0 : gap),
+                  const SkipButton(next: true, size: 32),
+                  if (full) const RepeatButton(),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

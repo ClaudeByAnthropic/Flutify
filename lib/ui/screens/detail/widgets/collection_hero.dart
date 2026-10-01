@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../core/utils/artwork_palette.dart';
 import '../../../shell/shell_breakpoints.dart';
 import '../../../widgets/cover_image.dart';
@@ -423,7 +424,7 @@ class _HeroCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(size >= 200 ? 12 : 10);
+    final radius = context.tokens.radius(size >= 200 ? 12 : 10);
     final cover = hero.coverOverride != null
         ? SizedBox.square(dimension: size, child: FittedBox(child: hero.coverOverride))
         : CoverImage(

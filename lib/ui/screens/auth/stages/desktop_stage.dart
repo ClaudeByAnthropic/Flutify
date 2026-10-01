@@ -73,12 +73,6 @@ class DesktopStage extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 28),
-        const AuthHint(
-          icon: Icons.shield_outlined,
-          text: '与官方桌面版相同的授权流程：密码只在 Spotify 官方页面输入，人机验证、两步验证与 Passkey '
-              '均由官方处理；Flutify 只保存可续期的令牌。这是风控风险最低的登录方式。',
-        ),
       ],
     );
   }

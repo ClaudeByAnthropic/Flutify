@@ -94,7 +94,7 @@ class DesktopShell extends StatelessWidget {
                                 width: ShellBreakpoints.nowPlayingWidth,
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
-                                    borderRadius: PanelSurface.radius,
+                                    borderRadius: PanelSurface.radiusOf(context),
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withAlpha(90),

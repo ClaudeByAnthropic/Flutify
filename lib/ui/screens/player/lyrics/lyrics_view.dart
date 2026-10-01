@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../models/lyrics.dart';
 import '../../../../providers/playback_provider.dart';
@@ -28,11 +29,19 @@ class LyricsView extends StatefulWidget {
   final double topInset;
   final double bottomInset;
 
+  /// 歌词字号：手机 / 右栏 30，桌面沉浸式更大。
+  final double fontSize;
+
+  /// 歌词区左右留白。
+  final double horizontalPadding;
+
   const LyricsView({
     super.key,
     required this.trackId,
     this.topInset = 0,
     this.bottomInset = 0,
+    this.fontSize = 30,
+    this.horizontalPadding = 28,
   });
 
   @override
@@ -134,7 +143,7 @@ class _LyricsViewState extends State<LyricsView> {
     Scrollable.ensureVisible(
       ctx,
       alignment: alignment,
-      duration: animate ? const Duration(milliseconds: 500) : Duration.zero,
+      duration: animate && !context.reduceMotion ? const Duration(milliseconds: 500) : Duration.zero,
       curve: Curves.easeOutCubic,
     );
   }
@@ -214,7 +223,12 @@ class _LyricsViewState extends State<LyricsView> {
           controller: _scroll,
           physics: const BouncingScrollPhysics(),
           // 上下各留出到对焦中心的距离，第一句和最后一句也能停在正中
-          padding: EdgeInsets.fromLTRB(28, centerY, 28, _viewportHeight - centerY),
+          padding: EdgeInsets.fromLTRB(
+            widget.horizontalPadding,
+            centerY,
+            widget.horizontalPadding,
+            _viewportHeight - centerY,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -230,6 +244,7 @@ class _LyricsViewState extends State<LyricsView> {
                 LyricLineView(
                   key: _lineKeys[i],
                   text: lyrics.lines[i].words,
+                  fontSize: widget.fontSize,
                   // 以对焦行为中心：当句清晰，上下句按行距逐级模糊
                   distance: _isSynced ? i - _focusIndex : 0,
                   focusAll: !_isSynced || _browsing,

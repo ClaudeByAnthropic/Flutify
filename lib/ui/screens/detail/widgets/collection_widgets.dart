@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/theme/md3e_colors.dart';
+import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../models/playback_context.dart';
 import '../../../../models/track.dart';
@@ -16,7 +16,7 @@ import '../../../widgets/skeleton.dart';
 /// 详情页大号播放按钮：
 /// 正在播放该上下文 → 暂停；该上下文已暂停 → 继续；否则从头播放整个上下文。
 ///
-/// 与 Spotify 一致，深浅色主题下都是亮绿底 + 黑色图标（浅色主题的 primary 是加深绿，不用它）。
+/// 与 Spotify 一致，深浅色主题下都是强调色底 + 自动黑 / 白图标（浅色主题的 primary 是加深色，不用它）。
 class ContextPlayButton extends StatelessWidget {
   final List<SpotifyTrack> tracks;
   final PlaybackContext playbackContext;
@@ -36,6 +36,7 @@ class ContextPlayButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uri = playbackContext.uri;
+    final tokens = context.tokens;
     final (isPlayingThis, isThisContext) = context.select<PlaybackProvider, (bool, bool)>(
       (p) => (p.isPlayingContext(uri), p.playbackContext.uri == uri),
     );
@@ -51,7 +52,7 @@ class ContextPlayButton extends StatelessWidget {
         ],
       ),
       child: Material(
-        color: MD3EColors.spotifyGreen,
+        color: tokens.accent,
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -67,7 +68,7 @@ class ContextPlayButton extends StatelessWidget {
                 },
           child: Icon(
             isPlayingThis ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            color: Colors.black,
+            color: tokens.onAccent,
             size: size * 0.6,
           ),
         ),

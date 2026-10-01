@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/md3e_colors.dart';
+import '../../core/theme/flutify_tokens.dart';
 import '../../core/theme/md3e_shapes.dart';
 import '../shell/shell_breakpoints.dart';
 import 'cover_image.dart';
@@ -37,6 +37,8 @@ class ExpressiveCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final hoverCapable = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+    final tokens = context.tokens;
+    final cardRadius = tokens.radius(MD3EShapes.radiusLarge);
 
     return Container(
       width: width,
@@ -44,10 +46,10 @@ class ExpressiveCard extends StatelessWidget {
       child: HoverBuilder(
         builder: (context, hovered) => Material(
           color: hovered ? colorScheme.surfaceContainerHigh : Colors.transparent,
-          borderRadius: MD3EShapes.roundedLarge,
+          borderRadius: cardRadius,
           child: InkWell(
             onTap: onTap,
-            borderRadius: MD3EShapes.roundedLarge,
+            borderRadius: cardRadius,
             // 悬停底色由 Material 负责（带动画的 InkWell 悬停色会与之叠加变脏）
             hoverColor: Colors.transparent,
             child: Padding(
@@ -64,7 +66,7 @@ class ExpressiveCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHigh,
                             shape: isCircular ? BoxShape.circle : BoxShape.rectangle,
-                            borderRadius: isCircular ? null : MD3EShapes.roundedMedium,
+                            borderRadius: isCircular ? null : tokens.radius(MD3EShapes.radiusMedium),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withAlpha(60),
@@ -138,7 +140,8 @@ class _HoverPlayButtonState extends State<_HoverPlayButton> {
   @override
   Widget build(BuildContext context) {
     const curve = Curves.easeOutBack;
-    const duration = Duration(milliseconds: 220);
+    final duration = context.motion(const Duration(milliseconds: 220));
+    final tokens = context.tokens;
     return IgnorePointer(
       ignoring: !widget.visible,
       child: AnimatedSlide(
@@ -147,7 +150,7 @@ class _HoverPlayButtonState extends State<_HoverPlayButton> {
         curve: curve,
         child: AnimatedOpacity(
           opacity: widget.visible ? 1 : 0,
-          duration: const Duration(milliseconds: 160),
+          duration: context.motion(const Duration(milliseconds: 160)),
           child: AnimatedScale(
             scale: widget.visible ? (_pressed ? 0.92 : 1) : 0.8,
             duration: duration,
@@ -160,18 +163,18 @@ class _HoverPlayButtonState extends State<_HoverPlayButton> {
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
+                  duration: context.motion(const Duration(milliseconds: 180)),
                   curve: Curves.easeOutCubic,
                   width: _size,
                   height: _size,
                   decoration: BoxDecoration(
-                    color: MD3EColors.spotifyGreen,
-                    borderRadius: BorderRadius.circular(_pressed ? 14 : _size / 2),
+                    color: tokens.accent,
+                    borderRadius: BorderRadius.circular(_pressed ? 14 : (tokens.squareCorners ? 12 : _size / 2)),
                     boxShadow: [
                       BoxShadow(color: Colors.black.withAlpha(110), blurRadius: 10, offset: const Offset(0, 4)),
                     ],
                   ),
-                  child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 28),
+                  child: Icon(Icons.play_arrow_rounded, color: tokens.onAccent, size: 28),
                 ),
               ),
             ),

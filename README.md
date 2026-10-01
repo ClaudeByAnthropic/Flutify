@@ -36,7 +36,9 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
     中间区域可在「封面 / 歌词 / 播放队列」间切换（底部按钮，再点一次回到封面）；**左右滑动封面切歌**，小幅拖动松手回弹；内嵌歌词右上角可进入全屏歌词。
   - **播放失败提示**：未登录（带「登录」按钮）、曲目不可播放（说明已自动跳过）、网络错误（带「重试」按钮）均以浮动提示条告知，连续失败只保留最新一条。
   - **Spotify Connect 设备切换**：支持检测并切换播放设备（PC / 手机 / 音箱）。
-  - **实时同步歌词 (Synced Lyrics)**：Apple Music iOS 风格——流动封面背景（`LiquidArtworkBackground`）、顶部信息胶囊与底部控制台采用液态玻璃（`LiquidGlass`），当前行清晰、上下句按行距逐级模糊变暗；手动滚动时全部变清晰，停手 3 秒后自动回到当前行；点击任意行跳转。
+  - **实时同步歌词 (Synced Lyrics)**：Apple Music iOS 风格——流动封面背景（`LyricsBackdrop`）、顶部信息胶囊与底部控制台采用液态玻璃（`LiquidGlass`），当前行清晰、上下句按行距逐级模糊变暗；手动滚动时全部变清晰，停手 3 秒后自动回到当前行；点击任意行跳转。
+    **所有歌词界面同一套液态玻璃观感**：全屏歌词面板、全屏播放器的歌词视图（背景交叉淡入流动封面、控件收进玻璃）、桌面右栏歌词。
+  - **桌面沉浸式歌词**（`immersive_lyrics_screen.dart`）：窗口进入系统全屏，左侧大封面 + 玻璃控制台、右侧大字号歌词；Esc / F11 退出，鼠标静止 3 秒隐藏光标与按钮。入口：播放栏右侧、右栏歌词右上角、全屏播放器歌词、F11。
   - **播放队列管理器 (Queue)**：与 Spotify 一致的双层队列——"Next in queue"（用户手动添加，优先播放）+ "Next from: 上下文"，两段均支持拖拽排序、滑动删除、点击跳播、一键清空。
   - **播放上下文 (Playback Context)**：记录"正在从哪个歌单 / 专辑 / 艺人 / 搜索播放"，全屏播放器顶部显示「正在播放歌单」等，详情页播放键可在"播放整个上下文 / 暂停 / 继续"间切换。
   - **真随机与循环**：随机模式基于打乱的播放顺序表，切换时以当前曲目为起点重建；列表循环在末尾回绕，单曲循环重播。
@@ -45,8 +47,13 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 向上滚动后收起为吸顶标题栏，带小号播放键。
   - 拿不到数据时显示「登录后即可查看」或「暂时无法加载」，带登录 / 重试按钮，不会一直转圈。
 * **悬停与右键（桌面端）**：卡片悬停浮出绿色播放键（按下时由圆变圆角方形）；曲目行悬停时序号变 ▶、露出收藏与「⋯」；右键曲目弹出上下文菜单（加入歌单[二级菜单] / 收藏 / 加入队列 / 前往艺人 / 前往专辑 / 复制链接）。移动端长按曲目打开底部菜单。
-* **深浅色**：跟随系统；浅色模式下药丸、播放键、详情页头部与状态栏图标都单独调过对比度。
-* **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环、Ctrl+K / Ctrl+L 聚焦搜索、Alt+←/→ 后退 / 前进、Esc 关闭浮层右栏。
+* **深浅色**：默认跟随系统；浅色模式下药丸、播放键、详情页头部与状态栏图标都单独调过对比度。
+* **自定义外观（设置页，iOS 分组样式，修改即时生效并自动保存）**：
+  - 主题模式（跟随系统 / 浅色 / 深色）、纯黑背景（OLED）；
+  - 强调色：7 个预设 + HSV 自定义（十六进制输入），或「跟随封面取色」——强调色随正在播放的封面变化，并自动保证与背景的对比度（WCAG ≥ 3:1）；
+  - 液态玻璃模糊强度 / 不透明度（带实时预览）、字号（85% – 130%）、圆角风格（圆润 / 标准 / 方正）、减弱动效（同时尊重系统设置）。
+  - 实现：`AppearanceProvider` 生成主题，主题之外的参数通过 ThemeExtension `FlutifyTokens` 下发（`context.tokens`、`context.motion()`）。
+* **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环、Ctrl+K / Ctrl+L 聚焦搜索、Alt+←/→ 后退 / 前进、F11 沉浸式歌词、Esc 关闭浮层右栏 / 退出沉浸式歌词。
 
 ### 3. 响应式外壳（桌面三栏 / 移动端）
 * **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：自绘标题栏（拖动 / 双击最大化 / Win11 风格窗口按钮）+ 顶栏（后退前进、主页、居中搜索、头像）；
@@ -54,6 +61,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   右栏「正在播放 / 播放队列 / 歌词」；底部播放栏（窗口变窄时依次隐藏音量条、音量键，不溢出）。
 * **右栏形态**：≥ 1280px 停靠在内容右侧（开关状态持久化）；1100 – 1280px 为浮层，默认关闭，点空白处或 Esc 关闭，不遮挡内容。
 * **< 800px 移动端**（`ui/shell/mobile/`）：内容铺到底部之下，毛玻璃底部导航 + 悬浮胶囊迷你播放器；页面底部留白按实际遮挡高度计算（`ContentBottomSpacer`）。
+  手机（屏幕最短边 < 600）锁定竖屏，平板不限制（`core/utils/orientation_policy.dart`）。
 
 ---
 
@@ -146,7 +154,7 @@ d:/Flutify/app/
 │   │   ├── playback_provider.dart        # 播放状态、上下文、双层队列、随机/循环、音量
 │   │   ├── library_provider.dart         # 收藏歌曲、歌单、关注艺人、收藏专辑（持久化）
 │   │   ├── spotify_provider.dart         # 主页数据、防抖搜索、搜索历史、歌词缓存、设备
-│   │   └── settings_provider.dart        # 手动凭据（令牌 / 自定义 API 基址 / SpClient 令牌）
+│   │   └── appearance_provider.dart      # 外观设置（主题 / 强调色 / 玻璃 / 字号 / 圆角 / 动效），防抖持久化
 │   ├── ui/
 │   │   ├── navigation/                   # Tab 内嵌 Navigator、统一跳转 AppRoutes、后退 / 前进历史 content_history
 │   │   ├── shell/
@@ -162,11 +170,13 @@ d:/Flutify/app/
 │   │   │   ├── library/library_screen.dart# 媒体库与已点赞歌曲
 │   │   │   ├── detail/                   # 歌单、专辑、艺人详情页
 │   │   │   │   └── widgets/              # collection_hero（大头图 + 吸顶栏 + 主色）、collection_widgets（操作行 / 占位）
-│   │   │   ├── player/                   # 全屏播放器、歌词、队列列表 queue_list 与设备列表
+│   │   │   ├── player/                   # 全屏播放器、全屏歌词、桌面沉浸式歌词、队列列表 queue_list 与设备列表
+│   │   │   │   ├── lyrics/               # 歌词滚动区、单行、液态背景、玻璃控制台、玻璃圆按钮
 │   │   │   │   └── widgets/swipeable_artwork.dart # 左右滑动切歌的封面
 │   │   │   ├── auth/                     # 登录页外壳 login_screen.dart + stages/（浏览器登录[默认]、密码、手机号、
 │   │   │   │                             #   链接、导入凭据、开发者应用授权、验证码）+ widgets/（品牌标、授权等待页等）
-│   │   │   └── settings/settings_screen.dart # 账号卡片（登录/刷新令牌/退出）+ 手动凭据
+│   │   │   └── settings/                 # 设置页：账号卡片 + sections/（外观、强调色、液态玻璃、文字与形状、动效）
+│   │   │                                 #   + widgets/（分组、分段控件、滑杆行、色板、自定义取色、玻璃预览）
 │   │   └── widgets/                      # MiniPlayer、TrackTile、CoverImage、PlaybackScrubber、
 │   │                                     # PlayerControls、TrackOptionsSheet、CreatePlaylistDialog 等；
 │   │                                     # track_menu（桌面右键菜单 / 移动端底部菜单）、hover_builder、
@@ -177,7 +187,8 @@ d:/Flutify/app/
 └── test/
     ├── fixtures/sample_catalog.dart      # 合成曲库（虚构数据，不含任何账号内容）
     ├── fakes/                            # 音频 / 音频源 / 媒体库 / 数据服务的内存替身
-    ├── ui/                               # 大头图、三种宽度（1440 / 1024 / 390）、移动端播放器、错误状态
+    ├── ui/                               # 大头图、三种宽度（1440 / 1024 / 390）、移动端播放器、错误状态、外观设置与沉浸式歌词
+    ├── audit/                            # 离屏渲染审查（默认跳过，见「代码分析与自动化测试」）
     ├── ui_flow_test.dart, widget_test.dart # 移动 / 桌面关键流程冒烟
     └── ...                               # Provider、协议、媒体库编解码等单元测试
 ```
@@ -248,3 +259,10 @@ cd d:\Flutify\app
 & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" analyze
 & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" test
 ```
+
+离屏渲染审查（不打开任何窗口，在测试环境里按 390×844 手机竖屏深浅色各渲染一遍主要页面，外加桌面右栏歌词与沉浸式歌词；
+图片写入 `build/audit/`，用于人工检查布局）：
+```powershell
+$env:FLUTIFY_AUDIT='1'; & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" test --update-goldens test/audit; $env:FLUTIFY_AUDIT=$null
+```
+> 测试环境下阴影不做模糊（`debugDisableShadows`），封面下方的实色"台阶"是测试渲染特有的，实机为柔和投影。

@@ -50,12 +50,31 @@ Spotify 新版桌面三栏布局 + MD3E 质感；跟随系统深浅色；自绘�
 - [ ] 深浅色切换后各页观感；详情页头图主色是否自然；悬停动效节奏
 - [ ] Android：毛玻璃导航的模糊性能、状态栏图标颜色、滑动切歌手感
 
+## 已完成 ③：自定义主题 / 液态玻璃歌词 / 手机竖屏（测试全部通过，**实机外观待用户查看**）
+
+- [x] 外观设置（`models/appearance.dart` + `providers/appearance_provider.dart`，持久化键 `ui_appearance`）：
+      主题模式、强调色（7 预设 + HSV 自定义）、跟随封面取色、玻璃模糊 / 不透明度、纯黑背景、字号、圆角风格、减弱动效
+- [x] 主题令牌 `core/theme/flutify_tokens.dart`（ThemeExtension）：`context.tokens.accent / radius() / pill / glassSigma`、
+      `context.motion()`；按钮、药丸、卡片、封面、面板、迷你播放器、全屏播放器均已接入
+- [x] 设置页重写为 iOS 分组样式（`settings/sections/` + `settings/widgets/`），删除逆向横幅、手动凭据区、令牌信息与「刷新令牌」；
+      登录页底部协议 / 风控说明删除；账号卡片文案迁入 ARB
+- [x] 所有歌词液态玻璃化：共用 `player/lyrics/lyrics_backdrop.dart`、`lyrics_glass_controls.dart`、`glass_icon_button.dart`；
+      全屏播放器歌词视图背景交叉淡入流动封面、控件收进玻璃；桌面右栏歌词同款背景 + 「沉浸式」入口
+- [x] 桌面沉浸式歌词 `player/immersive_lyrics_screen.dart`：窗口系统全屏，左封面 + 控制台、右大字号歌词；
+      Esc / F11 退出，鼠标静止 3 秒隐藏光标与按钮；入口：播放栏、右栏歌词、全屏播放器歌词、F11
+- [x] 手机锁定竖屏（`core/utils/orientation_policy.dart`，最短边 < 600 才锁）；离屏渲染审查 `test/audit/`（默认跳过，见 README）
+
+### 需要用户在实机上看的
+
+- [ ] 沉浸式歌词进入 / 退出系统全屏是否顺滑（Windows），退出后窗口是否回到原大小
+- [ ] 玻璃模糊调到最大时 Android 上的流畅度；跟随封面取色在浅色主题下的对比度
+
 ## 其他待办 / 优化
 
 - [ ] 主页「最近播放」：目前快捷网格是媒体库前 7 个歌单，可改为真实播放历史（`recently-played` / 本机记录）
-- [ ] 字体裁剪到 GB2312 + 常用字（约 30 MB → 8 MB）
 - [ ] 音乐库「按字母顺序」改为按拼音排序（左栏 `library_sidebar_entry.dart` 与移动端 `library_screen.dart` 两处）
-- [ ] 登录页、账号卡片的中文文案迁入 ARB
+- [ ] 登录页的中文文案迁入 ARB（账号卡片已完成）
+- [ ] 外观设置跨设备同步（目前仅本机）；沉浸式歌词支持逐字歌词（需 color-lyrics 的 syllable 数据）
 - [ ] 主页按官方分区显示（带分区标题）
 - [ ] Spotify Connect 设备列表（dealer / connect-state）
 - [ ] 桌面客户端升级后 Pathfinder hash 失效检测与提示

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/flutify_tokens.dart';
 import '../../../core/theme/md3e_shapes.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/album.dart';
@@ -362,7 +363,7 @@ class _LibraryGrid extends StatelessWidget {
         final item = items[i];
         return InkWell(
           key: ValueKey(item.id),
-          borderRadius: MD3EShapes.roundedMedium,
+          borderRadius: context.tokens.radius(MD3EShapes.radiusMedium),
           onTap: item.onTap,
           child: Column(
             crossAxisAlignment: item.circular ? CrossAxisAlignment.center : CrossAxisAlignment.start,
@@ -401,13 +402,13 @@ class _ItemCover extends StatelessWidget {
       return Container(
         width: size,
         height: size,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFF450AF5), Color(0xFF8E8EE5)],
           ),
-          borderRadius: MD3EShapes.roundedSmall,
+          borderRadius: context.tokens.radius(MD3EShapes.radiusSmall),
         ),
         child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 28),
       );
@@ -416,7 +417,7 @@ class _ItemCover extends StatelessWidget {
       url: item.imageUrl,
       size: size,
       circular: item.circular,
-      borderRadius: item.circular ? null : MD3EShapes.roundedSmall,
+      borderRadius: item.circular ? null : context.tokens.radius(MD3EShapes.radiusSmall),
       placeholderIcon: item.circular ? Icons.person_rounded : Icons.music_note_rounded,
     );
   }

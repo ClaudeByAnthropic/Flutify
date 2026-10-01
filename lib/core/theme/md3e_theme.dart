@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../models/appearance.dart';
+import 'flutify_tokens.dart';
 import 'md3e_colors.dart';
 import 'md3e_shapes.dart';
 import 'md3e_typography.dart';
@@ -7,19 +10,29 @@ import 'md3e_typography.dart';
 class MD3ETheme {
   MD3ETheme._();
 
-  /// 默认品牌色的深 / 浅色主题（含 MiSans TextTheme，只构建一次）。
-  /// 全屏播放器等深色沉浸页面在浅色模式下也用 [dark] 包裹，保证白色系控件与深色背景匹配。
-  static final ThemeData dark = darkTheme();
-  static final ThemeData light = lightTheme();
+  /// 默认外观的深 / 浅色主题（测试与未接入外观设置的场景使用）。
+  static final ThemeData dark = build(Brightness.dark, AppearanceSettings.defaults, MD3EColors.spotifyGreen);
+  static final ThemeData light = build(Brightness.light, AppearanceSettings.defaults, MD3EColors.spotifyGreen);
 
-  static ThemeData darkTheme({Color primary = MD3EColors.spotifyGreen}) =>
-      _build(MD3EColors.createColorScheme(primary: primary, brightness: Brightness.dark));
+  /// 最近用过的主题；拖动设置页滑杆时会连续生成，限制数量避免无限增长。
+  static final Map<(Brightness, AppearanceSettings, Color), ThemeData> _cache = {};
 
-  /// 浅色主题：组件规则与深色完全一致，只替换色板（跟随系统深浅色）。
-  static ThemeData lightTheme({Color primary = MD3EColors.spotifyGreen}) =>
-      _build(MD3EColors.createColorScheme(primary: primary, brightness: Brightness.light));
+  /// 按外观设置生成主题。[accent] 是本次实际使用的强调色（动态取色时为封面色，否则为用户所选）。
+  static ThemeData build(Brightness brightness, AppearanceSettings settings, Color accent) {
+    final key = (brightness, settings, accent);
+    final hit = _cache[key];
+    if (hit != null) return hit;
+    if (_cache.length > 24) _cache.remove(_cache.keys.first);
 
-  static ThemeData _build(ColorScheme colorScheme) {
+    final scheme = MD3EColors.createColorScheme(
+      primary: accent,
+      brightness: brightness,
+      pureBlack: settings.pureBlack && brightness == Brightness.dark,
+    );
+    return _cache[key] = _build(scheme, FlutifyTokens.from(settings, accent), settings.reduceMotion);
+  }
+
+  static ThemeData _build(ColorScheme colorScheme, FlutifyTokens tokens, bool reduceMotion) {
     final isDark = colorScheme.brightness == Brightness.dark;
     // englishLike 的样式 inherit=false，ThemeData 合并时不会补颜色；
     // FlexibleSpaceBar 等组件会对 titleLarge.color 做非空断言，必须显式着色。
@@ -36,6 +49,17 @@ class MD3ETheme {
       // 全局默认字族：未显式指定字族的 TextStyle（按钮、导航标签等）同样使用 MiSans
       fontFamily: MD3ETypography.fontFamily,
       textTheme: textTheme,
+      extensions: [tokens],
+      // 减弱动效：页面切换不做滑动 / 缩放，直接出现
+      pageTransitionsTheme: reduceMotion
+          ? const PageTransitionsTheme(builders: {
+              TargetPlatform.android: _NoTransitionsBuilder(),
+              TargetPlatform.iOS: _NoTransitionsBuilder(),
+              TargetPlatform.windows: _NoTransitionsBuilder(),
+              TargetPlatform.macOS: _NoTransitionsBuilder(),
+              TargetPlatform.linux: _NoTransitionsBuilder(),
+            })
+          : null,
 
       // App Bar Theme
       appBarTheme: AppBarTheme(
@@ -100,10 +124,14 @@ class MD3ETheme {
       cardTheme: CardThemeData(
         color: colorScheme.surfaceContainer,
         elevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: MD3EShapes.roundedLarge,
+        shape: RoundedRectangleBorder(
+          borderRadius: tokens.radius(MD3EShapes.radiusLarge),
         ),
         margin: EdgeInsets.zero,
+      ),
+
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(borderRadius: tokens.radius(MD3EShapes.radiusExtraLarge)),
       ),
 
       // Expressive Floating Action Button
@@ -112,7 +140,7 @@ class MD3ETheme {
         foregroundColor: colorScheme.onPrimary,
         elevation: 4,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: tokens.radius(20),
         ),
       ),
 
@@ -121,7 +149,7 @@ class MD3ETheme {
         style: FilledButton.styleFrom(
           backgroundColor: colorScheme.primary,
           foregroundColor: colorScheme.onPrimary,
-          shape: const StadiumBorder(),
+          shape: tokens.pillShape,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
@@ -132,7 +160,7 @@ class MD3ETheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: colorScheme.onSurface,
           side: BorderSide(color: colorScheme.outlineVariant),
-          shape: const StadiumBorder(),
+          shape: tokens.pillShape,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         ),
       ),
@@ -145,7 +173,8 @@ class MD3ETheme {
           color: colorScheme.onSurface,
           fontWeight: FontWeight.w600,
         ),
-        shape: const StadiumBorder(side: BorderSide.none),
+        shape: tokens.pillShape,
+        side: BorderSide.none,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       ),
 
@@ -164,8 +193,8 @@ class MD3ETheme {
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colorScheme.surfaceContainerHigh,
         modalBackgroundColor: colorScheme.surfaceContainerHigh,
-        shape: const RoundedRectangleBorder(
-          borderRadius: MD3EShapes.topSheet,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(tokens.corner(32))),
         ),
         elevation: 16,
         showDragHandle: true,
@@ -177,15 +206,15 @@ class MD3ETheme {
         filled: true,
         fillColor: colorScheme.surfaceContainerHigh,
         border: OutlineInputBorder(
-          borderRadius: MD3EShapes.pill,
+          borderRadius: tokens.pill,
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: MD3EShapes.pill,
+          borderRadius: tokens.pill,
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: MD3EShapes.pill,
+          borderRadius: tokens.pill,
           borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -193,4 +222,19 @@ class MD3ETheme {
       ),
     );
   }
+}
+
+/// 减弱动效时的页面切换：不做任何过渡动画。
+class _NoTransitionsBuilder extends PageTransitionsBuilder {
+  const _NoTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) =>
+      child;
 }

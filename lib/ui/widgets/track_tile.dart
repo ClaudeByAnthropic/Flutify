@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/flutify_tokens.dart';
 import '../../core/theme/md3e_shapes.dart';
 import '../../core/utils/formatters.dart';
 import '../../l10n/l10n.dart';
@@ -75,7 +76,7 @@ class TrackTile extends StatelessWidget {
           onTap: onTap ?? () => _play(context),
           onLongPress: () => TrackMenu.show(context, track),
           onSecondaryTapUp: (details) => TrackMenu.show(context, track, position: details.globalPosition),
-          borderRadius: MD3EShapes.roundedMedium,
+          borderRadius: context.tokens.radius(MD3EShapes.radiusMedium),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
@@ -109,12 +110,12 @@ class TrackTile extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        CoverImage(url: track.coverUrl, size: 48, borderRadius: BorderRadius.circular(8.0)),
+                        CoverImage(url: track.coverUrl, size: 48, borderRadius: context.tokens.radius(8)),
                         if (isCurrent || hovered)
                           DecoratedBox(
                             decoration: BoxDecoration(
                               color: Colors.black54,
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: context.tokens.radius(8),
                             ),
                             child: Center(
                               child: hovered

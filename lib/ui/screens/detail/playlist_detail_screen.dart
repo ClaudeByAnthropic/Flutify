@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/theme/md3e_colors.dart';
+import '../../../core/theme/flutify_tokens.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/playback_context.dart';
@@ -214,10 +214,10 @@ class _PlaylistMeta extends StatelessWidget {
         ],
         Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 12,
-              backgroundColor: MD3EColors.spotifyGreen,
-              child: Icon(Icons.music_note_rounded, color: Colors.black, size: 14),
+              backgroundColor: context.tokens.accent,
+              child: Icon(Icons.music_note_rounded, color: context.tokens.onAccent, size: 14),
             ),
             const SizedBox(width: 8),
             Flexible(

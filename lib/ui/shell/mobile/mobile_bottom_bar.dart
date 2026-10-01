@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../widgets/mini_player.dart';
 
@@ -50,14 +51,18 @@ class _GlassNavigationBar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = colorScheme.brightness == Brightness.dark;
     final l10n = context.l10n;
+    final tokens = context.tokens;
+    // 底色不透明度随设置页「玻璃不透明度」变化（默认 0.3 → 深色 175 / 浅色 205）；
+    // 浅色下需要更高的不透明度，否则白底上的深色内容会让图标难以辨认
+    final alpha = (isDark ? 120 + tokens.glassOpacity * 185 : 150 + tokens.glassOpacity * 183).clamp(0, 250).round();
+    final sigma = tokens.glassSigma * 0.8;
 
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            // 浅色下需要更高的不透明度，否则白底上的深色内容会让图标难以辨认
-            color: colorScheme.surface.withAlpha(isDark ? 175 : 205),
+            color: colorScheme.surface.withAlpha(alpha),
             border: Border(top: BorderSide(color: colorScheme.outlineVariant.withAlpha(110), width: 0.5)),
           ),
           child: NavigationBar(

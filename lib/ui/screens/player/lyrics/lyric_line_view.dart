@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/flutify_tokens.dart';
+
 /// 单行歌词（Apple Music iOS 风格）。
 ///
 /// 视觉规则由 [distance]（与当前行的行距，负数为已唱过）决定：
@@ -16,12 +18,16 @@ class LyricLineView extends StatelessWidget {
   final bool focusAll;
   final VoidCallback? onTap;
 
+  /// 字号；行距随字号等比放大。
+  final double fontSize;
+
   const LyricLineView({
     super.key,
     required this.text,
     required this.distance,
     this.focusAll = false,
     this.onTap,
+    this.fontSize = 30,
   });
 
   static const double _maxBlur = 3.5;
@@ -45,14 +51,14 @@ class LyricLineView extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        padding: EdgeInsets.symmetric(vertical: fontSize * 0.4),
         child: TweenAnimationBuilder<_LineVisual>(
           tween: _LineVisualTween(end: _LineVisual(blur, opacity, scale)),
-          duration: _duration,
+          duration: context.motion(_duration),
           curve: Curves.easeOutCubic,
           builder: (context, v, _) {
             // 透明度直接写进文字颜色，省去 Opacity 的离屏图层
-            Widget result = _LineText(text: text, opacity: v.opacity);
+            Widget result = _LineText(text: text, opacity: v.opacity, fontSize: fontSize);
             // sigma 过小时跳过滤镜，避免无意义的离屏渲染
             if (v.blur > 0.05) {
               result = ImageFiltered(
@@ -72,8 +78,9 @@ class LyricLineView extends StatelessWidget {
 class _LineText extends StatelessWidget {
   final String text;
   final double opacity;
+  final double fontSize;
 
-  const _LineText({required this.text, required this.opacity});
+  const _LineText({required this.text, required this.opacity, required this.fontSize});
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +90,7 @@ class _LineText extends StatelessWidget {
       child: Text(
         isInterlude ? '•  •  •' : text,
         style: TextStyle(
-          fontSize: 30,
+          fontSize: fontSize,
           fontWeight: FontWeight.w800,
           color: Colors.white.withValues(alpha: opacity),
           // 中文歌词：字距只轻微收紧，行高放宽并上下均分，多行时汉字不挤、不裁切

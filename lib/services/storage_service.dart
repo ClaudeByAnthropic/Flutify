@@ -27,6 +27,7 @@ class StorageService {
 
   static const String _keyRecentSearches = 'sp_recent_searches';
   static const String _keyVolume = 'sp_volume';
+  static const String _keyAppearance = 'ui_appearance'; // 外观设置 JSON
 
   // 媒体库（JSON 序列化的实体列表）
   static const String keyLibraryLikedTracks = 'lib_liked_tracks';
@@ -137,6 +138,10 @@ class StorageService {
   // ---------------------------------------------------------------------------
   double get volume => _prefs.getDouble(_keyVolume) ?? 0.8;
   Future<bool> setVolume(double value) => _prefs.setDouble(_keyVolume, value);
+
+  /// 外观设置（JSON 字符串，解析见 AppearanceSettings.fromJson）；未保存过为空串。
+  String get appearanceJson => _prefs.getString(_keyAppearance) ?? '';
+  Future<bool> setAppearanceJson(String value) => _prefs.setString(_keyAppearance, value);
 
   // ---------------------------------------------------------------------------
   // Generic JSON list persistence (used by LibraryProvider)

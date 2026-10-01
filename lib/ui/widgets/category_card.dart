@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/theme/flutify_tokens.dart';
 import '../../core/theme/md3e_shapes.dart';
 import '../../models/category.dart';
 import 'cover_image.dart';
@@ -18,12 +19,12 @@ class CategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: MD3EShapes.roundedLarge,
+      borderRadius: context.tokens.radius(MD3EShapes.radiusLarge),
       child: Container(
         height: 100,
         decoration: BoxDecoration(
           color: category.color,
-          borderRadius: MD3EShapes.roundedLarge,
+          borderRadius: context.tokens.radius(MD3EShapes.radiusLarge),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

@@ -45,6 +45,13 @@ class DesktopWindow {
       await windowManager.maximize();
     }
   }
+
+  /// 进入 / 退出系统全屏（沉浸式歌词使用）。未启用自绘标题栏（测试、移动端）时不做任何事。
+  static Future<void> setFullScreen(bool value) async {
+    if (!_enabled) return;
+    if (await windowManager.isFullScreen() == value) return;
+    await windowManager.setFullScreen(value);
+  }
 }
 
 /// 窗口拖动区：按住拖动移动窗口，双击最大化 / 还原（Windows 标题栏行为）。

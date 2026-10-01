@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/theme/flutify_tokens.dart';
+
 /// iOS 风格的克制型玻璃容器。
 ///
 /// 三层叠加：
@@ -13,20 +15,24 @@ import 'package:flutter/material.dart';
 /// 性能：每个实例是一次 BackdropFilter，页面内应控制在少量几个。
 class LiquidGlass extends StatelessWidget {
   final Widget child;
-  final BorderRadius borderRadius;
-  final EdgeInsetsGeometry padding;
-  final double blur;
 
-  /// 玻璃填充亮度（0~1）；深色背景上 0.05 左右即可。
-  final double tint;
+  /// 为空时按 28px 基准随「圆角风格」缩放。
+  final BorderRadius? borderRadius;
+  final EdgeInsetsGeometry padding;
+
+  /// 模糊半径；为空时取设置页「玻璃模糊」。
+  final double? blur;
+
+  /// 玻璃填充亮度（0~1）；为空时取设置页「玻璃不透明度」（默认约 0.05）。
+  final double? tint;
 
   const LiquidGlass({
     super.key,
     required this.child,
-    this.borderRadius = const BorderRadius.all(Radius.circular(28)),
+    this.borderRadius,
     this.padding = EdgeInsets.zero,
-    this.blur = 30,
-    this.tint = 0.05,
+    this.blur,
+    this.tint,
   });
 
   /// 饱和度 1.15 的颜色矩阵（按 Rec.709 亮度权重）。
@@ -39,17 +45,20 @@ class LiquidGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final radius = borderRadius ?? tokens.radius(28);
+    final sigma = blur ?? tokens.glassSigma;
     return ClipRRect(
-      borderRadius: borderRadius,
+      borderRadius: radius,
       child: BackdropFilter(
         filter: ImageFilter.compose(
           outer: _saturate,
-          inner: ImageFilter.blur(sigmaX: blur, sigmaY: blur, tileMode: TileMode.mirror),
+          inner: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.mirror),
         ),
         child: CustomPaint(
-          foregroundPainter: _HairlinePainter(borderRadius),
+          foregroundPainter: _HairlinePainter(radius),
           child: ColoredBox(
-            color: Colors.white.withValues(alpha: tint),
+            color: Colors.white.withValues(alpha: tint ?? tokens.glassTint),
             child: Padding(padding: padding, child: child),
           ),
         ),

@@ -217,7 +217,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeLoadFailedTitle => '无法加载推荐内容';
 
   @override
-  String get homeLoadFailedMessage => '请检查网络连接或 API 设置。';
+  String get homeLoadFailedMessage => '请检查网络连接后重试。';
 
   @override
   String get homeMadeForYou => '为你打造';
@@ -256,7 +256,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchCategoriesFailedTitle => '无法加载分类';
 
   @override
-  String get searchCategoriesFailedMessage => '请检查网络连接或 API 设置后重试。';
+  String get searchCategoriesFailedMessage => '请检查网络连接后重试。';
 
   @override
   String searchNoResultsTitle(String query) {
@@ -481,6 +481,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lyricsUnsynced => '这些歌词尚未与歌曲同步。';
 
   @override
+  String get lyricsImmersive => '沉浸式歌词';
+
+  @override
+  String get lyricsExitImmersive => '退出全屏（Esc）';
+
+  @override
   String get deviceConnectTitle => '连接到设备';
 
   @override
@@ -547,43 +553,113 @@ class AppLocalizationsZh extends AppLocalizations {
   String get createPlaylistDefaultName => '我的歌单';
 
   @override
-  String get settingsSave => '保存设置';
+  String get settingsAppearanceSection => '外观';
 
   @override
-  String get settingsSaved => 'Spotify API 配置已保存';
+  String get settingsThemeMode => '主题';
 
   @override
-  String get settingsBannerTitle => 'Spotify 逆向工程已就绪';
+  String get settingsThemeSystem => '跟随系统';
 
   @override
-  String get settingsBannerMessage =>
-      '配置逆向获取的 SpClient 令牌、OAuth 密钥或本地 MITM 代理地址。';
+  String get settingsThemeLight => '浅色';
 
   @override
-  String get settingsCredentialsSection => 'API 凭据与代理';
+  String get settingsThemeDark => '深色';
 
   @override
-  String get settingsBaseUrlLabel => 'API 基础地址';
+  String get settingsPureBlack => '纯黑背景';
 
   @override
-  String get settingsBaseUrlHint =>
-      'https://api.spotify.com/v1 或 http://localhost:8080/v1';
+  String get settingsPureBlackSubtitle => '深色模式下使用纯黑底色，OLED 屏幕更省电';
 
   @override
-  String get settingsTokenLabel => 'Spotify 访问令牌（Bearer）';
+  String get settingsAccentSection => '强调色';
 
   @override
-  String get settingsTokenHint => 'BQ…（OAuth 访问令牌）';
+  String get settingsAccentCustom => '自定义颜色';
 
   @override
-  String get settingsTokenManaged => '已登录：令牌由 Login5 自动获取与续期';
+  String get settingsDynamicAccent => '跟随封面取色';
 
   @override
-  String get settingsPasteToken => '粘贴令牌';
+  String get settingsDynamicAccentSubtitle => '强调色随正在播放的专辑封面变化';
 
   @override
-  String get settingsSpClientLabel => 'SpClient Cookie（sp_dc / 内部令牌）';
+  String get settingsGlassSection => '液态玻璃';
 
   @override
-  String get settingsSpClientHint => '从 Spotify 桌面端 / Android 客户端的 Cookie 中提取';
+  String get settingsGlassPreview => '玻璃预览';
+
+  @override
+  String get settingsGlassBlur => '模糊强度';
+
+  @override
+  String get settingsGlassOpacity => '不透明度';
+
+  @override
+  String get settingsTextShapeSection => '文字与形状';
+
+  @override
+  String get settingsFontScale => '字号';
+
+  @override
+  String get settingsFontPreview => '夜空中最亮的星';
+
+  @override
+  String get settingsCornerStyle => '圆角';
+
+  @override
+  String get settingsCornerRounded => '圆润';
+
+  @override
+  String get settingsCornerStandard => '标准';
+
+  @override
+  String get settingsCornerSquare => '方正';
+
+  @override
+  String get settingsMotionSection => '动效';
+
+  @override
+  String get settingsReduceMotion => '减弱动效';
+
+  @override
+  String get settingsReduceMotionSubtitle => '关闭流动背景、过渡与悬停等装饰性动画';
+
+  @override
+  String get settingsResetAppearance => '恢复默认外观';
+
+  @override
+  String get settingsCustomColorTitle => '自定义强调色';
+
+  @override
+  String get settingsHue => '色相';
+
+  @override
+  String get settingsSaturation => '饱和度';
+
+  @override
+  String get settingsBrightness => '亮度';
+
+  @override
+  String get accountTitle => 'Spotify 账号';
+
+  @override
+  String get accountSignedOutMessage => '登录后同步你的音乐库';
+
+  @override
+  String get accountSignIn => '登录';
+
+  @override
+  String get accountSignOut => '退出登录';
+
+  @override
+  String get accountSignOutTitle => '退出登录？';
+
+  @override
+  String get accountSignOutMessage => '将清除本机保存的登录信息与媒体库缓存，退出后需重新登录才能播放和查看媒体库。';
+
+  @override
+  String get accountSignOutConfirm => '退出';
 }

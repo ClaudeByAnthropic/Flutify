@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../../../providers/auth_provider.dart';
 import '../login_method.dart';
 import '../widgets/auth_form_parts.dart';
-import '../widgets/auth_notice.dart';
 import '../widgets/flutify_mark.dart';
 
 /// 阶段：账号密码登录（Login5，备用方式）。底部提供切换到手机号与"更多方式"的入口。
@@ -120,8 +119,6 @@ class _PasswordStageState extends State<PasswordStage> {
             ),
           ],
         ),
-        const SizedBox(height: 28),
-        const AuthNotice(),
       ],
     );
   }

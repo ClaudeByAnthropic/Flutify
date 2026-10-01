@@ -8,6 +8,8 @@ import 'package:flutify_app/providers/playback_provider.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/detail/widgets/collection_hero.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
+import 'package:flutify_app/ui/screens/player/lyrics/lyrics_backdrop.dart';
+import 'package:flutify_app/ui/screens/player/lyrics_sheet.dart';
 import 'package:flutify_app/ui/screens/player/queue_list.dart';
 import 'package:flutify_app/ui/shell/desktop/now_playing_panel.dart';
 import 'package:flutify_app/ui/widgets/filter_pill.dart';
@@ -84,11 +86,17 @@ void main() {
     await tester.tap(find.byTooltip('歌词'));
     await settle(tester);
     expect(find.text('First synthetic line'), findsOneWidget);
+    // 内嵌歌词同样是液态玻璃风格：流动背景 + 玻璃控制区 + 玻璃「全屏」按钮
+    expect(find.byType(LyricsBackdrop), findsOneWidget);
+    expect(find.byType(LiquidGlass), findsNWidgets(2));
 
     // 全屏歌词：顶部信息胶囊 + 底部控制台两块液态玻璃；非当前行带模糊
     await tester.tap(find.byTooltip('全屏歌词'));
     await settle(tester);
-    expect(find.byType(LiquidGlass), findsNWidgets(2));
+    expect(
+      find.descendant(of: find.byType(LyricsSheet), matching: find.byType(LiquidGlass)),
+      findsNWidgets(2),
+    );
     expect(find.byType(ImageFiltered), findsWidgets);
     // 0:00 时第一句清晰，并停在上下玻璃之间的正中
     final firstLine = find.text('First synthetic line').last;

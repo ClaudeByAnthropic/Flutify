@@ -219,7 +219,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeLoadFailedTitle => 'Couldn\'t load recommendations';
 
   @override
-  String get homeLoadFailedMessage => 'Check your connection or API settings.';
+  String get homeLoadFailedMessage => 'Check your connection and try again.';
 
   @override
   String get homeMadeForYou => 'Made For You';
@@ -261,7 +261,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchCategoriesFailedMessage =>
-      'Check your connection or API settings, then try again.';
+      'Check your connection and try again.';
 
   @override
   String searchNoResultsTitle(String query) {
@@ -495,6 +495,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lyricsUnsynced => 'These lyrics aren\'t synced to the song yet.';
 
   @override
+  String get lyricsImmersive => 'Immersive lyrics';
+
+  @override
+  String get lyricsExitImmersive => 'Exit full screen (Esc)';
+
+  @override
   String get deviceConnectTitle => 'Connect to a device';
 
   @override
@@ -562,46 +568,117 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createPlaylistDefaultName => 'My Playlist';
 
   @override
-  String get settingsSave => 'Save Settings';
+  String get settingsAppearanceSection => 'Appearance';
 
   @override
-  String get settingsSaved => 'Spotify API configuration saved!';
+  String get settingsThemeMode => 'Theme';
 
   @override
-  String get settingsBannerTitle => 'Spotify Reverse Engineering Ready';
+  String get settingsThemeSystem => 'System';
 
   @override
-  String get settingsBannerMessage =>
-      'Configure your reverse-engineered SpClient tokens, OAuth keys, or local MITM proxy URL.';
+  String get settingsThemeLight => 'Light';
 
   @override
-  String get settingsCredentialsSection => 'API Credentials & Proxy';
+  String get settingsThemeDark => 'Dark';
 
   @override
-  String get settingsBaseUrlLabel => 'API Base URL';
+  String get settingsPureBlack => 'Pure black';
 
   @override
-  String get settingsBaseUrlHint =>
-      'https://api.spotify.com/v1 or http://localhost:8080/v1';
+  String get settingsPureBlackSubtitle =>
+      'Use true black in dark mode to save power on OLED screens';
 
   @override
-  String get settingsTokenLabel => 'Spotify Access Token (Bearer)';
+  String get settingsAccentSection => 'Accent colour';
 
   @override
-  String get settingsTokenHint => 'BQ... (OAuth Access Token)';
+  String get settingsAccentCustom => 'Custom colour';
 
   @override
-  String get settingsTokenManaged =>
-      'Signed in: the token is fetched and renewed by Login5';
+  String get settingsDynamicAccent => 'Match album artwork';
 
   @override
-  String get settingsPasteToken => 'Paste token';
+  String get settingsDynamicAccentSubtitle =>
+      'The accent follows the artwork of what\'s playing';
 
   @override
-  String get settingsSpClientLabel =>
-      'SpClient Cookie (sp_dc / internal token)';
+  String get settingsGlassSection => 'Liquid glass';
 
   @override
-  String get settingsSpClientHint =>
-      'Extracted from Spotify Desktop / Android app cookies';
+  String get settingsGlassPreview => 'Glass preview';
+
+  @override
+  String get settingsGlassBlur => 'Blur';
+
+  @override
+  String get settingsGlassOpacity => 'Opacity';
+
+  @override
+  String get settingsTextShapeSection => 'Text & shape';
+
+  @override
+  String get settingsFontScale => 'Text size';
+
+  @override
+  String get settingsFontPreview => 'The brightest star in the night sky';
+
+  @override
+  String get settingsCornerStyle => 'Corners';
+
+  @override
+  String get settingsCornerRounded => 'Rounded';
+
+  @override
+  String get settingsCornerStandard => 'Standard';
+
+  @override
+  String get settingsCornerSquare => 'Square';
+
+  @override
+  String get settingsMotionSection => 'Motion';
+
+  @override
+  String get settingsReduceMotion => 'Reduce motion';
+
+  @override
+  String get settingsReduceMotionSubtitle =>
+      'Turns off flowing backgrounds, transitions and hover animations';
+
+  @override
+  String get settingsResetAppearance => 'Reset appearance';
+
+  @override
+  String get settingsCustomColorTitle => 'Custom accent colour';
+
+  @override
+  String get settingsHue => 'Hue';
+
+  @override
+  String get settingsSaturation => 'Saturation';
+
+  @override
+  String get settingsBrightness => 'Brightness';
+
+  @override
+  String get accountTitle => 'Spotify account';
+
+  @override
+  String get accountSignedOutMessage => 'Sign in to sync your library';
+
+  @override
+  String get accountSignIn => 'Sign in';
+
+  @override
+  String get accountSignOut => 'Sign out';
+
+  @override
+  String get accountSignOutTitle => 'Sign out?';
+
+  @override
+  String get accountSignOutMessage =>
+      'Your saved sign-in and library cache will be removed from this device. You\'ll need to sign in again to play music and view your library.';
+
+  @override
+  String get accountSignOutConfirm => 'Sign out';
 }

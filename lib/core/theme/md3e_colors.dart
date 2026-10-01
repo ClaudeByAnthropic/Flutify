@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'accent_colors.dart';
+
 /// Material 3 Expressive (MD3E) Color Tokens
 /// Combining Spotify's signature vibrancy with Google Material 3 Expressive tonal surface hierarchy.
 class MD3EColors {
@@ -54,17 +56,26 @@ class MD3EColors {
   static const Color accentEmerald = Color(0xFF00E676);
   static const Color accentRose = Color(0xFFE91E63);
 
-  // Dynamic ColorScheme generator supporting dominant artwork seed
+  // 纯黑（OLED）表面层级：底色纯黑，容器只做极轻的提亮，保留卡片 / 悬停的层次。
+  static const Color oledSurfaceContainerLow = Color(0xFF0B0B0D);
+  static const Color oledSurfaceContainer = Color(0xFF121214);
+  static const Color oledSurfaceContainerHigh = Color(0xFF1A1A1E);
+  static const Color oledSurfaceContainerHighest = Color(0xFF242428);
+
+  /// 生成配色。[primary] 为用户的强调色（任意颜色），这里保证它作为文字 / 图标时在对应背景上可读：
+  /// 深色下过暗会提亮，浅色下过亮会加深（Spotify 绿在浅色下即为 [spotifyGreenOnLight] 附近的深绿）。
   static ColorScheme createColorScheme({
     Color primary = spotifyGreen,
     Brightness brightness = Brightness.dark,
+    bool pureBlack = false,
   }) {
     if (brightness == Brightness.dark) {
+      final darkPrimary = AccentColors.readableOn(primary, surface);
       return ColorScheme(
         brightness: Brightness.dark,
-        primary: primary,
-        onPrimary: Colors.black,
-        primaryContainer: primary.withAlpha(55),
+        primary: darkPrimary,
+        onPrimary: AccentColors.onAccent(darkPrimary),
+        primaryContainer: darkPrimary.withAlpha(55),
         onPrimaryContainer: Colors.white,
         secondary: const Color(0xFF72D572),
         onSecondary: Colors.black,
@@ -78,27 +89,27 @@ class MD3EColors {
         onError: const Color(0xFF690005),
         errorContainer: const Color(0xFF93000A),
         onErrorContainer: const Color(0xFFFFDAD6),
-        surface: surface,
+        surface: pureBlack ? Colors.black : surface,
         onSurface: onSurface,
         onSurfaceVariant: onSurfaceVariant,
         outline: outline,
         outlineVariant: outlineVariant,
-        surfaceContainerLowest: surfaceContainerLowest,
-        surfaceContainerLow: surfaceContainerLow,
-        surfaceContainer: surfaceContainer,
-        surfaceContainerHigh: surfaceContainerHigh,
-        surfaceContainerHighest: surfaceContainerHighest,
+        surfaceContainerLowest: pureBlack ? Colors.black : surfaceContainerLowest,
+        surfaceContainerLow: pureBlack ? oledSurfaceContainerLow : surfaceContainerLow,
+        surfaceContainer: pureBlack ? oledSurfaceContainer : surfaceContainer,
+        surfaceContainerHigh: pureBlack ? oledSurfaceContainerHigh : surfaceContainerHigh,
+        surfaceContainerHighest: pureBlack ? oledSurfaceContainerHighest : surfaceContainerHighest,
         inverseSurface: const Color(0xFFE4E1E9),
         onInverseSurface: const Color(0xFF2F3036),
         inversePrimary: spotifyGreenDark,
         shadow: Colors.black,
       );
     } else {
-      final lightPrimary = primary == spotifyGreen ? spotifyGreenOnLight : primary;
+      final lightPrimary = primary == spotifyGreen ? spotifyGreenOnLight : AccentColors.readableOn(primary, lightSurface);
       return ColorScheme(
         brightness: Brightness.light,
         primary: lightPrimary,
-        onPrimary: Colors.white,
+        onPrimary: AccentColors.onAccent(lightPrimary),
         primaryContainer: lightPrimary.withAlpha(40),
         onPrimaryContainer: const Color(0xFF00391A),
         secondary: const Color(0xFF2E7D32),

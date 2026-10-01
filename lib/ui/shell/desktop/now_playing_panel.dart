@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/utils/artwork_palette.dart';
+import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/track.dart';
 import '../../../providers/playback_provider.dart';
+import '../../screens/player/immersive_lyrics_screen.dart';
+import '../../screens/player/lyrics/glass_icon_button.dart';
+import '../../screens/player/lyrics/lyrics_backdrop.dart';
 import '../../screens/player/lyrics/lyrics_view.dart';
 import '../../screens/player/queue_list.dart';
 import '../../widgets/empty_state.dart';
@@ -69,7 +72,7 @@ class NowPlayingPanel extends StatelessWidget {
           ),
           Expanded(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
+              duration: context.motion(const Duration(milliseconds: 220)),
               switchInCurve: Curves.easeOutCubic,
               child: KeyedSubtree(
                 key: ValueKey(layout.tab),
@@ -91,7 +94,8 @@ class NowPlayingPanel extends StatelessWidget {
   }
 }
 
-/// 歌词卡片：以封面主色（压暗 40%）为底，歌词保持白色，与全屏歌词页观感一致。
+/// 歌词卡片：与全屏歌词同一套液态玻璃观感（流动封面背景 + 白色对焦歌词），
+/// 右上角玻璃按钮进入桌面沉浸式歌词。
 class _LyricsCard extends StatelessWidget {
   final SpotifyTrack track;
 
@@ -101,17 +105,31 @@ class _LyricsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: ArtworkColorBuilder(
-        imageUrl: track.coverUrl,
-        fallback: const Color(0xFF3A3A48),
-        builder: (context, color) => AnimatedContainer(
-          duration: const Duration(milliseconds: 400),
-          decoration: BoxDecoration(
-            color: Color.lerp(color, Colors.black, 0.4),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: LyricsView(trackId: track.id, topInset: 12, bottomInset: 12),
+      child: ClipRRect(
+        borderRadius: context.tokens.radius(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            LyricsBackdrop(imageUrl: track.coverUrl),
+            LyricsView(
+              key: ValueKey(track.id),
+              trackId: track.id,
+              topInset: 56,
+              bottomInset: 16,
+              fontSize: 24,
+              horizontalPadding: 20,
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: GlassIconButton(
+                icon: Icons.open_in_full_rounded,
+                tooltip: context.l10n.lyricsImmersive,
+                size: 36,
+                onPressed: () => ImmersiveLyricsScreen.open(context),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/flutify_tokens.dart';
 import '../../core/utils/artwork_palette.dart';
 import '../../l10n/l10n.dart';
 import '../../models/track.dart';
@@ -26,12 +27,15 @@ class MiniPlayer extends StatelessWidget {
     final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
     if (track == null) return const SizedBox.shrink();
 
-    final colorScheme = Theme.of(context).colorScheme;
-    const shape = StadiumBorder();
+    // 方正风格下胶囊换成 16px 圆角矩形，其余风格保持胶囊
+    final tokens = context.tokens;
+    final ShapeBorder shape =
+        tokens.squareCorners ? RoundedRectangleBorder(borderRadius: tokens.radius(16)) : const StadiumBorder();
 
     return ArtworkColorBuilder(
       imageUrl: track.coverUrl,
-      fallback: colorScheme.inverseSurface,
+      // 前景固定为白色，取色前 / 无封面时用深石墨色兜底（inverseSurface 在深色主题下是浅色）
+      fallback: const Color(0xFF3A3A42),
       builder: (context, artColor) {
         final background = Color.lerp(artColor, Colors.black, 0.35)!;
         return AnimatedContainer(

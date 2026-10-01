@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/theme/md3e_colors.dart';
-import '../../../../core/theme/md3e_shapes.dart';
+import '../../../../core/theme/flutify_tokens.dart';
+import '../../../../l10n/l10n.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../services/storage_service.dart';
 import '../../../widgets/cover_image.dart';
 import '../../auth/login_screen.dart';
 import '../../auth/widgets/flutify_mark.dart';
 
 /// 设置页顶部的 Spotify 账号卡片。
 ///
-/// - 未登录：品牌标 + 说明 + 「登录」；
-/// - 已登录：用户名、access_token 有效期、「刷新令牌」与「退出登录」。
+/// - 未登录：品牌标 + 一句说明 + 「登录」；
+/// - 已登录：头像、用户名与「退出登录」（令牌由后台自动续期，不向用户暴露）。
 class AccountCard extends StatelessWidget {
   const AccountCard({super.key});
 
@@ -25,10 +24,10 @@ class AccountCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: MD3EShapes.roundedLarge,
+        borderRadius: context.tokens.radius(20),
       ),
       child: AnimatedSize(
-        duration: const Duration(milliseconds: 220),
+        duration: context.motion(const Duration(milliseconds: 220)),
         curve: Curves.easeOut,
         alignment: Alignment.topCenter,
         child: auth.isSignedIn ? _SignedIn(auth: auth) : const _SignedOut(),
@@ -43,6 +42,7 @@ class _SignedOut extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     return Row(
       children: [
         const FlutifyMark(size: 48, glow: false),
@@ -51,20 +51,17 @@ class _SignedOut extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Spotify 账号', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+              Text(l10n.accountTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 2),
               Text(
-                '登录后使用真实数据，令牌自动续期',
+                l10n.accountSignedOutMessage,
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ),
         ),
         const SizedBox(width: 12),
-        FilledButton(
-          onPressed: () => LoginScreen.open(context),
-          child: const Text('登录'),
-        ),
+        FilledButton(onPressed: () => LoginScreen.open(context), child: Text(l10n.accountSignIn)),
       ],
     );
   }
@@ -76,17 +73,18 @@ class _SignedIn extends StatelessWidget {
   const _SignedIn({required this.auth});
 
   Future<void> _confirmSignOut(BuildContext context) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('退出登录？'),
-        content: const Text('将清除本机保存的凭据与令牌及本机媒体库缓存，退出后需重新登录才能播放和查看媒体库。'),
+        title: Text(l10n.accountSignOutTitle),
+        content: Text(l10n.accountSignOutMessage),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.commonCancel)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-            child: const Text('退出'),
+            child: Text(l10n.accountSignOutConfirm),
           ),
         ],
       ),
@@ -94,96 +92,51 @@ class _SignedIn extends StatelessWidget {
     if (confirmed == true) await auth.signOut();
   }
 
-  /// 令牌有效期文案：仍有效显示到期时刻，已过期提示会自动续期。
-  String _expiryText() {
-    final expiry = auth.accessTokenExpiry;
-    if (expiry == null) return '尚未获取令牌';
-    if (expiry.isBefore(DateTime.now())) return '令牌已过期，将自动续期';
-    final hh = expiry.hour.toString().padLeft(2, '0');
-    final mm = expiry.minute.toString().padLeft(2, '0');
-    return '令牌有效至 $hh:$mm';
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final tokens = context.tokens;
+    final l10n = context.l10n;
     final name = auth.displayName;
     final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
-    final methodLabel = switch (auth.method) {
-      AuthMethod.desktop => 'OAuth · 桌面版',
-      AuthMethod.oauth => 'OAuth · 开发者应用',
-      AuthMethod.login5 => 'Login5 · 官方协议',
-    };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
       children: [
-        Row(
-          children: [
-            auth.avatarUrl.isNotEmpty
-                ? CoverImage(url: auth.avatarUrl, size: 48, circular: true, placeholderIcon: Icons.person_rounded)
-                : CircleAvatar(
-                    radius: 24,
-                    backgroundColor: MD3EColors.spotifyGreen,
-                    child: Text(
-                      initial,
-                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 20),
-                    ),
-                  ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.verified_rounded, size: 16, color: MD3EColors.spotifyGreen),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$methodLabel  ·  ${_expiryText()}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                  ),
-                ],
+        auth.avatarUrl.isNotEmpty
+            ? CoverImage(url: auth.avatarUrl, size: 52, circular: true, placeholderIcon: Icons.person_rounded)
+            : CircleAvatar(
+                radius: 26,
+                backgroundColor: tokens.accent,
+                child: Text(
+                  initial,
+                  style: TextStyle(color: tokens.onAccent, fontWeight: FontWeight.w800, fontSize: 20),
+                ),
               ),
-            ),
-          ],
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                l10n.accountTitle,
+                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
-        if (auth.error != null) ...[
-          const SizedBox(height: 12),
-          Text(auth.error!, style: TextStyle(color: colorScheme.error, fontSize: 12)),
-        ],
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.tonal(
-                onPressed: auth.isRefreshing ? null : auth.refreshToken,
-                child: auth.isRefreshing
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('刷新令牌'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => _confirmSignOut(context),
-                style: OutlinedButton.styleFrom(foregroundColor: colorScheme.error),
-                child: const Text('退出登录'),
-              ),
-            ),
-          ],
+        const SizedBox(width: 12),
+        OutlinedButton(
+          onPressed: () => _confirmSignOut(context),
+          style: OutlinedButton.styleFrom(foregroundColor: colorScheme.error),
+          child: Text(l10n.accountSignOut),
         ),
       ],
     );

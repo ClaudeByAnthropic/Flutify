@@ -41,7 +41,7 @@ void main() {
     );
 
     await tester.pumpWidget(MaterialApp(
-      theme: theme ?? MD3ETheme.darkTheme(),
+      theme: theme ?? MD3ETheme.dark,
       home: pushed ? const Scaffold() : page,
     ));
     if (pushed) {
@@ -86,7 +86,7 @@ void main() {
   });
 
   testWidgets('narrow (mobile): centered cover and a back button', (tester) async {
-    await pumpHero(tester, size: const Size(390, 844), pushed: true, theme: MD3ETheme.lightTheme());
+    await pumpHero(tester, size: const Size(390, 844), pushed: true, theme: MD3ETheme.light);
 
     expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     // 封面水平居中
