@@ -313,6 +313,28 @@ void main() {
       await unmount(tester);
     });
 
+    test('pausing the remote keeps control there until this device plays', () async {
+      final connect = ConnectProvider(service, available: () => true, resolveTrack: (_) async => null);
+      bool remote() => connect.controlsRemote(localPlaying: false, localHasTrack: true);
+
+      service.push(syntheticCluster());
+      await Future<void>.delayed(Duration.zero);
+      expect(remote(), isTrue);
+
+      // 远程被暂停（空格 / 暂停键）：本机虽有上次的曲目，下一次按键仍应继续远程
+      service.push(syntheticCluster(playing: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(remote(), isTrue);
+
+      // 本机开始播放后控制权回到本机；远程再次出声时重新接管
+      connect.localPlaybackStarted();
+      expect(remote(), isFalse);
+      service.push(syntheticCluster());
+      await Future<void>.delayed(Duration.zero);
+      expect(remote(), isTrue);
+      connect.dispose();
+    });
+
     testWidgets('media keys go to the remote device only in remote mode', (tester) async {
       await pumpHost(tester, const Size(1280, 700), host, cluster: syntheticCluster());
       final context = tester.element(find.byType(SizedBox).last);

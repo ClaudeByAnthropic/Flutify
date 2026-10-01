@@ -40,6 +40,7 @@ class ConnectProvider extends ChangeNotifier {
     // 广播流不会重放：先取服务当前快照，再订阅后续变化
     _cluster = service.current;
     _status = service.status;
+    _remoteInControl = hasRemoteSession && player.isAudible;
     _resolveRemoteTrack(_cluster.player.trackUri);
     _updateDisplayTrack();
     _syncPositionTicker();
@@ -68,9 +69,21 @@ class ConnectProvider extends ChangeNotifier {
   /// 播放控制（播放栏、快捷键、媒体键）是否应发给远程设备，即播放栏是否为远程模式：
   /// - 本机正在出声 → 本机优先；
   /// - 远程正在出声 → 远程；
-  /// - 远程已暂停、本机没有曲目 → 远程（可一键继续远程上次的曲目）。
+  /// - 远程已暂停：最后出声的是远程（[remoteInControl]）或本机没有曲目 → 仍是远程，
+  ///   这样暂停远程后再按空格 / 播放键会继续远程，而不是突然在本机放起上次的曲目。
   bool controlsRemote({required bool localPlaying, required bool localHasTrack}) =>
-      hasRemoteSession && !localPlaying && (player.isAudible || !localHasTrack);
+      hasRemoteSession && !localPlaying && (player.isAudible || _remoteInControl || !localHasTrack);
+
+  /// 最后出声的一方是否为远程设备：远程开始出声时置为 true，本机开始播放时（[localPlaybackStarted]）置为 false。
+  bool get remoteInControl => _remoteInControl;
+  bool _remoteInControl = false;
+
+  /// 本机开始播放时调用（由 main.dart 监听播放 Provider 接上）：控制权回到本机。
+  void localPlaybackStarted() {
+    if (!_remoteInControl) return;
+    _remoteInControl = false;
+    _notify();
+  }
 
   /// 远程曲目的完整信息（含艺人）；补全中或失败时为 null，UI 回退到 [player] 里的标题 / 专辑。
   SpotifyTrack? get remoteTrack => _tracks[player.trackUri];
@@ -104,6 +117,7 @@ class ConnectProvider extends ChangeNotifier {
     } else {
       await service.stop();
       _cluster = ConnectCluster.empty;
+      _remoteInControl = false;
       _tracks.clear();
       _updateDisplayTrack();
       _syncPositionTicker();
@@ -120,7 +134,10 @@ class ConnectProvider extends ChangeNotifier {
   }
 
   void _onCluster(ConnectCluster cluster) {
+    // 只在远程「开始出声」时接管：本机播放期间远程一直在响的快照不应抢走控制权
+    final wasAudible = hasRemoteSession && player.isAudible;
     _cluster = cluster;
+    if (!wasAudible && hasRemoteSession && player.isAudible) _remoteInControl = true;
     if (_pendingVolume != null && _volumeTimer == null) _pendingVolume = null;
     _resolveRemoteTrack(cluster.player.trackUri);
     _updateDisplayTrack();

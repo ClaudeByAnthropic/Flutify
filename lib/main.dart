@@ -182,6 +182,10 @@ class FlutifyApp extends StatelessWidget {
             );
             // 在其他设备上播放时，系统媒体键控制那台设备
             mediaSync?.redirect = connectMediaRedirect(connect, playback);
+            // 本机开始播放 → 控制权回到本机（远程暂停后按键不再发给远程）；两者与 App 同生命周期
+            playback.addListener(() {
+              if (playback.isPlaying) connect.localPlaybackStarted();
+            });
             return connect;
           },
         ),
