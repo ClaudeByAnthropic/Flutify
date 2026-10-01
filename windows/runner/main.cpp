@@ -38,6 +38,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
   }
 
+  // 关窗收尾（保存播放进度等）已在 Dart 侧 DesktopWindow 的关闭钩子里完成。
+  // 先销毁窗口与引擎（释放 SMTC 等 WinRT 对象），再反初始化 COM。
+  window.Destroy();
   ::CoUninitialize();
+
+  // 直接结束进程：正常退出时进程要等 Dart VM 的线程池收尾（进行中的网络请求等），
+  // 实测会再卡 5–12 秒。此时引擎已释放、该保存的都已落盘，没有需要等的东西。
+  ::TerminateProcess(::GetCurrentProcess(), EXIT_SUCCESS);
   return EXIT_SUCCESS;
 }
