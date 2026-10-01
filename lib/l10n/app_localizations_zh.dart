@@ -33,7 +33,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shellExpandLibrary => '展开音乐库';
 
   @override
-  String get shellNowPlayingView => '正在播放视图';
+  String get shellPlaybackStatus => '播放状态';
 
   @override
   String get shellHidePanel => '隐藏';

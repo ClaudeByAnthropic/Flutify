@@ -33,7 +33,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shellExpandLibrary => 'Expand Your Library';
 
   @override
-  String get shellNowPlayingView => 'Now Playing view';
+  String get shellPlaybackStatus => 'Playback status';
 
   @override
   String get shellHidePanel => 'Hide';

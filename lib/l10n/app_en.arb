@@ -10,7 +10,7 @@
   "shellAccountMenu": "Account",
   "shellCollapseLibrary": "Collapse Your Library",
   "shellExpandLibrary": "Expand Your Library",
-  "shellNowPlayingView": "Now Playing view",
+  "shellPlaybackStatus": "Playback status",
   "shellHidePanel": "Hide",
   "shellAboutArtist": "About the artist",
   "shellMonthlyFollowers": "{count} followers",

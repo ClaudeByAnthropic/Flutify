@@ -9,13 +9,13 @@ import '../navigation/app_routes.dart';
 import '../screens/player/device_picker_sheet.dart';
 import '../screens/player/full_player_sheet.dart';
 import '../screens/player/immersive_lyrics_screen.dart';
-import '../screens/player/lyrics_sheet.dart';
 import '../screens/player/queue_sheet.dart';
 import '../shell/shell_layout_controller.dart';
 import 'connect/connect_actions.dart';
 import 'connect/remote_player_bar.dart';
 import 'cover_image.dart';
 import 'playback_scrubber.dart';
+import 'playback_status_button.dart';
 import 'player_controls.dart';
 
 /// 桌面端底部通栏播放器（Spotify PC 风格）。
@@ -240,40 +240,20 @@ class _RightControls extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     // 远程设备有会话（已暂停）时设备键高亮，提示可以转回去
     final hasDevice = context.select<ConnectProvider?, bool>((c) => c?.hasRemoteSession ?? false);
-    // 三栏框架下：歌词 / 队列 / 正在播放视图切换右栏标签（当前标签高亮）；
+    // 三栏框架下：「播放状态」开关右栏（正在播放 / 歌词在右栏里切换），队列直达队列标签；
     // 没有框架（单独使用播放栏）时回退为底部面板
     final layout = context.watch<ShellLayoutController?>();
 
-    Widget panelButton(NowPlayingTab tab, IconData icon, String tooltip, VoidCallback fallback) {
-      final active = layout != null && layout.rightPanelVisible && layout.tab == tab;
-      return IconButton(
-        icon: Icon(icon, size: 20),
-        color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
-        tooltip: tooltip,
-        style: _barIconStyle,
-        onPressed: layout == null ? fallback : () => layout.showTab(tab),
-      );
-    }
-
     final buttons = <Widget>[
-      if (layout != null)
-        panelButton(
-          NowPlayingTab.details,
-          Icons.picture_in_picture_alt_rounded,
-          context.l10n.shellNowPlayingView,
-          () {},
-        ),
-      panelButton(
-        NowPlayingTab.lyrics,
-        Icons.lyrics_outlined,
-        context.l10n.lyricsTitle,
-        () => LyricsSheet.show(context),
-      ),
-      panelButton(
-        NowPlayingTab.queue,
-        Icons.queue_music_rounded,
-        context.l10n.queueTitle,
-        () => QueueSheet.show(context),
+      PlaybackStatusButton(layout: layout, style: _barIconStyle),
+      IconButton(
+        icon: const Icon(Icons.queue_music_rounded, size: 20),
+        color: layout != null && layout.rightPanelVisible && layout.tab == NowPlayingTab.queue
+            ? colorScheme.primary
+            : colorScheme.onSurfaceVariant,
+        tooltip: context.l10n.queueTitle,
+        style: _barIconStyle,
+        onPressed: layout == null ? () => QueueSheet.show(context) : () => layout.showTab(NowPlayingTab.queue),
       ),
       IconButton(
         icon: Icon(

@@ -146,11 +146,11 @@ abstract class AppLocalizations {
   /// **'展开音乐库'**
   String get shellExpandLibrary;
 
-  /// No description provided for @shellNowPlayingView.
+  /// No description provided for @shellPlaybackStatus.
   ///
   /// In zh, this message translates to:
-  /// **'正在播放视图'**
-  String get shellNowPlayingView;
+  /// **'播放状态'**
+  String get shellPlaybackStatus;
 
   /// No description provided for @shellHidePanel.
   ///

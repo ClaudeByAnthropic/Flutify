@@ -10,7 +10,7 @@
   "shellAccountMenu": "账号",
   "shellCollapseLibrary": "收起音乐库",
   "shellExpandLibrary": "展开音乐库",
-  "shellNowPlayingView": "正在播放视图",
+  "shellPlaybackStatus": "播放状态",
   "shellHidePanel": "隐藏",
   "shellAboutArtist": "关于艺人",
   "shellMonthlyFollowers": "{count} 位粉丝",

@@ -78,6 +78,20 @@ class ShellLayoutController extends ChangeNotifier {
     _setVisible(open);
   }
 
+  /// 右栏是否正显示「播放状态」（正在播放 / 歌词，不含播放队列）。
+  bool get playbackStatusVisible => rightPanelVisible && _tab != NowPlayingTab.queue;
+
+  /// 播放栏「播放状态」键：显示中再点关闭；否则打开右栏，
+  /// 停在上次看的「正在播放」或「歌词」（上次是队列时回到「正在播放」）。
+  void togglePlaybackStatus() {
+    if (playbackStatusVisible) {
+      _setVisible(false);
+      return;
+    }
+    if (_tab == NowPlayingTab.queue) _tab = NowPlayingTab.details;
+    _setVisible(true);
+  }
+
   void selectTab(NowPlayingTab tab) {
     if (_tab == tab) return;
     _tab = tab;

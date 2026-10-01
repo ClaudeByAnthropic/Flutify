@@ -8,6 +8,7 @@ import '../../screens/player/device_picker_sheet.dart';
 import '../../screens/player/lyrics_sheet.dart';
 import '../../shell/shell_layout_controller.dart';
 import '../cover_image.dart';
+import '../playback_status_button.dart';
 import 'connect_device_icon.dart';
 import 'remote_progress.dart';
 import 'remote_transport_controls.dart';
@@ -130,41 +131,20 @@ class _RemoteRightControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final colorScheme = Theme.of(context).colorScheme;
     final connect = context.watch<ConnectProvider>();
     final device = connect.activeDevice;
-    // 三栏框架下切换右栏标签；没有框架（单独使用播放栏）时歌词回退为底部面板
+    // 「播放状态」键：三栏框架下开关右栏；没有框架（单独使用播放栏）时回退为底部歌词面板
     final layout = context.watch<ShellLayoutController?>();
-
-    Widget panelButton(NowPlayingTab tab, IconData icon, String tooltip) {
-      final active = layout != null && layout.rightPanelVisible && layout.tab == tab;
-      return IconButton(
-        icon: Icon(icon, size: 20),
-        color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
-        tooltip: tooltip,
-        style: _style,
-        onPressed: () => layout == null ? LyricsSheet.show(context) : layout.showTab(tab),
-      );
-    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final panelButtons = layout == null ? 1 : 2;
-        final showPanels = constraints.maxWidth >= (panelButtons + 1) * _buttonSize;
-        final used = (showPanels ? panelButtons : 0) * _buttonSize + _buttonSize;
+        final showPanels = constraints.maxWidth >= 2 * _buttonSize;
+        final used = (showPanels ? 2 : 1) * _buttonSize;
         final showSlider = device != null && device.supportsVolume && constraints.maxWidth >= used + _sliderWidth + 8;
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            if (showPanels) ...[
-              if (layout != null)
-                panelButton(
-                  NowPlayingTab.details,
-                  Icons.picture_in_picture_alt_rounded,
-                  context.l10n.shellNowPlayingView,
-                ),
-              panelButton(NowPlayingTab.lyrics, Icons.lyrics_outlined, context.l10n.lyricsTitle),
-            ],
+            if (showPanels) PlaybackStatusButton(layout: layout, style: _style),
             IconButton(
               icon: Icon(device == null ? Icons.devices_rounded : connectDeviceIcon(device.type), size: 20),
               color: tokens.accent,
