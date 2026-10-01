@@ -81,6 +81,14 @@ class DesktopWindow {
     ]);
   }
 
+  /// 把窗口带到前台（最小化时先还原）。任务栏歌词「打开 Flutify」使用。
+  static Future<void> bringToFront() async {
+    if (!_enabled) return;
+    if (await windowManager.isMinimized()) await windowManager.restore();
+    await windowManager.show();
+    await windowManager.focus();
+  }
+
   static Future<void> toggleMaximize() async {
     if (await windowManager.isMaximized()) {
       await windowManager.unmaximize();

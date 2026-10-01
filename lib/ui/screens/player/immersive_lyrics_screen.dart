@@ -247,7 +247,7 @@ class _WideLayout extends StatelessWidget {
             padding: const EdgeInsets.only(right: 56),
             child: LyricsView(
               key: ValueKey((track.id, remote)),
-              trackId: track.id,
+              track: track,
               remote: remote,
               topInset: 80,
               bottomInset: 80,
@@ -282,7 +282,7 @@ class _NarrowLayout extends StatelessWidget {
       children: [
         LyricsView(
           key: ValueKey((track.id, remote)),
-          trackId: track.id,
+          track: track,
           remote: remote,
           topInset: _headerHeight + topInset,
           bottomInset: _controlsHeight,

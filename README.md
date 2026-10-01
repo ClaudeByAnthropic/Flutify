@@ -56,6 +56,18 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - **桌面沉浸式歌词**（`immersive_lyrics_screen.dart`）：左侧大封面 + 玻璃控制台、右侧大字号歌词；鼠标静止 3 秒隐藏光标与按钮。
     两种铺满方式，右上角按钮或 F11 切换并记住选择：默认**只铺满窗口**（保留深色窗口按钮，顶部可拖动窗口），或进入系统全屏铺满整个屏幕；Esc 退出。
     入口：播放栏右侧、右栏歌词右上角、全屏播放器歌词、F11。
+  - **歌词补全（LRCLIB）**（`services/lyrics/`，移植自原「任务栏歌词」项目）：Spotify 没有逐行同步歌词（只有纯文本或完全没有）时，
+    从 [LRCLIB](https://lrclib.net) 开放歌词库补全，歌词底部注明来源。查询顺序：`/api/get` 精确匹配 → `/api/search` 曲名 + 第一位艺人 → 只按曲名 →
+    全文 `q` 搜索（含简繁互换的曲名），请求间隔 600ms、429 / 5xx / 断网退避重试两次。
+    选词按**原唱语言**投票（同一首歌占多数的语言即原词，曲名 / 歌手只算小票，避免英文歌配上日文译词），翻译版 / 罗马音 / 双语对照降为备选，
+    中文歌按曲名与歌手的字形对齐简繁（对照表 `zh_script_table.dart` 由 `tool/gen_zh_script_table.ps1` 调 Windows `LCMapStringEx` 生成）。
+    结果按曲目 ID 存进应用数据目录 `lyrics_lrc/`；补全请求因网络失败时不缓存，下次再试。设置 → 歌词 →「补全歌词」可关闭。
+  - **任务栏歌词（Windows）**：原「任务栏歌词」项目的原生 C++ 重写，嵌在 Win11 任务栏天气小组件右侧（`windows/runner/taskbar_lyrics*.cpp`），
+    不需要单独的 exe。当前句大字、下一句小字，切句时上滚（300ms）；放不下时缩小或折成两行；无同步歌词时显示封面 + 歌名 + 播放控制。
+    悬停显示上一首 / 播放暂停 / 下一首，点击打开 Flutify，右键菜单「打开 Flutify / 重新获取歌词 / 关闭任务栏歌词」。
+    它作为第二个系统媒体控制端挂在 `MediaControlsSync` 上（`MultiMediaControls`），因此和 SMTC 一样自动跟随本机 / Connect 远程播放，按键路由也相同。
+    窗口跑在独立线程（跨进程子窗口会与 explorer 共享输入队列，不能占用 Flutter 主线程），UIA 定位小组件按钮，explorer 重启后自动重新嵌入。
+    设置 → 任务栏歌词：开关（默认关闭）、文字颜色（自动按任务栏背景取黑 / 白、白、黑、跟随 Flutify 强调色、自定义）、不透明度，顶部带实时预览。
   - **播放队列管理器 (Queue)**：与 Spotify 一致的双层队列——"Next in queue"（用户手动添加，优先播放）+ "Next from: 上下文"，两段均支持拖拽排序、滑动删除、点击跳播、一键清空。
   - **播放上下文 (Playback Context)**：记录"正在从哪个歌单 / 专辑 / 艺人 / 搜索播放"，全屏播放器顶部显示「正在播放歌单」等，详情页播放键可在"播放整个上下文 / 暂停 / 继续"间切换。
   - **真随机与循环**：随机模式基于打乱的播放顺序表，切换时以当前曲目为起点重建；列表循环在末尾回绕，单曲循环重播。
@@ -89,7 +101,8 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 实现：`AppearanceProvider` 生成主题，主题之外的参数通过 ThemeExtension `FlutifyTokens` 下发（`context.tokens`、`context.motion()`）。
 * **其他设置项**（全部免费账号可用；非外观偏好统一存在 `AppPreferences`，由 `PreferencesProvider` 持久化，播放类偏好由 `PlaybackProvider` 持有）：
   - 语言：跟随系统 / 中文 / English，切换后同时用新语言重新拉取主页等 Spotify 文案；
-  - 歌词：字号（80% – 140%）、左对齐 / 居中、其他行模糊强度（可关）、全屏歌词默认铺满屏幕还是窗口；
+  - 歌词：字号（80% – 140%）、左对齐 / 居中、其他行模糊强度（可关）、LRCLIB 补全歌词、全屏歌词默认铺满屏幕还是窗口；
+  - 任务栏歌词（仅 Windows）：开关、文字颜色、不透明度；
   - 播放：音量均衡（读取 Spotify 文件头里的响度数据，只衰减偏响的歌）、歌曲间淡入淡出（0 – 12 秒，单播放器实现，两首不重叠）；
   - 启动：打开主页 / 音乐库 / 上次位置；桌面端记住窗口大小、位置与最大化状态（显示器变化导致不可见时回到居中，`screen_retriever` 枚举显示器）；
   - Spotify Connect：总开关、远程歌词提前量（±2 秒，只影响歌词切行）；
@@ -98,7 +111,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
     系统代理在 Windows 读注册表 `Internet Settings`（含绕过列表，30 秒重读，Clash 等开关系统代理后自动跟随），其他平台读 `https_proxy` 等环境变量；
     只支持 HTTP 代理（不支持 SOCKS / PAC），本机回环地址始终直连，登录 WebView 跟随系统设置；
   - 存储：音频缓存占用、上限（256 MB – 5 GB，超出按最久未播放淘汰，正在播放与预取的下一首始终保留）、一键清除；
-  - 隐私：清除搜索记录、清除歌词缓存；关于：版本、键盘快捷键一览（桌面端）、开源许可。
+  - 隐私：清除搜索记录、清除歌词缓存（含 LRCLIB 本地缓存）；关于：版本、键盘快捷键一览（桌面端）、开源许可。
 * **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环、Ctrl+K / Ctrl+L 聚焦搜索、Alt+←/→ 后退 / 前进、F11 沉浸式歌词、Esc 关闭浮层右栏 / 退出沉浸式歌词。
 
 ### 3. 响应式外壳（桌面三栏 / 移动端）
@@ -160,6 +173,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 | **完整曲目播放** | `lib/services/protocol/` + `audio_player_service.dart` | 纯逆向协议链路：extended-metadata（TRACK_V4）→ storage-resolve → AP 音频密钥（DH + Shannon 握手，`0xab` 令牌登录、`0x0c` 取密钥）→ CDN 下载 + AES-128-CTR 解密（边下边播，见「性能架构」）→ 去掉 Spotify 头部后交给 just_audio，下载完成后写入本地缓存。仅支持 OGG Vorbis / MP3；FLAC / AAC 属 Widevine DRM，会抛 `TrackPlaybackException`。`PlaybackProvider.playbackError` / `playbackErrors` 暴露错误，「不可播放」类自动跳下一首（有上限）；AP 连接会记住上次可用的接入点并重试多个候选 |
 | **媒体库** | `lib/services/library/` | `LibrarySource` 抽象：桌面会话走 spclient `collection/v2/paging`（protobuf，已点赞歌曲 / 专辑 / 艺人）+ `playlist/v2/user/{u}/rootlist`（歌单）+ Pathfinder 补全曲目与实体；无桌面会话时走 Web API。点赞 / 收藏 / 关注乐观更新并尽力同步到账号（失败记入 `syncError`）；自建歌单仅保存在本机。未登录时媒体库为空 |
 | **歌词** | `lib/services/lyrics_service.dart` | spclient `GET /color-lyrics/v2/track/{id}`，请求头沿用会话身份（桌面会话即桌面端头）；404 = 无歌词（可缓存），其他错误不缓存 |
+| **歌词补全** | `lib/services/lyrics/` | `LyricsResolver` 合并官方与 LRCLIB：官方有逐行同步歌词直接用，否则查 LRCLIB；官方出错且 LRCLIB 也没有时抛原错误 |
 | **协议登录** | `lib/services/auth/` | 只有**桌面版 OAuth**：与官方桌面版相同的 client_id，系统浏览器打开 accounts.spotify.com 登录，本机回环 `127.0.0.1:8898/login` 接收授权码，PKCE 换令牌、refresh_token 续期（被吊销时标记「登录已过期」），并以 Windows 桌面身份申请 `client-token`；旧版本其他登录方式留下的会话启动时清除。会话的 client_id、client-token 平台数据、User-Agent 与 `app-platform` 请求头始终来自同一种客户端身份（`client_profile.dart`）；登出调用 `/api/logout/v1` |
 | **桌面端数据层** | `lib/services/pathfinder/` | 桌面版 OAuth 会话下，公开 Web API（api.spotify.com）会因共享 client_id 频繁 429，因此改走官方桌面端自己的内部接口：Pathfinder GraphQL（`api-partner.spotify.com/pathfinder/v2/query`，持久化查询 hash 取自本机 `xpui.spa` 1.3.1.234）负责主页、分类、搜索、专辑、艺人、唱片目录与曲目补全；spclient `playlist/v2` 负责歌单（封面依次取 `pictureSize`、上传封面 `picture`、前几首曲目专辑封面拼的 `mosaic.scdn.co` 四宫格，见 `services/library/playlist_cover.dart`）、`user-profile-view/v3/profile/{用户名}` 负责昵称头像。桌面版令牌不含用户名，登录后用令牌登录一次 AP 取 canonical username（歌单根列表、收藏分页都按用户名寻址；注意 `profile/me` 是用户名为 "me" 的另一个账号，不能用）；旧版本缺用户名的会话启动时自动补齐并重新加载媒体库 |
 | **探测脚本** | `tool/` | 纯 Dart 命令行探针（不属于 App）：`protocol_probe.dart`（播放链路端到端）、`live_probe.dart`（用本机已保存会话实测播放 / 媒体库 / 歌词）、`pathfinder_probe.dart`（Pathfinder 入参探测）、`ap_ports_probe.dart`（AP 网络可达性）。输出只写入 `tool/probe_out/`（已 gitignore，含账号数据，不得进入测试或文档） |
@@ -193,6 +207,7 @@ d:/Flutify/app/
 │   ├── models/                           # Spotify 对应的数据模型
 │   │   ├── track.dart, album.dart, artist.dart
 │   │   ├── playlist.dart, lyrics.dart, device.dart
+│   │   ├── lyrics_query.dart             # 查歌词的曲目信息（ID / 曲名 / 歌手 / 专辑 / 时长）
 │   │   ├── playback_context.dart         # 播放上下文（歌单 / 专辑 / 艺人 / 搜索）
 │   │   ├── playback_session.dart         # 上次播放会话（重启还原）
 │   │   └── user_profile.dart, playback_state.dart
@@ -218,6 +233,9 @@ d:/Flutify/app/
 │   │   │   └── decrypt/                  # 可插拔解密：DecryptSpec（解法）+ DecryptBackend（内联 / 常驻后台 Isolate）
 │   │   ├── network/                      # 网络代理：系统代理读取、全局选路（HttpOverrides）、CONNECT 隧道、测试连接
 │   │   ├── media_controls/               # 系统媒体控制：Windows SMTC（原生通道）/ audio_service（Android、iOS）+ 播放状态同步
+│   │   │                                 #   multi_media_controls.dart：多个控制端合一（SMTC + 任务栏歌词）
+│   │   ├── lyrics/                       # LRCLIB 歌词补全：LRC 解析、文种识别、简繁对照、翻译版过滤、选词、磁盘缓存、合并器
+│   │   ├── taskbar_lyrics/               # 任务栏歌词：原生通道（flutify/taskbar_lyrics）与作为媒体控制端的推送逻辑
 │   │   ├── downloading_audio_source.dart # 把下载中的音频接到 just_audio（StreamAudioSource）
 │   │   ├── playback_session_store.dart   # 上次播放会话（曲目 / 队列 / 进度）的文件存储
 │   │   ├── library/                      # 媒体库来源：collection 编解码、rootlist 解析、桌面 / Web API 实现

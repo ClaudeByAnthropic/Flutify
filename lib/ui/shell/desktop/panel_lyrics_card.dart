@@ -39,7 +39,7 @@ class PanelLyricsCard extends StatelessWidget {
           LyricsBackdrop(imageUrl: track.coverUrl),
           LyricsView(
             key: ValueKey((track.id, remote)),
-            trackId: track.id,
+            track: track,
             remote: remote,
             topInset: _barHeight + (expanded ? 8 : 0),
             bottomInset: 16,

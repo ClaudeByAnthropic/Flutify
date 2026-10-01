@@ -508,6 +508,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lyricsUnsynced => 'These lyrics aren\'t synced to the song yet.';
 
   @override
+  String get lyricsFromLrclib => 'Lyrics from LRCLIB';
+
+  @override
   String get lyricsImmersive => 'Immersive lyrics';
 
   @override
@@ -868,6 +871,69 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsLyricsImmersiveScreenSubtitle =>
       'When off, they fill only the window. Press F11 in full-screen lyrics to switch';
+
+  @override
+  String get settingsLyricsFallback => 'Fill in missing lyrics';
+
+  @override
+  String get settingsLyricsFallbackSubtitle =>
+      'When Spotify has no time-synced lyrics, get them from the open LRCLIB library in the song\'s original language';
+
+  @override
+  String get settingsTaskbarLyricsSection => 'Taskbar lyrics';
+
+  @override
+  String get settingsTaskbarLyrics => 'Show lyrics on the taskbar';
+
+  @override
+  String get settingsTaskbarLyricsSubtitle =>
+      'Shown next to the Widgets button. Hover for playback controls, click to open Flutify, right-click to reload lyrics';
+
+  @override
+  String get settingsTaskbarLyricsColor => 'Text color';
+
+  @override
+  String get settingsTaskbarLyricsCustomColor => 'Custom color';
+
+  @override
+  String get settingsTaskbarLyricsChangeColor => 'Change';
+
+  @override
+  String get settingsTaskbarLyricsOpacity => 'Opacity';
+
+  @override
+  String get taskbarLyricsColorAuto => 'Auto';
+
+  @override
+  String get taskbarLyricsColorWhite => 'White';
+
+  @override
+  String get taskbarLyricsColorBlack => 'Black';
+
+  @override
+  String get taskbarLyricsColorAccent => 'Accent';
+
+  @override
+  String get taskbarLyricsColorCustom => 'Custom';
+
+  @override
+  String get taskbarLyricsMenuOpen => 'Open Flutify';
+
+  @override
+  String get taskbarLyricsMenuRefetch => 'Reload lyrics';
+
+  @override
+  String get taskbarLyricsMenuDisable => 'Turn off taskbar lyrics';
+
+  @override
+  String get taskbarLyricsPreviewLine1 =>
+      'Lyrics scroll here as the song plays';
+
+  @override
+  String get taskbarLyricsPreviewLine2 => 'Hover to skip or pause';
+
+  @override
+  String get taskbarLyricsPreviewLine3 => 'Color and opacity apply instantly';
 
   @override
   String get settingsOff => 'Off';

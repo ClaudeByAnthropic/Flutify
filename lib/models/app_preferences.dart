@@ -14,6 +14,9 @@ enum LyricsAlign { left, center }
 /// 网络代理：跟随系统 / 不使用（直连）/ 手动指定 HTTP 代理。
 enum ProxyMode { system, none, manual }
 
+/// 任务栏歌词的文字颜色：自动（按任务栏背景明暗取黑 / 白）、白、黑、跟随强调色、自定义。
+enum TaskbarLyricsColor { auto, white, black, accent, custom }
+
 /// 非外观类的界面偏好（外观见 `AppearanceSettings`，播放类偏好由 PlaybackProvider 持有）。
 ///
 /// 不可变；整体序列化为一段 JSON 存在 `app_prefs` 键下。
@@ -49,6 +52,19 @@ class AppPreferences {
   final String proxyHost;
   final int proxyPort;
 
+  /// Spotify 没有逐行同步歌词（只有纯文本或完全没有）时，从 LRCLIB 补全。
+  final bool lyricsFallback;
+
+  /// Windows：把当前歌词嵌入任务栏（天气小组件右侧）。
+  final bool taskbarLyrics;
+  final TaskbarLyricsColor taskbarLyricsColor;
+
+  /// [TaskbarLyricsColor.custom] 时的颜色（ARGB）。
+  final int taskbarLyricsCustomColor;
+
+  /// 任务栏歌词文字整体不透明度（百分比，[minTaskbarLyricsOpacity] ~ 100）。
+  final int taskbarLyricsOpacity;
+
   const AppPreferences({
     this.language = AppLanguage.zh,
     this.lyricsScale = 1.0,
@@ -62,6 +78,11 @@ class AppPreferences {
     this.proxyMode = ProxyMode.system,
     this.proxyHost = '',
     this.proxyPort = 0,
+    this.lyricsFallback = true,
+    this.taskbarLyrics = false,
+    this.taskbarLyricsColor = TaskbarLyricsColor.auto,
+    this.taskbarLyricsCustomColor = defaultTaskbarLyricsCustomColor,
+    this.taskbarLyricsOpacity = 100,
   });
 
   static const AppPreferences defaults = AppPreferences();
@@ -70,6 +91,8 @@ class AppPreferences {
   static const double maxLyricsScale = 1.4;
   static const double maxLyricsBlur = 2.0;
   static const int maxRemoteLyricsLeadMs = 2000;
+  static const int minTaskbarLyricsOpacity = 15;
+  static const int defaultTaskbarLyricsCustomColor = 0xFF1ED760;
 
   AppPreferences copyWith({
     AppLanguage? language,
@@ -84,6 +107,11 @@ class AppPreferences {
     ProxyMode? proxyMode,
     String? proxyHost,
     int? proxyPort,
+    bool? lyricsFallback,
+    bool? taskbarLyrics,
+    TaskbarLyricsColor? taskbarLyricsColor,
+    int? taskbarLyricsCustomColor,
+    int? taskbarLyricsOpacity,
   }) {
     return AppPreferences(
       language: language ?? this.language,
@@ -98,6 +126,11 @@ class AppPreferences {
       proxyMode: proxyMode ?? this.proxyMode,
       proxyHost: proxyHost ?? this.proxyHost,
       proxyPort: proxyPort ?? this.proxyPort,
+      lyricsFallback: lyricsFallback ?? this.lyricsFallback,
+      taskbarLyrics: taskbarLyrics ?? this.taskbarLyrics,
+      taskbarLyricsColor: taskbarLyricsColor ?? this.taskbarLyricsColor,
+      taskbarLyricsCustomColor: taskbarLyricsCustomColor ?? this.taskbarLyricsCustomColor,
+      taskbarLyricsOpacity: taskbarLyricsOpacity ?? this.taskbarLyricsOpacity,
     );
   }
 
@@ -114,6 +147,11 @@ class AppPreferences {
     'proxyMode': proxyMode.name,
     'proxyHost': proxyHost,
     'proxyPort': proxyPort,
+    'lyricsFallback': lyricsFallback,
+    'taskbarLyrics': taskbarLyrics,
+    'taskbarLyricsColor': taskbarLyricsColor.name,
+    'taskbarLyricsCustomColor': taskbarLyricsCustomColor,
+    'taskbarLyricsOpacity': taskbarLyricsOpacity,
   };
 
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
@@ -126,6 +164,8 @@ class AppPreferences {
     const d = defaults;
     final lead = json['remoteLyricsLeadMs'];
     final port = json['proxyPort'];
+    final customColor = json['taskbarLyricsCustomColor'];
+    final opacity = json['taskbarLyricsOpacity'];
     return AppPreferences(
       language: pick(AppLanguage.values, json['language'], d.language),
       lyricsScale: number(json['lyricsScale'], d.lyricsScale, minLyricsScale, maxLyricsScale),
@@ -139,6 +179,14 @@ class AppPreferences {
       proxyMode: pick(ProxyMode.values, json['proxyMode'], d.proxyMode),
       proxyHost: json['proxyHost'] is String ? (json['proxyHost'] as String).trim() : d.proxyHost,
       proxyPort: port is int && port > 0 && port <= 65535 ? port : d.proxyPort,
+      lyricsFallback: flag(json['lyricsFallback'], d.lyricsFallback),
+      taskbarLyrics: flag(json['taskbarLyrics'], d.taskbarLyrics),
+      taskbarLyricsColor: pick(TaskbarLyricsColor.values, json['taskbarLyricsColor'], d.taskbarLyricsColor),
+      // 只认不透明颜色：自定义色存的总是 0xFFxxxxxx
+      taskbarLyricsCustomColor: customColor is int && customColor >= 0 && customColor <= 0xFFFFFFFF
+          ? 0xFF000000 | customColor
+          : d.taskbarLyricsCustomColor,
+      taskbarLyricsOpacity: opacity is int ? opacity.clamp(minTaskbarLyricsOpacity, 100) : d.taskbarLyricsOpacity,
     );
   }
 
@@ -169,7 +217,12 @@ class AppPreferences {
       other.compactTrackList == compactTrackList &&
       other.proxyMode == proxyMode &&
       other.proxyHost == proxyHost &&
-      other.proxyPort == proxyPort;
+      other.proxyPort == proxyPort &&
+      other.lyricsFallback == lyricsFallback &&
+      other.taskbarLyrics == taskbarLyrics &&
+      other.taskbarLyricsColor == taskbarLyricsColor &&
+      other.taskbarLyricsCustomColor == taskbarLyricsCustomColor &&
+      other.taskbarLyricsOpacity == taskbarLyricsOpacity;
 
   @override
   int get hashCode => Object.hash(
@@ -185,5 +238,10 @@ class AppPreferences {
     proxyMode,
     proxyHost,
     proxyPort,
+    lyricsFallback,
+    taskbarLyrics,
+    taskbarLyricsColor,
+    taskbarLyricsCustomColor,
+    taskbarLyricsOpacity,
   );
 }

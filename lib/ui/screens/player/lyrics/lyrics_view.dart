@@ -8,6 +8,8 @@ import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../models/app_preferences.dart';
 import '../../../../models/lyrics.dart';
+import '../../../../models/lyrics_query.dart';
+import '../../../../models/track.dart';
 import '../../../../providers/connect_provider.dart';
 import '../../../../providers/playback_provider.dart';
 import '../../../../providers/preferences_provider.dart';
@@ -28,7 +30,8 @@ import 'lyric_line_view.dart';
 /// 性能：手动监听 positionNotifier，只有「当前行」变化时才 setState；
 /// 当前行用二分查找定位。
 class LyricsView extends StatefulWidget {
-  final String trackId;
+  /// 曲目：官方歌词按 ID 取，LRCLIB 补全按曲名 / 歌手 / 专辑 / 时长匹配。
+  final SpotifyTrack track;
 
   /// 顶部 / 底部被玻璃控件覆盖的高度，歌词可从其下方滚过。
   final double topInset;
@@ -46,7 +49,7 @@ class LyricsView extends StatefulWidget {
 
   const LyricsView({
     super.key,
-    required this.trackId,
+    required this.track,
     this.topInset = 0,
     this.bottomInset = 0,
     this.fontSize = 30,
@@ -81,7 +84,7 @@ class _LyricsViewState extends State<LyricsView> {
   /// 歌词样式（设置页「歌词」分组）；没有 PreferencesProvider（部分测试）时用默认值。
   AppPreferences _style = AppPreferences.defaults;
 
-  bool get _isSynced => _lyrics?.syncType == 'LINE_SYNCED';
+  bool get _isSynced => _lyrics?.isSynced ?? false;
 
   /// 用于切行的时间点：固定提前量 + 远程模式下用户设置的提前量（服务端快照推算会有偏差）。
   int get _lookupMs => _position.value.inMilliseconds + _leadMs + (widget.remote ? _style.remoteLyricsLeadMs : 0);
@@ -99,16 +102,24 @@ class _LyricsViewState extends State<LyricsView> {
       _seek = playback.seekTo;
     }
     _position.addListener(_onPosition);
+    _load();
+  }
 
+  /// 已加载的歌词对应的缓存代数（[SpotifyProvider.lyricsGeneration]），变化时重新加载。
+  int _generation = 0;
+
+  void _load() {
     final spotify = context.read<SpotifyProvider>();
-    final cached = spotify.cachedLyrics(widget.trackId);
+    _generation = spotify.lyricsGeneration;
+    final cached = spotify.cachedLyrics(widget.track.id);
     if (cached != null) {
       _setLyrics(cached);
-    } else {
-      spotify.fetchLyrics(widget.trackId).then((lyrics) {
-        if (mounted) setState(() => _setLyrics(lyrics));
-      });
+      return;
     }
+    final generation = _generation;
+    spotify.fetchLyrics(LyricsQuery.fromTrack(widget.track)).then((lyrics) {
+      if (mounted && generation == _generation) setState(() => _setLyrics(lyrics));
+    });
   }
 
   void _setLyrics(SpotifyLyrics lyrics) {
@@ -208,6 +219,15 @@ class _LyricsViewState extends State<LyricsView> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive(animate: false));
     }
     _style = style;
+    // 歌词缓存被清空或这首歌被要求重新获取：回到加载态重新取
+    final generation = context.select<SpotifyProvider, int>((s) => s.lyricsGeneration);
+    if (generation != _generation) {
+      _lyrics = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(_load);
+      });
+      _generation = generation;
+    }
     final lyrics = _lyrics;
     if (lyrics == null) return _LoadingLines(topInset: widget.topInset);
     if (lyrics.lines.isEmpty) {
@@ -284,6 +304,14 @@ class _LyricsViewState extends State<LyricsView> {
                   distance: _isSynced ? i - _focusIndex : 0,
                   focusAll: !_isSynced || _browsing,
                   onTap: _isSynced ? () => _seekToLine(lyrics.lines[i]) : null,
+                ),
+              if (lyrics.provider == LyricsProvider.lrclib)
+                Padding(
+                  padding: const EdgeInsets.only(top: 28),
+                  child: Text(
+                    context.l10n.lyricsFromLrclib,
+                    style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
                 ),
             ],
           ),

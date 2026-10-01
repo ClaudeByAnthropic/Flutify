@@ -29,16 +29,24 @@ class LyricLine {
   };
 }
 
+/// 歌词来源：Spotify 官方（color-lyrics），或 Spotify 没有逐行同步歌词时由 LRCLIB 补全。
+enum LyricsProvider { spotify, lrclib }
+
 class SpotifyLyrics {
   final String syncType; // 'LINE_SYNCED' or 'UNSYNCED'
   final List<LyricLine> lines;
   final String language;
+  final LyricsProvider provider;
 
   const SpotifyLyrics({
     this.syncType = 'LINE_SYNCED',
     this.lines = const [],
     this.language = 'en',
+    this.provider = LyricsProvider.spotify,
   });
+
+  /// 有逐行时间轴、可以随播放滚动的歌词。
+  bool get isSynced => syncType == 'LINE_SYNCED' && lines.isNotEmpty;
 
   factory SpotifyLyrics.fromJson(Map<String, dynamic> json) {
     final lyricsData = json['lyrics'] is Map<String, dynamic>

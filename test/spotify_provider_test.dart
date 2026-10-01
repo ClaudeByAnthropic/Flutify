@@ -1,6 +1,11 @@
 import 'dart:convert';
 
+import 'package:flutify_app/models/lyrics.dart';
+import 'package:flutify_app/models/lyrics_query.dart';
 import 'package:flutify_app/providers/spotify_provider.dart';
+import 'package:flutify_app/services/lyrics/lrclib_client.dart';
+import 'package:flutify_app/services/lyrics/lrclib_lyrics_source.dart';
+import 'package:flutify_app/services/lyrics/lyrics_resolver.dart';
 import 'package:flutify_app/services/spotify_api_service.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,21 +103,23 @@ void main() {
 
   test('lyrics are cached after the first fetch', () async {
     final id = SampleCatalog.track1.id;
+    final query = LyricsQuery.fromTrack(SampleCatalog.track1);
     expect(spotify.cachedLyrics(id), isNull);
 
-    final lyrics = await spotify.fetchLyrics(id);
+    final lyrics = await spotify.fetchLyrics(query);
     expect(lyrics.lines.map((l) => l.words), ['first line', 'second line']);
     expect(identical(spotify.cachedLyrics(id), lyrics), isTrue);
 
-    await spotify.fetchLyrics(id);
+    await spotify.fetchLyrics(query);
     expect(requests.where((u) => u.path.contains('/color-lyrics/')), hasLength(1));
   });
 
   test('没有歌词（404）也会缓存为空歌词', () async {
     lyricsStatus = 404;
     final id = SampleCatalog.track2.id;
+    final query = LyricsQuery.fromTrack(SampleCatalog.track2);
 
-    final lyrics = await spotify.fetchLyrics(id);
+    final lyrics = await spotify.fetchLyrics(query);
 
     expect(lyrics.lines, isEmpty);
     expect(spotify.cachedLyrics(id), isNotNull);
@@ -121,13 +128,82 @@ void main() {
   test('歌词请求失败（5xx）返回空歌词但不缓存，下次会重试', () async {
     lyricsStatus = 503;
     final id = SampleCatalog.track3.id;
+    final query = LyricsQuery.fromTrack(SampleCatalog.track3);
 
-    final failed = await spotify.fetchLyrics(id);
+    final failed = await spotify.fetchLyrics(query);
     expect(failed.lines, isEmpty);
     expect(spotify.cachedLyrics(id), isNull);
 
     lyricsStatus = 200;
-    final retried = await spotify.fetchLyrics(id);
+    final retried = await spotify.fetchLyrics(query);
     expect(retried.lines, hasLength(2));
+  });
+
+  group('LRCLIB 补全', () {
+    late SpotifyProvider withFallback;
+    var fallbackOn = true;
+    var lrclibCalls = 0;
+
+    // 合成 LRCLIB：/api/get 返回一份同步歌词，其余接口返回空
+    http.Response lrclib(http.Request req) {
+      lrclibCalls++;
+      if (req.url.path.endsWith('/get')) {
+        return http.Response(
+          jsonEncode({
+            'id': 1,
+            'trackName': req.url.queryParameters['track_name'],
+            'artistName': req.url.queryParameters['artist_name'],
+            'syncedLyrics': '[00:01.00]synthetic one\n[00:02.50]synthetic two',
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('[]', 200);
+    }
+
+    setUp(() {
+      fallbackOn = true;
+      lrclibCalls = 0;
+      final api = SpotifyApiService(storage, MockClient((req) async => handle(req)));
+      withFallback = SpotifyProvider(
+        api,
+        storage,
+        lyrics: LyricsResolver(
+          api.getLyrics,
+          fallback: LrclibLyricsSource(
+            LrclibClient(MockClient((req) async => lrclib(req)), sleep: (_) async {}),
+            sleep: (_) async {},
+          ),
+          fallbackEnabled: () => fallbackOn,
+        ),
+      );
+    });
+
+    tearDown(() => withFallback.dispose());
+
+    test('官方有逐行同步歌词时不查 LRCLIB', () async {
+      final lyrics = await withFallback.fetchLyrics(LyricsQuery.fromTrack(SampleCatalog.track1));
+      expect(lyrics.provider, LyricsProvider.spotify);
+      expect(lrclibCalls, 0);
+    });
+
+    test('官方没有歌词时用 LRCLIB 补全并缓存', () async {
+      lyricsStatus = 404;
+      final query = LyricsQuery.fromTrack(SampleCatalog.track2);
+      final lyrics = await withFallback.fetchLyrics(query);
+      expect(lyrics.provider, LyricsProvider.lrclib);
+      expect(lyrics.lines.map((l) => l.words), ['synthetic one', 'synthetic two']);
+      expect(lyrics.lines.map((l) => l.startTimeMs), [1000, 2500]);
+      expect(withFallback.cachedLyrics(query.trackId), same(lyrics));
+    });
+
+    test('关闭补全后保持官方结果', () async {
+      lyricsStatus = 404;
+      fallbackOn = false;
+      final lyrics = await withFallback.fetchLyrics(LyricsQuery.fromTrack(SampleCatalog.track3));
+      expect(lyrics.lines, isEmpty);
+      expect(lrclibCalls, 0);
+    });
   });
 }

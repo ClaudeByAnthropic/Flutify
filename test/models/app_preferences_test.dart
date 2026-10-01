@@ -16,8 +16,21 @@ void main() {
       proxyMode: ProxyMode.manual,
       proxyHost: '10.0.0.2',
       proxyPort: 8080,
+      lyricsFallback: false,
+      taskbarLyrics: true,
+      taskbarLyricsColor: TaskbarLyricsColor.custom,
+      taskbarLyricsCustomColor: 0xFF336699,
+      taskbarLyricsOpacity: 60,
     );
     expect(AppPreferences.decode(prefs.encode()), prefs);
+  });
+
+  test('taskbar lyrics: off by default, bad values are sanitised', () {
+    expect(AppPreferences.defaults.taskbarLyrics, isFalse);
+    expect(AppPreferences.defaults.lyricsFallback, isTrue);
+    final prefs = AppPreferences.fromJson({'taskbarLyricsColor': 'rainbow', 'taskbarLyricsOpacity': 3});
+    expect(prefs.taskbarLyricsColor, TaskbarLyricsColor.auto);
+    expect(prefs.taskbarLyricsOpacity, AppPreferences.minTaskbarLyricsOpacity);
   });
 
   test('proxy fields: unknown mode falls back to system, bad port to 0', () {

@@ -496,6 +496,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lyricsUnsynced => '这些歌词尚未与歌曲同步。';
 
   @override
+  String get lyricsFromLrclib => '歌词来自 LRCLIB';
+
+  @override
   String get lyricsImmersive => '沉浸式歌词';
 
   @override
@@ -845,6 +848,68 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsLyricsImmersiveScreenSubtitle =>
       '关闭时只铺满窗口；在全屏歌词里按 F11 也能切换';
+
+  @override
+  String get settingsLyricsFallback => '补全歌词';
+
+  @override
+  String get settingsLyricsFallbackSubtitle =>
+      'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选';
+
+  @override
+  String get settingsTaskbarLyricsSection => '任务栏歌词';
+
+  @override
+  String get settingsTaskbarLyrics => '在任务栏显示歌词';
+
+  @override
+  String get settingsTaskbarLyricsSubtitle =>
+      '显示在天气小组件右侧。悬停时显示播放控制，点按打开 Flutify，右键可重新获取歌词';
+
+  @override
+  String get settingsTaskbarLyricsColor => '文字颜色';
+
+  @override
+  String get settingsTaskbarLyricsCustomColor => '自定义颜色';
+
+  @override
+  String get settingsTaskbarLyricsChangeColor => '更改';
+
+  @override
+  String get settingsTaskbarLyricsOpacity => '不透明度';
+
+  @override
+  String get taskbarLyricsColorAuto => '自动';
+
+  @override
+  String get taskbarLyricsColorWhite => '白色';
+
+  @override
+  String get taskbarLyricsColorBlack => '黑色';
+
+  @override
+  String get taskbarLyricsColorAccent => '强调色';
+
+  @override
+  String get taskbarLyricsColorCustom => '自定义';
+
+  @override
+  String get taskbarLyricsMenuOpen => '打开 Flutify';
+
+  @override
+  String get taskbarLyricsMenuRefetch => '重新获取歌词';
+
+  @override
+  String get taskbarLyricsMenuDisable => '关闭任务栏歌词';
+
+  @override
+  String get taskbarLyricsPreviewLine1 => '歌词会在这里随歌声滚动';
+
+  @override
+  String get taskbarLyricsPreviewLine2 => '悬停即可切歌、暂停';
+
+  @override
+  String get taskbarLyricsPreviewLine3 => '颜色与不透明度即时生效';
 
   @override
   String get settingsOff => '关';

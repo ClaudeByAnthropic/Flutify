@@ -1,0 +1,194 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:http/http.dart' as http;
+
+import '../../models/lyrics.dart';
+import '../../models/lyrics_query.dart';
+import '../media_controls/system_media_controls.dart';
+import 'taskbar_lyrics_channel.dart';
+
+/// 任务栏歌词：作为又一个「系统媒体控制端」挂在 MediaControlsSync 上。
+///
+/// 这样它天然跟随「正在播放」的来源（本机 / Connect 远程设备，与系统媒体卡片一致），
+/// 任务栏上的上一首 / 播放暂停 / 下一首也走同一条按键路由。
+///
+/// 职责：
+/// - 收到曲目后按 [lyricsLoader] 取歌词（与 App 内歌词同一来源，含 LRCLIB 补全），只把逐行同步歌词推给原生；
+///   纯文本或没有歌词时原生显示控制条（封面 + 歌名 + 按钮）；
+/// - 下载封面字节交给原生解码（只保留最近一张）；
+/// - 关闭时不向原生推任何曲目数据，开启时补推当前状态。
+/// 「打开 Flutify」「关闭任务栏歌词」由界面层（TaskbarLyricsBinding）通过回调处理。
+class TaskbarLyricsControls implements SystemMediaControls {
+  final TaskbarLyricsPlatform _platform;
+  final http.Client _http;
+
+  final StreamController<MediaControlEvent> _events = StreamController.broadcast();
+  StreamSubscription<TaskbarLyricsEvent>? _platformEvents;
+
+  /// 取歌词 / 强制重新取歌词（由界面层接到 SpotifyProvider）。
+  Future<SpotifyLyrics> Function(LyricsQuery query)? lyricsLoader;
+  Future<SpotifyLyrics> Function(LyricsQuery query)? lyricsReloader;
+
+  void Function()? onOpen;
+  void Function()? onDisable;
+
+  bool _enabled = false;
+  TaskbarLyricsStyle? _style;
+  MediaTrackInfo? _track;
+  MediaPlaybackInfo? _playback;
+  DateTime _playbackAt = DateTime.now();
+
+  // 每换一次曲目递增，丢弃过期的异步结果（歌词 / 封面）
+  int _generation = 0;
+  String? _artUrl;
+  Uint8List? _art;
+
+  TaskbarLyricsControls(this._platform, {http.Client? client}) : _http = client ?? http.Client() {
+    _platformEvents = _platform.events.listen(_onPlatformEvent);
+  }
+
+  bool get enabled => _enabled;
+
+  /// 界面层每次构建时调用；只在开关 / 样式真正变化时通知原生。
+  void configure({required bool enabled, required TaskbarLyricsStyle style}) {
+    if (style != _style) {
+      _style = style;
+      if (_enabled) unawaited(_platform.setStyle(style));
+    }
+    if (enabled == _enabled) return;
+    _enabled = enabled;
+    if (enabled) {
+      unawaited(_platform.setEnabled(true).then((_) => _pushAll()));
+    } else {
+      unawaited(_platform.setEnabled(false));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SystemMediaControls
+  // ---------------------------------------------------------------------------
+
+  @override
+  Stream<MediaControlEvent> get events => _events.stream;
+
+  /// 原生按锚点自行推算进度；周期性补发用于校正漂移。
+  @override
+  bool get needsPeriodicTimeline => true;
+
+  @override
+  Future<void> setTrack(MediaTrackInfo? track) async {
+    _track = track;
+    _generation++;
+    if (_enabled) await _pushTrack();
+  }
+
+  @override
+  Future<void> setPlayback(MediaPlaybackInfo info) async {
+    _playback = info;
+    _playbackAt = DateTime.now();
+    if (_enabled) await _platform.setPlayback(playing: info.playing, position: info.position);
+  }
+
+  @override
+  void dispose() {
+    _platformEvents?.cancel();
+    unawaited(_platform.setEnabled(false));
+    _events.close();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 推送
+  // ---------------------------------------------------------------------------
+
+  Future<void> _pushAll() async {
+    final style = _style;
+    if (style != null) await _platform.setStyle(style);
+    await _pushTrack();
+    final playback = _playback;
+    if (playback != null) {
+      // 开启时距上次推送已过去一段时间：按经过的时间补上进度
+      final elapsed = playback.playing ? DateTime.now().difference(_playbackAt) : Duration.zero;
+      await _platform.setPlayback(playing: playback.playing, position: playback.position + elapsed);
+    }
+  }
+
+  Future<void> _pushTrack() async {
+    final track = _track;
+    final generation = _generation;
+    if (track == null) {
+      await _platform.setTrack(null);
+      await _platform.setLyrics(null);
+      return;
+    }
+    await _platform.setTrack((title: track.title, artist: track.artist));
+    // 先清掉上一首的歌词，新歌词到之前显示控制条，不会错配
+    await _platform.setLyrics(null);
+    await Future.wait([_pushArt(track, generation), _pushLyrics(track, generation)]);
+  }
+
+  Future<void> _pushArt(MediaTrackInfo track, int generation) async {
+    final url = track.artUrl;
+    if (url != _artUrl) {
+      _artUrl = url;
+      _art = url.isEmpty ? null : await _download(url);
+    }
+    if (generation == _generation && _enabled) await _platform.setArt(_art);
+  }
+
+  Future<Uint8List?> _download(String url) async {
+    try {
+      final res = await _http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 ? res.bodyBytes : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _pushLyrics(MediaTrackInfo track, int generation, {bool reload = false}) async {
+    final loader = reload ? lyricsReloader : lyricsLoader;
+    if (loader == null) return;
+    SpotifyLyrics lyrics;
+    try {
+      lyrics = await loader(_query(track));
+    } catch (_) {
+      return;
+    }
+    if (generation != _generation || !_enabled) return;
+    await _platform.setLyrics(lyrics.isSynced ? lyrics.lines : null);
+  }
+
+  static LyricsQuery _query(MediaTrackInfo track) => LyricsQuery(
+    trackId: track.id,
+    title: track.title,
+    artist: track.artist,
+    album: track.album,
+    durationMs: track.duration.inMilliseconds,
+  );
+
+  /// 歌词加载器就绪（界面层首次绑定）后补推当前曲目的歌词。
+  void lyricsSourceReady() {
+    final track = _track;
+    if (_enabled && track != null) unawaited(_pushLyrics(track, _generation));
+  }
+
+  void _onPlatformEvent(TaskbarLyricsEvent event) {
+    switch (event) {
+      case TaskbarLyricsEvent.previous:
+        _events.add(const MediaButtonEvent(MediaButton.previous));
+      case TaskbarLyricsEvent.toggle:
+        _events.add(const MediaButtonEvent(MediaButton.toggle));
+      case TaskbarLyricsEvent.next:
+        _events.add(const MediaButtonEvent(MediaButton.next));
+      case TaskbarLyricsEvent.open:
+        onOpen?.call();
+      case TaskbarLyricsEvent.disable:
+        onDisable?.call();
+      case TaskbarLyricsEvent.refetch:
+        final track = _track;
+        if (track != null) {
+          unawaited(_platform.setLyrics(null).then((_) => _pushLyrics(track, _generation, reload: true)));
+        }
+    }
+  }
+}

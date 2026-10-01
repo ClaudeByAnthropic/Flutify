@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -22,8 +23,13 @@ import 'providers/sleep_timer_provider.dart';
 import 'providers/spotify_provider.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
+import 'services/lyrics/lrclib_client.dart';
+import 'services/lyrics/lrclib_lyrics_source.dart';
+import 'services/lyrics/lyrics_disk_cache.dart';
+import 'services/lyrics/lyrics_resolver.dart';
 import 'services/media_controls/connect_media_source.dart';
 import 'services/media_controls/media_controls_sync.dart';
+import 'services/media_controls/multi_media_controls.dart';
 import 'services/media_controls/system_media_controls.dart';
 import 'services/network/network_proxy.dart';
 import 'services/playback_session_store.dart';
@@ -31,11 +37,14 @@ import 'services/protocol/audio_cache_store.dart';
 import 'services/protocol/track_audio_loader.dart';
 import 'services/spotify_api_service.dart';
 import 'services/storage_service.dart';
+import 'services/taskbar_lyrics/taskbar_lyrics_channel.dart';
+import 'services/taskbar_lyrics/taskbar_lyrics_controls.dart';
 import 'ui/screens/main_shell.dart';
 import 'ui/shell/desktop/desktop_window.dart';
 import 'ui/shell/desktop/window_frame.dart';
 import 'ui/widgets/dynamic_accent_sync.dart';
 import 'ui/widgets/playback_session_keeper.dart';
+import 'ui/widgets/taskbar_lyrics_binding.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -91,8 +100,19 @@ Future<void> main() async {
   // 桌面端：隐藏系统标题栏（由顶栏自绘）、设置最小窗口尺寸、还原上次的窗口位置
   await DesktopWindow.init(storageService);
 
-  // 系统媒体控制：Windows SMTC（任务栏 / 锁屏媒体卡片、媒体键），Android / iOS 通知栏与锁屏
-  final mediaControls = await SystemMediaControls.create();
+  // 系统媒体控制：Windows SMTC（任务栏 / 锁屏媒体卡片、媒体键），Android / iOS 通知栏与锁屏。
+  // Windows 上再挂一个任务栏歌词，二者共用同一套本机 / 远程切换与按键路由
+  final systemControls = await SystemMediaControls.create();
+  final taskbarLyrics = Platform.isWindows ? TaskbarLyricsControls(MethodChannelTaskbarLyrics()) : null;
+  final mediaControls = taskbarLyrics == null
+      ? systemControls
+      : MultiMediaControls([?systemControls, taskbarLyrics]);
+
+  // 歌词补全：Spotify 没有逐行同步歌词时查 LRCLIB，选中的歌词缓存在应用数据目录
+  final lyricsFallback = LrclibLyricsSource(
+    LrclibClient(http.Client()),
+    cache: LyricsDiskCache(Directory('${supportDir.path}${Platform.pathSeparator}lyrics_lrc')),
+  );
 
   runApp(
     FlutifyApp(
@@ -104,6 +124,8 @@ Future<void> main() async {
       playbackSessionStore: sessionStore,
       mediaControls: mediaControls,
       networkProxy: NetworkProxy.instance,
+      lyricsFallback: lyricsFallback,
+      taskbarLyrics: taskbarLyrics,
     ),
   );
 }
@@ -128,6 +150,12 @@ class FlutifyApp extends StatelessWidget {
   /// 网络代理策略；为空时设置页只显示模式、不探测系统代理（测试默认）。
   final NetworkProxy? networkProxy;
 
+  /// LRCLIB 歌词补全；为空时只用 Spotify 官方歌词（测试默认）。
+  final LrclibLyricsSource? lyricsFallback;
+
+  /// 任务栏歌词（Windows）；已包含在 [mediaControls] 里，这里供界面层绑定设置与歌词来源。
+  final TaskbarLyricsControls? taskbarLyrics;
+
   const FlutifyApp({
     super.key,
     required this.storageService,
@@ -138,6 +166,8 @@ class FlutifyApp extends StatelessWidget {
     this.playbackSessionStore,
     this.mediaControls,
     this.networkProxy,
+    this.lyricsFallback,
+    this.taskbarLyrics,
   });
 
   @override
@@ -179,7 +209,6 @@ class FlutifyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (ctx) => SleepTimerProvider(ctx.read<PlaybackProvider>())),
         ChangeNotifierProvider(create: (_) => LibraryProvider(storageService, source: spotifyApiService.library)),
-        ChangeNotifierProvider(create: (_) => SpotifyProvider(spotifyApiService, storageService)),
         ChangeNotifierProvider(create: (_) => AppearanceProvider(storageService)),
         ChangeNotifierProvider(
           create: (_) {
@@ -197,6 +226,19 @@ class FlutifyApp extends StatelessWidget {
             return preferences;
           },
         ),
+        // 在 PreferencesProvider 之后创建：歌词补全开关在每次取歌词时读取
+        ChangeNotifierProvider(
+          create: (ctx) => SpotifyProvider(
+            spotifyApiService,
+            storageService,
+            lyrics: LyricsResolver(
+              spotifyApiService.getLyrics,
+              fallback: lyricsFallback,
+              fallbackEnabled: () => ctx.read<PreferencesProvider>().prefs.lyricsFallback,
+            ),
+          ),
+        ),
+        Provider<TaskbarLyricsControls?>.value(value: taskbarLyrics),
         // 设置页「存储」分组：音频缓存占用 / 上限 / 清除（未接入协议链路时为 null）
         Provider<AudioCacheStore?>.value(
           value: trackAudioLoader is AudioCacheStore ? trackAudioLoader as AudioCacheStore : null,
@@ -276,7 +318,7 @@ class _ThemedApp extends StatelessWidget {
           child: AnnotatedRegion<SystemUiOverlayStyle>(
             value: systemBarsStyle(Theme.of(context).brightness),
             // 桌面：窗口按钮 / 窄窗口标题条覆盖在所有路由之上
-            child: WindowFrame(child: child!),
+            child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
           ),
         );
       },

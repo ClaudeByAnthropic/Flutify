@@ -8,6 +8,7 @@
 
 #include "media_controls.h"
 #include "snap_layout.h"
+#include "taskbar_lyrics.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -36,6 +37,9 @@ class FlutterWindow : public Win32Window {
 
   // Windows 11 分屏布局：自绘最大化按钮的命中测试。
   std::unique_ptr<SnapLayout> snap_layout_;
+
+  // 任务栏歌词（嵌入 Windows 任务栏的歌词窗口）。
+  std::unique_ptr<TaskbarLyrics> taskbar_lyrics_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

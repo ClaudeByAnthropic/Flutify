@@ -64,7 +64,7 @@ class LyricsSheet extends StatelessWidget {
             else
               LyricsView(
                 key: ValueKey((track.id, remote)),
-                trackId: track.id,
+                track: track,
                 remote: remote,
                 topInset: _headerHeight,
                 bottomInset: _controlsHeight + bottomSafe,

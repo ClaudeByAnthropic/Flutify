@@ -992,6 +992,12 @@ abstract class AppLocalizations {
   /// **'这些歌词尚未与歌曲同步。'**
   String get lyricsUnsynced;
 
+  /// No description provided for @lyricsFromLrclib.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来自 LRCLIB'**
+  String get lyricsFromLrclib;
+
   /// No description provided for @lyricsImmersive.
   ///
   /// In zh, this message translates to:
@@ -1645,6 +1651,126 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'关闭时只铺满窗口；在全屏歌词里按 F11 也能切换'**
   String get settingsLyricsImmersiveScreenSubtitle;
+
+  /// No description provided for @settingsLyricsFallback.
+  ///
+  /// In zh, this message translates to:
+  /// **'补全歌词'**
+  String get settingsLyricsFallback;
+
+  /// No description provided for @settingsLyricsFallbackSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选'**
+  String get settingsLyricsFallbackSubtitle;
+
+  /// No description provided for @settingsTaskbarLyricsSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'任务栏歌词'**
+  String get settingsTaskbarLyricsSection;
+
+  /// No description provided for @settingsTaskbarLyrics.
+  ///
+  /// In zh, this message translates to:
+  /// **'在任务栏显示歌词'**
+  String get settingsTaskbarLyrics;
+
+  /// No description provided for @settingsTaskbarLyricsSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示在天气小组件右侧。悬停时显示播放控制，点按打开 Flutify，右键可重新获取歌词'**
+  String get settingsTaskbarLyricsSubtitle;
+
+  /// No description provided for @settingsTaskbarLyricsColor.
+  ///
+  /// In zh, this message translates to:
+  /// **'文字颜色'**
+  String get settingsTaskbarLyricsColor;
+
+  /// No description provided for @settingsTaskbarLyricsCustomColor.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义颜色'**
+  String get settingsTaskbarLyricsCustomColor;
+
+  /// No description provided for @settingsTaskbarLyricsChangeColor.
+  ///
+  /// In zh, this message translates to:
+  /// **'更改'**
+  String get settingsTaskbarLyricsChangeColor;
+
+  /// No description provided for @settingsTaskbarLyricsOpacity.
+  ///
+  /// In zh, this message translates to:
+  /// **'不透明度'**
+  String get settingsTaskbarLyricsOpacity;
+
+  /// No description provided for @taskbarLyricsColorAuto.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动'**
+  String get taskbarLyricsColorAuto;
+
+  /// No description provided for @taskbarLyricsColorWhite.
+  ///
+  /// In zh, this message translates to:
+  /// **'白色'**
+  String get taskbarLyricsColorWhite;
+
+  /// No description provided for @taskbarLyricsColorBlack.
+  ///
+  /// In zh, this message translates to:
+  /// **'黑色'**
+  String get taskbarLyricsColorBlack;
+
+  /// No description provided for @taskbarLyricsColorAccent.
+  ///
+  /// In zh, this message translates to:
+  /// **'强调色'**
+  String get taskbarLyricsColorAccent;
+
+  /// No description provided for @taskbarLyricsColorCustom.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义'**
+  String get taskbarLyricsColorCustom;
+
+  /// No description provided for @taskbarLyricsMenuOpen.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开 Flutify'**
+  String get taskbarLyricsMenuOpen;
+
+  /// No description provided for @taskbarLyricsMenuRefetch.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新获取歌词'**
+  String get taskbarLyricsMenuRefetch;
+
+  /// No description provided for @taskbarLyricsMenuDisable.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭任务栏歌词'**
+  String get taskbarLyricsMenuDisable;
+
+  /// No description provided for @taskbarLyricsPreviewLine1.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词会在这里随歌声滚动'**
+  String get taskbarLyricsPreviewLine1;
+
+  /// No description provided for @taskbarLyricsPreviewLine2.
+  ///
+  /// In zh, this message translates to:
+  /// **'悬停即可切歌、暂停'**
+  String get taskbarLyricsPreviewLine2;
+
+  /// No description provided for @taskbarLyricsPreviewLine3.
+  ///
+  /// In zh, this message translates to:
+  /// **'颜色与不透明度即时生效'**
+  String get taskbarLyricsPreviewLine3;
 
   /// No description provided for @settingsOff.
   ///

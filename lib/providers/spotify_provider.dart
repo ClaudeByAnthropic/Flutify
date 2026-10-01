@@ -7,9 +7,11 @@ import '../models/category.dart';
 import '../models/device.dart';
 import '../models/home_feed.dart';
 import '../models/lyrics.dart';
+import '../models/lyrics_query.dart';
 import '../models/playlist.dart';
 import '../models/track.dart';
 import '../models/user_profile.dart';
+import '../services/lyrics/lyrics_resolver.dart';
 import '../services/spotify_api_service.dart';
 import '../services/storage_service.dart';
 
@@ -44,13 +46,17 @@ class SpotifyProvider extends ChangeNotifier {
   List<String> _recentSearches = [];
 
   // Lyrics（按曲目 ID 缓存，避免重复打开歌词页时重复请求）
+  final LyricsResolver _lyrics;
   final Map<String, SpotifyLyrics> _lyricsCache = {};
   final Map<String, Future<SpotifyLyrics>> _lyricsInFlight = {};
+  int _lyricsGeneration = 0;
 
   /// dispose 之后异步回调不得再 notifyListeners。
   bool _disposed = false;
 
-  SpotifyProvider(this._api, this._storage) {
+  /// [lyrics] 为空时只用 Spotify 官方歌词（测试默认）；App 里注入带 LRCLIB 补全的合并器。
+  SpotifyProvider(this._api, this._storage, {LyricsResolver? lyrics})
+    : _lyrics = lyrics ?? LyricsResolver(_api.getLyrics) {
     _recentSearches = _storage.recentSearches;
     loadInitialData();
   }
@@ -213,28 +219,45 @@ class SpotifyProvider extends ChangeNotifier {
   /// 已缓存歌词的曲目数（设置页「隐私」分组展示）。
   int get cachedLyricsCount => _lyricsCache.length;
 
-  /// 清空歌词缓存：已打开的歌词视图不受影响，之后打开的会重新请求。
+  /// 歌词缓存被清空 / 某首歌被要求重新获取时递增；歌词视图据此重新加载。
+  int get lyricsGeneration => _lyricsGeneration;
+
+  /// 清空歌词缓存（含 LRCLIB 补全的本地缓存）：已打开的歌词视图随之重新请求。
   void clearLyricsCache() {
+    unawaited(_lyrics.fallback?.cache?.clear());
     if (_lyricsCache.isEmpty) return;
     _lyricsCache.clear();
+    _lyricsGeneration++;
     notifyListeners();
   }
 
-  /// 获取歌词：命中缓存直接返回，并发请求合并为同一个 Future。
-  Future<SpotifyLyrics> fetchLyrics(String trackId) {
+  /// 重新获取一首歌的歌词：丢掉内存与本地缓存后重新查（补全歌词选错语言 / 版本时用）。
+  Future<SpotifyLyrics> refetchLyrics(LyricsQuery query) async {
+    _lyricsCache.remove(query.trackId);
+    await _lyrics.fallback?.forget(query);
+    final lyrics = fetchLyrics(query);
+    _lyricsGeneration++;
+    if (!_disposed) notifyListeners();
+    return lyrics;
+  }
+
+  /// 获取歌词（Spotify 官方优先，没有逐行同步歌词时按设置用 LRCLIB 补全，见 [LyricsResolver]）：
+  /// 命中缓存直接返回，并发请求合并为同一个 Future。
+  Future<SpotifyLyrics> fetchLyrics(LyricsQuery query) {
+    final trackId = query.trackId;
     final cached = _lyricsCache[trackId];
     if (cached != null) return Future.value(cached);
 
     // whenComplete 回调必须是块体：箭头函数会返回 remove() 取出的 Future 本身，
     // whenComplete 会等待该 Future，形成自我等待的死锁。
     //
-    // 只缓存成功结果（含「这首歌没有歌词」）；网络 / 鉴权错误不缓存，下次打开歌词页会重试，
+    // 只缓存确定的结果（含「这首歌没有歌词」）；网络 / 鉴权错误不缓存，下次打开歌词页会重试，
     // 本次对 UI 返回空歌词（显示「暂无歌词」）。
-    return _lyricsInFlight[trackId] ??= _api
-        .getLyrics(trackId)
-        .then((lyrics) {
-          _lyricsCache[trackId] = lyrics;
-          return lyrics;
+    return _lyricsInFlight[trackId] ??= _lyrics
+        .resolve(query)
+        .then((resolved) {
+          if (resolved.cacheable) _lyricsCache[trackId] = resolved.lyrics;
+          return resolved.lyrics;
         })
         .catchError((Object _) => const SpotifyLyrics(lines: []))
         .whenComplete(() {

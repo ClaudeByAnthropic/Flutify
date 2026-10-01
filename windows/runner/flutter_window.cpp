@@ -30,6 +30,7 @@ bool FlutterWindow::OnCreate() {
   auto* messenger = flutter_controller_->engine()->messenger();
   media_controls_ = std::make_unique<MediaControls>(GetHandle(), messenger);
   snap_layout_ = std::make_unique<SnapLayout>(GetHandle(), flutter_controller_->view()->GetNativeWindow(), messenger);
+  taskbar_lyrics_ = std::make_unique<TaskbarLyrics>(GetHandle(), messenger);
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
@@ -45,6 +46,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   // 先于引擎释放：它们持有引擎的 MethodChannel
+  taskbar_lyrics_ = nullptr;
   snap_layout_ = nullptr;
   media_controls_ = nullptr;
   if (flutter_controller_) {
@@ -65,6 +67,9 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     }
   }
   if (media_controls_ && media_controls_->HandleMessage(message, wparam, lparam)) {
+    return 0;
+  }
+  if (taskbar_lyrics_ && taskbar_lyrics_->HandleMessage(message, wparam, lparam)) {
     return 0;
   }
 

@@ -259,7 +259,7 @@ class _InlineLyrics extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: LyricsView(key: ValueKey(track.id), trackId: track.id, topInset: 16, bottomInset: 8),
+          child: LyricsView(key: ValueKey(track.id), track: track, topInset: 16, bottomInset: 8),
         ),
         Positioned(
           top: 0,
