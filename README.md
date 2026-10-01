@@ -37,7 +37,15 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
     中间区域可在「封面 / 歌词 / 播放队列」间切换（底部按钮，再点一次回到封面）；**左右滑动封面切歌**，小幅拖动松手回弹；内嵌歌词右上角可进入全屏歌词。
   - **播放失败提示**：未登录（带「登录」按钮）、曲目不可播放（说明已自动跳过）、网络错误（带「重试」按钮）均以 MD3E 悬浮提示卡告知（反色表面、大圆角、左侧错误类型图标、胶囊操作键；桌面端居中显示在播放栏之上），连续失败只保留最新一条。
     连续 3 首无法播放时自动暂停、不再跳过（设置 →「播放」可关闭），提示带「下一首」按钮。
-  - **Spotify Connect 设备切换**：支持检测并切换播放设备（PC / 手机 / 音箱）。
+  - **Spotify Connect 遥控**（桌面版会话，免费账号可用的部分）：本机以隐藏观察者身份接入账号的 Connect 网络
+    （dealer 长连接 + connect-state，`services/connect/`），不会出现在别人的设备列表里。
+    - 设备面板（`device_picker_sheet.dart`）：桌面端贴在播放栏右下方，移动端为底部面板；
+      顶部「当前收听设备」卡片（跳动音柱、远程音量滑块），下方其他设备，点按转移播放；
+      远程在用时提供「此设备」：暂停远程，本机从同一首、同一进度继续。
+    - 别的设备在出声（或远程已暂停而本机没有曲目）时，桌面播放栏与手机迷你播放器切换为远程模式
+      （`widgets/connect/`）：曲目、进度按服务端快照推算、播放暂停 / 切歌 / 拖动进度 / 随机 / 循环 / 音量都发给远程设备；
+      桌面播放栏下方多一条强调色「正在 {设备} 上播放」。
+    - 命令被拒（免费账号部分操作）时弹出提示；Jam（一起听）需要 Premium，未实现。
   - **实时同步歌词 (Synced Lyrics)**：Apple Music iOS 风格——流动封面背景（`LyricsBackdrop`）、顶部信息胶囊与底部控制台采用液态玻璃（`LiquidGlass`），当前行清晰、上下句按行距逐级模糊变暗；手动滚动时全部变清晰，停手 3 秒后自动回到当前行；点击任意行跳转。
     **所有歌词界面同一套液态玻璃观感**：全屏歌词面板、全屏播放器的歌词视图（背景交叉淡入流动封面、控件收进玻璃）、桌面右栏歌词。
   - **桌面沉浸式歌词**（`immersive_lyrics_screen.dart`）：窗口进入系统全屏，左侧大封面 + 玻璃控制台、右侧大字号歌词；Esc / F11 退出，鼠标静止 3 秒隐藏光标与按钮。入口：播放栏右侧、右栏歌词右上角、全屏播放器歌词、F11。
@@ -48,7 +56,12 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 大头图（`CollectionHero`）：封面主色铺满头部并一直渐隐到操作行，没有硬边；宽屏为 232px 封面 + 自适应字号大标题（放不下时逐档缩小），手机为居中封面。
   - 向上滚动后收起为吸顶标题栏，带小号播放键。
   - 拿不到数据时显示「登录后即可查看」或「暂时无法加载」，带登录 / 重试按钮，不会一直转圈。
-* **悬停与右键（桌面端）**：卡片悬停浮出绿色播放键（按下时由圆变圆角方形）；曲目行悬停时序号变 ▶、露出收藏与「⋯」；右键曲目弹出上下文菜单（加入歌单[二级菜单] / 收藏 / 加入队列 / 前往艺人 / 前往专辑 / 复制链接）。移动端长按曲目打开底部菜单。
+* **悬停与右键（桌面端）**：卡片悬停浮出绿色播放键（按下时由圆变圆角方形）；曲目行悬停时序号变 ▶、露出收藏与「⋯」；右键曲目弹出上下文菜单（加入歌单[二级菜单] / 收藏 / 加入队列 / 前往艺人 / 前往专辑 / 分享）。移动端长按曲目打开底部菜单。
+* **分享面板**（`ui/widgets/share/`）：曲目、歌单、专辑、艺人共用；桌面端为居中对话框，移动端为底部面板。
+  快捷操作：复制网页链接、复制 Spotify URI、网页打开（失败时退回复制链接）；嵌入代码：标准 352 / 紧凑 152 高度、深色主题，
+  预览为真实嵌入页（`embed_web_view.dart`，flutter_inappwebview；Windows 用 WebView2，缺运行时 / 加载失败 / 测试中退回示意预览），
+  附可选中的 iframe 代码。Windows 构建需要 nuget，`windows/CMakeLists.txt` 在找不到时自动下载到 `build/`。复制反馈就地完成（按钮变为对勾 +「已复制」，徽章由圆形形变为圆角方形），不再弹底部提示。
+  本地歌单、已点赞的歌曲没有公开链接，不显示分享入口（`models/share_target.dart`）。
 * **深浅色**：默认跟随系统；浅色模式下药丸、播放键、详情页头部与状态栏图标都单独调过对比度。
 * **自定义外观（设置页，修改即时生效并自动保存）**：手机为 iOS 分组样式；桌面端嵌在主框架内容区（保留顶栏、侧栏与播放栏），
   大标题 + 横向设置行（标题在左、控件在右），内容区 ≥ 1040px 时分左右两栏。滑杆拖动时只做局部预览、松手才应用到全局，主题切换不做插值动画（单帧完成）。
@@ -61,6 +74,8 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 ### 3. 响应式外壳（桌面三栏 / 移动端）
 * **窗口外框**（`window_frame.dart`，位于所有路由之上）：Win11 风格窗口按钮在任何页面（设置、登录、对话框）都可见；窗口最小可缩到 360×600，
   窄于 800px 时切换为移动端布局，顶部多一条 32px 标题条（拖动 + 窗口按钮），可直接在桌面上调试手机界面；沉浸式全屏时隐藏。
+  退出系统全屏后强制刷新一次窗口尺寸（`DesktopWindow._refreshFrame`），绕过 window_manager 在 Windows 上
+  从普通窗口进入全屏时不刷新子视图、退出后留下大片黑边的问题。
 * **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：顶栏与标题栏合一（空白处拖动 / 双击最大化，右侧为窗口按钮留位）+ 后退前进、主页、居中搜索、头像；
   左栏音乐库（筛选、库内搜索、排序，可拖宽，窄于 280px 或手动收起时变为 72px 图标栏；未登录显示登录引导）；
   右栏「正在播放 / 播放队列 / 歌词」；底部播放栏（窗口变窄时依次隐藏音量条、音量键，不溢出）。
@@ -150,6 +165,7 @@ d:/Flutify/app/
 │   │   │   └── desktop_data_source.dart  # 页面级数据：主页/分类/搜索/专辑/艺人/歌单，5 分钟查询缓存
 │   │   ├── protocol/                     # 完整曲目播放链路（AP 握手、音频密钥、CDN 解密、TrackAudioSource）
 │   │   ├── library/                      # 媒体库来源：collection 编解码、rootlist 解析、桌面 / Web API 实现
+│   │   ├── connect/                      # Spotify Connect：dealer 长连接与重连、connect-state 注册 / 命令、ConnectService 总控
 │   │   ├── lyrics_service.dart           # spclient color-lyrics 取词与解析
 │   │   ├── audio_player_service.dart     # 基于 just_audio 播放本地已解密文件
 │   │   ├── spotify_api_service.dart      # 主页 / 搜索 / 实体详情（无 Mock；失败抛 SpotifyDataException）
@@ -158,7 +174,8 @@ d:/Flutify/app/
 │   │   ├── auth_provider.dart            # 登录态：表单 → 验证码 → 已登录，错误中文化
 │   │   ├── playback_provider.dart        # 播放状态、上下文、双层队列、随机/循环、音量
 │   │   ├── library_provider.dart         # 收藏歌曲、歌单、关注艺人、收藏专辑（持久化）
-│   │   ├── spotify_provider.dart         # 主页数据、防抖搜索、搜索历史、歌词缓存、设备
+│   │   ├── spotify_provider.dart         # 主页数据、防抖搜索、搜索历史、歌词缓存
+│   │   ├── connect_provider.dart         # Connect 遥控：设备 / 远程播放状态、远程曲目补全、命令、音量节流
 │   │   └── appearance_provider.dart      # 外观设置（主题 / 强调色 / 玻璃 / 字号 / 圆角 / 动效），防抖持久化
 │   ├── ui/
 │   │   ├── navigation/                   # Tab 内嵌 Navigator、统一跳转 AppRoutes、后退 / 前进历史 content_history
@@ -185,7 +202,9 @@ d:/Flutify/app/
 │   │   └── widgets/                      # MiniPlayer、TrackTile、CoverImage、PlaybackScrubber、
 │   │                                     # PlayerControls、TrackOptionsSheet、CreatePlaylistDialog 等；
 │   │                                     # track_menu（桌面右键菜单 / 移动端底部菜单）、hover_builder、
-│   │                                     # playback_error_listener（播放失败提示）、content_bottom_spacer
+│   │                                     # playback_error_listener（播放失败提示）、content_bottom_spacer；
+│   │                                     # share/（分享面板、快捷操作卡片、嵌入代码区与预览、分享按钮）；
+│   │                                     # connect/（远程播放栏、远程迷你播放器、进度推算、音柱、设备图标、本机 ↔ 远程协调）
 │   └── main.dart
 ├── assets/fonts/MiSans/                  # MiSans Regular / Medium / Demibold / Bold（TTF）
 ├── l10n.yaml                             # gen-l10n 配置（模板 app_zh.arb）
@@ -253,7 +272,7 @@ cd d:\Flutify\app
 会话内 client_id、client-token 平台数据（`desktop_windows`）、User-Agent、`app-platform` / `spotify-app-version`
 来自同一客户端身份，避免"桌面令牌 + 安卓设备"的混搭特征；令牌只在临近过期时续期，并发续期合并为一次请求；device_id 固定不变。
 
-桌面版 OAuth 登录后，数据走桌面端内部接口（见上表「桌面端数据层」）。暂不支持：Spotify Connect 设备列表（桌面端走 dealer / connect-state，列表为空）。
+桌面版 OAuth 登录后，数据走桌面端内部接口（见上表「桌面端数据层」），Spotify Connect 遥控也只在这种会话下可用（dealer / connect-state）。
 桌面客户端升级后若出现 `PersistedQueryNotFound`，可用 `tool/pathfinder_probe.dart` 探测并从新的 `xpui.spa` 重新提取 hash。
 
 未实现：魔法链接的发送请求（可用「登录链接」代替）、Login5 下的 reCAPTCHA 挑战（会提示改用浏览器登录）、家庭儿童账号切换。

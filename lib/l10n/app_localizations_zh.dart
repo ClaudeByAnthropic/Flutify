@@ -121,6 +121,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navLibrary => '音乐库';
 
   @override
+  String get typeTrack => '歌曲';
+
+  @override
   String get typeArtist => '艺人';
 
   @override
@@ -502,6 +505,44 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deviceSpotifyConnect => 'Spotify Connect';
 
   @override
+  String get connectThisDevice => '此设备';
+
+  @override
+  String get connectTakeOver => '在此设备继续播放';
+
+  @override
+  String connectPlayingOn(String device) {
+    return '正在 $device 上播放';
+  }
+
+  @override
+  String get connectOtherDevices => '选择其他设备';
+
+  @override
+  String get connectNoDevices => '没有找到其他设备';
+
+  @override
+  String get connectNoDevicesHint => '在手机、电脑或音箱上打开 Spotify，并登录同一账号';
+
+  @override
+  String get connectUnavailable => '使用桌面版方式登录后，即可遥控其他设备上的 Spotify';
+
+  @override
+  String get connectConnecting => '正在连接 Spotify Connect…';
+
+  @override
+  String get connectOffline => '连接已断开，正在重试…';
+
+  @override
+  String get connectSameNetwork => '同一网络';
+
+  @override
+  String get connectCommandFailed => '操作未成功：免费账号可能不支持远程执行此操作';
+
+  @override
+  String get connectVolume => '设备音量';
+
+  @override
   String get trackAddToPlaylist => '添加到歌单';
 
   @override
@@ -533,7 +574,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastAddedToQueue => '已添加到播放队列';
 
   @override
-  String get toastLinkCopied => '链接已复制到剪贴板';
+  String get shareCopyLink => '复制链接';
+
+  @override
+  String get shareCopyUri => '复制 URI';
+
+  @override
+  String get shareOpenWeb => '网页打开';
+
+  @override
+  String get shareCopied => '已复制';
+
+  @override
+  String get shareEmbedTitle => '嵌入代码';
+
+  @override
+  String get shareEmbedSubtitle => '粘贴到网页 HTML 中，即可展示 Spotify 播放器';
+
+  @override
+  String get shareEmbedStandard => '标准';
+
+  @override
+  String get shareEmbedCompact => '紧凑';
+
+  @override
+  String get shareEmbedDark => '深色';
+
+  @override
+  String get shareEmbedCopy => '复制代码';
 
   @override
   String toastAddedTo(String name) {

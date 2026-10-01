@@ -314,6 +314,12 @@ abstract class AppLocalizations {
   /// **'音乐库'**
   String get navLibrary;
 
+  /// No description provided for @typeTrack.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌曲'**
+  String get typeTrack;
+
   /// No description provided for @typeArtist.
   ///
   /// In zh, this message translates to:
@@ -1004,6 +1010,78 @@ abstract class AppLocalizations {
   /// **'Spotify Connect'**
   String get deviceSpotifyConnect;
 
+  /// No description provided for @connectThisDevice.
+  ///
+  /// In zh, this message translates to:
+  /// **'此设备'**
+  String get connectThisDevice;
+
+  /// No description provided for @connectTakeOver.
+  ///
+  /// In zh, this message translates to:
+  /// **'在此设备继续播放'**
+  String get connectTakeOver;
+
+  /// No description provided for @connectPlayingOn.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在 {device} 上播放'**
+  String connectPlayingOn(String device);
+
+  /// No description provided for @connectOtherDevices.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择其他设备'**
+  String get connectOtherDevices;
+
+  /// No description provided for @connectNoDevices.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有找到其他设备'**
+  String get connectNoDevices;
+
+  /// No description provided for @connectNoDevicesHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在手机、电脑或音箱上打开 Spotify，并登录同一账号'**
+  String get connectNoDevicesHint;
+
+  /// No description provided for @connectUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用桌面版方式登录后，即可遥控其他设备上的 Spotify'**
+  String get connectUnavailable;
+
+  /// No description provided for @connectConnecting.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在连接 Spotify Connect…'**
+  String get connectConnecting;
+
+  /// No description provided for @connectOffline.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接已断开，正在重试…'**
+  String get connectOffline;
+
+  /// No description provided for @connectSameNetwork.
+  ///
+  /// In zh, this message translates to:
+  /// **'同一网络'**
+  String get connectSameNetwork;
+
+  /// No description provided for @connectCommandFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作未成功：免费账号可能不支持远程执行此操作'**
+  String get connectCommandFailed;
+
+  /// No description provided for @connectVolume.
+  ///
+  /// In zh, this message translates to:
+  /// **'设备音量'**
+  String get connectVolume;
+
   /// No description provided for @trackAddToPlaylist.
   ///
   /// In zh, this message translates to:
@@ -1052,11 +1130,65 @@ abstract class AppLocalizations {
   /// **'已添加到播放队列'**
   String get toastAddedToQueue;
 
-  /// No description provided for @toastLinkCopied.
+  /// No description provided for @shareCopyLink.
   ///
   /// In zh, this message translates to:
-  /// **'链接已复制到剪贴板'**
-  String get toastLinkCopied;
+  /// **'复制链接'**
+  String get shareCopyLink;
+
+  /// No description provided for @shareCopyUri.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制 URI'**
+  String get shareCopyUri;
+
+  /// No description provided for @shareOpenWeb.
+  ///
+  /// In zh, this message translates to:
+  /// **'网页打开'**
+  String get shareOpenWeb;
+
+  /// No description provided for @shareCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'已复制'**
+  String get shareCopied;
+
+  /// No description provided for @shareEmbedTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'嵌入代码'**
+  String get shareEmbedTitle;
+
+  /// No description provided for @shareEmbedSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'粘贴到网页 HTML 中，即可展示 Spotify 播放器'**
+  String get shareEmbedSubtitle;
+
+  /// No description provided for @shareEmbedStandard.
+  ///
+  /// In zh, this message translates to:
+  /// **'标准'**
+  String get shareEmbedStandard;
+
+  /// No description provided for @shareEmbedCompact.
+  ///
+  /// In zh, this message translates to:
+  /// **'紧凑'**
+  String get shareEmbedCompact;
+
+  /// No description provided for @shareEmbedDark.
+  ///
+  /// In zh, this message translates to:
+  /// **'深色'**
+  String get shareEmbedDark;
+
+  /// No description provided for @shareEmbedCopy.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制代码'**
+  String get shareEmbedCopy;
 
   /// No description provided for @toastAddedTo.
   ///

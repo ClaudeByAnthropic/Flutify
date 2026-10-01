@@ -53,6 +53,25 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 add_subdirectory("runner")
 
 
+# flutter_inappwebview（分享面板的嵌入播放器预览）构建时用 nuget 拉取 WebView2 SDK。
+# 本机没装 nuget 时自动下载到构建目录，免去手动安装；插件里的 find_program(NUGET nuget)
+# 看到缓存变量已设置就不会再找。
+find_program(NUGET nuget)
+if(NOT NUGET)
+  set(NUGET_LOCAL "${CMAKE_BINARY_DIR}/tools/nuget.exe")
+  if(NOT EXISTS "${NUGET_LOCAL}")
+    message(STATUS "nuget not found, downloading to ${NUGET_LOCAL}")
+    file(DOWNLOAD "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" "${NUGET_LOCAL}"
+         STATUS NUGET_DOWNLOAD_STATUS)
+    list(GET NUGET_DOWNLOAD_STATUS 0 NUGET_DOWNLOAD_CODE)
+    if(NOT NUGET_DOWNLOAD_CODE EQUAL 0)
+      file(REMOVE "${NUGET_LOCAL}")
+      message(FATAL_ERROR "Failed to download nuget.exe: ${NUGET_DOWNLOAD_STATUS}")
+    endif()
+  endif()
+  set(NUGET "${NUGET_LOCAL}" CACHE FILEPATH "nuget executable" FORCE)
+endif()
+
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)

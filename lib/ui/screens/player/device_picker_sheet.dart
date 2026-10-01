@@ -1,17 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/theme/md3e_shapes.dart';
-import '../../../l10n/l10n.dart';
-import '../../../providers/spotify_provider.dart';
 
+import '../../../core/theme/flutify_tokens.dart';
+import '../../../l10n/l10n.dart';
+import '../../../providers/connect_provider.dart';
+import '../../../providers/playback_provider.dart';
+import '../../../services/connect/connect_service.dart' show ConnectStatus;
+import '../../shell/shell_breakpoints.dart';
+import '../../widgets/connect/connect_actions.dart';
+import '../../widgets/connect/connect_device_icon.dart';
+import '../../widgets/connect/equalizer_bars.dart';
+
+/// 「连接到设备」面板（Spotify Connect 遥控）。
+///
+/// - 桌面端：贴在播放栏右下方的浮层（与官方桌面端位置一致）；移动端：底部面板；
+/// - 顶部为「当前收听设备」卡片：远程设备在用时显示它的名字、跳动音柱与音量滑块，否则为「此设备」；
+/// - 下方列出其他设备：点按转移播放；远程在用时额外提供「此设备」（暂停远程、本机从同一进度继续）；
+/// - 非桌面版会话、连接中、断线、没有其他设备时各有说明。
 class DevicePickerSheet extends StatelessWidget {
   const DevicePickerSheet({super.key});
 
+  /// 桌面浮层宽度。
+  static const double panelWidth = 360;
+
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+    context.read<ConnectProvider?>()?.refresh();
+    if (ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)) {
+      final tokens = context.tokens;
+      return showDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        barrierColor: Colors.black26,
+        builder: (dialogContext) => Dialog(
+          alignment: Alignment.bottomRight,
+          // 贴在播放栏（90）之上、右侧留白与播放栏内边距一致
+          insetPadding: const EdgeInsets.fromLTRB(24, 24, 16, 100),
+          backgroundColor: Theme.of(dialogContext).colorScheme.surfaceContainerHigh,
+          shape: RoundedRectangleBorder(borderRadius: tokens.radius(24)),
+          clipBehavior: Clip.antiAlias,
+          child: const SizedBox(width: panelWidth, child: DevicePickerSheet()),
+        ),
+      );
+    }
+    return showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
-      showDragHandle: false,
+      showDragHandle: true,
+      isScrollControlled: true,
       builder: (_) => const DevicePickerSheet(),
     );
   }
@@ -19,93 +54,315 @@ class DevicePickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final spotify = context.watch<SpotifyProvider>();
+    final l10n = context.l10n;
+    final connect = context.watch<ConnectProvider?>();
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
 
-    // 背景必须是 Material 而不是带颜色的 DecoratedBox，否则 ListTile 的水波纹会被遮住
-    return Material(
-      color: colorScheme.surfaceContainerHigh,
-      shape: const RoundedRectangleBorder(borderRadius: MD3EShapes.topSheet),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-        child: SafeArea(
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(color: colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              Row(
-                children: [
-                  Icon(Icons.devices_rounded, color: colorScheme.primary, size: 28),
-                  const SizedBox(width: 12),
-                  Text(
-                    context.l10n.deviceConnectTitle,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                context.l10n.deviceConnectDescription,
-                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
+              Text(l10n.deviceConnectTitle, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 16),
-
-              ...spotify.devices.map((device) {
-                final isCurrent = spotify.activeDevice?.id == device.id;
-                IconData iconData = Icons.speaker_rounded;
-                if (device.type == 'Computer') iconData = Icons.computer_rounded;
-                if (device.type == 'Smartphone') iconData = Icons.phone_android_rounded;
-
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isCurrent ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      iconData,
-                      color: isCurrent ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                      size: 24,
-                    ),
-                  ),
-                  title: Text(
-                    device.name,
-                    style: TextStyle(
-                      fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                      color: isCurrent ? colorScheme.primary : colorScheme.onSurface,
-                    ),
-                  ),
-                  subtitle: Text(
-                    isCurrent ? context.l10n.deviceCurrent : context.l10n.deviceSpotifyConnect,
-                    style: TextStyle(
-                      color: isCurrent ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                    ),
-                  ),
-                  trailing: isCurrent ? Icon(Icons.volume_up_rounded, color: colorScheme.primary) : null,
-                  onTap: () {
-                    spotify.setActiveDevice(device);
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-
-              const SizedBox(height: 12),
+              if (connect == null || !connect.available)
+                _Notice(icon: Icons.devices_rounded, title: l10n.connectUnavailable)
+              else
+                _DeviceList(connect: connect),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 已接入 Connect 时的内容：当前设备卡片 + 其他设备列表 / 状态说明。
+class _DeviceList extends StatelessWidget {
+  final ConnectProvider connect;
+
+  const _DeviceList({required this.connect});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final active = connect.activeDevice;
+    final remoteInUse = connect.hasRemoteSession;
+    final others = connect.devices.where((d) => d.id != active?.id && d.canPlay).toList();
+
+    final status = switch (connect.status) {
+      ConnectStatus.connecting || ConnectStatus.idle => l10n.connectConnecting,
+      ConnectStatus.offline => l10n.connectOffline,
+      ConnectStatus.online => null,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _CurrentDeviceCard(connect: connect),
+        if (status != null) ...[
+          const SizedBox(height: 12),
+          _StatusLine(text: status, busy: connect.status != ConnectStatus.offline),
+        ],
+        const SizedBox(height: 20),
+        if (remoteInUse || others.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 6),
+            child: Text(
+              l10n.connectOtherDevices,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        if (remoteInUse)
+          _DeviceTile(
+            icon: Icons.computer_rounded,
+            title: l10n.connectThisDevice,
+            subtitle: l10n.connectTakeOver,
+            onTap: () {
+              Navigator.of(context).pop();
+              ConnectActions.takeOver(context);
+            },
+          ),
+        for (final device in others)
+          _DeviceTile(
+            icon: connectDeviceIcon(device.type),
+            title: device.name,
+            subtitle: device.isSameNetwork ? l10n.connectSameNetwork : l10n.deviceSpotifyConnect,
+            onTap: () {
+              Navigator.of(context).pop();
+              ConnectActions.transferTo(context, device);
+            },
+          ),
+        if (!remoteInUse && others.isEmpty && connect.status == ConnectStatus.online)
+          _Notice(icon: Icons.devices_other_rounded, title: l10n.connectNoDevices, subtitle: l10n.connectNoDevicesHint),
+      ],
+    );
+  }
+}
+
+/// 「当前收听设备」卡片：强调色色调容器 + 设备徽章 + 名称 / 曲目 + 音柱；远程设备支持时附音量滑块。
+class _CurrentDeviceCard extends StatelessWidget {
+  final ConnectProvider connect;
+
+  const _CurrentDeviceCard({required this.connect});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.tokens;
+    final l10n = context.l10n;
+    final remote = connect.hasRemoteSession ? connect.activeDevice : null;
+    final localPlaying = context.select<PlaybackProvider, bool>((p) => p.isPlaying);
+    final playing = remote != null ? connect.player.isAudible : localPlaying;
+    final nowPlaying = remote != null ? (connect.remoteTrack?.name ?? connect.player.title) : '';
+    final accent = tokens.accent;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(accent.withAlpha(30), theme.colorScheme.surfaceContainerHighest),
+        borderRadius: tokens.radius(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(color: accent, borderRadius: tokens.radius(16)),
+                child: Icon(
+                  remote != null ? connectDeviceIcon(remote.type) : Icons.computer_rounded,
+                  color: tokens.onAccent,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.deviceCurrent,
+                      style: theme.textTheme.labelMedium?.copyWith(color: accent, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      remote?.name ?? l10n.connectThisDevice,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    if (nowPlaying.isNotEmpty)
+                      Text(
+                        nowPlaying,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              EqualizerBars(playing: playing, color: accent, size: 18),
+            ],
+          ),
+          if (remote != null && remote.supportsVolume) ...[const SizedBox(height: 10), _RemoteVolume(connect: connect)],
+        ],
+      ),
+    );
+  }
+}
+
+/// 远程设备音量：拖动时本地即时生效，请求由 Provider 节流。
+class _RemoteVolume extends StatelessWidget {
+  final ConnectProvider connect;
+
+  const _RemoteVolume({required this.connect});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final volume = connect.volume;
+    return Row(
+      children: [
+        Icon(
+          volume == 0 ? Icons.volume_off_rounded : (volume < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+          size: 20,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        Expanded(
+          child: Slider(
+            value: volume,
+            semanticFormatterCallback: (v) => '${context.l10n.connectVolume} ${(v * 100).round()}%',
+            onChanged: connect.setVolume,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 设备行：图标徽章 + 名称 + 副标题；整行可点。
+class _DeviceTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _DeviceTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.tokens;
+    return InkWell(
+      borderRadius: tokens.radius(16),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
+              child: Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 连接中 / 断线的一行状态。
+class _StatusLine extends StatelessWidget {
+  final String text;
+  final bool busy;
+
+  const _StatusLine({required this.text, required this.busy});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        SizedBox.square(
+          dimension: 14,
+          child: busy
+              ? const CircularProgressIndicator(strokeWidth: 2)
+              : Icon(Icons.cloud_off_rounded, size: 14, color: theme.colorScheme.error),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        ),
+      ],
+    );
+  }
+}
+
+/// 说明块：图标 + 标题 + 可选副标题（未接入、没有其他设备）。
+class _Notice extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+
+  const _Notice({required this.icon, required this.title, this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

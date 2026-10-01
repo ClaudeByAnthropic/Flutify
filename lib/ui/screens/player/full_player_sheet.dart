@@ -12,7 +12,7 @@ import '../../../models/playback_context.dart';
 import '../../../models/track.dart';
 import '../../../providers/appearance_provider.dart';
 import '../../../providers/playback_provider.dart';
-import '../../../providers/spotify_provider.dart';
+import '../../../providers/connect_provider.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/liquid_glass.dart';
@@ -64,10 +64,7 @@ class FullPlayerSheet extends StatefulWidget {
       useSafeArea: false,
       showDragHandle: false,
       backgroundColor: Colors.transparent,
-      builder: (_) => SizedBox(
-        height: MediaQuery.sizeOf(context).height,
-        child: const FullPlayerSheet(),
-      ),
+      builder: (_) => SizedBox(height: MediaQuery.sizeOf(context).height, child: const FullPlayerSheet()),
     );
   }
 
@@ -191,11 +188,7 @@ class _ControlsGroup extends StatelessWidget {
         _TitleRow(track: track),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: PlaybackScrubber(
-            activeColor: Colors.white,
-            inactiveColor: Colors.white24,
-            labelColor: Colors.white60,
-          ),
+          child: PlaybackScrubber(activeColor: Colors.white, inactiveColor: Colors.white24, labelColor: Colors.white60),
         ),
         const SizedBox(height: 6),
         const Padding(
@@ -238,11 +231,13 @@ class _Middle extends StatelessWidget {
         key: ValueKey(view),
         child: switch (view) {
           _PlayerView.artwork => LayoutBuilder(
-              builder: (context, box) {
-                final size = (box.maxWidth * 0.86).clamp(140.0, 400.0).clamp(0.0, box.maxHeight * 0.9);
-                return Center(child: SwipeableArtwork(url: track.coverUrl, size: size));
-              },
-            ),
+            builder: (context, box) {
+              final size = (box.maxWidth * 0.86).clamp(140.0, 400.0).clamp(0.0, box.maxHeight * 0.9);
+              return Center(
+                child: SwipeableArtwork(url: track.coverUrl, size: size),
+              );
+            },
+          ),
           _PlayerView.lyrics => _InlineLyrics(track: track),
           _PlayerView.queue => const QueueList(horizontalPadding: 16),
         },
@@ -429,7 +424,9 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final deviceName = context.select<SpotifyProvider, String?>((s) => s.activeDevice?.name);
+    final deviceName = context.select<ConnectProvider?, String?>(
+      (c) => (c?.hasRemoteSession ?? false) ? c?.activeDevice?.name : null,
+    );
     final primary = Theme.of(context).colorScheme.primary;
     final deviceColor = deviceName != null ? primary : Colors.white70;
 

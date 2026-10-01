@@ -122,6 +122,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navLibrary => 'Your Library';
 
   @override
+  String get typeTrack => 'Song';
+
+  @override
   String get typeArtist => 'Artist';
 
   @override
@@ -514,6 +517,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deviceSpotifyConnect => 'Spotify Connect';
 
   @override
+  String get connectThisDevice => 'This device';
+
+  @override
+  String get connectTakeOver => 'Continue playing here';
+
+  @override
+  String connectPlayingOn(String device) {
+    return 'Playing on $device';
+  }
+
+  @override
+  String get connectOtherDevices => 'Select another device';
+
+  @override
+  String get connectNoDevices => 'No other devices found';
+
+  @override
+  String get connectNoDevicesHint =>
+      'Open Spotify on a phone, computer or speaker signed in to the same account';
+
+  @override
+  String get connectUnavailable =>
+      'Sign in with the desktop method to control Spotify on your other devices';
+
+  @override
+  String get connectConnecting => 'Connecting to Spotify Connect…';
+
+  @override
+  String get connectOffline => 'Connection lost, retrying…';
+
+  @override
+  String get connectSameNetwork => 'Same network';
+
+  @override
+  String get connectCommandFailed =>
+      'That didn\'t work: free accounts may not support this remote action';
+
+  @override
+  String get connectVolume => 'Device volume';
+
+  @override
   String get trackAddToPlaylist => 'Add to playlist';
 
   @override
@@ -546,7 +590,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toastAddedToQueue => 'Added to queue';
 
   @override
-  String get toastLinkCopied => 'Link copied to clipboard';
+  String get shareCopyLink => 'Copy link';
+
+  @override
+  String get shareCopyUri => 'Copy URI';
+
+  @override
+  String get shareOpenWeb => 'Open web';
+
+  @override
+  String get shareCopied => 'Copied';
+
+  @override
+  String get shareEmbedTitle => 'Embed';
+
+  @override
+  String get shareEmbedSubtitle =>
+      'Paste into your page\'s HTML to show a Spotify player';
+
+  @override
+  String get shareEmbedStandard => 'Standard';
+
+  @override
+  String get shareEmbedCompact => 'Compact';
+
+  @override
+  String get shareEmbedDark => 'Dark';
+
+  @override
+  String get shareEmbedCopy => 'Copy code';
 
   @override
   String toastAddedTo(String name) {

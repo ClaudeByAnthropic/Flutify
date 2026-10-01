@@ -47,8 +47,7 @@ class ContextPlayButton extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
-          if (elevated)
-            BoxShadow(color: Colors.black.withAlpha(70), blurRadius: 16, offset: const Offset(0, 6)),
+          if (elevated) BoxShadow(color: Colors.black.withAlpha(70), blurRadius: 16, offset: const Offset(0, 6)),
         ],
       ),
       child: Material(
@@ -85,12 +84,7 @@ class CollectionActionRow extends StatelessWidget {
   final List<SpotifyTrack> tracks;
   final PlaybackContext playbackContext;
 
-  const CollectionActionRow({
-    super.key,
-    required this.leading,
-    required this.tracks,
-    required this.playbackContext,
-  });
+  const CollectionActionRow({super.key, required this.leading, required this.tracks, required this.playbackContext});
 
   @override
   Widget build(BuildContext context) {
@@ -101,25 +95,9 @@ class CollectionActionRow extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= 600) {
-          return Row(
-            children: [
-              play,
-              const SizedBox(width: 20),
-              shuffle,
-              const SizedBox(width: 4),
-              ...leading,
-            ],
-          );
+          return Row(children: [play, const SizedBox(width: 20), shuffle, const SizedBox(width: 4), ...leading]);
         }
-        return Row(
-          children: [
-            ...leading,
-            const Spacer(),
-            shuffle,
-            const SizedBox(width: 8),
-            play,
-          ],
-        );
+        return Row(children: [...leading, const Spacer(), shuffle, const SizedBox(width: 8), play]);
       },
     );
   }
@@ -175,11 +153,7 @@ class CollectionPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading) {
       return SliverToBoxAdapter(
-        child: SkeletonPulse(
-          child: Column(
-            children: [for (var i = 0; i < 6; i++) const _SkeletonTrackRow()],
-          ),
-        ),
+        child: SkeletonPulse(child: Column(children: [for (var i = 0; i < 6; i++) const _SkeletonTrackRow()])),
       );
     }
     return SliverToBoxAdapter(
@@ -236,11 +210,7 @@ class _SkeletonTrackRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FractionallySizedBox(
-                  widthFactor: 0.6,
-                  alignment: Alignment.centerLeft,
-                  child: SkeletonBox(height: 13),
-                ),
+                FractionallySizedBox(widthFactor: 0.6, alignment: Alignment.centerLeft, child: SkeletonBox(height: 13)),
                 SizedBox(height: 8),
                 FractionallySizedBox(
                   widthFactor: 0.35,

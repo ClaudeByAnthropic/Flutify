@@ -92,8 +92,21 @@ Spotify 新版桌面三栏布局 + MD3E 质感；跟随系统深浅色；自绘�
       吸顶筛选标签（服务端 homeChips，含二级标签）、快捷入口（最多 8 个）、普通卡架（艺人头像 / 显示全部）、
       最近播放、推荐流网格（FeedBaseline 合并 + 推荐理由，只显示整行）；请求带 `Accept-Language: zh-CN`，
       问候语 / 分区标题 / 标签由服务端本地化；`test/ui/home_layout_test.dart` 填满数据扫 15 宽度 × 两档字号
+- [x] 退出沉浸式全屏后的大片黑边：window_manager 只在 SIZE_MAXIMIZED 时记为全屏，从普通窗口进入时退出不刷新子视图；
+      `DesktopWindow._refreshFrame` 退出后宽度 +1 再还原，强制重排
+- [x] 分享面板 MD3E 化（`ui/widgets/share/`）：复制链接 / URI / 网页打开 + iframe 嵌入代码（尺寸、深色、预览），
+      就地「已复制」反馈；歌单 / 专辑 / 艺人详情页新增分享按钮；`test/ui/share_sheet_test.dart` 6 种窗口 × 两档字号
+- [x] 嵌入预览改为真实 WebView（`share/embed_web_view.dart`），外链交给系统浏览器；不可用时退回示意预览
+- [x] Spotify Connect 遥控（只做免费账号可用的部分）：隐藏观察者接入、设备面板 MD3E 重做、转移播放 / 此设备继续、
+      远程模式播放栏与迷你播放器（播放暂停 / 切歌 / 进度 / 随机 / 循环 / 音量）；
+      `test/connect/` 覆盖协议层（假 dealer），`test/ui/connect_ui_test.dart` 覆盖界面（合成设备，多宽度 × 两档字号）
 
 ### 需要用户在实机上看的
+
+- [ ] 沉浸式歌词退出后黑边是否消失（含进入前为最大化 / 普通窗口两种情况）
+- [ ] 分享面板「网页打开」能否拉起默认浏览器；嵌入页 WebView 是否正常显示、深色切换是否刷新
+- [ ] Connect：设备面板能否列出手机 / 其他电脑；手机播放时 Flutify 播放栏是否切成远程模式、进度是否同步；
+      免费账号下哪些命令被拒（转移 / 暂停 / 切歌 / 进度 / 音量），被拒时是否有提示
 
 - [ ] 重启后昵称 / 头像是否为本人、「已点赞歌曲」是否出现
 - [ ] 主页 / 音乐库里之前没图的两个歌单是否显示封面
@@ -106,5 +119,5 @@ Spotify 新版桌面三栏布局 + MD3E 质感；跟随系统深浅色；自绘�
 - [ ] 音乐库「按字母顺序」改为按拼音排序（左栏 `library_sidebar_entry.dart` 与移动端 `library_screen.dart` 两处）
 - [ ] 登录页的中文文案迁入 ARB（账号卡片已完成）
 - [ ] 外观设置跨设备同步（目前仅本机）；沉浸式歌词支持逐字歌词（需 color-lyrics 的 syllable 数据）
-- [ ] Spotify Connect 设备列表（dealer / connect-state）
+- [ ] Connect：远程模式下打开全屏播放器（目前点按打开设备面板）；本机作为可被遥控的播放端（需要实现 Connect 播放端协议）
 - [ ] 桌面客户端升级后 Pathfinder hash 失效检测与提示

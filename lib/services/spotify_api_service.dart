@@ -13,6 +13,7 @@ import '../models/playlist.dart';
 import '../models/track.dart';
 import '../models/user_profile.dart';
 import 'auth/spotify_auth_service.dart';
+import 'connect/connect_service.dart';
 import 'library/desktop_library_source.dart';
 import 'library/library_source.dart';
 import 'library/session_library_source.dart';
@@ -57,6 +58,14 @@ class SpotifyApiService {
   /// 歌词服务（color-lyrics）。
   late final LyricsService lyrics = LyricsService(_client, headers: _headers);
 
+  /// Spotify Connect 遥控服务（dealer 长连接 + connect-state）；懒创建，调用 `start()` 才会联网。
+  /// 只有桌面版会话可用，见 [supportsConnect]。
+  late final ConnectService connect = ConnectService(
+    client: _client,
+    headers: _headers,
+    deviceId: () => _storage.deviceId,
+  );
+
   /// 媒体库数据源：桌面版会话走内部接口，其余会话走 Web API；供 LibraryProvider 使用。
   late final LibrarySource library = SessionLibrarySource(
     useDesktop: () => _useDesktop,
@@ -82,6 +91,9 @@ class SpotifyApiService {
 
   /// 当前是否走桌面端内部接口。
   bool get _useDesktop => isConfigured && _auth?.isLoggedIn == true && _auth?.method == AuthMethod.desktop;
+
+  /// 是否支持 Spotify Connect 遥控：dealer / connect-state 只接受桌面版会话的令牌与客户端身份。
+  bool get supportsConnect => _useDesktop;
 
   /// 请求头：已登录时先确保 access_token 未过期；续期失败则沿用旧值，由接口返回 401 体现。
   Future<Map<String, String>> _headers() async {
@@ -256,6 +268,18 @@ class SpotifyApiService {
       return items is List ? items.whereType<Map<String, dynamic>>().map(SpotifyTrack.fromJson).toList() : const [];
     } catch (_) {
       return const [];
+    }
+  }
+
+  /// 按 URI 取单曲完整信息（Connect 远程曲目补全艺人 / 封面用）。
+  /// 只有桌面版会话可用（与 Connect 一致）；非曲目 URI 或失败时返回 null。
+  Future<SpotifyTrack?> getTrackByUri(String uri) async {
+    if (!isConfigured || !_useDesktop || !uri.startsWith('spotify:track:')) return null;
+    try {
+      final tracks = await _desktop.tracksByUris([uri]);
+      return tracks.isEmpty ? null : tracks.first;
+    } catch (_) {
+      return null;
     }
   }
 

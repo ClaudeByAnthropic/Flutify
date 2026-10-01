@@ -10,6 +10,7 @@ import 'core/utils/orientation_policy.dart';
 import 'l10n/app_locale.dart';
 import 'providers/appearance_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/connect_provider.dart';
 import 'providers/library_provider.dart';
 import 'providers/playback_provider.dart';
 import 'providers/spotify_provider.dart';
@@ -108,27 +109,27 @@ class FlutifyApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(
-          create: (_) => PlaybackProvider(
-            audioPlayerService,
-            storageService,
-            audioLoader: trackAudioLoader,
+          create: (_) => PlaybackProvider(audioPlayerService, storageService, audioLoader: trackAudioLoader),
+        ),
+        ChangeNotifierProvider(create: (_) => LibraryProvider(storageService, source: spotifyApiService.library)),
+        ChangeNotifierProvider(create: (_) => SpotifyProvider(spotifyApiService, storageService)),
+        ChangeNotifierProvider(create: (_) => AppearanceProvider(storageService)),
+        // Spotify Connect 遥控：非惰性，启动即接入（桌面版会话），播放栏才能及时显示远程播放
+        ChangeNotifierProvider(
+          lazy: false,
+          create: (_) => ConnectProvider(
+            spotifyApiService.connect,
+            available: () => spotifyApiService.supportsConnect,
+            resolveTrack: spotifyApiService.getTrackByUri,
           ),
         ),
-        ChangeNotifierProvider(
-          create: (_) => LibraryProvider(storageService, source: spotifyApiService.library),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => SpotifyProvider(spotifyApiService, storageService),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => AppearanceProvider(storageService),
-        ),
-        // 登录态变化后：重新拉取主页数据与媒体库（未登录时清空）
+        // 登录态变化后：重新拉取主页数据与媒体库（未登录时清空），Connect 重新接入或断开
         ChangeNotifierProvider(
           create: (ctx) => AuthProvider(ctx.read<SpotifyAuthService>())
             ..onSessionChanged = () {
               ctx.read<SpotifyProvider>().loadInitialData();
               ctx.read<LibraryProvider>().refresh();
+              ctx.read<ConnectProvider>().sessionChanged();
             },
         ),
       ],

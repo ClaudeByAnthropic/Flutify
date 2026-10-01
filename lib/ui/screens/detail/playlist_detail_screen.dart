@@ -6,10 +6,12 @@ import '../../../core/utils/formatters.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/playback_context.dart';
 import '../../../models/playlist.dart';
+import '../../../models/share_target.dart';
 import '../../../models/track.dart';
 import '../../../providers/library_provider.dart';
 import '../../../services/spotify_api_service.dart';
 import '../../widgets/content_bottom_spacer.dart';
+import '../../widgets/share/share_button.dart';
 import '../../widgets/track_tile.dart';
 import 'widgets/collection_hero.dart';
 import 'widgets/collection_widgets.dart';
@@ -84,77 +86,76 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         imageUrl: isLikedSongs ? '' : playlist.coverUrl,
         fallback: isLikedSongs ? const Color(0xFF4A2FB8) : const Color(0xFF3A3A48),
         child: CustomScrollView(
-        slivers: [
-          CollectionHero(
-            typeLabel: l10n.typePlaylist,
-            title: title,
-            imageUrl: playlist.coverUrl,
-            coverOverride: isLikedSongs ? const _LikedSongsCover() : null,
-            meta: _PlaylistMeta(description: description, ownerName: playlist.ownerName, summary: summary),
-            collapsedAction: ContextPlayButton(
-              tracks: tracks,
-              playbackContext: playbackContext,
-              size: 44,
-              elevated: false,
+          slivers: [
+            CollectionHero(
+              typeLabel: l10n.typePlaylist,
+              title: title,
+              imageUrl: playlist.coverUrl,
+              coverOverride: isLikedSongs ? const _LikedSongsCover() : null,
+              meta: _PlaylistMeta(description: description, ownerName: playlist.ownerName, summary: summary),
+              collapsedAction: ContextPlayButton(
+                tracks: tracks,
+                playbackContext: playbackContext,
+                size: 44,
+                elevated: false,
+              ),
             ),
-          ),
 
-          SliverToBoxAdapter(
-            child: CollectionHeroFade(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                child: CollectionActionRow(
-                  tracks: tracks,
-                  playbackContext: playbackContext,
-                  leading: [
-                    if (!isLikedSongs && !isOwn)
-                      SaveToggleButton(saved: isSaved, onPressed: () => library.togglePlaylistSaved(playlist)),
-                    if (isOwn)
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_horiz_rounded, size: 28),
-                        tooltip: l10n.commonMoreOptions,
-                        onSelected: (value) {
-                          if (value == 'delete') {
-                            library.deletePlaylist(playlist.id);
-                            Navigator.pop(context);
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(value: 'delete', child: Text(l10n.playlistDelete)),
-                        ],
-                      ),
-                  ],
+            SliverToBoxAdapter(
+              child: CollectionHeroFade(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: CollectionActionRow(
+                    tracks: tracks,
+                    playbackContext: playbackContext,
+                    leading: [
+                      if (!isLikedSongs && !isOwn)
+                        SaveToggleButton(saved: isSaved, onPressed: () => library.togglePlaylistSaved(playlist)),
+                      ShareButton(target: ShareTarget.playlist(playlist)),
+                      if (isOwn)
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_horiz_rounded, size: 28),
+                          tooltip: l10n.commonMoreOptions,
+                          onSelected: (value) {
+                            if (value == 'delete') {
+                              library.deletePlaylist(playlist.id);
+                              Navigator.pop(context);
+                            }
+                          },
+                          itemBuilder: (_) => [PopupMenuItem(value: 'delete', child: Text(l10n.playlistDelete))],
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          if (_loading)
-            const CollectionPlaceholder(loading: true)
-          else if (_error != null)
-            CollectionErrorPlaceholder(
-              signedOut: identical(_error, SpotifyDataException.notSignedIn),
-              onRetry: _fetch,
-            )
-          else if (tracks.isEmpty)
-            CollectionPlaceholder(
-              message: isLikedSongs
-                  ? l10n.playlistLikedEmpty
-                  : isOwn
-                      ? l10n.playlistOwnEmpty
-                      : l10n.playlistEmpty,
-              icon: isLikedSongs ? Icons.favorite_border_rounded : Icons.queue_music_rounded,
-            )
-          else
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildTile(tracks, index, playbackContext, isOwn ? playlist.id : null),
-                childCount: tracks.length,
+            if (_loading)
+              const CollectionPlaceholder(loading: true)
+            else if (_error != null)
+              CollectionErrorPlaceholder(
+                signedOut: identical(_error, SpotifyDataException.notSignedIn),
+                onRetry: _fetch,
+              )
+            else if (tracks.isEmpty)
+              CollectionPlaceholder(
+                message: isLikedSongs
+                    ? l10n.playlistLikedEmpty
+                    : isOwn
+                    ? l10n.playlistOwnEmpty
+                    : l10n.playlistEmpty,
+                icon: isLikedSongs ? Icons.favorite_border_rounded : Icons.queue_music_rounded,
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildTile(tracks, index, playbackContext, isOwn ? playlist.id : null),
+                  childCount: tracks.length,
+                ),
               ),
-            ),
 
-          const ContentBottomSpacer(),
-        ],
+            const ContentBottomSpacer(),
+          ],
         ),
       ),
     );

@@ -48,6 +48,7 @@
   "navSearch": "搜索",
   "navLibrary": "音乐库",
 
+  "typeTrack": "歌曲",
   "typeArtist": "艺人",
   "typePlaylist": "歌单",
   "typeAlbum": "专辑",
@@ -222,6 +223,21 @@
   "deviceConnectDescription": "通过 Spotify Connect，可在电脑、手机或智能音箱上无缝播放。",
   "deviceCurrent": "当前收听设备",
   "deviceSpotifyConnect": "Spotify Connect",
+  "connectThisDevice": "此设备",
+  "connectTakeOver": "在此设备继续播放",
+  "connectPlayingOn": "正在 {device} 上播放",
+  "@connectPlayingOn": {
+    "placeholders": { "device": { "type": "String" } }
+  },
+  "connectOtherDevices": "选择其他设备",
+  "connectNoDevices": "没有找到其他设备",
+  "connectNoDevicesHint": "在手机、电脑或音箱上打开 Spotify，并登录同一账号",
+  "connectUnavailable": "使用桌面版方式登录后，即可遥控其他设备上的 Spotify",
+  "connectConnecting": "正在连接 Spotify Connect…",
+  "connectOffline": "连接已断开，正在重试…",
+  "connectSameNetwork": "同一网络",
+  "connectCommandFailed": "操作未成功：免费账号可能不支持远程执行此操作",
+  "connectVolume": "设备音量",
 
   "trackAddToPlaylist": "添加到歌单",
   "trackAddToQueue": "添加到播放队列",
@@ -234,7 +250,16 @@
   "toastLikeAdded": "已添加到已点赞的歌曲",
   "toastLikeRemoved": "已从已点赞的歌曲中移除",
   "toastAddedToQueue": "已添加到播放队列",
-  "toastLinkCopied": "链接已复制到剪贴板",
+  "shareCopyLink": "复制链接",
+  "shareCopyUri": "复制 URI",
+  "shareOpenWeb": "网页打开",
+  "shareCopied": "已复制",
+  "shareEmbedTitle": "嵌入代码",
+  "shareEmbedSubtitle": "粘贴到网页 HTML 中，即可展示 Spotify 播放器",
+  "shareEmbedStandard": "标准",
+  "shareEmbedCompact": "紧凑",
+  "shareEmbedDark": "深色",
+  "shareEmbedCopy": "复制代码",
   "toastAddedTo": "已添加到「{name}」",
   "@toastAddedTo": {
     "placeholders": { "name": { "type": "String" } }

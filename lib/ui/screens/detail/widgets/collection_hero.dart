@@ -47,9 +47,8 @@ class CollectionTint extends InheritedWidget {
   }
 
   /// 头部底色：深色主题略压暗（配浅色文字），浅色主题提亮成淡彩（配深色文字）。
-  static Color toneFor(Color art, Brightness brightness) => brightness == Brightness.dark
-      ? Color.lerp(art, Colors.black, 0.15)!
-      : Color.lerp(art, Colors.white, 0.55)!;
+  static Color toneFor(Color art, Brightness brightness) =>
+      brightness == Brightness.dark ? Color.lerp(art, Colors.black, 0.15)! : Color.lerp(art, Colors.white, 0.55)!;
 
   /// 头部底边的颜色（已向页面底色过渡一段），[CollectionHeroFade] 从这里接着淡出。
   static Color heroBottom(Color tone, ColorScheme scheme) => Color.lerp(tone, scheme.surface, 0.35)!;
@@ -120,8 +119,7 @@ class CollectionHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final tone = CollectionTint.maybeOf(context) ??
-        CollectionTint.toneFor(const Color(0xFF3A3A48), brightness);
+    final tone = CollectionTint.maybeOf(context) ?? CollectionTint.toneFor(const Color(0xFF3A3A48), brightness);
     final topPadding = MediaQuery.paddingOf(context).top;
     final inDesktopShell = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
     final showBack = !inDesktopShell && (ModalRoute.of(context)?.canPop ?? false);
@@ -186,8 +184,9 @@ class _HeroDelegate extends SliverPersistentHeaderDelegate {
     final barColor = brightness == Brightness.dark
         ? Color.lerp(tone, Colors.black, 0.3)!
         : Color.lerp(tone, Colors.black, 0.08)!;
-    final barForeground =
-        ThemeData.estimateBrightnessForColor(barColor) == Brightness.dark ? Colors.white : const Color(0xFF15161B);
+    final barForeground = ThemeData.estimateBrightnessForColor(barColor) == Brightness.dark
+        ? Colors.white
+        : const Color(0xFF15161B);
 
     return ClipRect(
       child: Stack(
@@ -212,7 +211,9 @@ class _HeroDelegate extends SliverPersistentHeaderDelegate {
               ignoring: contentOpacity == 0,
               child: Opacity(
                 opacity: contentOpacity,
-                child: wide ? _WideContent(hero: hero, coverSize: _wideCover) : _NarrowContent(hero: hero, topPadding: topPadding),
+                child: wide
+                    ? _WideContent(hero: hero, coverSize: _wideCover)
+                    : _NarrowContent(hero: hero, topPadding: topPadding),
               ),
             ),
           ),
@@ -237,10 +238,9 @@ class _HeroDelegate extends SliverPersistentHeaderDelegate {
                             hero.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: barForeground,
-                                ),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: barForeground),
                           ),
                         ),
                       ],
@@ -250,12 +250,7 @@ class _HeroDelegate extends SliverPersistentHeaderDelegate {
               ),
             ),
           ),
-          if (showBack)
-            Positioned(
-              left: 8,
-              top: topPadding + 12,
-              child: const _BackCircle(),
-            ),
+          if (showBack) Positioned(left: 8, top: topPadding + 12, child: const _BackCircle()),
         ],
       ),
     );
@@ -359,7 +354,10 @@ class _TitleFitter {
     var result = _sizes.last;
     for (final size in _sizes) {
       final painter = TextPainter(
-        text: TextSpan(text: title, style: style.copyWith(fontSize: size)),
+        text: TextSpan(
+          text: title,
+          style: style.copyWith(fontSize: size),
+        ),
         maxLines: 2,
         textDirection: Directionality.of(context),
         textScaler: scaler,
@@ -426,7 +424,10 @@ class _HeroCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = context.tokens.radius(size >= 200 ? 12 : 10);
     final cover = hero.coverOverride != null
-        ? SizedBox.square(dimension: size, child: FittedBox(child: hero.coverOverride))
+        ? SizedBox.square(
+            dimension: size,
+            child: FittedBox(child: hero.coverOverride),
+          )
         : CoverImage(
             url: hero.imageUrl,
             size: size,

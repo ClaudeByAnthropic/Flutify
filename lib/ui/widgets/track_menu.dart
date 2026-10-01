@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/l10n.dart';
+import '../../models/share_target.dart';
 import '../../models/track.dart';
 import '../../providers/library_provider.dart';
 import '../../providers/playback_provider.dart';
@@ -10,6 +10,7 @@ import '../navigation/app_routes.dart';
 import '../shell/shell_breakpoints.dart';
 import 'cover_image.dart';
 import 'create_playlist_dialog.dart';
+import 'share/share_sheet.dart';
 import 'track_options_sheet.dart';
 
 /// 曲目操作统一入口。
@@ -68,9 +69,9 @@ class TrackMenu {
 
   static void _toast(BuildContext context, String message) {
     if (!context.mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, width: 360),
-    );
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, width: 360));
   }
 
   static Future<void> _showDesktop(BuildContext context, SpotifyTrack track, Offset position) async {
@@ -79,6 +80,7 @@ class TrackMenu {
     final playback = context.read<PlaybackProvider>();
     final liked = library.isLiked(track.id);
     final album = track.album;
+    final share = ShareTarget.track(track);
 
     final action = await _menu<_Action>(context, position, [
       _item(_Action.addToPlaylist, Icons.playlist_add_rounded, l10n.trackAddToPlaylist),
@@ -93,8 +95,10 @@ class TrackMenu {
       if (track.artists.isNotEmpty)
         _item(_Action.artist, Icons.person_rounded, l10n.trackGoToArtist(track.artists.length)),
       if (album != null && album.id.isNotEmpty) _item(_Action.album, Icons.album_rounded, l10n.trackGoToAlbum),
-      const PopupMenuDivider(height: 8),
-      _item(_Action.share, Icons.link_rounded, l10n.commonShare),
+      if (share.isShareable) ...[
+        const PopupMenuDivider(height: 8),
+        _item(_Action.share, Icons.ios_share_rounded, l10n.commonShare),
+      ],
     ]);
     if (action == null || !context.mounted) return;
 
@@ -112,8 +116,7 @@ class TrackMenu {
       case _Action.addToPlaylist:
         await _addToPlaylist(context, track, position);
       case _Action.share:
-        await Clipboard.setData(ClipboardData(text: 'https://open.spotify.com/track/${track.id}'));
-        if (context.mounted) _toast(context, l10n.toastLinkCopied);
+        await ShareSheet.show(context, share);
     }
   }
 

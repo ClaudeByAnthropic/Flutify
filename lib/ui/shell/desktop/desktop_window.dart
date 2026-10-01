@@ -56,6 +56,23 @@ class DesktopWindow {
     fullScreen.value = value;
     if (await windowManager.isFullScreen() == value) return;
     await windowManager.setFullScreen(value);
+    if (!value) await _refreshFrame();
+  }
+
+  /// 退出全屏后强制原生窗口重算边框、重排 Flutter 视图。
+  ///
+  /// window_manager 在 Windows 上只有收到 SIZE_MAXIMIZED 才记为「已进入全屏」；
+  /// 从普通窗口进入全屏时收到的是 SIZE_RESTORED，状态没记上，退出时就跳过了
+  /// 子视图刷新，客户区残留全屏时的尺寸，露出大片黑边。
+  /// 宽度临时 +1 再改回，触发两次 WM_SIZE，让子视图贴合新的客户区。
+  static Future<void> _refreshFrame() async {
+    if (!Platform.isWindows) return;
+    // 等原生还原落定：进入全屏前若是最大化，插件会异步再发一次 SC_MAXIMIZE
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (await windowManager.isFullScreen() || await windowManager.isMaximized()) return;
+    final size = await windowManager.getSize();
+    await windowManager.setSize(Size(size.width + 1, size.height));
+    await windowManager.setSize(size);
   }
 }
 

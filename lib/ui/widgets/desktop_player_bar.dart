@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/l10n.dart';
 import '../../models/track.dart';
+import '../../providers/connect_provider.dart';
 import '../../providers/playback_provider.dart';
-import '../../providers/spotify_provider.dart';
 import '../navigation/app_routes.dart';
 import '../screens/player/device_picker_sheet.dart';
 import '../screens/player/full_player_sheet.dart';
@@ -12,6 +12,8 @@ import '../screens/player/immersive_lyrics_screen.dart';
 import '../screens/player/lyrics_sheet.dart';
 import '../screens/player/queue_sheet.dart';
 import '../shell/shell_layout_controller.dart';
+import 'connect/connect_actions.dart';
+import 'connect/remote_player_bar.dart';
 import 'cover_image.dart';
 import 'playback_scrubber.dart';
 import 'player_controls.dart';
@@ -24,6 +26,8 @@ class DesktopPlayerBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 正在遥控其他设备时整条换成远程播放栏
+    if (ConnectActions.showRemote(context)) return const RemotePlayerBar();
     final colorScheme = Theme.of(context).colorScheme;
     final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
     // 与窗口底色相同、无分隔线：播放栏与三栏面板靠色阶区分（Spotify 新版桌面端）
@@ -50,7 +54,10 @@ class DesktopPlayerBar extends StatelessWidget {
 
           return Row(
             children: [
-              SizedBox(width: sideWidth, child: _NowPlayingInfo(track: track)),
+              SizedBox(
+                width: sideWidth,
+                child: _NowPlayingInfo(track: track),
+              ),
               Expanded(
                 child: Center(
                   child: ConstrainedBox(
@@ -107,10 +114,7 @@ class _IdleBar extends StatelessWidget {
         Container(
           width: 56,
           height: 56,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(8)),
           child: Icon(Icons.music_note_rounded, color: colorScheme.onSurfaceVariant.withAlpha(140)),
         ),
         const SizedBox(width: 12),
@@ -205,9 +209,7 @@ class _HoverLinkState extends State<_HoverLink> {
         onTap: widget.onTap,
         child: Text(
           widget.text,
-          style: widget.style?.copyWith(
-            decoration: _hover && widget.onTap != null ? TextDecoration.underline : null,
-          ),
+          style: widget.style?.copyWith(decoration: _hover && widget.onTap != null ? TextDecoration.underline : null),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -236,7 +238,8 @@ class _RightControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final hasDevice = context.select<SpotifyProvider, bool>((s) => s.activeDevice != null);
+    // 远程设备有会话（已暂停）时设备键高亮，提示可以转回去
+    final hasDevice = context.select<ConnectProvider?, bool>((c) => c?.hasRemoteSession ?? false);
     // 三栏框架下：歌词 / 队列 / 正在播放视图切换右栏标签（当前标签高亮）；
     // 没有框架（单独使用播放栏）时回退为底部面板
     final layout = context.watch<ShellLayoutController?>();
@@ -260,8 +263,18 @@ class _RightControls extends StatelessWidget {
           context.l10n.shellNowPlayingView,
           () {},
         ),
-      panelButton(NowPlayingTab.lyrics, Icons.lyrics_outlined, context.l10n.lyricsTitle, () => LyricsSheet.show(context)),
-      panelButton(NowPlayingTab.queue, Icons.queue_music_rounded, context.l10n.queueTitle, () => QueueSheet.show(context)),
+      panelButton(
+        NowPlayingTab.lyrics,
+        Icons.lyrics_outlined,
+        context.l10n.lyricsTitle,
+        () => LyricsSheet.show(context),
+      ),
+      panelButton(
+        NowPlayingTab.queue,
+        Icons.queue_music_rounded,
+        context.l10n.queueTitle,
+        () => QueueSheet.show(context),
+      ),
       IconButton(
         icon: Icon(
           Icons.devices_rounded,
@@ -315,8 +328,8 @@ class _VolumeControl extends StatelessWidget {
     final icon = volume == 0
         ? Icons.volume_off_rounded
         : volume < 0.5
-            ? Icons.volume_down_rounded
-            : Icons.volume_up_rounded;
+        ? Icons.volume_down_rounded
+        : Icons.volume_up_rounded;
 
     return Row(
       mainAxisSize: MainAxisSize.min,

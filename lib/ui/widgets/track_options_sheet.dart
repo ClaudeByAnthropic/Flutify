@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/l10n.dart';
 import '../../models/artist.dart';
+import '../../models/share_target.dart';
 import '../../models/track.dart';
 import '../../providers/library_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../navigation/app_routes.dart';
 import 'cover_image.dart';
 import 'create_playlist_dialog.dart';
+import 'share/share_sheet.dart';
 
 /// 曲目「更多」操作面板（Spotify 长按 / ⋮ 菜单）。
 class TrackOptionsSheet extends StatelessWidget {
@@ -31,9 +32,9 @@ class TrackOptionsSheet extends StatelessWidget {
 
   void _toast(String message) {
     if (!hostContext.mounted) return;
-    ScaffoldMessenger.maybeOf(hostContext)?.showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    ScaffoldMessenger.maybeOf(
+      hostContext,
+    )?.showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
   }
 
   @override
@@ -95,23 +96,22 @@ class TrackOptionsSheet extends StatelessWidget {
                 title: Text(l10n.trackGoToArtist(track.artists.length)),
                 onTap: () => _goToArtist(context),
               ),
-            ListTile(
-              leading: const Icon(Icons.share_rounded),
-              title: Text(l10n.commonShare),
-              subtitle: Text(_shareUrl, maxLines: 1, overflow: TextOverflow.ellipsis),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: _shareUrl));
-                Navigator.pop(context);
-                _toast(l10n.toastLinkCopied);
-              },
-            ),
+            if (_share.isShareable)
+              ListTile(
+                leading: const Icon(Icons.ios_share_rounded),
+                title: Text(l10n.commonShare),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (hostContext.mounted) ShareSheet.show(hostContext, _share);
+                },
+              ),
           ],
         ),
       ),
     );
   }
 
-  String get _shareUrl => 'https://open.spotify.com/track/${track.id}';
+  ShareTarget get _share => ShareTarget.track(track);
 
   /// 曲目里的 artist 是 simplified 对象（无头像）；艺人详情页会按 id 再补全完整信息。
   SpotifyArtist _resolveArtist(SpotifyArtist a) => a;
@@ -131,7 +131,12 @@ class TrackOptionsSheet extends StatelessWidget {
           children: track.artists.map((a) {
             final artist = _resolveArtist(a);
             return ListTile(
-              leading: CoverImage(url: artist.avatarUrl, size: 40, circular: true, placeholderIcon: Icons.person_rounded),
+              leading: CoverImage(
+                url: artist.avatarUrl,
+                size: 40,
+                circular: true,
+                placeholderIcon: Icons.person_rounded,
+              ),
               title: Text(artist.name),
               onTap: () => AppRoutes.openArtist(hostContext, artist),
             );
@@ -158,7 +163,10 @@ class TrackOptionsSheet extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                  child: Text(l10n.trackAddToPlaylist, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  child: Text(
+                    l10n.trackAddToPlaylist,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
                 ),
                 ListTile(
                   leading: Container(
@@ -181,21 +189,25 @@ class TrackOptionsSheet extends StatelessWidget {
                   },
                 ),
                 for (final id in own)
-                  Builder(builder: (_) {
-                    final playlist = library.findPlaylist(id)!;
-                    final contains = playlist.tracks.any((t) => t.id == track.id);
-                    return ListTile(
-                      leading: CoverImage(url: playlist.coverUrl, size: 48, borderRadius: BorderRadius.circular(6)),
-                      title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: Text(l10n.songCount(playlist.tracks.length)),
-                      trailing: contains ? Icon(Icons.check_circle_rounded, color: Theme.of(ctx).colorScheme.primary) : null,
-                      onTap: () {
-                        final added = library.addTrackToPlaylist(id, track);
-                        Navigator.pop(ctx);
-                        _toast(added ? l10n.toastAddedTo(playlist.name) : l10n.toastAlreadyIn(playlist.name));
-                      },
-                    );
-                  }),
+                  Builder(
+                    builder: (_) {
+                      final playlist = library.findPlaylist(id)!;
+                      final contains = playlist.tracks.any((t) => t.id == track.id);
+                      return ListTile(
+                        leading: CoverImage(url: playlist.coverUrl, size: 48, borderRadius: BorderRadius.circular(6)),
+                        title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text(l10n.songCount(playlist.tracks.length)),
+                        trailing: contains
+                            ? Icon(Icons.check_circle_rounded, color: Theme.of(ctx).colorScheme.primary)
+                            : null,
+                        onTap: () {
+                          final added = library.addTrackToPlaylist(id, track);
+                          Navigator.pop(ctx);
+                          _toast(added ? l10n.toastAddedTo(playlist.name) : l10n.toastAlreadyIn(playlist.name));
+                        },
+                      );
+                    },
+                  ),
               ],
             ),
           ),

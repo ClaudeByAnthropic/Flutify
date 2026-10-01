@@ -5,10 +5,12 @@ import '../../core/theme/flutify_tokens.dart';
 import '../../core/utils/artwork_palette.dart';
 import '../../l10n/l10n.dart';
 import '../../models/track.dart';
+import '../../providers/connect_provider.dart';
 import '../../providers/playback_provider.dart';
-import '../../providers/spotify_provider.dart';
 import '../screens/player/device_picker_sheet.dart';
 import '../screens/player/full_player_sheet.dart';
+import 'connect/connect_actions.dart';
+import 'connect/remote_mini_player.dart';
 import 'cover_image.dart';
 import 'playback_scrubber.dart';
 import 'player_controls.dart';
@@ -24,13 +26,16 @@ class MiniPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 正在遥控其他设备时换成远程胶囊
+    if (ConnectActions.showRemote(context)) return const RemoteMiniPlayer();
     final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
     if (track == null) return const SizedBox.shrink();
 
     // 方正风格下胶囊换成 16px 圆角矩形，其余风格保持胶囊
     final tokens = context.tokens;
-    final ShapeBorder shape =
-        tokens.squareCorners ? RoundedRectangleBorder(borderRadius: tokens.radius(16)) : const StadiumBorder();
+    final ShapeBorder shape = tokens.squareCorners
+        ? RoundedRectangleBorder(borderRadius: tokens.radius(16))
+        : const StadiumBorder();
 
     return ArtworkColorBuilder(
       imageUrl: track.coverUrl,
@@ -45,9 +50,7 @@ class MiniPlayer extends StatelessWidget {
           decoration: ShapeDecoration(
             color: background,
             shape: shape,
-            shadows: [
-              BoxShadow(color: Colors.black.withAlpha(90), blurRadius: 20, offset: const Offset(0, 6)),
-            ],
+            shadows: [BoxShadow(color: Colors.black.withAlpha(90), blurRadius: 20, offset: const Offset(0, 6))],
           ),
           clipBehavior: Clip.antiAlias,
           child: Material(
@@ -99,7 +102,10 @@ class _MiniPlayerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final activeDeviceName = context.select<SpotifyProvider, String?>((s) => s.activeDevice?.name);
+    // 有远程会话（已暂停）时设备键高亮，提示可以转回去
+    final activeDeviceName = context.select<ConnectProvider?, String?>(
+      (c) => (c?.hasRemoteSession ?? false) ? c?.activeDevice?.name : null,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -154,12 +160,7 @@ class _MiniPlayerRow extends StatelessWidget {
 
               if (showLike) LikeButton(track: track, size: 22),
 
-              const PlayPauseButton(
-                size: 40,
-                iconSize: 26,
-                background: Colors.transparent,
-                foreground: Colors.white,
-              ),
+              const PlayPauseButton(size: 40, iconSize: 26, background: Colors.transparent, foreground: Colors.white),
             ],
           ),
         );

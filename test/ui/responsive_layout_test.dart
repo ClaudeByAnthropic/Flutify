@@ -9,6 +9,7 @@ import 'package:flutify_app/ui/screens/detail/widgets/collection_hero.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/shell/desktop/desktop_shell.dart';
 import 'package:flutify_app/ui/shell/mobile/mobile_bottom_bar.dart';
+import 'package:flutify_app/ui/widgets/share/share_sheet.dart';
 import 'package:flutify_app/ui/widgets/track_tile.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +28,11 @@ void main() {
     ownerName: 'Tester',
     tracks: List.generate(
       12,
-      (i) => SpotifyTrack(id: 'synthetic-$i', name: 'Synthetic Track $i', durationMs: 150000 + i * 1000),
+      (i) => SpotifyTrack(
+        id: 'synthetic${'$i'.padLeft(13, '0')}',
+        name: 'Synthetic Track $i',
+        durationMs: 150000 + i * 1000,
+      ),
     ),
     totalTracks: 12,
   );
@@ -40,11 +45,13 @@ void main() {
 
     SharedPreferences.setMockInitialValues({});
     final storage = await StorageService.init();
-    await tester.pumpWidget(FlutifyApp(
-      storageService: storage,
-      audioPlayerService: FakeAudioPlayerService(),
-      spotifyApiService: SpotifyApiService(storage),
-    ));
+    await tester.pumpWidget(
+      FlutifyApp(
+        storageService: storage,
+        audioPlayerService: FakeAudioPlayerService(),
+        spotifyApiService: SpotifyApiService(storage),
+      ),
+    );
     await settle(tester);
   }
 
@@ -101,11 +108,23 @@ void main() {
     await settle(tester);
 
     expect(find.byIcon(Icons.queue_music_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.link_rounded), findsOneWidget);
+    // 详情页操作行也有分享按钮，这里只认菜单里的那一项
+    Finder menuShare() => find.descendant(
+      of: find.byWidgetPredicate((w) => w is PopupMenuItem),
+      matching: find.byIcon(Icons.ios_share_rounded),
+    );
+    expect(menuShare(), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.queue_music_rounded));
     await settle(tester);
     expect(find.byType(SnackBar), findsOneWidget);
+
+    // 「分享」打开分享对话框，而不是直接复制链接
+    await tester.tap(find.byType(TrackTile).first, buttons: kSecondaryButton);
+    await settle(tester);
+    await tester.tap(menuShare());
+    await settle(tester);
+    expect(find.byType(ShareSheet), findsOneWidget);
   });
 }
 

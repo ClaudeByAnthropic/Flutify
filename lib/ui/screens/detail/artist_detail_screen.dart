@@ -9,12 +9,14 @@ import '../../../l10n/model_labels.dart';
 import '../../../models/album.dart';
 import '../../../models/artist.dart';
 import '../../../models/playback_context.dart';
+import '../../../models/share_target.dart';
 import '../../../models/track.dart';
 import '../../../providers/library_provider.dart';
 import '../../../services/spotify_api_service.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/expressive_card.dart';
+import '../../widgets/share/share_button.dart';
 import '../../widgets/track_tile.dart';
 import 'widgets/collection_hero.dart';
 import 'widgets/collection_widgets.dart';
@@ -82,127 +84,129 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
             imageUrl: artist.avatarUrl,
             fallback: const Color(0xFF3A3A48),
             child: CustomScrollView(
-            slivers: [
-              CollectionHero(
-                typeLabel: l10n.typeArtist,
-                title: artist.name,
-                imageUrl: artist.avatarUrl,
-                circularCover: true,
-                meta: artist.followers == null
-                    ? null
-                    : Text(
-                        l10n.followerCount(Formatters.formatCompactNumber(l10n, artist.followers)),
-                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
-                      ),
-                collapsedAction: ContextPlayButton(
-                  tracks: topTracks,
-                  playbackContext: playbackContext,
-                  size: 44,
-                  elevated: false,
-                ),
-              ),
-
-              SliverToBoxAdapter(
-                child: CollectionHeroFade(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CollectionActionRow(
-                          tracks: topTracks,
-                          playbackContext: playbackContext,
-                          leading: [
-                            _FollowButton(
-                              following: isFollowing,
-                              onPressed: () => context.read<LibraryProvider>().toggleFollowArtist(artist),
-                            ),
-                          ],
+              slivers: [
+                CollectionHero(
+                  typeLabel: l10n.typeArtist,
+                  title: artist.name,
+                  imageUrl: artist.avatarUrl,
+                  circularCover: true,
+                  meta: artist.followers == null
+                      ? null
+                      : Text(
+                          l10n.followerCount(Formatters.formatCompactNumber(l10n, artist.followers)),
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                         ),
-                        const SizedBox(height: 20),
-                        Text(
-                          l10n.artistPopular,
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              if (loading)
-                const CollectionPlaceholder(loading: true)
-              else if (topTracks.isEmpty && !context.read<SpotifyApiService>().isConfigured)
-                CollectionErrorPlaceholder(signedOut: true, onRetry: _reload)
-              else if (topTracks.isEmpty)
-                CollectionPlaceholder(message: l10n.artistNoPopular)
-              else
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => TrackTile(
-                      key: ValueKey(topTracks[index].id),
-                      track: topTracks[index],
-                      index: index + 1,
-                      showCover: true,
-                      contextQueue: topTracks,
-                      playbackContext: playbackContext,
-                    ),
-                    childCount: visibleCount,
+                  collapsedAction: ContextPlayButton(
+                    tracks: topTracks,
+                    playbackContext: playbackContext,
+                    size: 44,
+                    elevated: false,
                   ),
                 ),
 
-              if (topTracks.length > _collapsedCount)
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: () => setState(() => _showAllTracks = !_showAllTracks),
-                        child: Text(_showAllTracks ? l10n.commonShowLess : l10n.commonSeeMore),
-                      ),
-                    ),
-                  ),
-                ),
-
-              SliverToBoxAdapter(
-                child: FutureBuilder<List<SpotifyAlbum>>(
-                  future: _albumsFuture,
-                  builder: (context, snap) {
-                    final albums = snap.data ?? const <SpotifyAlbum>[];
-                    if (albums.isEmpty) return const SizedBox.shrink();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                          child: Text(
-                            l10n.artistDiscography,
+                  child: CollectionHeroFade(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CollectionActionRow(
+                            tracks: topTracks,
+                            playbackContext: playbackContext,
+                            leading: [
+                              _FollowButton(
+                                following: isFollowing,
+                                onPressed: () => context.read<LibraryProvider>().toggleFollowArtist(artist),
+                              ),
+                              const SizedBox(width: 4),
+                              ShareButton(target: ShareTarget.artist(artist)),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            l10n.artistPopular,
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                           ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                if (loading)
+                  const CollectionPlaceholder(loading: true)
+                else if (topTracks.isEmpty && !context.read<SpotifyApiService>().isConfigured)
+                  CollectionErrorPlaceholder(signedOut: true, onRetry: _reload)
+                else if (topTracks.isEmpty)
+                  CollectionPlaceholder(message: l10n.artistNoPopular)
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => TrackTile(
+                        key: ValueKey(topTracks[index].id),
+                        track: topTracks[index],
+                        index: index + 1,
+                        showCover: true,
+                        contextQueue: topTracks,
+                        playbackContext: playbackContext,
+                      ),
+                      childCount: visibleCount,
+                    ),
+                  ),
+
+                if (topTracks.length > _collapsedCount)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () => setState(() => _showAllTracks = !_showAllTracks),
+                          child: Text(_showAllTracks ? l10n.commonShowLess : l10n.commonSeeMore),
                         ),
-                        SizedBox(
-                          height: 220,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            itemCount: albums.length,
-                            itemBuilder: (context, i) => ExpressiveCard(
-                              title: albums[i].name,
-                              subtitle: l10n.subtitleJoin(l10n.albumType(albums[i]), albums[i].releaseYear),
-                              imageUrl: albums[i].coverUrl,
-                              onTap: () => AppRoutes.openAlbum(context, albums[i]),
+                      ),
+                    ),
+                  ),
+
+                SliverToBoxAdapter(
+                  child: FutureBuilder<List<SpotifyAlbum>>(
+                    future: _albumsFuture,
+                    builder: (context, snap) {
+                      final albums = snap.data ?? const <SpotifyAlbum>[];
+                      if (albums.isEmpty) return const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            child: Text(
+                              l10n.artistDiscography,
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                          SizedBox(
+                            height: 220,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              itemCount: albums.length,
+                              itemBuilder: (context, i) => ExpressiveCard(
+                                title: albums[i].name,
+                                subtitle: l10n.subtitleJoin(l10n.albumType(albums[i]), albums[i].releaseYear),
+                                imageUrl: albums[i].coverUrl,
+                                onTap: () => AppRoutes.openAlbum(context, albums[i]),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
 
-              const ContentBottomSpacer(),
-            ],
+                const ContentBottomSpacer(),
+              ],
             ),
           );
         },
