@@ -17,6 +17,7 @@ import 'widgets/home_feed_grid.dart';
 import 'widgets/home_shelf.dart';
 import 'widgets/home_shortcuts_grid.dart';
 import 'widgets/home_skeleton.dart';
+import 'widgets/home_top_gradient.dart';
 
 /// 主页：与官方 Spotify 客户端同源的 home 查询，按分区原样还原。
 ///
@@ -26,10 +27,28 @@ import 'widgets/home_skeleton.dart';
 /// 3. 各分区：普通卡架 / 最近播放 / 推荐流网格（顺序与服务端一致）。
 ///
 /// 只订阅主页数据与加载状态；播放状态一律通过 read 调用，播放过程中主页不会重建。
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenSettings;
 
   const HomeScreen({super.key, required this.onOpenSettings});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  /// 悬停快捷入口时的封面主色：只驱动顶部渐变（ValueListenable 避免整页重建）。
+  final ValueNotifier<Color?> _hoverTint = ValueNotifier(null);
+
+  @override
+  void dispose() {
+    _hoverTint.dispose();
+    super.dispose();
+  }
+
+  void _setHoverTint(Color? color) {
+    if (_hoverTint.value != color) _hoverTint.value = color;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,22 +60,33 @@ class HomeScreen extends StatelessWidget {
     final provider = context.read<SpotifyProvider>();
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            if (!desktop || home.chips.isNotEmpty)
-              HomeChipBar(
-                chips: home.chips,
-                selected: facet,
-                onSelected: provider.selectHomeFacet,
-                background: theme.scaffoldBackgroundColor,
-                leading: desktop ? null : GestureDetector(onTap: onOpenSettings, child: const UserAvatar(size: 32)),
-              ),
-            ..._content(context, home: home, facet: facet, loading: loading, desktop: desktop),
-            const ContentBottomSpacer(),
-          ],
-        ),
+      body: Stack(
+        children: [
+          // 顶部渐变（官方桌面端效果）：随快捷入口悬停的封面取色，固定在顶部不随滚动
+          Positioned(top: 0, left: 0, right: 0, height: 360, child: HomeTopGradient(tint: _hoverTint)),
+          SafeArea(
+            bottom: false,
+            child: CustomScrollView(
+              slivers: [
+                if (!desktop || home.chips.isNotEmpty)
+                  HomeChipBar(
+                    chips: home.chips,
+                    selected: facet,
+                    onSelected: provider.selectHomeFacet,
+                    background: theme.scaffoldBackgroundColor,
+                    leading: desktop
+                        ? null
+                        : GestureDetector(
+                            onTap: widget.onOpenSettings,
+                            child: const UserAvatar(size: 32),
+                          ),
+                  ),
+                ..._content(context, home: home, facet: facet, loading: loading, desktop: desktop),
+                const ContentBottomSpacer(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -122,7 +152,10 @@ class HomeScreen extends StatelessWidget {
   /// 分区 → sliver：连续的卡架合并进一个懒加载列表（30 余个分区只构建可见的几个），
   /// 推荐流单独成网格。
   List<Widget> _sections(BuildContext context, HomeFeed home, {required String facet, required bool desktop}) {
-    final slivers = <Widget>[if (home.shortcuts.isNotEmpty) HomeShortcutsGrid(items: home.shortcuts, desktop: desktop)];
+    final slivers = <Widget>[
+      if (home.shortcuts.isNotEmpty)
+        HomeShortcutsGrid(items: home.shortcuts, desktop: desktop, onHoverTint: _setHoverTint),
+    ];
     var shelves = <HomeSection>[];
 
     void flushShelves() {

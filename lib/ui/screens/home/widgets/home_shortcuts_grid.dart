@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../core/theme/md3e_shapes.dart';
+import '../../../../core/utils/artwork_palette.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../models/home_feed.dart';
 import '../../../widgets/cover_image.dart';
@@ -23,7 +24,15 @@ class HomeShortcutsGrid extends StatelessWidget {
   final List<HomeItem> items;
   final bool desktop;
 
-  const HomeShortcutsGrid({super.key, required this.items, required this.desktop});
+  /// 悬停条目时回调封面主色（离开时回调 null）；主页顶部渐变按它取色。
+  final ValueChanged<Color?>? onHoverTint;
+
+  const HomeShortcutsGrid({
+    super.key,
+    required this.items,
+    required this.desktop,
+    this.onHoverTint,
+  });
 
   static const double _wideWidth = 720;
   static const double _largeWidth = 1141;
@@ -58,6 +67,7 @@ class HomeShortcutsGrid extends StatelessWidget {
                 titleStyle: titleStyle,
                 // 太窄时不放播放键，把空间留给标题
                 showPlay: desktop && tileWidth >= 200 && HomeItemActions.canPlay(items[index]),
+                onHoverTint: onHoverTint,
               ),
               childCount: items.length,
             ),
@@ -68,22 +78,57 @@ class HomeShortcutsGrid extends StatelessWidget {
   }
 }
 
-class _ShortcutTile extends StatelessWidget {
+class _ShortcutTile extends StatefulWidget {
   final HomeItem item;
   final double cover;
   final TextStyle? titleStyle;
   final bool showPlay;
+  final ValueChanged<Color?>? onHoverTint;
 
-  const _ShortcutTile({required this.item, required this.cover, required this.titleStyle, required this.showPlay});
+  const _ShortcutTile({
+    required this.item,
+    required this.cover,
+    required this.titleStyle,
+    required this.showPlay,
+    this.onHoverTint,
+  });
+
+  @override
+  State<_ShortcutTile> createState() => _ShortcutTileState();
+}
+
+class _ShortcutTileState extends State<_ShortcutTile> {
+  /// 悬停代数：封面主色异步解析完时若已离开（或悬停了别的），丢弃结果。
+  int _hoverGen = 0;
+
+  void _onHoverChanged(bool hovered) {
+    final gen = ++_hoverGen;
+    final tint = widget.onHoverTint;
+    if (tint == null) return;
+    if (!hovered) {
+      tint(null);
+      return;
+    }
+    final liked = widget.item.kind == HomeItemKind.likedSongs;
+    final url = liked ? HomeItemCard.likedSongsCover : widget.item.imageUrl;
+    ArtworkPalette.resolve(url).then((color) {
+      if (mounted && gen == _hoverGen) tint(color);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final cover = widget.cover;
+    final titleStyle = widget.titleStyle;
+    final showPlay = widget.showPlay;
     final colorScheme = Theme.of(context).colorScheme;
     final tokens = context.tokens;
     final radius = tokens.radius(MD3EShapes.radiusSmall);
     final liked = item.kind == HomeItemKind.likedSongs;
 
     return HoverBuilder(
+      onHoverChanged: _onHoverChanged,
       builder: (context, hovered) => Material(
         color: hovered ? colorScheme.surfaceContainerHighest : colorScheme.surfaceContainerHigh,
         borderRadius: radius,

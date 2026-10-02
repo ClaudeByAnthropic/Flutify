@@ -7,7 +7,15 @@ class HoverBuilder extends StatefulWidget {
   final Widget Function(BuildContext context, bool hovered) builder;
   final MouseCursor cursor;
 
-  const HoverBuilder({super.key, required this.builder, this.cursor = MouseCursor.defer});
+  /// 悬停状态翻转时回调（只在变化时触发，不在 build 里跑副作用）。
+  final ValueChanged<bool>? onHoverChanged;
+
+  const HoverBuilder({
+    super.key,
+    required this.builder,
+    this.cursor = MouseCursor.defer,
+    this.onHoverChanged,
+  });
 
   @override
   State<HoverBuilder> createState() => _HoverBuilderState();
@@ -17,7 +25,10 @@ class _HoverBuilderState extends State<HoverBuilder> {
   bool _hovered = false;
 
   void _set(bool value) {
-    if (_hovered != value) setState(() => _hovered = value);
+    if (_hovered != value) {
+      setState(() => _hovered = value);
+      widget.onHoverChanged?.call(value);
+    }
   }
 
   @override
