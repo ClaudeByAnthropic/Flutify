@@ -945,6 +945,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTaskbarLyricsFontSize => 'Font size';
 
   @override
+  String get settingsCopyLog => 'Copy diagnostic log';
+
+  @override
+  String get settingsCopyLogSubtitle =>
+      'Paste it when reporting a problem; contains run records, no passwords';
+
+  @override
+  String get settingsCopyLogDone => 'Log copied to clipboard';
+
+  @override
+  String get settingsCopyLogEmpty => 'No log yet';
+
+  @override
   String get taskbarLyricsColorAuto => 'Auto';
 
   @override

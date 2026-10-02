@@ -1766,6 +1766,30 @@ abstract class AppLocalizations {
   /// **'字号'**
   String get settingsTaskbarLyricsFontSize;
 
+  /// No description provided for @settingsCopyLog.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制诊断日志'**
+  String get settingsCopyLog;
+
+  /// No description provided for @settingsCopyLogSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'反馈问题时粘贴给开发者；日志只含运行记录，不含密码'**
+  String get settingsCopyLogSubtitle;
+
+  /// No description provided for @settingsCopyLogDone.
+  ///
+  /// In zh, this message translates to:
+  /// **'日志已复制到剪贴板'**
+  String get settingsCopyLogDone;
+
+  /// No description provided for @settingsCopyLogEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无日志'**
+  String get settingsCopyLogEmpty;
+
   /// No description provided for @taskbarLyricsColorAuto.
   ///
   /// In zh, this message translates to:

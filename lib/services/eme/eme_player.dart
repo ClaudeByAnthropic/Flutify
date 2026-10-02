@@ -99,6 +99,16 @@ class EmePlayer {
           callback: _onJsEvent,
         );
       },
+      // Android WebView：Widevine 需要 App 显式授予「受保护媒体 ID」，否则 requestMediaKeySystemAccess 直接失败。
+      // 只放行这一项，其余（摄像头 / 麦克风等）一律拒绝。WebView2 不走这里。
+      onPermissionRequest: (_, request) async {
+        final drm = request.resources.contains(PermissionResourceType.PROTECTED_MEDIA_ID);
+        debugPrint('[eme] 权限请求 ${request.resources.map((r) => r.toNativeValue()).join(',')} → ${drm ? '允许' : '拒绝'}');
+        return PermissionResponse(
+          resources: drm ? [PermissionResourceType.PROTECTED_MEDIA_ID] : const [],
+          action: drm ? PermissionResponseAction.GRANT : PermissionResponseAction.DENY,
+        );
+      },
       onLoadStop: (_, _) {
         if (!_pageReady.isCompleted) _pageReady.complete();
       },
@@ -408,6 +418,20 @@ window.emePlayHls = () => (async () => {
   } catch (e) {
     return 'ERR:' + String(e);
   }
+})();
+
+// 启动时探测一次 Widevine 是否可用，结果写进日志（安卓 WebView 排查用）
+(async () => {
+  try {
+    const access = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
+      initDataTypes: ['cenc'],
+      audioCapabilities: [{contentType: 'audio/mp4; codecs="mp4a.40.2"'}],
+    }]);
+    send('log', {msg: 'Widevine 可用 ' + JSON.stringify(access.getConfiguration().audioCapabilities)});
+  } catch (e) {
+    send('log', {msg: 'Widevine 不可用: ' + e});
+  }
+  send('log', {msg: 'UA ' + navigator.userAgent});
 })();
 
 window.emePause = () => { if (audio) audio.pause(); };

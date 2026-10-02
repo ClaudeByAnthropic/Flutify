@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_info.dart';
+import '../../../../core/utils/file_log.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../shell/shell_breakpoints.dart';
+import '../../../widgets/toast/app_toast.dart';
 import '../widgets/settings_section.dart';
 import '../widgets/shortcuts_dialog.dart';
 
@@ -27,6 +30,12 @@ class AboutSection extends StatelessWidget {
         if (desktop)
           SettingsTile(title: l10n.settingsShortcuts, trailing: chevron, onTap: () => ShortcutsDialog.show(context)),
         SettingsTile(
+          title: l10n.settingsCopyLog,
+          subtitle: l10n.settingsCopyLogSubtitle,
+          trailing: Icon(Icons.content_copy_rounded, color: muted, size: 20),
+          onTap: () => _copyLog(context),
+        ),
+        SettingsTile(
           title: l10n.settingsLicenses,
           trailing: chevron,
           onTap: () => showLicensePage(
@@ -37,5 +46,18 @@ class AboutSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// 把本次运行的日志末尾复制到剪贴板，方便用户粘贴反馈（手机上没有别的取日志途径）。
+  static Future<void> _copyLog(BuildContext context) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final l10n = context.l10n;
+    final text = await readLogTail();
+    if (text.isEmpty) {
+      AppToast.showOn(messenger, l10n.settingsCopyLogEmpty, tone: ToastTone.warning);
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: text));
+    AppToast.showOn(messenger, l10n.settingsCopyLogDone, tone: ToastTone.success);
   }
 }

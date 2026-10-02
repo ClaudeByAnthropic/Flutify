@@ -918,6 +918,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsTaskbarLyricsFontSize => '字号';
 
   @override
+  String get settingsCopyLog => '复制诊断日志';
+
+  @override
+  String get settingsCopyLogSubtitle => '反馈问题时粘贴给开发者；日志只含运行记录，不含密码';
+
+  @override
+  String get settingsCopyLogDone => '日志已复制到剪贴板';
+
+  @override
+  String get settingsCopyLogEmpty => '暂无日志';
+
+  @override
   String get taskbarLyricsColorAuto => '自动';
 
   @override
