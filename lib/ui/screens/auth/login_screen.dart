@@ -62,10 +62,23 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// 统一登录页（WebView）是否开着：桌面授权在其中后台完成时 AuthProvider 先变成已登录，
+  /// 此时若直接 pop 根导航，关掉的是上层的登录页而不是本页；等它返回后再收尾。
+  bool _webLoginOpen = false;
+
+  /// 主按钮：打开应用内统一登录页，一次登录同时拿到 Web 会话与桌面授权。
+  Future<void> _signIn() async {
+    if (_webLoginOpen) return;
+    _webLoginOpen = true;
+    await WebLoginScreen.open(context);
+    _webLoginOpen = false;
+    _onAuthChanged();
+  }
+
   /// 登录成功后关闭页面，并在下层页面上提示登录身份。
   /// 还没有 Web 登录态（sp_dc）时，紧接着引导第二步：应用内 Web 登录解锁全曲播放。
   void _onAuthChanged() {
-    if (_finished || !_auth.isSignedIn || !mounted) return;
+    if (_webLoginOpen || _finished || !_auth.isSignedIn || !mounted) return;
     _finished = true;
     final messenger = ScaffoldMessenger.maybeOf(context);
     final name = _auth.displayName;
@@ -147,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: authorizing
                                 ? const OAuthWaitingView(key: ValueKey('waiting'))
-                                : const LoginIntroView(key: ValueKey('intro')),
+                                : LoginIntroView(key: const ValueKey('intro'), onSignIn: _signIn),
                           ),
                         ),
                       ),

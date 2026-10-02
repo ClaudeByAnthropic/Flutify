@@ -2,7 +2,7 @@
 
 > **当前版本：v0.01 Beta**（首个公开测试版）· 支持 Windows x64 与 Android
 >
-> 下载：[Releases](../../releases) 页面。Windows 解压后运行 `flutify_app.exe`（需要 WebView2 运行时，Win11 自带）；
+> 下载：[Releases](../../releases) 页面。Windows 解压后运行 `Flutify.exe`（需要 WebView2 运行时，Win11 自带）；
 > Android 一般选 `arm64-v8a`，不确定时选 `universal`。
 > 安装包由 GitHub Actions 自动构建（`.github/workflows/build.yml`），推送 `v*` 标签即发布。
 >

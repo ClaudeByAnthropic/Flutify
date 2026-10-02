@@ -20,7 +20,7 @@ void main() {
     }
   }
 
-  testWidgets('login: single browser sign-in page renders and closes', (tester) async {
+  testWidgets('login: single in-app sign-in page renders and closes', (tester) async {
     tester.view.physicalSize = const Size(360, 740);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -43,7 +43,7 @@ void main() {
 
     expect(find.byType(LoginHero), findsOneWidget);
     expect(find.text('登录 Spotify'), findsOneWidget);
-    expect(find.text('在浏览器中登录'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '登录'), findsOneWidget);
     // 其他登录方式已移除
     expect(find.text('账号密码'), findsNothing);
     expect(find.text('更多方式'), findsNothing);

@@ -4,20 +4,15 @@ import 'package:provider/provider.dart';
 import '../../../../providers/auth_provider.dart';
 import 'auth_error_banner.dart';
 import 'login_hero.dart';
-import 'oauth_waiting_view.dart';
 
-/// 登录页的初始态：主视觉 + 标题 + 三条安心说明 + 「在浏览器中登录」主按钮。
+/// 登录页的初始态：主视觉 + 标题 + 三条安心说明 + 「登录」主按钮。
 ///
-/// 唯一的桌面登录方式：系统浏览器打开 accounts.spotify.com 官方登录页（Google 等
-/// 第三方登录在浏览器里完成，凭据不经过应用内 WebView），登录完成后经本机回环回到 App。
-/// 登录成功后会接着引导一次应用内 Web 登录（sp_dc，全曲播放用），见 LoginScreen。
+/// 点按后由 [onSignIn] 打开应用内统一登录页（WebLoginScreen）：用户只在官方登录页登录一次，
+/// 全曲播放凭据（sp_dc）与桌面授权都在后台自动完成，不再跳系统浏览器。
 class LoginIntroView extends StatelessWidget {
-  const LoginIntroView({super.key});
+  final VoidCallback onSignIn;
 
-  Future<void> _begin(BuildContext context) async {
-    final url = await context.read<AuthProvider>().beginOAuth();
-    if (url != null && context.mounted) await OAuthWaitingView.launch(context, url);
-  }
+  const LoginIntroView({super.key, required this.onSignIn});
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +33,7 @@ class LoginIntroView extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          '在浏览器中打开 Spotify 官方登录页，\n登录完成后自动回到 Flutify',
+          '在 Spotify 官方登录页登录一次，\n其余授权全部自动完成',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant, height: 1.5),
         ),
@@ -48,13 +43,13 @@ class LoginIntroView extends StatelessWidget {
         SizedBox(
           height: 60,
           child: FilledButton.icon(
-            onPressed: () => _begin(context),
+            onPressed: onSignIn,
             style: FilledButton.styleFrom(
               shape: const StadiumBorder(),
               textStyle: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
-            icon: const Icon(Icons.open_in_browser_rounded, size: 22),
-            label: const Text('在浏览器中登录'),
+            icon: const Icon(Icons.login_rounded, size: 22),
+            label: const Text('登录'),
           ),
         ),
         AuthErrorBanner(message: error),

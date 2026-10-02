@@ -35,17 +35,32 @@ class AuthProvider extends ChangeNotifier {
   Uri? _authorizeUrl;
 
   AuthProvider(this._auth) : _status = _auth.isLoggedIn ? AuthStatus.signedIn : AuthStatus.signedOut {
-    // 恢复的会话缺资料（昵称 / 用户名）时启动后补拉一次；拿到用户名后媒体库需要重新加载
-    if (_auth.needsProfile) {
-      final usernameBefore = _auth.username;
-      unawaited(
-        _auth.ensureProfile().then((_) {
-          notifyListeners();
-          if (_auth.username != usernameBefore) onSessionChanged?.call();
-        }),
-      );
-    }
+    // 恢复的会话缺资料（昵称 / 用户名）时启动后补拉；拿到用户名后媒体库需要重新加载
+    unawaited(_backfillProfile());
     _auth.sessionExpired.addListener(notifyListeners);
+  }
+
+  /// 资料补拉的退避间隔：登录刚完成时 AP 取用户名可能失败、/v1/me 常被限流，
+  /// 不重试的话要重启 App 才有用户名（媒体库、歌单都按用户名寻址）。
+  static const List<Duration> _profileRetryDelays = [
+    Duration.zero,
+    Duration(seconds: 3),
+    Duration(seconds: 8),
+    Duration(seconds: 20),
+  ];
+
+  /// 资料缺失时按 [_profileRetryDelays] 补拉，用户名变化后回调 [onSessionChanged] 刷新依赖数据。
+  Future<void> _backfillProfile() async {
+    for (final delay in _profileRetryDelays) {
+      if (!_auth.needsProfile) return;
+      if (delay > Duration.zero) await Future<void>.delayed(delay);
+      final usernameBefore = _auth.username;
+      await _auth.ensureProfile();
+      if (_auth.username != usernameBefore || !_auth.needsProfile) {
+        notifyListeners();
+        if (_auth.username != usernameBefore) onSessionChanged?.call();
+      }
+    }
   }
 
   @override
@@ -101,6 +116,8 @@ class AuthProvider extends ChangeNotifier {
             _status = AuthStatus.signedIn;
             notifyListeners();
             onSessionChanged?.call();
+            // 登录时资料没拉全（用户名为空）就继续补拉，不必等下次启动
+            unawaited(_backfillProfile());
           })
           .catchError((Object e) {
             // 用户主动取消时状态已被 cancelOAuth 重置，不再覆盖

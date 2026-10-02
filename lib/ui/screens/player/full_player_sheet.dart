@@ -68,7 +68,15 @@ class FullPlayerSheet extends StatefulWidget {
       useSafeArea: false,
       showDragHandle: false,
       backgroundColor: Colors.transparent,
-      builder: (_) => SizedBox(height: MediaQuery.sizeOf(context).height, child: const FullPlayerSheet()),
+      // 底部面板会清掉顶部安全区（useSafeArea: false 时 removeTop），全屏播放器又铺满整屏，
+      // 内部的 SafeArea 因此读到 0、内容画进状态栏；这里把外层的安全区原样补回。
+      builder: (sheetContext) => MediaQuery(
+        data: MediaQuery.of(sheetContext).copyWith(
+          padding: MediaQuery.paddingOf(context),
+          viewPadding: MediaQuery.viewPaddingOf(context),
+        ),
+        child: SizedBox(height: MediaQuery.sizeOf(context).height, child: const FullPlayerSheet()),
+      ),
     );
   }
 
