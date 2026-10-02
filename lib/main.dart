@@ -262,12 +262,9 @@ class FlutifyApp extends StatelessWidget {
             });
             // 播放栏处于远程模式时，点歌默认在那台设备上播放；无法远程（本地文件）或命令失败时回到本机播放
             playback.remotePlay = (context, tracks, start) async {
-              if (!connect.controlsRemote(
-                localPlaying: playback.isPlaying,
-                localHasTrack: playback.currentTrack != null,
-              )) {
-                return false;
-              }
+              // 存在活动的远程设备且本机没在出声就一律走远程。不再依赖 controlsRemote 的“最后出声方”推断：
+              // 切换曲目瞬间远程会短暂处于暂停 / 缓冲状态，那会误判为本机并回退到本机播放。
+              if (connect.activeDevice == null || playback.isPlaying) return false;
               final request = ConnectPlayRequest.from(
                 context: context,
                 tracks: tracks,

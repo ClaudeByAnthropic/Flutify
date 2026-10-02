@@ -73,7 +73,9 @@ class ConnectProvider extends ChangeNotifier {
   /// - 远程已暂停：最后出声的是远程（[remoteInControl]）或本机没有曲目 → 仍是远程，
   ///   这样暂停远程后再按空格 / 播放键会继续远程，而不是突然在本机放起上次的曲目。
   bool controlsRemote({required bool localPlaying, required bool localHasTrack}) =>
-      hasRemoteSession && !localPlaying && (player.isAudible || _remoteInControl || !localHasTrack);
+      // 以集群状态为准：本 App 只是观察者、自己不是 Connect 设备，只要集群里有活动设备且带曲目，
+      // 播放的就是那台设备；仅当本机正在出声（本地文件等）才归本机。不再推断“最后出声方”。
+      hasRemoteSession && !localPlaying;
 
   /// 最后出声的一方是否为远程设备：远程开始出声时置为 true，本机开始播放时（[localPlaybackStarted]）置为 false。
   bool get remoteInControl => _remoteInControl;

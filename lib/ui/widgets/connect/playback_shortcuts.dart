@@ -17,6 +17,13 @@ class PlaybackShortcuts {
 
   static const double _volumeStep = 0.1;
 
+  /// 当前主焦点是否在可编辑文本组件内（TextField 等）。
+  static bool _isTextInputFocused() {
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    if (ctx == null) return false;
+    return ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
+
   static Map<ShortcutActivator, VoidCallback> bindings(BuildContext context) {
     VoidCallback route(void Function(PlaybackProvider p) local, Future<void> Function(ConnectProvider c) remote) => () {
       if (ConnectActions.isRemoteNow(context)) {
@@ -50,7 +57,11 @@ class PlaybackShortcuts {
     };
 
     return {
-      const SingleActivator(LogicalKeyboardKey.space): route((p) => p.togglePlayPause(), (c) => c.togglePlayPause()),
+      // 空格：焦点在文本输入框时应输入空格，不触发播放/暂停
+      const SingleActivator(LogicalKeyboardKey.space): () {
+        if (_isTextInputFocused()) return;
+        route((p) => p.togglePlayPause(), (c) => c.togglePlayPause())();
+      },
       const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): route(
         (p) => p.nextTrack(),
         (c) => c.skipNext(),
