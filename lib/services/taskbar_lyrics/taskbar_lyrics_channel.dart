@@ -16,6 +16,9 @@ class TaskbarLyricsStyle {
   final int accentOnDark;
   final int accentOnLight;
   final int opacity;
+
+  /// 字号百分比（100 = 默认）。
+  final int fontScale;
   final String openLabel;
   final String refetchLabel;
   final String disableLabel;
@@ -26,6 +29,7 @@ class TaskbarLyricsStyle {
     this.accentOnDark = 0xFF1ED760,
     this.accentOnLight = 0xFF1DB954,
     this.opacity = 100,
+    this.fontScale = 100,
     this.openLabel = '',
     this.refetchLabel = '',
     this.disableLabel = '',
@@ -37,6 +41,7 @@ class TaskbarLyricsStyle {
     'accentOnDark': accentOnDark,
     'accentOnLight': accentOnLight,
     'opacity': opacity,
+    'fontScale': fontScale,
     'labels': {'open': openLabel, 'refetch': refetchLabel, 'disable': disableLabel},
   };
 
@@ -48,13 +53,14 @@ class TaskbarLyricsStyle {
       other.accentOnDark == accentOnDark &&
       other.accentOnLight == accentOnLight &&
       other.opacity == opacity &&
+      other.fontScale == fontScale &&
       other.openLabel == openLabel &&
       other.refetchLabel == refetchLabel &&
       other.disableLabel == disableLabel;
 
   @override
   int get hashCode =>
-      Object.hash(mode, customColor, accentOnDark, accentOnLight, opacity, openLabel, refetchLabel, disableLabel);
+      Object.hash(mode, customColor, accentOnDark, accentOnLight, opacity, fontScale, openLabel, refetchLabel, disableLabel);
 }
 
 /// 任务栏上的用户操作。

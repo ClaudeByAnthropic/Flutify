@@ -14,7 +14,16 @@ class TaskbarLyricsPreview extends StatefulWidget {
   final double opacity;
   final bool lightTaskbar;
 
-  const TaskbarLyricsPreview({super.key, required this.color, required this.opacity, required this.lightTaskbar});
+  /// 字号倍率（1.0 = 默认），与原生任务栏歌词同步缩放。
+  final double fontScale;
+
+  const TaskbarLyricsPreview({
+    super.key,
+    required this.color,
+    required this.opacity,
+    required this.lightTaskbar,
+    this.fontScale = 1.0,
+  });
 
   @override
   State<TaskbarLyricsPreview> createState() => _TaskbarLyricsPreviewState();
@@ -98,7 +107,7 @@ class _TaskbarLyricsPreviewState extends State<TaskbarLyricsPreview> {
                       current,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w700, height: 1.2),
+                      style: TextStyle(color: ink, fontSize: 14 * widget.fontScale, fontWeight: FontWeight.w700, height: 1.2),
                     ),
                     Text(
                       next,
@@ -106,7 +115,7 @@ class _TaskbarLyricsPreviewState extends State<TaskbarLyricsPreview> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: ink.withValues(alpha: ink.a * 0.55),
-                        fontSize: 10.5,
+                        fontSize: 10.5 * widget.fontScale,
                         fontWeight: FontWeight.w600,
                         height: 1.3,
                       ),

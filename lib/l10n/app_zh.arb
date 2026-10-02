@@ -394,6 +394,7 @@
   "settingsTaskbarLyricsCustomColor": "自定义颜色",
   "settingsTaskbarLyricsChangeColor": "更改",
   "settingsTaskbarLyricsOpacity": "不透明度",
+  "settingsTaskbarLyricsFontSize": "字号",
   "taskbarLyricsColorAuto": "自动",
   "taskbarLyricsColorWhite": "白色",
   "taskbarLyricsColorBlack": "黑色",

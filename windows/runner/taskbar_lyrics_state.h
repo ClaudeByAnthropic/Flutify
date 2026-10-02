@@ -28,6 +28,7 @@ struct Style {
   // 强调色分两档：深色任务栏上用亮的一档，浅色任务栏上用暗的一档，保证对比度
   uint32_t accent_on_dark = 0xFF1ED760;
   uint32_t accent_on_light = 0xFF1DB954;
+  int font_scale = 100;  // 歌词字号百分比（80 ~ 130）
   int opacity = 100;  // 文字整体不透明度（15 ~ 100）
 };
 

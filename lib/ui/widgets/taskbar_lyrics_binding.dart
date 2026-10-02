@@ -97,6 +97,7 @@ class _TaskbarLyricsBindingState extends State<TaskbarLyricsBinding> {
         accentOnDark: onDark,
         accentOnLight: onLight,
         opacity: prefs.taskbarLyricsOpacity,
+        fontScale: prefs.taskbarLyricsFontScale,
         openLabel: l10n.taskbarLyricsMenuOpen,
         refetchLabel: l10n.taskbarLyricsMenuRefetch,
         disableLabel: l10n.taskbarLyricsMenuDisable,

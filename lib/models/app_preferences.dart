@@ -74,6 +74,10 @@ class AppPreferences {
   /// 任务栏歌词文字整体不透明度（百分比，[minTaskbarLyricsOpacity] ~ 100）。
   final int taskbarLyricsOpacity;
 
+  /// 任务栏歌词字号（百分比，[minTaskbarLyricsFontScale] ~ [maxTaskbarLyricsFontScale]）；
+  /// 放不下时原生层仍会自动缩小或折行。
+  final int taskbarLyricsFontScale;
+
   const AppPreferences({
     this.language = AppLanguage.zh,
     this.lyricsScale = 1.0,
@@ -94,6 +98,7 @@ class AppPreferences {
     this.taskbarLyricsColor = TaskbarLyricsColor.auto,
     this.taskbarLyricsCustomColor = defaultTaskbarLyricsCustomColor,
     this.taskbarLyricsOpacity = 100,
+    this.taskbarLyricsFontScale = 100,
   });
 
   static const AppPreferences defaults = AppPreferences();
@@ -104,6 +109,8 @@ class AppPreferences {
   static const int maxRemoteLyricsLeadMs = 2000;
   static const int minTaskbarLyricsOpacity = 15;
   static const int defaultTaskbarLyricsCustomColor = 0xFF1ED760;
+  static const int minTaskbarLyricsFontScale = 80;
+  static const int maxTaskbarLyricsFontScale = 130;
 
   AppPreferences copyWith({
     AppLanguage? language,
@@ -125,6 +132,7 @@ class AppPreferences {
     TaskbarLyricsColor? taskbarLyricsColor,
     int? taskbarLyricsCustomColor,
     int? taskbarLyricsOpacity,
+    int? taskbarLyricsFontScale,
   }) {
     return AppPreferences(
       language: language ?? this.language,
@@ -147,6 +155,7 @@ class AppPreferences {
       taskbarLyricsCustomColor:
           taskbarLyricsCustomColor ?? this.taskbarLyricsCustomColor,
       taskbarLyricsOpacity: taskbarLyricsOpacity ?? this.taskbarLyricsOpacity,
+      taskbarLyricsFontScale: taskbarLyricsFontScale ?? this.taskbarLyricsFontScale,
     );
   }
 
@@ -170,6 +179,7 @@ class AppPreferences {
     'taskbarLyricsColor': taskbarLyricsColor.name,
     'taskbarLyricsCustomColor': taskbarLyricsCustomColor,
     'taskbarLyricsOpacity': taskbarLyricsOpacity,
+    'taskbarLyricsFontScale': taskbarLyricsFontScale,
   };
 
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
@@ -184,6 +194,7 @@ class AppPreferences {
     final port = json['proxyPort'];
     final customColor = json['taskbarLyricsCustomColor'];
     final opacity = json['taskbarLyricsOpacity'];
+    final fontScale = json['taskbarLyricsFontScale'];
     return AppPreferences(
       language: pick(AppLanguage.values, json['language'], d.language),
       lyricsScale: number(
@@ -223,6 +234,9 @@ class AppPreferences {
       taskbarLyricsOpacity: opacity is int
           ? opacity.clamp(minTaskbarLyricsOpacity, 100)
           : d.taskbarLyricsOpacity,
+      taskbarLyricsFontScale: fontScale is int
+          ? fontScale.clamp(minTaskbarLyricsFontScale, maxTaskbarLyricsFontScale)
+          : d.taskbarLyricsFontScale,
     );
   }
 
@@ -262,7 +276,8 @@ class AppPreferences {
       other.taskbarLyrics == taskbarLyrics &&
       other.taskbarLyricsColor == taskbarLyricsColor &&
       other.taskbarLyricsCustomColor == taskbarLyricsCustomColor &&
-      other.taskbarLyricsOpacity == taskbarLyricsOpacity;
+      other.taskbarLyricsOpacity == taskbarLyricsOpacity &&
+      other.taskbarLyricsFontScale == taskbarLyricsFontScale;
 
   @override
   int get hashCode => Object.hash(
@@ -285,5 +300,6 @@ class AppPreferences {
     taskbarLyricsColor,
     taskbarLyricsCustomColor,
     taskbarLyricsOpacity,
+    taskbarLyricsFontScale,
   );
 }

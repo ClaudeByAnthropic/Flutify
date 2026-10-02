@@ -54,6 +54,7 @@ class TaskbarLyricsWindow {
   bool DetectVerticalTaskbar();
   // 任务栏图标是否居中（Win11 的 TaskbarAl=1；Win10 无此键，视为居左）。
   bool IconsCentered() const;
+  bool IsXamlTaskbar() const;
   int MeasureWidgetRight(const RECT& tray, int rebar_left);
   int ScanWidgetRight(const RECT& tray, int rebar_left);
   void SampleBackground();

@@ -419,6 +419,11 @@ bool TaskbarLyricsWindow::IconsCentered() const {
          value != 0;
 }
 
+// Win11 的新任务栏由 XAML 绘制，Shell_TrayWnd 下有 DesktopWindowContentBridge 子窗口；Win10 没有。
+bool TaskbarLyricsWindow::IsXamlTaskbar() const {
+  return FindWindowExW(tray_, nullptr, L"Windows.UI.Composition.DesktopWindowContentBridge", nullptr) != nullptr;
+}
+
 void TaskbarLyricsWindow::Reflow(bool force) {
   RECT tray{};
   if (!GetWindowRect(tray_, &tray)) return;
@@ -454,9 +459,18 @@ void TaskbarLyricsWindow::Reflow(bool force) {
     if (notify && GetWindowRect(notify, &nr) && nr.left > tray.left) {
       right = nr.left - tray.left - static_cast<int>(10 * scale_);
     }
-    // 宽度取任务栏的 1/3（至少 200px），向左延伸；空间不足时收缩到可用宽度。
+    // 左界：Win11 的 ReBarWindow32 宽度随图标数量变化，右缘就是最后一个应用图标；
+    // Win10 的 ReBarWindow32 一直铺到托盘，不能作左界，只留边距。
+    int left = static_cast<int>(8 * scale_);
+    HWND rebar = FindWindowExW(tray_, nullptr, L"ReBarWindow32", nullptr);
+    RECT rr{};
+    if (IsXamlTaskbar() && rebar && GetWindowRect(rebar, &rr) && rr.right > tray.left) {
+      left = (std::max)(left, static_cast<int>(rr.right - tray.left + 12 * scale_));
+    }
+    // 宽度取任务栏的 1/3（至少 200px），贴着托盘向左延伸；图标太多时收缩到图标与托盘之间的空隙，
+    // 空隙为 0 时宽度为 0（等于不显示），宁可不显示也不盖住图标。
     width = (std::max)(static_cast<int>(200 * scale_), tray_width / 3);
-    width = (std::min)(width, (std::max)(right - static_cast<int>(8 * scale_), static_cast<int>(60 * scale_)));
+    width = (std::min)(width, (std::max)(right - left, 0));
     x = right - width;
   }
 
@@ -587,6 +601,7 @@ void TaskbarLyricsWindow::Render() {
   }
   const Gdiplus::Color color = TextColor();
   const std::wstring style_sig = std::to_wstring(color.GetValue()) + L"|" + std::to_wstring(style_.opacity) + L"|" +
+                                 std::to_wstring(style_.font_scale) + L"|" +
                                  std::to_wstring(w) + L"x" + std::to_wstring(h);
 
   std::wstring previous, current, next;
@@ -637,7 +652,8 @@ void TaskbarLyricsWindow::Render() {
   g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
   g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
   g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-  const TaskbarLyricsPainter::Canvas canvas{&g, w, h, scale_, color, style_.opacity};
+  const TaskbarLyricsPainter::Canvas canvas{&g, w, h, scale_, color, style_.opacity,
+                                                style_.font_scale / 100.0};
   if (control) {
     layout_ = painter_->PaintControl(canvas, title_.empty() ? L"Flutify" : title_, artist_, art_.get(), playing_,
                                      hovered_button_);

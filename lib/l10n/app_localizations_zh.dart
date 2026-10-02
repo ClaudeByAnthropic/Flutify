@@ -915,6 +915,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsTaskbarLyricsOpacity => '不透明度';
 
   @override
+  String get settingsTaskbarLyricsFontSize => '字号';
+
+  @override
   String get taskbarLyricsColorAuto => '自动';
 
   @override

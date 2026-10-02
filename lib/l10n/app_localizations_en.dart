@@ -942,6 +942,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTaskbarLyricsOpacity => 'Opacity';
 
   @override
+  String get settingsTaskbarLyricsFontSize => 'Font size';
+
+  @override
   String get taskbarLyricsColorAuto => 'Auto';
 
   @override

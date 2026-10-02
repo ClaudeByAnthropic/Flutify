@@ -180,14 +180,14 @@ void TaskbarLyricsPainter::DrawText(const Canvas& canvas, const std::wstring& te
 bool TaskbarLyricsPainter::NeedsWrap(const Canvas& canvas, const std::wstring& current) {
   const float pad = static_cast<float>(8 * canvas.scale);
   const float avail = canvas.width - pad * 2;
-  Font* big = FontFor(current, kBigPt * canvas.scale, true);
+  Font* big = FontFor(current, kBigPt * canvas.scale * canvas.font_scale, true);
   return MeasureWidth(canvas.graphics, current, big) * kMinScale > avail && current.size() > 4;
 }
 
 void TaskbarLyricsPainter::PaintLyrics(const Canvas& canvas, const std::wstring& previous,
                                        const std::wstring& current, const std::wstring& next, float progress) {
-  const double big_pt = kBigPt * canvas.scale;
-  const double small_pt = kSmallPt * canvas.scale;
+  const double big_pt = kBigPt * canvas.scale * canvas.font_scale;
+  const double small_pt = kSmallPt * canvas.scale * canvas.font_scale;
   const float pad = static_cast<float>(8 * canvas.scale);
   const float avail = canvas.width - pad * 2;
 

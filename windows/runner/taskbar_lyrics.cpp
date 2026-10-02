@@ -135,6 +135,8 @@ void TaskbarLyrics::OnMethodCall(const flutter::MethodCall<EncodableValue>& call
         style.accent_on_light = static_cast<uint32_t>(GetInt(*args, "accentOnLight", style.accent_on_light));
         style.opacity = static_cast<int>(GetInt(*args, "opacity", 100));
         style.opacity = style.opacity < 15 ? 15 : (style.opacity > 100 ? 100 : style.opacity);
+        style.font_scale = static_cast<int>(GetInt(*args, "fontScale", 100));
+        style.font_scale = style.font_scale < 80 ? 80 : (style.font_scale > 130 ? 130 : style.font_scale);
         if (const EncodableValue* labels = Find(*args, "labels")) {
           if (const auto* map = std::get_if<EncodableMap>(labels)) {
             shared_.labels.open = GetText(*map, "open");

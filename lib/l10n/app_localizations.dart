@@ -1760,6 +1760,12 @@ abstract class AppLocalizations {
   /// **'不透明度'**
   String get settingsTaskbarLyricsOpacity;
 
+  /// No description provided for @settingsTaskbarLyricsFontSize.
+  ///
+  /// In zh, this message translates to:
+  /// **'字号'**
+  String get settingsTaskbarLyricsFontSize;
+
   /// No description provided for @taskbarLyricsColorAuto.
   ///
   /// In zh, this message translates to:
