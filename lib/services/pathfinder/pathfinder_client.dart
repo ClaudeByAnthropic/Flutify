@@ -37,9 +37,27 @@ class PathfinderClient {
     final data = json is Map<String, dynamic> ? json['data'] : null;
     if (res.statusCode != 200 || data is! Map<String, dynamic>) {
       final errors = json is Map<String, dynamic> ? json['errors'] : null;
-      throw PathfinderException(op.name, res.statusCode, errors?.toString() ?? '');
+      final hashStale = _isHashStale(errors);
+      throw PathfinderException(op.name, res.statusCode, errors?.toString() ?? '', hashStale: hashStale);
     }
     return data;
+  }
+
+  /// 桌面客户端升级后旧的 sha256Hash 会被服务端拒绝：
+  /// 返回 `PersistedQueryNotFound` 类错误（不同版本的 code / message 写法略有差异）。
+  static bool _isHashStale(Object? errors) {
+    if (errors is! List) return false;
+    for (final e in errors) {
+      if (e is! Map) continue;
+      final code = (e['extensions'] is Map ? (e['extensions'] as Map)['code'] : null)?.toString() ?? '';
+      final message = e['message']?.toString() ?? '';
+      if (code.toLowerCase().contains('persistedquery') ||
+          message.toLowerCase().contains('persisted query') ||
+          message.toLowerCase().contains('persistedquery')) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
@@ -48,8 +66,16 @@ class PathfinderException implements Exception {
   final int statusCode;
   final String detail;
 
-  const PathfinderException(this.operation, this.statusCode, this.detail);
+  /// 持久化查询哈希已失效（桌面客户端升级后旧 hash 被拒）。只能更新客户端解决。
+  final bool hashStale;
+
+  const PathfinderException(this.operation, this.statusCode, this.detail, {this.hashStale = false});
+
+  /// 面向用户、可直接展示的说明。
+  String get message => hashStale
+      ? 'Spotify 桌面客户端已升级，本版本的查询签名已失效，请更新 Flutify 后重试'
+      : 'Pathfinder $operation 失败（HTTP $statusCode）$detail';
 
   @override
-  String toString() => 'Pathfinder $operation 失败（HTTP $statusCode）$detail';
+  String toString() => message;
 }

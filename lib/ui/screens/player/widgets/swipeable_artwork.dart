@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/theme/md3e_shapes.dart';
 import '../../../../l10n/l10n.dart';
+import '../../../../providers/connect_provider.dart';
 import '../../../../providers/playback_provider.dart';
+import '../../../widgets/connect/connect_actions.dart';
 import '../../../widgets/cover_image.dart';
 
-/// 全屏播放器的大封面：左右拖动切歌。
+/// 全屏播放器的大封面：左右拖动切歌（远程模式下发给远程设备）。
 ///
 /// - 拖动时封面跟手平移并轻微旋转、变淡；
 /// - 松手时位移超过封面宽度的 25% 或甩动速度 > 500 即切到下一首（左滑）/ 上一首（右滑），
@@ -33,11 +35,24 @@ class _SwipeableArtworkState extends State<SwipeableArtwork> {
   void _onEnd(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
     final threshold = widget.size * 0.25;
-    final playback = context.read<PlaybackProvider>();
-    if (_dx < -threshold || velocity < -500) {
-      playback.nextTrack();
-    } else if (_dx > threshold || velocity > 500) {
-      playback.previousTrack();
+    final next = _dx < -threshold || velocity < -500;
+    final previous = _dx > threshold || velocity > 500;
+
+    if (ConnectActions.isRemoteNow(context)) {
+      // 远程模式：切歌发给正在使用的远程设备
+      final connect = context.read<ConnectProvider>();
+      if (next) {
+        ConnectActions.run(context, connect.skipNext);
+      } else if (previous) {
+        ConnectActions.run(context, connect.skipPrevious);
+      }
+    } else {
+      final playback = context.read<PlaybackProvider>();
+      if (next) {
+        playback.nextTrack();
+      } else if (previous) {
+        playback.previousTrack();
+      }
     }
     setState(() {
       _dragging = false;

@@ -15,6 +15,9 @@ import '../../../providers/playback_provider.dart';
 import '../../../providers/connect_provider.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/connect/connect_actions.dart';
+import '../../widgets/connect/remote_progress.dart';
+import '../../widgets/connect/remote_transport_controls.dart';
 import '../../widgets/liquid_glass.dart';
 import '../../widgets/playback_scrubber.dart';
 import '../../widgets/player_controls.dart';
@@ -37,7 +40,8 @@ enum _PlayerView { artwork, lyrics, queue }
 ///   标题、进度条与播放控件始终保留在下方；
 /// - 封面可左右拖动切歌（[SwipeableArtwork]）；
 /// - 背景为封面主色 → 近黑的渐变；切到歌词视图时交叉淡入为流动封面，控件收进液态玻璃；
-/// - 深浅色主题下都按用户外观设置的深色主题绘制（白色系控件）。
+/// - 深浅色主题下都按用户外观设置的深色主题绘制（白色系控件）；
+/// - **远程模式**（Connect 遥控其他设备）：显示远程曲目，进度与控制发给远程设备。
 ///
 /// 本组件只在切歌或播放上下文变化时重建；进度条、播放按钮、随机/循环、
 /// 点赞按钮均为独立订阅的子组件。
@@ -91,8 +95,17 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
   }
 
   Widget _buildContent(BuildContext context) {
-    final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
-    final playbackContext = context.select<PlaybackProvider, PlaybackContext>((p) => p.playbackContext);
+    // 远程模式：显示远程曲目、标题行标出设备名（控制权规则与播放栏一致）
+    final remote = ConnectActions.showRemote(context);
+    final track = remote
+        ? context.select<ConnectProvider?, SpotifyTrack?>((c) => c?.displayTrack)
+        : context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
+    final deviceName = remote
+        ? context.select<ConnectProvider?, String?>((c) => c?.activeDevice?.name)
+        : null;
+    final playbackContext = remote
+        ? PlaybackContext(type: 'device', name: deviceName ?? '')
+        : context.select<PlaybackProvider, PlaybackContext>((p) => p.playbackContext);
     final colorScheme = Theme.of(context).colorScheme;
     final topRadius = BorderRadius.vertical(top: Radius.circular(context.tokens.corner(32)));
     if (track == null) {
@@ -123,7 +136,7 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
                   children: [
                     _TopBar(track: track, playbackContext: playbackContext),
                     if (compact) SizedBox(height: 200, child: middle) else Expanded(child: middle),
-                    _ControlsGroup(track: track, glass: lyricsMode),
+                    _ControlsGroup(track: track, glass: lyricsMode, remote: remote),
                     _BottomBar(view: _view, onToggle: _toggle),
                   ],
                 );
@@ -177,8 +190,9 @@ class _GradientBackground extends StatelessWidget {
 class _ControlsGroup extends StatelessWidget {
   final SpotifyTrack track;
   final bool glass;
+  final bool remote;
 
-  const _ControlsGroup({required this.track, required this.glass});
+  const _ControlsGroup({required this.track, required this.glass, required this.remote});
 
   @override
   Widget build(BuildContext context) {
@@ -186,23 +200,36 @@ class _ControlsGroup extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _TitleRow(track: track),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: PlaybackScrubber(activeColor: Colors.white, inactiveColor: Colors.white24, labelColor: Colors.white60),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: remote
+              ? const RemoteScrubber(
+                  compact: false,
+                  activeColor: Colors.white,
+                  inactiveColor: Colors.white24,
+                  labelColor: Colors.white60,
+                )
+              : const PlaybackScrubber(
+                  activeColor: Colors.white,
+                  inactiveColor: Colors.white24,
+                  labelColor: Colors.white60,
+                ),
         ),
         const SizedBox(height: 6),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ShuffleButton(),
-              SkipButton(next: false),
-              PlayPauseButton(),
-              SkipButton(next: true),
-              RepeatButton(),
-            ],
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: remote
+              ? const RemoteTransportControls(showModes: true, style: RemoteControlsStyle.glassFull)
+              : const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    ShuffleButton(),
+                    SkipButton(next: false),
+                    PlayPauseButton(),
+                    SkipButton(next: true),
+                    RepeatButton(),
+                  ],
+                ),
         ),
         const SizedBox(height: 8),
       ],

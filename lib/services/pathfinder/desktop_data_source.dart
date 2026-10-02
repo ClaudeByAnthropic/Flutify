@@ -95,6 +95,18 @@ class DesktopDataSource {
     return PathfinderParsers.categories(data);
   }
 
+  /// 分类页（browsePage）：[uri] 为 browseAll 返回的分类 URI（`spotify:page:…`）。
+  /// 返回全部分区与分区条目（条目与 home 同构，界面复用同一套卡片）。
+  Future<List<HomeSection>> browsePage(String uri) async {
+    final data = await _query(PathfinderOperation.browsePage, {
+      'uri': uri,
+      'pagePagination': {'offset': 0, 'limit': 20},
+      'sectionPagination': {'offset': 0, 'limit': 20},
+      'browseEndUserIntegration': kDesktopEndUserIntegration,
+    });
+    return HomeParser.browseSections(data);
+  }
+
   // ---------------------------------------------------------------------------
   // 专辑 / 艺人
   // ---------------------------------------------------------------------------

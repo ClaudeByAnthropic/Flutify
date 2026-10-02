@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../../../core/utils/pinyin_sort.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/library_provider.dart';
 import '../../navigation/app_routes.dart';
@@ -41,7 +42,7 @@ class LibrarySidebarEntry {
   /// 规则（对齐 Spotify 桌面端）：
   /// - 「已点赞的歌曲」固定置顶，只在「全部 / 歌单」筛选下出现，不参与排序与搜索过滤外的变化；
   /// - 最近添加：保持各类型在媒体库中的原始顺序（最新在前），类型之间按 歌单 → 专辑 → 艺人；
-  /// - 按字母顺序：对非置顶条目按标题排序；
+  /// - 按字母顺序：对非置顶条目按标题排序（中文按拼音）；
   /// - 搜索：标题或副标题包含关键词（不区分大小写）。
   static List<LibrarySidebarEntry> build({
     required LibraryProvider library,
@@ -112,7 +113,7 @@ class LibrarySidebarEntry {
     if (sort == LibrarySort.alphabetical) {
       final pinned = result.where((e) => e.pinned);
       final rest = result.where((e) => !e.pinned).toList()
-        ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        ..sort((a, b) => compareByPinyin(a.title, b.title));
       result = [...pinned, ...rest];
     }
     return result;

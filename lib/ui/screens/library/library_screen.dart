@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/flutify_tokens.dart';
 import '../../../core/theme/md3e_shapes.dart';
+import '../../../core/utils/pinyin_sort.dart';
 import '../../../l10n/l10n.dart';
 import '../../../models/album.dart';
 import '../../../models/artist.dart';
@@ -131,7 +132,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (_sort == _LibrarySort.alphabetical) {
       final pinned = result.where((i) => i.pinned);
       final rest = result.where((i) => !i.pinned).toList()
-        ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        ..sort((a, b) => compareByPinyin(a.title, b.title));
       result = [...pinned, ...rest];
     }
     return result;

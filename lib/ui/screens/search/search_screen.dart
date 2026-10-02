@@ -245,16 +245,7 @@ class _BrowseView extends StatelessWidget {
                     final category = categories[index];
                     return CategoryCard(
                       category: category,
-                      onTap: () => AppRoutes.openPlaylist(
-                        context,
-                        // 分类浏览（browsePage）尚未接入：先打开一个空的分类页，不再塞示例曲目
-                        SpotifyPlaylist(
-                          id: 'category_${category.id}',
-                          uri: 'spotify:playlist:category_${category.id}',
-                          name: l10n.searchCategoryMix(category.name),
-                          description: l10n.searchCategoryMixDescription(category.name),
-                        ),
-                      ),
+                      onTap: () => AppRoutes.openCategory(context, category),
                     );
                   },
                   childCount: categories.length,

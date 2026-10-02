@@ -397,13 +397,20 @@ class FlutifyApp extends StatelessWidget {
         ),
         // 登录态变化后：重新拉取主页数据与媒体库（未登录时清空），Connect 重新接入或断开
         ChangeNotifierProvider(
-          create: (ctx) =>
-              AuthProvider(ctx.read<SpotifyAuthService>())
-                ..onSessionChanged = () {
-                  ctx.read<SpotifyProvider>().loadInitialData();
-                  ctx.read<LibraryProvider>().refresh();
-                  ctx.read<ConnectProvider>().sessionChanged();
-                },
+          create: (ctx) {
+            late final AuthProvider auth;
+            auth = AuthProvider(ctx.read<SpotifyAuthService>())
+              ..onSessionChanged = () {
+                ctx.read<SpotifyProvider>().loadInitialData();
+                ctx.read<LibraryProvider>().refresh();
+                ctx.read<ConnectProvider>().sessionChanged();
+                // 登出 / 切换账号：上次播放会话属于旧账号，随登录态一起清除
+                if (!auth.isSignedIn) {
+                  unawaited(ctx.read<PlaybackProvider>().discardSession());
+                }
+              };
+            return auth;
+          },
         ),
       ],
       child: const PlaybackSessionKeeper(

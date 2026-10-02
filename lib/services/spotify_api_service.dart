@@ -22,6 +22,7 @@ import 'library/session_library_source.dart';
 import 'library/web_api_library_source.dart';
 import 'lyrics_service.dart';
 import 'pathfinder/desktop_data_source.dart';
+import 'pathfinder/pathfinder_client.dart';
 import 'podcast/podcast_service.dart';
 import 'storage_service.dart';
 
@@ -163,6 +164,9 @@ class SpotifyApiService {
       return value;
     } on SpotifyDataException {
       rethrow;
+    } on PathfinderException catch (e) {
+      // hash 失效的说明面向用户（引导升级客户端），直接透传不加「加载失败」前缀
+      throw SpotifyDataException(e.message);
     } catch (e) {
       throw SpotifyDataException('加载失败：$e');
     }
@@ -257,6 +261,46 @@ class SpotifyApiService {
               .map(SpotifyCategory.fromJson)
               .toList()
         : const [];
+  }
+
+  /// 分类页：分区与分区条目。
+  ///
+  /// 桌面版会话走 Pathfinder `browsePage`（[idOrUri] 为 browseAll 返回的分类 URI）；
+  /// 其余会话公开 Web API 没有分区概念，用该分类的歌单拼一个分区兜底。
+  Future<List<HomeSection>> getBrowsePage(String idOrUri) async {
+    if (!isConfigured) throw SpotifyDataException.notSignedIn;
+    if (_useDesktop) return _desktopLoad(() => _desktop.browsePage(idOrUri));
+
+    final id = idOrUri.split(':').last;
+    final data = await _getJson(
+      SpotifyEndpoints.categoryPlaylists.replaceAll('{category_id}', id) + '?limit=20',
+    );
+    final items = (data['playlists'] as Map<String, dynamic>?)?['items'];
+    final playlists = items is List
+        ? items
+              .whereType<Map<String, dynamic>>()
+              .map(SpotifyPlaylist.fromJson)
+              .toList()
+        : const <SpotifyPlaylist>[];
+    if (playlists.isEmpty) return const [];
+    return [
+      HomeSection(
+        uri: 'spotify:section:category_$id',
+        kind: HomeSectionKind.shelf,
+        title: '',
+        items: [
+          for (final p in playlists)
+            HomeItem(
+              kind: HomeItemKind.playlist,
+              uri: p.contextUri,
+              title: p.name,
+              subtitle: p.description,
+              images: p.images,
+              playlist: p,
+            ),
+        ],
+      ),
+    ];
   }
 
   // ---------------------------------------------------------------------------

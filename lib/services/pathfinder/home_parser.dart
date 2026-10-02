@@ -112,6 +112,59 @@ class HomeParser {
     return null;
   }
 
+  /// `browsePage`（分类页）响应 → 分区列表。
+  ///
+  /// 与 home 同源的分区结构（`sections.items[]` + `sectionItems.items[]`，条目共用 [item]）；
+  /// 根字段为 `browse`，个别版本写作 `browsePage`，都兼容；单条条目解析失败只跳过。
+  static List<HomeSection> browseSections(Map<String, dynamic> data) {
+    final root = _map(data['browse']) ??
+        _map(data['browsePage']) ??
+        _firstSectionsContainer(data);
+    if (root == null) return const [];
+    final sectionsMap = _map(_map(root['sectionContainer'])?['sections']) ??
+        _map(root['sections']);
+    final sections = <HomeSection>[];
+    for (final raw in _list(sectionsMap?['items'])) {
+      final section = _map(raw);
+      if (section == null) continue;
+      final sectionItems = _map(section['sectionItems']);
+      final items = _list(sectionItems?['items'])
+          .map(item)
+          .whereType<HomeItem>()
+          .toList();
+      if (items.isEmpty) continue;
+      final meta = _map(section['data']);
+      sections.add(
+        HomeSection(
+          uri: section['uri'] as String? ?? '',
+          kind: HomeSectionKind.shelf,
+          title: _label(meta?['title']),
+          subtitle: _label(meta?['subtitle']),
+          items: items,
+          totalCount: _int(sectionItems?['totalCount']) ?? items.length,
+        ),
+      );
+    }
+    return sections;
+  }
+
+  /// 根字段名对不上时兜底：在响应里找第一个带 `sections` 的对象（最多下探两层）。
+  static Map<String, dynamic>? _firstSectionsContainer(
+    Map<String, dynamic> data, [
+    int depth = 2,
+  ]) {
+    for (final value in data.values) {
+      final m = _map(value);
+      if (m == null) continue;
+      if (m['sections'] != null || m['sectionContainer'] != null) return m;
+      if (depth > 0) {
+        final nested = _firstSectionsContainer(m, depth - 1);
+        if (nested != null) return nested;
+      }
+    }
+    return null;
+  }
+
   static List<HomeItem> _shortcuts(List<HomeItem> items) {
     var list = items.take(maxShortcuts).toList();
     if (list.length < maxShortcuts && list.length.isOdd)

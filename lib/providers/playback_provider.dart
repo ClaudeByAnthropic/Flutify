@@ -723,6 +723,27 @@ class PlaybackProvider extends ChangeNotifier {
     await store.write(session);
   }
 
+  /// 登出 / 切换账号：上次播放会话属于旧账号，停止播放并清除（内存 + 磁盘）。
+  Future<void> discardSession() async {
+    _currentTrack = null;
+    _context = PlaybackContext.none;
+    _contextTracks = [];
+    _order = [];
+    _orderPos = 0;
+    _userQueue.clear();
+    _resumeAt = null;
+    _savedPosition = Duration.zero;
+    _duration = Duration.zero;
+    _isPlaying = false;
+    positionNotifier.value = Duration.zero;
+    loadProgressNotifier.value = 0;
+    try {
+      await _audio.stop();
+    } catch (_) {}
+    await sessionStore?.clear();
+    notifyListeners();
+  }
+
   // ---------------------------------------------------------------------------
   // Volume
   // ---------------------------------------------------------------------------

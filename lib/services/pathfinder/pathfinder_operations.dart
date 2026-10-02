@@ -12,6 +12,8 @@ class PathfinderOperation {
   static const home = PathfinderOperation('home', '76243c78b0e20ecdbe41b794dec8cbe73f75e585b0a7201b8d2e84578412847a');
   static const browseAll =
       PathfinderOperation('browseAll', 'dbd8b55e09a58afc52eab438bc228ba28fd72ac2f2148c6c26354980e4579001');
+  static const browsePage =
+      PathfinderOperation('browsePage', 'f5c4e6d668f5716464a231c1cc8b22c1cbf6ad68b09929fd7de813a30581298b');
   static const getAlbum =
       PathfinderOperation('getAlbum', '6a74b456cd1735c9193d9e8ec8cc5184cad7ce13572210315229db3975964361');
   static const queryArtistOverview =

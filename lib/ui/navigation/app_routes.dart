@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/album.dart';
 import '../../models/artist.dart';
+import '../../models/category.dart';
 import '../../models/home_feed.dart';
 import '../../models/playlist.dart';
 import '../screens/detail/album_detail_screen.dart';
@@ -9,6 +10,7 @@ import '../screens/detail/artist_detail_screen.dart';
 import '../screens/detail/playlist_detail_screen.dart';
 import '../screens/detail/podcast_detail_screen.dart';
 import '../screens/home/home_section_screen.dart';
+import '../screens/search/category_screen.dart';
 
 /// 详情页导航入口。
 ///
@@ -53,6 +55,10 @@ class AppRoutes {
     HomeSection section, {
     String facet = '',
   }) => _push(context, HomeSectionScreen(section: section, facet: facet));
+
+  /// 分类页（browsePage）。
+  static void openCategory(BuildContext context, SpotifyCategory category) =>
+      _push(context, CategoryScreen(category: category));
 
   static void _push(BuildContext context, Widget page) {
     // 先取出两个 Navigator：关闭弹层后 context 可能已失效

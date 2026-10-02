@@ -5,7 +5,7 @@ import '../../../core/theme/flutify_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../../providers/connect_provider.dart';
 import '../../screens/player/device_picker_sheet.dart';
-import '../../screens/player/lyrics_sheet.dart';
+import '../../screens/player/full_player_sheet.dart';
 import '../../shell/shell_layout_controller.dart';
 import '../desktop_player_bar.dart';
 import '../playback_status_button.dart';
@@ -17,7 +17,8 @@ import 'remote_transport_controls.dart';
 /// 桌面端播放栏的远程模式：内容与按钮作用于正在使用的远程设备。
 ///
 /// 与本机播放栏相同的悬浮液态玻璃胶囊（左曲目 / 中控制 + 进度 / 右设备与音量），
-/// 胶囊底部合并一条强调色细条「正在 {设备} 上播放」（通宽、圆角随胶囊）；点细条或设备键打开设备面板。
+/// 胶囊底部合并一条强调色细条「正在 {设备} 上播放」（通宽、圆角随胶囊）；
+/// 点细条或设备键打开设备面板，点封面打开全屏播放器（远程模式同样可打开）。
 class RemotePlayerBar extends StatelessWidget {
   const RemotePlayerBar({super.key});
 
@@ -72,13 +73,11 @@ class _RemoteTrackInfo extends StatelessWidget {
     final layout = context.watch<ShellLayoutController?>();
     return Row(
       children: [
-        // 点封面：右栏关着时打开「正在播放」；没有三栏框架时打开底部歌词面板
+        // 点封面：右栏关着时打开「正在播放」；没有三栏框架时打开全屏播放器（与本机播放栏一致）
         PlayerBarCover(
           url: track?.coverUrl ?? player.imageUrl,
           layout: layout,
-          onOpenFallback: layout == null
-              ? () => LyricsSheet.show(context)
-              : null,
+          onOpenFallback: layout == null ? () => FullPlayerSheet.show(context) : null,
         ),
         const SizedBox(width: 12),
         Expanded(

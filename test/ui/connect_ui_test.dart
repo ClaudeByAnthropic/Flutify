@@ -15,7 +15,7 @@ import 'package:flutify_app/services/spotify_api_service.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/player/device_picker_sheet.dart';
 import 'package:flutify_app/ui/screens/player/immersive_lyrics_screen.dart';
-import 'package:flutify_app/ui/screens/player/lyrics_sheet.dart';
+import 'package:flutify_app/ui/screens/player/full_player_sheet.dart';
 import 'package:flutify_app/ui/shell/desktop/desktop_window.dart';
 import 'package:flutify_app/ui/widgets/connect/remote_mini_player.dart';
 import 'package:flutify_app/ui/widgets/connect/remote_player_bar.dart';
@@ -478,19 +478,19 @@ void main() {
   group('remote lyrics', () {
     const remoteTitle = 'A Synthetic Remote Track With A Fairly Long Title';
 
-    testWidgets('tapping the remote capsule opens lyrics with remote controls', (tester) async {
+    testWidgets('tapping the remote capsule opens the full player with remote controls', (tester) async {
       await pumpHost(tester, const Size(390, 844), const MiniPlayer(), cluster: syntheticCluster(playing: false));
       await tester.tap(find.byType(RemoteMiniPlayer));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      final sheet = find.byType(LyricsSheet);
-      expect(sheet, findsOneWidget);
-      expect(find.descendant(of: sheet, matching: find.text(remoteTitle)), findsOneWidget);
+      final player = find.byType(FullPlayerSheet);
+      expect(player, findsOneWidget);
+      expect(find.descendant(of: player, matching: find.text(remoteTitle)), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      // 玻璃控制台的播放键发给远程设备，而不是本机
-      await tester.tap(find.descendant(of: sheet, matching: find.byIcon(Icons.play_arrow_rounded)));
+      // 全屏播放器的播放键发给远程设备，而不是本机
+      await tester.tap(find.descendant(of: player, matching: find.byIcon(Icons.play_arrow_rounded)));
       await tester.pump();
       expect(service.commands, ['resume:synthetic-speaker']);
       await unmount(tester);

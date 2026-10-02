@@ -133,4 +133,26 @@ void main() {
     file.writeAsStringSync(jsonEncode({'v': 1}));
     expect(FilePlaybackSessionStore(file).read(), isNull);
   });
+
+  test('登出 / 切换账号：清除上次播放会话（内存 + 磁盘），重启不再还原', () async {
+    final store = MemoryPlaybackSessionStore();
+    final playback = create(store);
+    await playback.playTrack(b, contextQueue: [a, b, c], context: ctx);
+    playback.addToQueue(x);
+    await playback.seekTo(const Duration(seconds: 20));
+    await settle();
+    expect(store.session, isNotNull);
+
+    await playback.discardSession();
+    expect(store.session, isNull);
+    expect(playback.currentTrack, isNull);
+    expect(playback.userQueue, isEmpty);
+    expect(playback.position, Duration.zero);
+
+    // 重启也不再还原旧账号的会话
+    final restored = create(store);
+    expect(restored.currentTrack, isNull);
+    restored.dispose();
+    playback.dispose();
+  });
 }
