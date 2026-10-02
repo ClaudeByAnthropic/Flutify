@@ -130,10 +130,13 @@ class _SearchScreenState extends State<SearchScreen> {
                   itemCount: searchFilters.length,
                   itemBuilder: (context, index) => Padding(
                     padding: const EdgeInsets.only(right: 8.0),
-                    child: FilterPill(
-                      label: searchFilters[index],
-                      isSelected: _searchFilterIndex == index,
-                      onTap: () => setState(() => _searchFilterIndex = index),
+                    // Center：横向列表会给子项 40 高的紧约束，胶囊要按内容高度居中，不被拉满
+                    child: Center(
+                      child: FilterPill(
+                        label: searchFilters[index],
+                        isSelected: _searchFilterIndex == index,
+                        onTap: () => setState(() => _searchFilterIndex = index),
+                      ),
                     ),
                   ),
                 ),
