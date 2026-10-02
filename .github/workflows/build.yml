@@ -7,6 +7,8 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    # 只改文档时不构建（标签推送不受影响）
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE']
   workflow_dispatch:
 
 permissions:

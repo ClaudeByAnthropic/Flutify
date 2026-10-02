@@ -11,7 +11,8 @@ Flutify 自身的源代码以 [MIT License](LICENSE) 发布。下列随仓库或
 | FFmpeg（`--disable-gpl --disable-nonfree --enable-version3`） | 静态链接于 `libmpv-2.dll` | LGPL-3.0-or-later | <https://ffmpeg.org>；构建脚本同上 |
 | Microsoft Edge WebView2 Loader | `WebView2Loader.dll` | Microsoft WebView2 SDK 许可（允许随应用再分发） | <https://www.nuget.org/packages/Microsoft.Web.WebView2> |
 
-`libmpv-2.dll` 以动态链接方式使用，用户可以用自行编译的同名、接口兼容的库替换它。
+`libmpv-2.dll` 由 [media_kit_libs_windows_audio](https://pub.dev/packages/media_kit_libs_windows_audio) 在构建时下载，
+对应的源码与构建脚本见上表链接，Flutify 未作任何修改。它以动态链接方式使用，用户可以用自行编译的同名、接口兼容的库替换它。
 LGPL 全文：<https://www.gnu.org/licenses/lgpl-2.1.html>、<https://www.gnu.org/licenses/lgpl-3.0.html>。
 
 ## 随仓库分发的资源
