@@ -6,6 +6,7 @@ import 'package:flutify_app/main.dart';
 import 'package:flutify_app/models/lyrics.dart';
 import 'package:flutify_app/models/playback_context.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
+import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/navigation/app_routes.dart';
 import 'package:flutify_app/ui/screens/auth/login_screen.dart';
@@ -89,7 +90,8 @@ void main() {
       );
       await tester.pumpWidget(FlutifyApp(
         storageService: storage,
-        audioPlayerService: FakeAudioPlayerService(),
+        audioEngine: FakeAudioPlayerService(),
+        emePlayer: EmePlayer(),
         spotifyApiService: FakeSpotifyApiService(
           storage,
           librarySource: library,
@@ -190,7 +192,8 @@ void main() {
     final storage = await StorageService.init();
     await tester.pumpWidget(FlutifyApp(
       storageService: storage,
-      audioPlayerService: FakeAudioPlayerService(),
+      audioEngine: FakeAudioPlayerService(),
+      emePlayer: EmePlayer(),
       spotifyApiService: FakeSpotifyApiService(storage, lyricsById: {
         SampleCatalog.track1.id: const SpotifyLyrics(lines: [
           LyricLine(startTimeMs: 0, words: '夜空中最亮的星'),
@@ -239,7 +242,8 @@ void main() {
       final storage = await StorageService.init();
       await tester.pumpWidget(FlutifyApp(
         storageService: storage,
-        audioPlayerService: FakeAudioPlayerService(),
+        audioEngine: FakeAudioPlayerService(),
+        emePlayer: EmePlayer(),
         spotifyApiService: FakeSpotifyApiService(storage),
         trackAudioLoader: FakeTrackAudioSource(),
       ));

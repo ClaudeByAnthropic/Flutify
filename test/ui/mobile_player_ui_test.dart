@@ -3,6 +3,7 @@ import 'package:flutify_app/main.dart';
 import 'package:flutify_app/models/playback_context.dart';
 import 'package:flutify_app/models/track.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
+import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/spotify_api_service.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
@@ -39,7 +40,8 @@ void main() {
     final storage = await StorageService.init();
     await tester.pumpWidget(FlutifyApp(
       storageService: storage,
-      audioPlayerService: FakeAudioPlayerService(),
+      audioEngine: FakeAudioPlayerService(),
+      emePlayer: EmePlayer(),
       spotifyApiService: SpotifyApiService(storage),
       trackAudioLoader: FakeTrackAudioSource(),
     ));

@@ -4,6 +4,7 @@ import 'package:flutify_app/core/utils/artwork_palette.dart';
 import 'package:flutify_app/main.dart';
 import 'package:flutify_app/models/appearance.dart';
 import 'package:flutify_app/providers/spotify_provider.dart';
+import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/detail/podcast_detail_screen.dart';
 import 'package:flutify_app/ui/screens/home/home_screen.dart';
@@ -63,7 +64,8 @@ void main() {
       FlutifyApp(
         key: key,
         storageService: storage,
-        audioPlayerService: FakeAudioPlayerService(),
+        audioEngine: FakeAudioPlayerService(),
+        emePlayer: EmePlayer(),
         spotifyApiService: FakeSpotifyApiService(
           storage,
           homeFeed: SampleHome.feed,

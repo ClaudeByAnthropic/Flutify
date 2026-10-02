@@ -1,5 +1,6 @@
 import 'package:flutify_app/core/utils/artwork_palette.dart';
 import 'package:flutify_app/main.dart';
+import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/spotify_api_service.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/auth/login_screen.dart';
@@ -30,7 +31,8 @@ void main() {
     await tester.pumpWidget(
       FlutifyApp(
         storageService: storage,
-        audioPlayerService: FakeAudioPlayerService(),
+        audioEngine: FakeAudioPlayerService(),
+        emePlayer: EmePlayer(),
         spotifyApiService: SpotifyApiService(storage),
       ),
     );

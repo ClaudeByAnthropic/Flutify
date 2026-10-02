@@ -5,6 +5,7 @@ import 'package:flutify_app/models/lyrics.dart';
 import 'package:flutify_app/models/playback_context.dart';
 import 'package:flutify_app/models/track.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
+import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/detail/widgets/collection_hero.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
@@ -51,7 +52,8 @@ void main() {
     final storage = await StorageService.init();
     await tester.pumpWidget(FlutifyApp(
       storageService: storage,
-      audioPlayerService: FakeAudioPlayerService(),
+      audioEngine: FakeAudioPlayerService(),
+      emePlayer: EmePlayer(),
       spotifyApiService: FakeSpotifyApiService(storage, librarySource: library, lyricsById: lyrics, albumTracks: albumTracks),
       trackAudioLoader: FakeTrackAudioSource(),
     ));

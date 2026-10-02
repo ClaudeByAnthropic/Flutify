@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutify_app/services/audio/audio_engine.dart';
 import 'package:flutify_app/services/audio_player_service.dart';
 import 'package:flutify_app/services/protocol/progressive_download.dart';
 import 'package:just_audio/just_audio.dart';
@@ -11,6 +12,7 @@ class FakeAudioPlayerService implements AudioPlayerService {
   final StreamController<PlayerState> stateController = StreamController<PlayerState>.broadcast(sync: true);
 
   final List<String> playedFiles = [];
+  final List<EmeTrackContent> playedEme = [];
   final List<Duration> seeks = [];
 
   /// 每次加载音源时的起始位置（null 表示从头）。
@@ -46,6 +48,14 @@ class FakeAudioPlayerService implements AudioPlayerService {
   @override
   Future<void> playStream(ProgressiveAudio audio, {Duration? initialPosition, bool autoplay = true}) async {
     playedFiles.add('stream');
+    initialPositions.add(initialPosition);
+    _hasSource = true;
+    _playing = autoplay;
+  }
+
+  @override
+  Future<void> playEme(EmeTrackContent content, {Duration? initialPosition, bool autoplay = true}) async {
+    playedEme.add(content);
     initialPositions.add(initialPosition);
     _hasSource = true;
     _playing = autoplay;

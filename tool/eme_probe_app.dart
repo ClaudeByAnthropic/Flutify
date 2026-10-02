@@ -9,7 +9,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:flutify_app/services/eme/eme_player.dart';
@@ -28,7 +27,6 @@ class EmeProbeApp extends StatefulWidget {
 
 class _EmeProbeAppState extends State<EmeProbeApp> {
   final EmePlayer _eme = EmePlayer();
-  WebViewEnvironment? _env;
   bool _ready = false;
   String _status = '初始化…';
   double _position = 0;
@@ -44,9 +42,10 @@ class _EmeProbeAppState extends State<EmeProbeApp> {
   }
 
   Future<void> _boot() async {
-    // 先起服务 + 建自定义 WebView 环境（关自动播放限制），再挂载 WebView
+    // 先起服务 + 建自定义 WebView 环境（关自动播放限制），再启动无头 WebView
     await _eme.init();
-    _env = await EmePlayer.ensureEnvironment();
+    await EmePlayer.ensureEnvironment();
+    await _eme.start();
     if (mounted) setState(() => _ready = true);
     WidgetsBinding.instance.addPostFrameCallback((_) => _run());
   }
@@ -139,14 +138,12 @@ class _EmeProbeAppState extends State<EmeProbeApp> {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // 隐藏 EME WebView（1×1 不可见）
-            if (_ready)
-              Positioned(left: 0, top: 0, child: _eme.buildHiddenView(environment: _env)),
+            // EME WebView 是无头的（不进 widget 树），这里只需展示状态
             Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_status, style: const TextStyle(color: Colors.white)),
+                  Text(_ready ? _status : '初始化…', style: const TextStyle(color: Colors.white)),
                   const SizedBox(height: 12),
                   Text(
                     '${_position.toStringAsFixed(1)} / ${_duration.toStringAsFixed(1)} 秒',

@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:window_manager/window_manager.dart';
 
 import '../services/auth/oauth_pkce_service.dart';
 import '../services/auth/spotify_auth_service.dart';

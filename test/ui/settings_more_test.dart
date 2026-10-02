@@ -2,6 +2,7 @@ import 'package:flutify_app/core/utils/artwork_palette.dart';
 import 'package:flutify_app/core/utils/byte_size.dart';
 import 'package:flutify_app/main.dart';
 import 'package:flutify_app/models/app_preferences.dart';
+import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/protocol/audio_cache_store.dart';
 import 'package:flutify_app/services/protocol/track_audio_loader.dart';
 import 'package:flutify_app/services/storage_service.dart';
@@ -65,7 +66,8 @@ void main() {
       FlutifyApp(
         key: UniqueKey(),
         storageService: storage,
-        audioPlayerService: FakeAudioPlayerService(),
+        audioEngine: FakeAudioPlayerService(),
+        emePlayer: EmePlayer(),
         spotifyApiService: FakeSpotifyApiService(storage),
         trackAudioLoader: loader ?? FakeTrackAudioSource(),
       ),
