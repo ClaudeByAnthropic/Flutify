@@ -184,6 +184,7 @@ class _MainShellState extends State<MainShell> {
           bindings: _shortcuts(),
           child: Focus(
             autofocus: true,
+            onKeyEvent: (_, event) => PlaybackShortcuts.onSpaceKey(context, event),
             child: DesktopShell(
               pages: _pages(),
               topBar: DesktopTopBar(

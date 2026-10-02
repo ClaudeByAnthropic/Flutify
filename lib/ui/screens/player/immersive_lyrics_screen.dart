@@ -132,6 +132,7 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
         },
         child: Focus(
           autofocus: true,
+          onKeyEvent: (_, event) => PlaybackShortcuts.onSpaceKey(context, event),
           child: MouseRegion(
             cursor: _idle ? SystemMouseCursors.none : MouseCursor.defer,
             onHover: (_) => _restartIdleTimer(),

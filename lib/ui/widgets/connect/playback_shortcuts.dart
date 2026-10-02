@@ -24,6 +24,24 @@ class PlaybackShortcuts {
     return ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 
+  /// 空格播放/暂停，用于 `Focus.onKeyEvent`。
+  /// 不能放进 CallbackShortcuts：它命中即吞掉按键，输入框就敲不进空格；这里在输入框聚焦时返回 ignored，让按键继续交给输入框。
+  static KeyEventResult onSpaceKey(BuildContext context, KeyEvent event) {
+    if (event.logicalKey != LogicalKeyboardKey.space) return KeyEventResult.ignored;
+    final kb = HardwareKeyboard.instance;
+    if (kb.isControlPressed || kb.isAltPressed || kb.isMetaPressed || kb.isShiftPressed) return KeyEventResult.ignored;
+    if (_isTextInputFocused()) return KeyEventResult.ignored;
+    if (event is KeyDownEvent) {
+      if (ConnectActions.isRemoteNow(context)) {
+        final connect = context.read<ConnectProvider>();
+        ConnectActions.run(context, () => connect.togglePlayPause());
+      } else {
+        context.read<PlaybackProvider>().togglePlayPause();
+      }
+    }
+    return KeyEventResult.handled;
+  }
+
   static Map<ShortcutActivator, VoidCallback> bindings(BuildContext context) {
     VoidCallback route(void Function(PlaybackProvider p) local, Future<void> Function(ConnectProvider c) remote) => () {
       if (ConnectActions.isRemoteNow(context)) {
@@ -57,11 +75,6 @@ class PlaybackShortcuts {
     };
 
     return {
-      // 空格：焦点在文本输入框时应输入空格，不触发播放/暂停
-      const SingleActivator(LogicalKeyboardKey.space): () {
-        if (_isTextInputFocused()) return;
-        route((p) => p.togglePlayPause(), (c) => c.togglePlayPause())();
-      },
       const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): route(
         (p) => p.nextTrack(),
         (c) => c.skipNext(),
