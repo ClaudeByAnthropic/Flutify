@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'core/utils/file_log.dart';
 
@@ -34,6 +33,7 @@ import 'services/auth/spotify_auth_service.dart';
 import 'services/auth/web_token_service.dart';
 import 'services/eme/eme_audio_engine.dart';
 import 'services/eme/eme_player.dart';
+import 'services/eme/license_client.dart';
 import 'services/connect/connect_play_request.dart';
 import 'services/connect/connect_service.dart';
 import 'services/connect/receiver/connect_receiver.dart';
@@ -105,53 +105,17 @@ Future<void> main() async {
   // 自定义 WebView2 环境（关自动播放手势限制，无头页无用户手势）
   await EmePlayer.ensureEnvironment();
   await emePlayer.start(); // 启动无头 WebView（窗口缩放/布局切换不影响播放）
-  // license 反代：CDM 请求体 → Spotify（用 Web token + client-token）
-  Future<Uint8List> emeLicensePoster(Uint8List request) async {
-    try {
-      final webToken = await webTokenService.ensureWebAccessToken();
-      final ct = await authService.ensureClientToken();
-      final res = await http.post(
-        Uri.parse('https://gae2-spclient.spotify.com/widevine-license/v1/audio/license'),
-        headers: {
-          'Authorization': 'Bearer $webToken',
-          'client-token': ct,
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
-          'Referer': 'https://open.spotify.com/',
-          'Content-Type': 'application/octet-stream',
-        },
-        body: request,
-      );
-      debugPrint('[eme] license POST → HTTP ${res.statusCode} ${res.bodyBytes.length}B');
-      if (res.statusCode != 200) {
-        throw StateError('license 反代失败：HTTP ${res.statusCode}');
-      }
-      return res.bodyBytes;
-    } catch (e) {
-      debugPrint('[eme] license 反代异常: $e');
-      rethrow;
-    }
-  }
-
-  // Widevine application-certificate 反代
-  Future<Uint8List> emeCertFetcher() async {
-    final ct = await authService.ensureClientToken();
-    final res = await http.get(
-      Uri.parse('https://spclient.wg.spotify.com/widevine-license/v1/application-certificate'),
-      headers: {
-        'client-token': ct,
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
-        'Referer': 'https://open.spotify.com/',
-      },
-    );
-    return res.bodyBytes;
-  }
-
+  // license 反代：CDM 请求体 → Spotify（用 Web token + client-token）。
+  // 多入口：手机网络下 gae2-spclient 等域名会被掐 TLS 握手，spclient.wg 实测可达，
+  // WidevineLicenseClient 按入口列表换域名重试（同一服务，路径一致）。
+  final licenseClient = WidevineLicenseClient(
+    webToken: webTokenService.ensureWebAccessToken,
+    clientToken: authService.ensureClientToken,
+  );
   final emeEngine = EmeAudioEngine(
     player: emePlayer,
-    licensePoster: emeLicensePoster,
-    certFetcher: emeCertFetcher,
+    licensePoster: licenseClient.postLicense,
+    certFetcher: licenseClient.fetchCert,
   );
   // 路由引擎：本地文件/流式 → just_audio；DRM 曲目 → EME
   final audioEngine = RoutedAudioEngine(local: audioPlayerService, eme: emeEngine);

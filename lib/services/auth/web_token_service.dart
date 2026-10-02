@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../storage_service.dart';
@@ -110,7 +110,7 @@ class WebTokenService {
       'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
       'Accept': 'application/json',
-    });
+    }).timeout(const Duration(seconds: 10));
     if (res.statusCode != 200) {
       throw StateError('铸造 Web token 失败：HTTP ${res.statusCode} ${res.body}');
     }
@@ -126,14 +126,35 @@ class WebTokenService {
   }
 
   /// 取一个可用的 Web access_token：缓存未过期直接用，否则重新铸造。
-  Future<String> ensureWebAccessToken() async {
+  ///
+  /// 手机网络下 `open.spotify.com` 的 TLS 握手偶发被掐（HandshakeException），
+  /// 铸造失败时隔 [retryDelay] 重试一次再放弃；两次都失败时若还有过期的旧 token
+  /// 就拿它兜底（license 对过期 token 返回 403，比网络异常更可诊断）。
+  Future<String> ensureWebAccessToken({int retries = 2}) async {
     final cached = _storage.webAccessToken;
     final expiry = _storage.webAccessTokenExpiry;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (cached.isNotEmpty && expiry > nowMs + 60 * 1000) {
       return cached;
     }
-    final minted = await mintAccessToken();
-    return minted.token;
+    Object? lastError;
+    for (var attempt = 0; attempt <= retries; attempt++) {
+      if (attempt > 0) await Future<void>.delayed(retryDelay);
+      try {
+        final minted = await mintAccessToken();
+        return minted.token;
+      } catch (e) {
+        lastError = e;
+        debugPrint('[web-token] 铸造失败（第 ${attempt + 1}/${retries + 1} 次）：$e');
+      }
+    }
+    if (cached.isNotEmpty) {
+      debugPrint('[web-token] 铸造不可达，用过期 token 兜底');
+      return cached;
+    }
+    throw StateError('铸造 Web token 失败：$lastError');
   }
+
+  /// 重试间隔（手机网络握手被掐通常是瞬时的，稍等即可恢复）。
+  static const Duration retryDelay = Duration(seconds: 2);
 }
