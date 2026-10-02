@@ -40,7 +40,7 @@ class HomeChipBar extends StatelessWidget {
 
   /// 标签行高度：胶囊（上下各 8 内边距 + 实测一行文字）与头像取大者，再加上下留白。
   static double extentOf(BuildContext context) {
-    final pill = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 10;
+    final pill = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 8;
     return math.max(pill, _leadingSize) + _verticalPadding * 2;
   }
 
@@ -129,7 +129,7 @@ class _ClearPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final size = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 10;
+    final size = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 8;
     return Tooltip(
       message: tooltip,
       child: HoverBuilder(

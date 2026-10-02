@@ -40,7 +40,7 @@ class FilterPill extends StatelessWidget {
           alignment: Alignment.center,
           // MiSans 汉字视觉重心比行框中心高约 0.03em（约 0.4px，实测字体度量），上下内边距补偿 0.5px
           padding: compact
-              ? const EdgeInsets.fromLTRB(14.0, 5.5, 14.0, 4.5)
+              ? const EdgeInsets.fromLTRB(12.0, 4.5, 12.0, 3.5)
               : const EdgeInsets.fromLTRB(16.0, 8.5, 16.0, 7.5),
           decoration: BoxDecoration(
             color: isSelected
