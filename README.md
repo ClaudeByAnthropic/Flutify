@@ -4,7 +4,7 @@
 
 # Flutify
 
-一个好看的第三方 Spotify 客户端 · Windows / Android
+一个让你呼吸通畅的 Spotify 第三方客户端 · Windows / Android
 
 [下载](../../releases) · 当前版本 **v0.01 Beta**
 
