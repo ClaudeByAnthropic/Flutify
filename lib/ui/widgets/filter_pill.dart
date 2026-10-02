@@ -32,7 +32,8 @@ class FilterPill extends StatelessWidget {
         child: AnimatedContainer(
           duration: context.motion(const Duration(milliseconds: 200)),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          // MiSans 的字身框偏上（汉字视觉重心高于行框中心），上下内边距不对称补偿 1.5px，使文字视觉居中
+          padding: const EdgeInsets.fromLTRB(16.0, 9.5, 16.0, 6.5),
           decoration: BoxDecoration(
             color: isSelected
                 ? tokens.accent
