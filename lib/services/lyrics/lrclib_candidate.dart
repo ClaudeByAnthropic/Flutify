@@ -29,20 +29,24 @@ class LrclibCandidate {
     this.instrumental = false,
   });
 
-  /// 解析单条记录；没有同步歌词或结构不对时返回 null。
+  /// 解析单条记录；没有同步歌词且不是纯音乐标记、或结构不对时返回 null。
+  ///
+  /// 纯音乐记录（`instrumental: true`，通常没有歌词字段）也要保留：
+  /// 选词器用它判定「这首歌是纯音乐」，避免给纯音乐硬配同名歌曲的歌词。
   static LrclibCandidate? fromJson(Object? json) {
     if (json is! Map) return null;
+    final instrumental = json['instrumental'] == true;
     final synced = json['syncedLyrics'];
-    if (synced is! String || synced.isEmpty) return null;
+    if ((synced is! String || synced.isEmpty) && !instrumental) return null;
     String str(String key) => json[key] is String ? json[key] as String : '';
     final duration = json['duration'];
     return LrclibCandidate(
       trackName: str('trackName'),
       artistName: str('artistName'),
       albumName: str('albumName'),
-      synced: synced,
+      synced: synced is String ? synced : '',
       duration: duration is num ? duration.toDouble() : 0,
-      instrumental: json['instrumental'] == true,
+      instrumental: instrumental,
     );
   }
 

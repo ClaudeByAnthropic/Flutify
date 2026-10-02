@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../providers/auth_provider.dart';
+import '../../../services/auth/web_token_service.dart';
 import '../../widgets/toast/app_toast.dart';
+import 'web_login_screen.dart';
 import 'widgets/login_intro_view.dart';
 import 'widgets/oauth_waiting_view.dart';
 
@@ -59,13 +63,28 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// 登录成功后关闭页面，并在下层页面上提示登录身份。
+  /// 还没有 Web 登录态（sp_dc）时，紧接着引导第二步：应用内 Web 登录解锁全曲播放。
   void _onAuthChanged() {
     if (_finished || !_auth.isSignedIn || !mounted) return;
     _finished = true;
     final messenger = ScaffoldMessenger.maybeOf(context);
     final name = _auth.displayName;
-    Navigator.of(context).pop(true);
+    // pop 之后本组件即卸载，先抓住根导航再关页
+    final navigator = Navigator.of(context, rootNavigator: true);
+    navigator.pop(true);
     AppToast.showOn(messenger, '已登录为 $name', icon: Icons.person_rounded, tone: ToastTone.success);
+    // 第二步：Web 登录（sp_dc）。可跳过，之后随时在设置页补
+    final tokens = navigator.context.read<WebTokenService?>();
+    if (tokens != null && !tokens.hasSpDc) {
+      unawaited(Future.microtask(() async {
+        final result = await navigator.push<WebLoginResult?>(
+          MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WebLoginScreen()),
+        );
+        if (result?.webSignedIn ?? false) {
+          AppToast.showOn(messenger, '全曲播放已就绪', icon: Icons.check_circle_rounded, tone: ToastTone.success);
+        }
+      }));
+    }
   }
 
   /// 左上角 / 系统返回：等待授权时先退回介绍态，否则关闭页面。

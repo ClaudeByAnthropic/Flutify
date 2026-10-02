@@ -2,6 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../services/network/proxy_mode.dart';
+
+/// 网络代理：跟随系统 / 不使用（直连）/ 手动指定 HTTP 代理。
+/// ProxyMode 已移至 services/network/proxy_mode.dart（纯 Dart，供命令行探针复用），这里再导出保持兼容。
+export '../services/network/proxy_mode.dart' show ProxyMode;
+
 /// 界面语言：跟随系统 / 固定中文 / 固定英文。
 enum AppLanguage { system, zh, en }
 
@@ -10,9 +16,6 @@ enum StartPage { home, library, last }
 
 /// 歌词行的对齐方式。
 enum LyricsAlign { left, center }
-
-/// 网络代理：跟随系统 / 不使用（直连）/ 手动指定 HTTP 代理。
-enum ProxyMode { system, none, manual }
 
 /// 任务栏歌词的文字颜色：自动（按任务栏背景明暗取黑 / 白）、白、黑、跟随强调色、自定义。
 enum TaskbarLyricsColor { auto, white, black, accent, custom }
@@ -129,7 +132,8 @@ class AppPreferences {
       lyricsFallback: lyricsFallback ?? this.lyricsFallback,
       taskbarLyrics: taskbarLyrics ?? this.taskbarLyrics,
       taskbarLyricsColor: taskbarLyricsColor ?? this.taskbarLyricsColor,
-      taskbarLyricsCustomColor: taskbarLyricsCustomColor ?? this.taskbarLyricsCustomColor,
+      taskbarLyricsCustomColor:
+          taskbarLyricsCustomColor ?? this.taskbarLyricsCustomColor,
       taskbarLyricsOpacity: taskbarLyricsOpacity ?? this.taskbarLyricsOpacity,
     );
   }
@@ -168,25 +172,41 @@ class AppPreferences {
     final opacity = json['taskbarLyricsOpacity'];
     return AppPreferences(
       language: pick(AppLanguage.values, json['language'], d.language),
-      lyricsScale: number(json['lyricsScale'], d.lyricsScale, minLyricsScale, maxLyricsScale),
+      lyricsScale: number(
+        json['lyricsScale'],
+        d.lyricsScale,
+        minLyricsScale,
+        maxLyricsScale,
+      ),
       lyricsAlign: pick(LyricsAlign.values, json['lyricsAlign'], d.lyricsAlign),
       lyricsBlur: number(json['lyricsBlur'], d.lyricsBlur, 0, maxLyricsBlur),
       startPage: pick(StartPage.values, json['startPage'], d.startPage),
       rememberWindow: flag(json['rememberWindow'], d.rememberWindow),
       connectEnabled: flag(json['connectEnabled'], d.connectEnabled),
-      remoteLyricsLeadMs: lead is int ? lead.clamp(-maxRemoteLyricsLeadMs, maxRemoteLyricsLeadMs) : 0,
+      remoteLyricsLeadMs: lead is int
+          ? lead.clamp(-maxRemoteLyricsLeadMs, maxRemoteLyricsLeadMs)
+          : 0,
       compactTrackList: flag(json['compactTrackList'], d.compactTrackList),
       proxyMode: pick(ProxyMode.values, json['proxyMode'], d.proxyMode),
-      proxyHost: json['proxyHost'] is String ? (json['proxyHost'] as String).trim() : d.proxyHost,
+      proxyHost: json['proxyHost'] is String
+          ? (json['proxyHost'] as String).trim()
+          : d.proxyHost,
       proxyPort: port is int && port > 0 && port <= 65535 ? port : d.proxyPort,
       lyricsFallback: flag(json['lyricsFallback'], d.lyricsFallback),
       taskbarLyrics: flag(json['taskbarLyrics'], d.taskbarLyrics),
-      taskbarLyricsColor: pick(TaskbarLyricsColor.values, json['taskbarLyricsColor'], d.taskbarLyricsColor),
+      taskbarLyricsColor: pick(
+        TaskbarLyricsColor.values,
+        json['taskbarLyricsColor'],
+        d.taskbarLyricsColor,
+      ),
       // 只认不透明颜色：自定义色存的总是 0xFFxxxxxx
-      taskbarLyricsCustomColor: customColor is int && customColor >= 0 && customColor <= 0xFFFFFFFF
+      taskbarLyricsCustomColor:
+          customColor is int && customColor >= 0 && customColor <= 0xFFFFFFFF
           ? 0xFF000000 | customColor
           : d.taskbarLyricsCustomColor,
-      taskbarLyricsOpacity: opacity is int ? opacity.clamp(minTaskbarLyricsOpacity, 100) : d.taskbarLyricsOpacity,
+      taskbarLyricsOpacity: opacity is int
+          ? opacity.clamp(minTaskbarLyricsOpacity, 100)
+          : d.taskbarLyricsOpacity,
     );
   }
 
@@ -195,7 +215,9 @@ class AppPreferences {
     if (raw.isEmpty) return defaults;
     try {
       final json = jsonDecode(raw);
-      return json is Map<String, dynamic> ? AppPreferences.fromJson(json) : defaults;
+      return json is Map<String, dynamic>
+          ? AppPreferences.fromJson(json)
+          : defaults;
     } catch (_) {
       return defaults;
     }

@@ -75,6 +75,43 @@ void main() {
 
     test('没有候选返回 null', () => expect(LrclibSelector.select([], query), isNull));
 
+    group('纯音乐守卫', () {
+      LrclibCandidate instrumental({String title = 'Road', double duration = 200, String artist = 'Someone'}) =>
+          LrclibCandidate(trackName: title, artistName: artist, synced: '', duration: duration, instrumental: true);
+
+      test('精确吻合的纯音乐记录存在时不上歌词（同名带词歌也不能用）', () {
+        // 当前曲目是纯音乐（LRCLIB 有吻合的纯音乐记录），另有同名歌曲的带词记录
+        final otherSong = candidate(english, artist: 'Another Singer');
+        expect(LrclibSelector.select([instrumental(), otherSong], query), isNull);
+      });
+
+      test('纯音乐记录与带词记录都精确吻合时，带词的优先', () {
+        final mine = candidate(english, artist: 'Someone');
+        final picked = LrclibSelector.select([instrumental(), mine], query);
+        expect(picked?.synced, english);
+      });
+
+      test('纯音乐记录不精确（时长差太多 / 歌手不同）时不影响正常选词', () {
+        final farAway = instrumental(duration: 500);
+        final otherArtist = instrumental(artist: 'Delta Band');
+        final mine = candidate(english, artist: 'Someone');
+        expect(LrclibSelector.select([farAway, mine], query)?.synced, english);
+        expect(LrclibSelector.select([otherArtist, mine], query)?.synced, english);
+      });
+
+      test('LRCLIB 的纯音乐记录没有歌词字段也能解析（否则守卫永远看不到它）', () {
+        final parsed = LrclibCandidate.fromJson({
+          'trackName': 'Road',
+          'artistName': 'Someone',
+          'duration': 200,
+          'instrumental': true,
+        });
+        expect(parsed, isNotNull);
+        expect(parsed!.instrumental, isTrue);
+        expect(parsed.lines, isEmpty);
+      });
+    });
+
     test('歌手对不上的同名歌即使时长吻合也不用', () {
       const q = LyricsQuery(trackId: 't', title: 'Road', artist: 'Alpha & Beta, Gamma', durationMs: 200000);
       final other = candidate(english, artist: 'Delta Band');
@@ -86,6 +123,24 @@ void main() {
     test('歌手文字不同（本地化译名）时不排除', () {
       const q = LyricsQuery(trackId: 't', title: '路', artist: '某歌手', durationMs: 200000);
       expect(LrclibSelector.select([candidate(chinese, title: '路', artist: 'Some Singer')], q), isNotNull);
+    });
+
+    group('歌手信息缺失（远程曲目未补全等）', () {
+      // 真实案例：纯音乐「My Way / OAO / 130s」在歌手缺失时被配上 Frank Sinatra 的同名歌词
+      const noArtist = LyricsQuery(trackId: 't', title: 'My Way', artist: '', durationMs: 130000);
+
+      test('只接受曲名一致且时长吻合的候选', () {
+        final sinatra = candidate(english, title: 'My Way', duration: 280, artist: 'Frank Sinatra');
+        final close = candidate(english.replaceAll('road', 'street'), title: 'My Way', duration: 131);
+        expect(LrclibSelector.select([sinatra], noArtist), isNull, reason: '时长差 150s，是另一首歌');
+        expect(LrclibSelector.select([sinatra, close], noArtist)?.synced, contains('street'));
+      });
+
+      test('时长也缺失时不上歌词', () {
+        const bare = LyricsQuery(trackId: 't', title: 'My Way', artist: '');
+        final sinatra = candidate(english, title: 'My Way', duration: 280, artist: 'Frank Sinatra');
+        expect(LrclibSelector.select([sinatra], bare), isNull);
+      });
     });
   });
 

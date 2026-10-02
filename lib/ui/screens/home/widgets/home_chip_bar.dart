@@ -38,9 +38,15 @@ class HomeChipBar extends StatelessWidget {
   static const double _verticalPadding = 8;
   static const double _leadingSize = 32;
 
-  /// 标签行高度：胶囊（上下各 8 内边距 + 实测一行文字）与头像取大者，再加上下留白。
+  /// 胶囊高度：与音乐库侧栏的筛选胶囊一致（侧栏行高 44 − 上下留白 12 = 32）。
+  ///
+  /// 必须显式给定：FilterPill 的容器带 alignment，父级高度有界时会撑满父级 ——
+  /// 标签栏整行高约 48px，不限高胶囊就会比侧栏的大一圈。
+  static const double pillHeight = 32;
+
+  /// 标签行高度：胶囊（上下共 10 内边距 + 实测一行文字）与头像取大者，再加上下留白。
   static double extentOf(BuildContext context) {
-    final pill = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 16;
+    final pill = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 10;
     return math.max(pill, _leadingSize) + _verticalPadding * 2;
   }
 
@@ -83,7 +89,13 @@ class HomeChipBar extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.fromLTRB(leading == null ? 16 : 10, 0, 16, 0),
                 child: Row(
-                  children: [for (final pill in pills) Padding(padding: const EdgeInsets.only(right: 8), child: pill)],
+                  children: [
+                    for (final pill in pills)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: SizedBox(height: pillHeight, child: pill),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -129,7 +141,8 @@ class _ClearPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final size = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 16;
+    // 与胶囊同高（见 HomeChipBar.pillHeight）
+    const size = HomeChipBar.pillHeight;
     return Tooltip(
       message: tooltip,
       child: HoverBuilder(

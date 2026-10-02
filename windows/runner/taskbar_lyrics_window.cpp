@@ -1,5 +1,6 @@
 #include "taskbar_lyrics_window.h"
 
+#include <shellapi.h>
 #include <shlwapi.h>
 
 #include <cmath>
@@ -257,6 +258,16 @@ void TaskbarLyricsWindow::Tick() {
     return;
   }
   const ULONGLONG now = GetTickCount64();
+  if (vertical_taskbar_) {
+    // 竖向任务栏：功能禁用。保持隐藏并每秒复查（Reflow 会更新标志），移回横向后自动恢复。
+    if (lyric_ && IsWindowVisible(lyric_)) ShowWindow(lyric_, SW_HIDE);
+    if (now - last_housekeep_ >= 1000) {
+      last_housekeep_ = now;
+      Reflow(false);
+    }
+    SetInterval(250);
+    return;
+  }
   if (now - last_housekeep_ >= 1000) {
     last_housekeep_ = now;
     Housekeep();
@@ -381,27 +392,73 @@ void TaskbarLyricsWindow::Housekeep() {
   if (style_.mode == ColorMode::kAuto || style_.mode == ColorMode::kAccent) SampleBackground();
 }
 
+// 任务栏在屏幕左 / 右边缘时返回 true（此时禁用歌词）。优先用 ABM_GETTASKBARPOS，
+// 失败时按任务栏矩形宽高比兜底判断。
+bool TaskbarLyricsWindow::DetectVerticalTaskbar() {
+  APPBARDATA abd{};
+  abd.cbSize = sizeof(abd);
+  abd.hWnd = tray_;
+  if (SHAppBarMessage(ABM_GETTASKBARPOS, &abd)) {
+    vertical_taskbar_ = abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT;
+    return vertical_taskbar_;
+  }
+  RECT tray{};
+  if (GetWindowRect(tray_, &tray)) {
+    vertical_taskbar_ = (tray.right - tray.left) < (tray.bottom - tray.top);
+  }
+  return vertical_taskbar_;
+}
+
+// Win11：HKCU\...\Explorer\Advanced 的 TaskbarAl=1 表示图标居中；0 表示居左。
+// Win10 没有该值，任务栏图标恒居左。
+bool TaskbarLyricsWindow::IconsCentered() const {
+  DWORD value = 0;
+  DWORD size = sizeof(value);
+  return RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+                      L"TaskbarAl", RRF_RT_REG_DWORD, nullptr, &value, &size) == ERROR_SUCCESS &&
+         value != 0;
+}
+
 void TaskbarLyricsWindow::Reflow(bool force) {
   RECT tray{};
   if (!GetWindowRect(tray_, &tray)) return;
+  // 每次重排都复查任务栏位置：竖向任务栏直接禁用（由 Tick 负责隐藏窗口）。
+  if (DetectVerticalTaskbar()) return;
+  const int tray_width = tray.right - tray.left;
   const int tray_height = tray.bottom - tray.top;
   const UINT dpi = GetDpiForWindow(tray_);
   scale_ = dpi > 0 ? dpi / 96.0 : 1.0;
   const int height = tray_height - static_cast<int>(6 * scale_);
   const int y = (tray_height - height) / 2;
 
-  // 右界：居中图标区（ReBarWindow32）左缘再留一点间距；找不到时取任务栏宽度的 1/3
-  int right = (tray.right - tray.left) / 3;
-  int rebar_left = right;
-  HWND rebar = FindWindowExW(tray_, nullptr, L"ReBarWindow32", nullptr);
-  RECT rr{};
-  if (rebar && GetWindowRect(rebar, &rr) && rr.left > tray.left) {
-    rebar_left = rr.left - tray.left;
-    right = rebar_left - static_cast<int>(14 * scale_);
+  int x, width;
+  if (IconsCentered()) {
+    // Win11 图标居中：摆在左侧 —— 天气小组件右缘起，到居中图标区（ReBarWindow32）左缘止。
+    // 右界找不到时取任务栏宽度的 1/3。
+    int right = tray_width / 3;
+    int rebar_left = right;
+    HWND rebar = FindWindowExW(tray_, nullptr, L"ReBarWindow32", nullptr);
+    RECT rr{};
+    if (rebar && GetWindowRect(rebar, &rr) && rr.left > tray.left) {
+      rebar_left = rr.left - tray.left;
+      right = rebar_left - static_cast<int>(14 * scale_);
+    }
+    x = MeasureWidgetRight(tray, rebar_left);
+    const int max_right = (std::max)(right, x + static_cast<int>(140 * scale_));
+    width = (std::max)(static_cast<int>(200 * scale_), max_right - x);
+  } else {
+    // Win10 或 Win11 图标居左：摆在右侧 —— 紧贴系统托盘区（TrayNotifyWnd）的左边。
+    int right = tray_width - static_cast<int>(10 * scale_);
+    HWND notify = FindWindowExW(tray_, nullptr, L"TrayNotifyWnd", nullptr);
+    RECT nr{};
+    if (notify && GetWindowRect(notify, &nr) && nr.left > tray.left) {
+      right = nr.left - tray.left - static_cast<int>(10 * scale_);
+    }
+    // 宽度取任务栏的 1/3（至少 200px），向左延伸；空间不足时收缩到可用宽度。
+    width = (std::max)(static_cast<int>(200 * scale_), tray_width / 3);
+    width = (std::min)(width, (std::max)(right - static_cast<int>(8 * scale_), static_cast<int>(60 * scale_)));
+    x = right - width;
   }
-  const int x = MeasureWidgetRight(tray, rebar_left);
-  const int max_right = (std::max)(right, x + static_cast<int>(140 * scale_));
-  const int width = (std::max)(static_cast<int>(200 * scale_), max_right - x);
 
   const int tolerance = static_cast<int>(4 * scale_);
   if (force || std::abs(x - x_) > tolerance || std::abs(width - width_) > tolerance || height != height_ ||

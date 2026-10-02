@@ -130,6 +130,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get typePlaylist => '歌单';
 
   @override
+  String get typePodcast => '播客';
+
+  @override
+  String podcastEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 集',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get podcastPlayed => '已播完';
+
+  @override
+  String podcastResumeFrom(String position) {
+    return '播至 $position';
+  }
+
+  @override
+  String get podcastEmpty => '这个节目暂时没有单集';
+
+  @override
+  String get podcastLoadFailed => '节目加载失败，请检查网络后重试';
+
+  @override
   String get typeAlbum => '专辑';
 
   @override
@@ -430,6 +457,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playbackErrorSignIn => '登录后才能播放';
+
+  @override
+  String get playbackErrorWebSignIn => '全曲播放需要先完成 Web 登录';
+
+  @override
+  String get webLoginAction => 'Web 登录';
+
+  @override
+  String get webLoginSuccess => 'Web 登录成功，全曲播放已就绪';
 
   @override
   String playbackErrorUnavailable(String track) {
@@ -864,7 +900,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsTaskbarLyricsSubtitle =>
-      '显示在天气小组件右侧。悬停时显示播放控制，点按打开 Flutify，右键可重新获取歌词';
+      '任务栏图标居中时显示在左侧，居左时显示在系统托盘左边；任务栏竖向时自动停用。悬停显示播放控制，点按打开 Flutify，右键重新获取歌词';
 
   @override
   String get settingsTaskbarLyricsColor => '文字颜色';

@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart';
-
 /// HTTP 代理地址（主机 + 端口）。
-@immutable
+///
+/// 保持纯 Dart（不引入 Flutter）：命令行探针经 network_proxy → 本文件联网。
 class ProxyEndpoint {
   final String host;
   final int port;
@@ -16,7 +15,9 @@ class ProxyEndpoint {
     if (scheme >= 0) s = s.substring(scheme + 3);
     final slash = s.indexOf('/');
     if (slash >= 0) s = s.substring(0, slash);
-    final m = RegExp(r'^(?:\[([^\]]+)\]|([^:\s\[\]]+)):(\d{1,5})$').firstMatch(s);
+    final m = RegExp(
+      r'^(?:\[([^\]]+)\]|([^:\s\[\]]+)):(\d{1,5})$',
+    ).firstMatch(s);
     if (m == null) return null;
     final port = int.parse(m.group(3)!);
     if (port <= 0 || port > 65535) return null;
@@ -28,7 +29,8 @@ class ProxyEndpoint {
   String toString() => host.contains(':') ? '[$host]:$port' : '$host:$port';
 
   @override
-  bool operator ==(Object other) => other is ProxyEndpoint && other.host == host && other.port == port;
+  bool operator ==(Object other) =>
+      other is ProxyEndpoint && other.host == host && other.port == port;
 
   @override
   int get hashCode => Object.hash(host, port);

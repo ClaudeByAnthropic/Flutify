@@ -19,15 +19,23 @@ class ProxyTunnel {
     required Duration timeout,
     NetworkProxy? proxy,
   }) async {
-    final endpoint = (proxy ?? NetworkProxy.instance).endpointFor(Uri(scheme: 'https', host: host, port: port));
+    final endpoint = (proxy ?? NetworkProxy.instance).endpointFor(
+      Uri(scheme: 'https', host: host, port: port),
+    );
     if (endpoint == null) {
       final socket = await Socket.connect(host, port, timeout: timeout);
       return (socket: socket, input: socket);
     }
 
-    final socket = await Socket.connect(endpoint.host, endpoint.port, timeout: timeout);
+    final socket = await Socket.connect(
+      endpoint.host,
+      endpoint.port,
+      timeout: timeout,
+    );
     final target = host.contains(':') ? '[$host]:$port' : '$host:$port';
-    socket.add(ascii.encode('CONNECT $target HTTP/1.1\r\nHost: $target\r\n\r\n'));
+    socket.add(
+      ascii.encode('CONNECT $target HTTP/1.1\r\nHost: $target\r\n\r\n'),
+    );
 
     final output = StreamController<Uint8List>();
     final established = Completer<void>();
@@ -44,7 +52,8 @@ class ProxyTunnel {
         final bytes = header.toBytes();
         final end = _headerEnd(bytes);
         if (end < 0) {
-          if (bytes.length > 16 * 1024) _fail(established, socket, const ProxyTunnelException('代理响应头过长'));
+          if (bytes.length > 16 * 1024)
+            _fail(established, socket, const ProxyTunnelException('代理响应头过长'));
           return;
         }
         final status = latin1.decode(bytes.sublist(0, end)).split('\r\n').first;
@@ -55,11 +64,15 @@ class ProxyTunnel {
         open = true;
         established.complete();
         // 响应头后面紧跟的字节已属于目标服务器
-        if (bytes.length > end + 4) output.add(Uint8List.sublistView(bytes, end + 4));
+        if (bytes.length > end + 4)
+          output.add(Uint8List.sublistView(bytes, end + 4));
       },
-      onError: (Object e) => established.isCompleted ? output.addError(e) : _fail(established, socket, e),
+      onError: (Object e) => established.isCompleted
+          ? output.addError(e)
+          : _fail(established, socket, e),
       onDone: () {
-        if (!established.isCompleted) _fail(established, socket, const ProxyTunnelException('代理关闭了连接'));
+        if (!established.isCompleted)
+          _fail(established, socket, const ProxyTunnelException('代理关闭了连接'));
         output.close();
       },
     );
@@ -81,7 +94,8 @@ class ProxyTunnel {
   /// `\r\n\r\n` 的位置；没有时返回 -1。
   static int _headerEnd(Uint8List b) {
     for (var i = 0; i + 3 < b.length; i++) {
-      if (b[i] == 13 && b[i + 1] == 10 && b[i + 2] == 13 && b[i + 3] == 10) return i;
+      if (b[i] == 13 && b[i + 1] == 10 && b[i + 2] == 13 && b[i + 3] == 10)
+        return i;
     }
     return -1;
   }

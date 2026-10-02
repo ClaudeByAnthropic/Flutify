@@ -44,6 +44,26 @@
   "typeTrack": "Song",
   "typeArtist": "Artist",
   "typePlaylist": "Playlist",
+  "typePodcast": "Podcast",
+  "podcastEpisodeCount": "{count, plural, =1{1 episode} other{{count} episodes}}",
+  "@podcastEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "podcastPlayed": "Played",
+  "podcastResumeFrom": "At {position}",
+  "@podcastResumeFrom": {
+    "placeholders": {
+      "position": {
+        "type": "String"
+      }
+    }
+  },
+  "podcastEmpty": "No episodes yet",
+  "podcastLoadFailed": "Couldn't load the show. Check your connection and try again",
   "typeAlbum": "Album",
   "typeSingle": "Single",
   "typeCompilation": "Compilation",
@@ -145,6 +165,9 @@
   "playerLyricsFullscreen": "Full-screen lyrics",
   "playerSwipeHint": "Swipe the artwork to change songs",
   "playbackErrorSignIn": "Sign in to play music",
+  "playbackErrorWebSignIn": "Full-track playback requires a Web sign-in first",
+  "webLoginAction": "Web sign-in",
+  "webLoginSuccess": "Web sign-in complete — full-track playback is ready",
   "playbackErrorUnavailable": "\"{track}\" isn't available right now",
   "playbackErrorSkipped": "\"{track}\" isn't available right now, skipped",
   "playbackErrorNetwork": "Couldn't load \"{track}\". Check your connection.",
@@ -291,7 +314,7 @@
   "settingsLyricsFallbackSubtitle": "When Spotify has no time-synced lyrics, get them from the open LRCLIB library in the song's original language",
   "settingsTaskbarLyricsSection": "Taskbar lyrics",
   "settingsTaskbarLyrics": "Show lyrics on the taskbar",
-  "settingsTaskbarLyricsSubtitle": "Shown next to the Widgets button. Hover for playback controls, click to open Flutify, right-click to reload lyrics",
+  "settingsTaskbarLyricsSubtitle": "Shown on the left when taskbar icons are centered, or just left of the system tray when left-aligned; paused on vertical taskbars. Hover for playback controls, click to open Flutify, right-click to reload lyrics",
   "settingsTaskbarLyricsColor": "Text color",
   "settingsTaskbarLyricsCustomColor": "Custom color",
   "settingsTaskbarLyricsChangeColor": "Change",

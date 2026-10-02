@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import '../../models/app_preferences.dart';
 import 'proxy_endpoint.dart';
+import 'proxy_mode.dart';
 import 'system_proxy.dart';
 
 /// 全局网络代理策略（设置 →「网络」）：所有 HTTP / WebSocket 请求与接入点的 TCP 连接都按它选路。
@@ -37,9 +37,17 @@ class NetworkProxy {
   SystemProxySettings get system => _system;
 
   /// 按偏好更新策略；切到「跟随系统」时立即重读一次系统代理。
-  Future<void> configure(AppPreferences prefs) {
-    _mode = prefs.proxyMode;
-    _manual = prefs.proxyPort > 0 ? ProxyEndpoint.tryParse('${prefs.proxyHost}:${prefs.proxyPort}') : null;
+  ///
+  /// 参数取自 AppPreferences（本类不直接依赖 models，保持纯 Dart 以便命令行探针复用）。
+  Future<void> configure({
+    required ProxyMode mode,
+    String proxyHost = '',
+    int proxyPort = 0,
+  }) {
+    _mode = mode;
+    _manual = proxyPort > 0
+        ? ProxyEndpoint.tryParse('$proxyHost:$proxyPort')
+        : null;
     return _mode == ProxyMode.system ? refreshSystem() : Future.value();
   }
 
@@ -64,9 +72,12 @@ class NetworkProxy {
         return _manual;
       case ProxyMode.system:
         final readAt = _systemReadAt;
-        if (readAt == null || DateTime.now().difference(readAt) > systemTtl) unawaited(refreshSystem());
+        if (readAt == null || DateTime.now().difference(readAt) > systemTtl)
+          unawaited(refreshSystem());
         if (_system.bypasses(host)) return null;
-        return uri.scheme == 'http' || uri.scheme == 'ws' ? _system.http : _system.https;
+        return uri.scheme == 'http' || uri.scheme == 'ws'
+            ? _system.http
+            : _system.https;
     }
   }
 
@@ -90,8 +101,10 @@ class ProxyHttpOverrides extends HttpOverrides {
   ProxyHttpOverrides(this.proxy);
 
   /// 在创建任何网络客户端之前调用。
-  static void install(NetworkProxy proxy) => HttpOverrides.global = ProxyHttpOverrides(proxy);
+  static void install(NetworkProxy proxy) =>
+      HttpOverrides.global = ProxyHttpOverrides(proxy);
 
   @override
-  HttpClient createHttpClient(SecurityContext? context) => super.createHttpClient(context)..findProxy = proxy.findProxy;
+  HttpClient createHttpClient(SecurityContext? context) =>
+      super.createHttpClient(context)..findProxy = proxy.findProxy;
 }

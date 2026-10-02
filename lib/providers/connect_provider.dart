@@ -68,10 +68,8 @@ class ConnectProvider extends ChangeNotifier {
   bool get hasRemoteSession => activeDevice != null && player.hasTrack;
 
   /// 播放控制（播放栏、快捷键、媒体键）是否应发给远程设备，即播放栏是否为远程模式：
-  /// - 本机正在出声 → 本机优先；
-  /// - 远程正在出声 → 远程；
-  /// - 远程已暂停：最后出声的是远程（[remoteInControl]）或本机没有曲目 → 仍是远程，
-  ///   这样暂停远程后再按空格 / 播放键会继续远程，而不是突然在本机放起上次的曲目。
+  /// 以集群状态为准 —— 只要集群里有活动设备且带曲目（播放中或已暂停）就归远程；
+  /// 仅当本机正在出声（[localPlaying]）时才归本机。不再推断「最后出声方」。
   bool controlsRemote({required bool localPlaying, required bool localHasTrack}) =>
       // 以集群状态为准：本 App 只是观察者、自己不是 Connect 设备，只要集群里有活动设备且带曲目，
       // 播放的就是那台设备；仅当本机正在出声（本地文件等）才归本机。不再推断“最后出声方”。

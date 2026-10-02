@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,8 +22,13 @@ import 'providers/playback_provider.dart';
 import 'providers/preferences_provider.dart';
 import 'providers/sleep_timer_provider.dart';
 import 'providers/spotify_provider.dart';
+import 'services/audio/audio_engine.dart';
+import 'services/audio/routed_audio_engine.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
+import 'services/auth/web_token_service.dart';
+import 'services/eme/eme_audio_engine.dart';
+import 'services/eme/eme_player.dart';
 import 'services/connect/connect_play_request.dart';
 import 'services/connect/connect_service.dart';
 import 'services/lyrics/lrclib_client.dart';
@@ -36,6 +42,7 @@ import 'services/media_controls/system_media_controls.dart';
 import 'services/network/network_proxy.dart';
 import 'services/playback_session_store.dart';
 import 'services/protocol/audio_cache_store.dart';
+import 'services/protocol/eme_track_audio_source.dart';
 import 'services/protocol/track_audio_loader.dart';
 import 'services/spotify_api_service.dart';
 import 'services/storage_service.dart';
@@ -66,35 +73,83 @@ Future<void> main() async {
 
   // 网络代理须在任何网络客户端创建前就位；系统代理最多等 1.5 秒，读不到就先直连、后台补读
   ProxyHttpOverrides.install(NetworkProxy.instance);
+  final initialPrefs = AppPreferences.decode(storageService.preferencesJson);
   await NetworkProxy.instance
-      .configure(AppPreferences.decode(storageService.preferencesJson))
+      .configure(
+        mode: initialPrefs.proxyMode,
+        proxyHost: initialPrefs.proxyHost,
+        proxyPort: initialPrefs.proxyPort,
+      )
       .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
 
   final audioPlayerService = AudioPlayerService();
   final spotifyApiService = SpotifyApiService(storageService);
   final authService = SpotifyAuthService(storageService);
 
-  // 完整曲目协议链路：metadata → storage-resolve → AP 音频密钥 → CDN 解密。
-  // access_token 每次取用前自动续期（与 API 层同一套凭据）。
-  final supportDir = await getApplicationSupportDirectory();
-  // 解密放在常驻后台 Isolate：启动时预热，第一次播放不必等它启动
-  final decryptBackend = IsolateDecryptBackend();
-  unawaited(decryptBackend.warmUp());
-  final trackAudioLoader = TrackAudioLoader(
-    decryptBackend: decryptBackend,
-    cacheDirectory: supportDir.path,
-    maxCacheBytes: storageService.audioCacheLimitMb * 1024 * 1024,
-    deviceId: storageService.deviceId,
-    accessToken: () async {
-      try {
-        await authService.ensureAccessToken();
-      } catch (_) {}
-      return storageService.accessToken;
-    },
-    clientToken: () => authService.ensureClientToken(),
+  // --- EME（Widevine）全曲播放链路 ---
+  // Web token 服务：sp_dc + TOTP 铸造 Web 播放器 access_token（Widevine 真密钥所需）
+  final webTokenService = WebTokenService(storageService);
+  // 无头 WebView2 播放器（空白页 + HLS.js，不进 widget 树、不渲染 open.spotify.com）
+  final emePlayer = EmePlayer();
+  // 加载 HLS.js 引擎（资产打包，供隐藏页用）
+  EmePlayer.hlsJsSource = await rootBundle.loadString('assets/js/hls.min.js');
+  await emePlayer.init(); // 先起本地服务
+  // 自定义 WebView2 环境（关自动播放手势限制，无头页无用户手势）
+  await EmePlayer.ensureEnvironment();
+  await emePlayer.start(); // 启动无头 WebView（窗口缩放/布局切换不影响播放）
+  // license 反代：CDM 请求体 → Spotify（用 Web token + client-token）
+  Future<Uint8List> emeLicensePoster(Uint8List request) async {
+    try {
+      final webToken = await webTokenService.ensureWebAccessToken();
+      final ct = await authService.ensureClientToken();
+      final res = await http.post(
+        Uri.parse('https://gae2-spclient.spotify.com/widevine-license/v1/audio/license'),
+        headers: {
+          'Authorization': 'Bearer $webToken',
+          'client-token': ct,
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+          'Referer': 'https://open.spotify.com/',
+          'Content-Type': 'application/octet-stream',
+        },
+        body: request,
+      );
+      debugPrint('[eme] license POST → HTTP ${res.statusCode} ${res.bodyBytes.length}B');
+      if (res.statusCode != 200) {
+        throw StateError('license 反代失败：HTTP ${res.statusCode}');
+      }
+      return res.bodyBytes;
+    } catch (e) {
+      debugPrint('[eme] license 反代异常: $e');
+      rethrow;
+    }
+  }
+
+  // Widevine application-certificate 反代
+  Future<Uint8List> emeCertFetcher() async {
+    final ct = await authService.ensureClientToken();
+    final res = await http.get(
+      Uri.parse('https://spclient.wg.spotify.com/widevine-license/v1/application-certificate'),
+      headers: {
+        'client-token': ct,
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+        'Referer': 'https://open.spotify.com/',
+      },
+    );
+    return res.bodyBytes;
+  }
+
+  final emeEngine = EmeAudioEngine(
+    player: emePlayer,
+    licensePoster: emeLicensePoster,
+    certFetcher: emeCertFetcher,
   );
+  // 路由引擎：本地文件/流式 → just_audio；DRM 曲目 → EME
+  final audioEngine = RoutedAudioEngine(local: audioPlayerService, eme: emeEngine);
 
   // 上次播放会话（曲目 / 队列 / 进度）：单独的 JSON 文件，不放进 SharedPreferences
+  final supportDir = await getApplicationSupportDirectory();
   final sessionStore = FilePlaybackSessionStore(
     File('${supportDir.path}${Platform.pathSeparator}playback_session.json'),
   );
@@ -105,22 +160,45 @@ Future<void> main() async {
   // 系统媒体控制：Windows SMTC（任务栏 / 锁屏媒体卡片、媒体键），Android / iOS 通知栏与锁屏。
   // Windows 上再挂一个任务栏歌词，二者共用同一套本机 / 远程切换与按键路由
   final systemControls = await SystemMediaControls.create();
-  final taskbarLyrics = Platform.isWindows ? TaskbarLyricsControls(MethodChannelTaskbarLyrics()) : null;
-  final mediaControls = taskbarLyrics == null ? systemControls : MultiMediaControls([?systemControls, taskbarLyrics]);
+  final taskbarLyrics = Platform.isWindows
+      ? TaskbarLyricsControls(MethodChannelTaskbarLyrics())
+      : null;
+  final mediaControls = taskbarLyrics == null
+      ? systemControls
+      : MultiMediaControls([?systemControls, taskbarLyrics]);
 
   // 歌词补全：Spotify 没有逐行同步歌词时查 LRCLIB，选中的歌词缓存在应用数据目录
   final lyricsFallback = LrclibLyricsSource(
     LrclibClient(http.Client()),
-    cache: LyricsDiskCache(Directory('${supportDir.path}${Platform.pathSeparator}lyrics_lrc')),
+    cache: LyricsDiskCache(
+      Directory('${supportDir.path}${Platform.pathSeparator}lyrics_lrc'),
+    ),
+  );
+
+  // EME 曲目源（Widevine 全曲播放）：AP 密钥被拒的 DRM 曲目走这里。
+  // 当前账号 AP RequestKey 全线被拒，EME 是全曲播放的主链路。
+  final emeTrackSource = EmeTrackAudioSource(
+    cacheDirectory: supportDir.path,
+    // 缺 sp_dc（Web 登录态）时在下载前拦截，引导用户完成 Web 登录
+    webSessionReady: () => webTokenService.hasSpDc,
+    accessToken: () async {
+      try {
+        await authService.ensureAccessToken();
+      } catch (_) {}
+      return storageService.accessToken;
+    },
+    clientToken: () => authService.ensureClientToken(),
   );
 
   runApp(
     FlutifyApp(
       storageService: storageService,
-      audioPlayerService: audioPlayerService,
+      audioEngine: audioEngine,
+      emePlayer: emePlayer,
       spotifyApiService: spotifyApiService,
       authService: authService,
-      trackAudioLoader: trackAudioLoader,
+      webTokenService: webTokenService,
+      trackAudioLoader: emeTrackSource,
       playbackSessionStore: sessionStore,
       mediaControls: mediaControls,
       networkProxy: NetworkProxy.instance,
@@ -132,11 +210,17 @@ Future<void> main() async {
 
 class FlutifyApp extends StatelessWidget {
   final StorageService storageService;
-  final AudioPlayerService audioPlayerService;
+  final AudioEngine audioEngine;
+
+  /// EME 播放器（无头 WebView2，不进 widget 树）。
+  final EmePlayer emePlayer;
   final SpotifyApiService spotifyApiService;
 
   /// Login5 鉴权服务；为空时按 [storageService] 默认创建（测试可注入假实现）。
   final SpotifyAuthService? authService;
+
+  /// Web token 服务（sp_dc + TOTP 铸 Web access_token）；为空时设置页不显示 Web 登录入口（测试默认）。
+  final WebTokenService? webTokenService;
 
   /// 完整曲目音频来源（协议链路）；为空时任何曲目都无法播放（PlaybackProvider 报「请先登录」）。
   final TrackAudioSource? trackAudioLoader;
@@ -159,9 +243,11 @@ class FlutifyApp extends StatelessWidget {
   const FlutifyApp({
     super.key,
     required this.storageService,
-    required this.audioPlayerService,
+    required this.audioEngine,
+    required this.emePlayer,
     required this.spotifyApiService,
     this.authService,
+    this.webTokenService,
     this.trackAudioLoader,
     this.playbackSessionStore,
     this.mediaControls,
@@ -177,8 +263,10 @@ class FlutifyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<StorageService>.value(value: storageService),
-        Provider<AudioPlayerService>.value(value: audioPlayerService),
+        Provider<AudioEngine>.value(value: audioEngine),
+        Provider<EmePlayer>.value(value: emePlayer),
         Provider<SpotifyApiService>.value(value: spotifyApiService),
+        if (webTokenService != null) Provider<WebTokenService>.value(value: webTokenService!),
         Provider<NetworkProxy?>.value(value: networkProxy),
         // 非惰性：启动即接入 API 层，首屏请求就能自动续期 access_token
         Provider<SpotifyAuthService>(
@@ -187,14 +275,17 @@ class FlutifyApp extends StatelessWidget {
             final auth = authService ?? SpotifyAuthService(storageService);
             spotifyApiService.attachAuth(auth);
             // 关窗时若正好在续期，等新令牌落盘：进程会被立即结束，丢掉轮换后的 refresh_token 就得重新登录
-            DesktopWindow.addBeforeCloseHook(auth.settle, timeout: const Duration(seconds: 5));
+            DesktopWindow.addBeforeCloseHook(
+              auth.settle,
+              timeout: const Duration(seconds: 5),
+            );
             return auth;
           },
         ),
         ChangeNotifierProvider(
           create: (_) {
             final playback = PlaybackProvider(
-              audioPlayerService,
+              audioEngine,
               storageService,
               audioLoader: trackAudioLoader,
               sessionStore: playbackSessionStore,
@@ -203,13 +294,23 @@ class FlutifyApp extends StatelessWidget {
             DesktopWindow.addBeforeCloseHook(playback.flushSession);
             // 与 App 同生命周期，不需要单独释放
             final controls = mediaControls;
-            if (controls != null) mediaSync = MediaControlsSync(playback, controls);
+            if (controls != null)
+              mediaSync = MediaControlsSync(playback, controls);
             return playback;
           },
         ),
-        ChangeNotifierProvider(create: (ctx) => SleepTimerProvider(ctx.read<PlaybackProvider>())),
-        ChangeNotifierProvider(create: (_) => LibraryProvider(storageService, source: spotifyApiService.library)),
-        ChangeNotifierProvider(create: (_) => AppearanceProvider(storageService)),
+        ChangeNotifierProvider(
+          create: (ctx) => SleepTimerProvider(ctx.read<PlaybackProvider>()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => LibraryProvider(
+            storageService,
+            source: spotifyApiService.library,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AppearanceProvider(storageService),
+        ),
         ChangeNotifierProvider(
           create: (_) {
             final preferences = PreferencesProvider(storageService);
@@ -221,7 +322,13 @@ class FlutifyApp extends StatelessWidget {
               final key = _proxyKey(preferences.prefs);
               if (key == proxyKey) return;
               proxyKey = key;
-              unawaited(proxy.configure(preferences.prefs));
+              unawaited(
+                proxy.configure(
+                  mode: preferences.prefs.proxyMode,
+                  proxyHost: preferences.prefs.proxyHost,
+                  proxyPort: preferences.prefs.proxyPort,
+                ),
+              );
             });
             return preferences;
           },
@@ -234,14 +341,17 @@ class FlutifyApp extends StatelessWidget {
             lyrics: LyricsResolver(
               spotifyApiService.getLyrics,
               fallback: lyricsFallback,
-              fallbackEnabled: () => ctx.read<PreferencesProvider>().prefs.lyricsFallback,
+              fallbackEnabled: () =>
+                  ctx.read<PreferencesProvider>().prefs.lyricsFallback,
             ),
           ),
         ),
         Provider<TaskbarLyricsControls?>.value(value: taskbarLyrics),
-        // 设置页「存储」分组：音频缓存占用 / 上限 / 清除（未接入协议链路时为 null）
+        // 设置页「存储」分组：音频缓存占用 / 上限 / 清除
         Provider<AudioCacheStore?>.value(
-          value: trackAudioLoader is AudioCacheStore ? trackAudioLoader as AudioCacheStore : null,
+          value: trackAudioLoader is AudioCacheStore
+              ? trackAudioLoader as AudioCacheStore
+              : null,
         ),
         // Spotify Connect 遥控：非惰性，启动即接入（桌面版会话且设置里未关闭），播放栏才能及时显示远程播放
         ChangeNotifierProvider(
@@ -251,7 +361,8 @@ class FlutifyApp extends StatelessWidget {
             final connect = ConnectProvider(
               spotifyApiService.connect,
               available: () =>
-                  spotifyApiService.supportsConnect && ctx.read<PreferencesProvider>().prefs.connectEnabled,
+                  spotifyApiService.supportsConnect &&
+                  ctx.read<PreferencesProvider>().prefs.connectEnabled,
               resolveTrack: spotifyApiService.getTrackByUri,
             );
             // 在其他设备上播放时，系统媒体卡片显示并控制那台设备
@@ -264,7 +375,8 @@ class FlutifyApp extends StatelessWidget {
             playback.remotePlay = (context, tracks, start) async {
               // 存在活动的远程设备且本机没在出声就一律走远程。不再依赖 controlsRemote 的“最后出声方”推断：
               // 切换曲目瞬间远程会短暂处于暂停 / 缓冲状态，那会误判为本机并回退到本机播放。
-              if (connect.activeDevice == null || playback.isPlaying) return false;
+              if (connect.activeDevice == null || playback.isPlaying)
+                return false;
               final request = ConnectPlayRequest.from(
                 context: context,
                 tracks: tracks,
@@ -285,21 +397,25 @@ class FlutifyApp extends StatelessWidget {
         ),
         // 登录态变化后：重新拉取主页数据与媒体库（未登录时清空），Connect 重新接入或断开
         ChangeNotifierProvider(
-          create: (ctx) => AuthProvider(ctx.read<SpotifyAuthService>())
-            ..onSessionChanged = () {
-              ctx.read<SpotifyProvider>().loadInitialData();
-              ctx.read<LibraryProvider>().refresh();
-              ctx.read<ConnectProvider>().sessionChanged();
-            },
+          create: (ctx) =>
+              AuthProvider(ctx.read<SpotifyAuthService>())
+                ..onSessionChanged = () {
+                  ctx.read<SpotifyProvider>().loadInitialData();
+                  ctx.read<LibraryProvider>().refresh();
+                  ctx.read<ConnectProvider>().sessionChanged();
+                },
         ),
       ],
-      child: const PlaybackSessionKeeper(child: DynamicAccentSync(child: _ThemedApp())),
+      child: const PlaybackSessionKeeper(
+        child: DynamicAccentSync(child: _ThemedApp()),
+      ),
     );
   }
 }
 
 /// 代理相关偏好的指纹，用于判断是否需要重配 [NetworkProxy]。
-(ProxyMode, String, int) _proxyKey(AppPreferences prefs) => (prefs.proxyMode, prefs.proxyHost, prefs.proxyPort);
+(ProxyMode, String, int) _proxyKey(AppPreferences prefs) =>
+    (prefs.proxyMode, prefs.proxyHost, prefs.proxyPort);
 
 /// 按外观设置生成主题；字号缩放与减弱动效通过 MediaQuery 下发给整棵树。
 class _ThemedApp extends StatelessWidget {
@@ -309,7 +425,9 @@ class _ThemedApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final appearance = context.watch<AppearanceProvider>();
     final settings = appearance.settings;
-    final language = context.select<PreferencesProvider, AppLanguage>((p) => p.prefs.language);
+    final language = context.select<PreferencesProvider, AppLanguage>(
+      (p) => p.prefs.language,
+    );
 
     return MaterialApp(
       title: 'Flutify',
@@ -331,14 +449,18 @@ class _ThemedApp extends StatelessWidget {
         return MediaQuery(
           data: media.copyWith(
             // 用户字号与系统字号相乘
-            textScaler: TextScaler.linear(media.textScaler.scale(1) * settings.fontScale),
+            textScaler: TextScaler.linear(
+              media.textScaler.scale(1) * settings.fontScale,
+            ),
             disableAnimations: media.disableAnimations || settings.reduceMotion,
           ),
           // 状态栏 / 导航栏图标随深浅色切换；全屏播放器等深色沉浸页面自行覆盖为浅色图标
           child: AnnotatedRegion<SystemUiOverlayStyle>(
             value: systemBarsStyle(Theme.of(context).brightness),
             // 桌面：窗口按钮 / 窄窗口标题条覆盖在所有路由之上
-            child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
+            child: TaskbarLyricsBinding(
+              child: WindowFrame(child: child!),
+            ),
           ),
         );
       },

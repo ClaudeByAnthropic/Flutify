@@ -38,7 +38,8 @@ class _NetworkSectionState extends State<NetworkSection> {
   void initState() {
     super.initState();
     _proxy = Provider.of<NetworkProxy?>(context, listen: false);
-    if (context.read<PreferencesProvider>().prefs.proxyMode == ProxyMode.system) _refreshSystem();
+    if (context.read<PreferencesProvider>().prefs.proxyMode == ProxyMode.system)
+      _refreshSystem();
   }
 
   void _refreshSystem() {
@@ -70,7 +71,12 @@ class _NetworkSectionState extends State<NetworkSection> {
     final token = ++_probeToken;
     setState(() => _probe = _ProbeState.running);
     // 等手动地址这类刚提交的配置生效（系统模式会重读系统代理）
-    await _proxy?.configure(context.read<PreferencesProvider>().prefs);
+    final prefs = context.read<PreferencesProvider>().prefs;
+    await _proxy?.configure(
+      mode: prefs.proxyMode,
+      proxyHost: prefs.proxyHost,
+      proxyPort: prefs.proxyPort,
+    );
     try {
       final elapsed = await ProxyProbe.run();
       if (!mounted || token != _probeToken) return;
@@ -90,7 +96,10 @@ class _NetworkSectionState extends State<NetworkSection> {
   /// 异常的一行摘要：去掉类型前缀，过长截断。
   static String _describe(Object error) {
     if (error is TimeoutException) return 'timeout';
-    var text = '$error'.split('\n').first.replaceFirst(RegExp(r'^\w*Exception:\s*'), '');
+    var text = '$error'
+        .split('\n')
+        .first
+        .replaceFirst(RegExp(r'^\w*Exception:\s*'), '');
     if (text.length > 90) text = '${text.substring(0, 90)}…';
     return text;
   }
@@ -100,9 +109,10 @@ class _NetworkSectionState extends State<NetworkSection> {
     final l10n = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
     final provider = context.read<PreferencesProvider>();
-    final (mode, host, port) = context.select<PreferencesProvider, (ProxyMode, String, int)>(
-      (p) => (p.prefs.proxyMode, p.prefs.proxyHost, p.prefs.proxyPort),
-    );
+    final (mode, host, port) = context
+        .select<PreferencesProvider, (ProxyMode, String, int)>(
+          (p) => (p.prefs.proxyMode, p.prefs.proxyHost, p.prefs.proxyPort),
+        );
     final proxy = _proxy;
 
     final String? subtitle = switch (mode) {
@@ -140,7 +150,8 @@ class _NetworkSectionState extends State<NetworkSection> {
             below: ProxyServerFields(
               host: host,
               port: port,
-              onApply: (h, p) => _update(provider.prefs.copyWith(proxyHost: h, proxyPort: p)),
+              onApply: (h, p) =>
+                  _update(provider.prefs.copyWith(proxyHost: h, proxyPort: p)),
             ),
           ),
         if (proxy != null)
@@ -149,7 +160,9 @@ class _NetworkSectionState extends State<NetworkSection> {
             subtitle: switch (_probe) {
               _ProbeState.idle => null,
               _ProbeState.running => l10n.settingsProxyTesting,
-              _ProbeState.ok => l10n.settingsProxyTestOk(int.parse(_probeDetail)),
+              _ProbeState.ok => l10n.settingsProxyTestOk(
+                int.parse(_probeDetail),
+              ),
               _ProbeState.failed => l10n.settingsProxyTestFailed(_probeDetail),
             },
             trailing: switch (_probe) {
@@ -157,9 +170,18 @@ class _NetworkSectionState extends State<NetworkSection> {
                 dimension: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              _ProbeState.ok => Icon(Icons.check_circle_rounded, color: colorScheme.primary),
-              _ProbeState.failed => Icon(Icons.error_rounded, color: colorScheme.error),
-              _ProbeState.idle => Icon(Icons.network_check_rounded, color: colorScheme.onSurfaceVariant),
+              _ProbeState.ok => Icon(
+                Icons.check_circle_rounded,
+                color: colorScheme.primary,
+              ),
+              _ProbeState.failed => Icon(
+                Icons.error_rounded,
+                color: colorScheme.error,
+              ),
+              _ProbeState.idle => Icon(
+                Icons.network_check_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
             },
             onTap: _probe == _ProbeState.running ? null : _runProbe,
           ),

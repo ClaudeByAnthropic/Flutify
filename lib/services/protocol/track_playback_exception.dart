@@ -3,6 +3,10 @@ enum TrackPlaybackFailure {
   /// 未登录或会话失效：需要重新登录，跳过也无意义。
   notSignedIn,
 
+  /// 缺少 Web 登录态（sp_dc）：DRM 全曲播放的 Widevine 真密钥依赖 Web token，
+  /// 需要用户完成一次 Web 登录；跳过无意义。
+  webSignInRequired,
+
   /// 曲目在当前地区 / 账号下不可播放（无音频文件、版权限制、仅 Premium 音质等）：提示并跳过。
   unavailable,
 

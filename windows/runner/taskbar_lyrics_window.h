@@ -14,7 +14,12 @@
 #include "taskbar_lyrics_state.h"
 #include "taskbar_widget_locator.h"
 
-// 嵌入 Windows 任务栏（Shell_TrayWnd）的歌词窗口，紧贴天气小组件右侧、居中图标区左侧。
+// 嵌入 Windows 任务栏（Shell_TrayWnd）的歌词窗口。
+//
+// 摆放位置随任务栏形态自适应（每秒复查一次注册表 / APPBAR 状态，用户改设置后自动跟随）：
+// - Windows 11 且任务栏图标居中：显示在左侧 —— 紧贴天气小组件右侧、居中图标区左侧；
+// - Windows 10 或 Windows 11 图标居左：显示在右侧 —— 紧贴系统托盘区的左边；
+// - 任务栏位于屏幕左侧 / 右侧（竖向）：功能自动禁用（隐藏窗口），移回底部 / 顶部后自动恢复。
 //
 // 线程：窗口运行在自己的线程和消息循环上。跨进程挂到任务栏下的子窗口会与资源管理器共享输入队列，
 // 放在 Flutter 主线程上的话 App 一忙任务栏就跟着卡。线程里有两个窗口：
@@ -45,6 +50,10 @@ class TaskbarLyricsWindow {
   bool EnsureEmbedded();
   void Housekeep();
   void Reflow(bool force);
+  // 任务栏在屏幕左 / 右边缘（竖向）：此时禁用任务栏歌词。
+  bool DetectVerticalTaskbar();
+  // 任务栏图标是否居中（Win11 的 TaskbarAl=1；Win10 无此键，视为居左）。
+  bool IconsCentered() const;
   int MeasureWidgetRight(const RECT& tray, int rebar_left);
   int ScanWidgetRight(const RECT& tray, int rebar_left);
   void SampleBackground();
@@ -84,7 +93,8 @@ class TaskbarLyricsWindow {
   double scale_ = 1.0;
   int x_ = 0, y_ = 0, width_ = 300, height_ = 40;
   ULONGLONG last_housekeep_ = 0;
-  bool dark_text_ = false;  // 自动配色：浅色任务栏用深色字
+  bool dark_text_ = false;        // 自动配色：浅色任务栏用深色字
+  bool vertical_taskbar_ = false;  // 竖向任务栏：功能禁用（窗口隐藏，每秒复查）
 
   // ---- 交互 ----
   bool hover_ = false;

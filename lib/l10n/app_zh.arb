@@ -51,6 +51,26 @@
   "typeTrack": "歌曲",
   "typeArtist": "艺人",
   "typePlaylist": "歌单",
+  "typePodcast": "播客",
+  "podcastEpisodeCount": "{count, plural, other{{count} 集}}",
+  "@podcastEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "podcastPlayed": "已播完",
+  "podcastResumeFrom": "播至 {position}",
+  "@podcastResumeFrom": {
+    "placeholders": {
+      "position": {
+        "type": "String"
+      }
+    }
+  },
+  "podcastEmpty": "这个节目暂时没有单集",
+  "podcastLoadFailed": "节目加载失败，请检查网络后重试",
   "typeAlbum": "专辑",
   "typeSingle": "单曲",
   "typeCompilation": "合辑",
@@ -184,6 +204,9 @@
   "playerLyricsFullscreen": "全屏歌词",
   "playerSwipeHint": "左右滑动封面切换歌曲",
   "playbackErrorSignIn": "登录后才能播放",
+  "playbackErrorWebSignIn": "全曲播放需要先完成 Web 登录",
+  "webLoginAction": "Web 登录",
+  "webLoginSuccess": "Web 登录成功，全曲播放已就绪",
   "playbackErrorUnavailable": "「{track}」暂时无法播放",
   "@playbackErrorUnavailable": {
     "placeholders": { "track": { "type": "String" } }
@@ -366,7 +389,7 @@
   "settingsLyricsFallbackSubtitle": "Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选",
   "settingsTaskbarLyricsSection": "任务栏歌词",
   "settingsTaskbarLyrics": "在任务栏显示歌词",
-  "settingsTaskbarLyricsSubtitle": "显示在天气小组件右侧。悬停时显示播放控制，点按打开 Flutify，右键可重新获取歌词",
+  "settingsTaskbarLyricsSubtitle": "任务栏图标居中时显示在左侧，居左时显示在系统托盘左边；任务栏竖向时自动停用。悬停显示播放控制，点按打开 Flutify，右键重新获取歌词",
   "settingsTaskbarLyricsColor": "文字颜色",
   "settingsTaskbarLyricsCustomColor": "自定义颜色",
   "settingsTaskbarLyricsChangeColor": "更改",

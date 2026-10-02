@@ -36,12 +36,31 @@ class LrclibSelector {
   }
 
   static LrclibSelection? select(List<LrclibCandidate> all, LyricsQuery query) {
-    final candidates = [
+    var candidates = [
       for (final c in all)
         if (!_otherArtist(c, query)) c,
     ];
     final title = query.title;
     final durSec = query.durationMs / 1000;
+
+    // 歌手信息缺失（如 Connect 远程曲目尚未补全）时撞名歌极多：
+    // 只接受曲名一致且时长吻合（±5s）的候选；时长也缺失时宁可不上歌词（配错歌比没有更糟）。
+    if (query.artist.trim().isEmpty) {
+      candidates = [
+        for (final c in candidates)
+          if (_sameTitle(c.trackName, title) &&
+              durSec > 0 &&
+              c.duration > 0 &&
+              (c.duration - durSec).abs() <= 5)
+            c,
+      ];
+      if (candidates.isEmpty) return null;
+    }
+
+    // 纯音乐守卫：曲名 + 歌手 + 时长都吻合的候选被标记为纯音乐，且没有同样吻合的带词版本时，
+    // 认定这首歌是纯音乐 —— 不配任何歌词（宁可没有，也不给纯音乐硬配同名歌曲的词）。
+    if (_isInstrumental(candidates, query)) return null;
+
     final wantHant = wantsTraditional(query);
     for (final c in candidates) {
       c.rejected = c.lines.isNotEmpty && TranslationFilter.isRejected(c, title);
@@ -136,6 +155,26 @@ class LrclibSelector {
       }
     }
     return score;
+  }
+
+  /// 判定当前曲目是纯音乐：存在「精确吻合」（曲名一致、歌手对上、时长差 ≤ 5 秒）的纯音乐候选，
+  /// 且没有同样精确吻合的带词候选（同一首歌常在库里同时有两种记录，带词的优先）。
+  static bool _isInstrumental(List<LrclibCandidate> candidates, LyricsQuery query) {
+    final durSec = query.durationMs / 1000;
+    bool exact(LrclibCandidate c) =>
+        _sameTitle(c.trackName, query.title) &&
+        _sameArtist(c, query) &&
+        (durSec <= 0 || c.duration <= 0 || (c.duration - durSec).abs() <= 5);
+    var instrumentalExact = false;
+    for (final c in candidates) {
+      if (!exact(c)) continue;
+      if (c.instrumental) {
+        instrumentalExact = true;
+      } else if (c.lines.isNotEmpty) {
+        return false; // 有精确吻合的带词版本：不是纯音乐
+      }
+    }
+    return instrumentalExact;
   }
 
   static bool _sameArtist(LrclibCandidate c, LyricsQuery query) =>

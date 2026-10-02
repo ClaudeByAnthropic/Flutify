@@ -16,7 +16,12 @@ class HomeFeed {
   final List<HomeItem> shortcuts;
   final List<HomeSection> sections;
 
-  const HomeFeed({this.greeting = '', this.chips = const [], this.shortcuts = const [], this.sections = const []});
+  const HomeFeed({
+    this.greeting = '',
+    this.chips = const [],
+    this.shortcuts = const [],
+    this.sections = const [],
+  });
 
   static const HomeFeed empty = HomeFeed();
 
@@ -30,7 +35,11 @@ class HomeChip {
   final String label;
   final List<HomeChip> subChips;
 
-  const HomeChip({required this.id, required this.label, this.subChips = const []});
+  const HomeChip({
+    required this.id,
+    required this.label,
+    this.subChips = const [],
+  });
 }
 
 /// 分区的展示形态。
@@ -96,6 +105,9 @@ class HomeItem {
   final SpotifyAlbum? album;
   final SpotifyArtist? artist;
 
+  /// 单集所属节目的 URI（`spotify:show:...`）；仅 [HomeItemKind.episode] 可能有值。
+  final String parentUri;
+
   const HomeItem({
     required this.kind,
     required this.uri,
@@ -107,14 +119,15 @@ class HomeItem {
     this.playlist,
     this.album,
     this.artist,
+    this.parentUri = '',
   });
 
   String get imageUrl => images.isEmpty ? '' : images.first.url;
 
   bool get isCircular => kind == HomeItemKind.artist;
 
-  /// App 内能打开详情页的类型（播客 / 单集暂不支持）。
-  bool get isOpenable => kind != HomeItemKind.podcast && kind != HomeItemKind.episode;
+  /// App 内能打开详情页的类型（播客节目页已支持；单集打开所属节目）。
+  bool get isOpenable => true;
 
   HomeItem withReason(String reason, SpotifyArtist? artist) => HomeItem(
     kind: kind,
@@ -127,5 +140,6 @@ class HomeItem {
     playlist: playlist,
     album: album,
     artist: this.artist,
+    parentUri: parentUri,
   );
 }

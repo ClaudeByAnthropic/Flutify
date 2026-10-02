@@ -131,6 +131,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get typePlaylist => 'Playlist';
 
   @override
+  String get typePodcast => 'Podcast';
+
+  @override
+  String podcastEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count episodes',
+      one: '1 episode',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get podcastPlayed => 'Played';
+
+  @override
+  String podcastResumeFrom(String position) {
+    return 'At $position';
+  }
+
+  @override
+  String get podcastEmpty => 'No episodes yet';
+
+  @override
+  String get podcastLoadFailed =>
+      'Couldn\'t load the show. Check your connection and try again';
+
+  @override
   String get typeAlbum => 'Album';
 
   @override
@@ -439,6 +468,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playbackErrorSignIn => 'Sign in to play music';
+
+  @override
+  String get playbackErrorWebSignIn =>
+      'Full-track playback requires a Web sign-in first';
+
+  @override
+  String get webLoginAction => 'Web sign-in';
+
+  @override
+  String get webLoginSuccess =>
+      'Web sign-in complete — full-track playback is ready';
 
   @override
   String playbackErrorUnavailable(String track) {
@@ -887,7 +927,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsTaskbarLyricsSubtitle =>
-      'Shown next to the Widgets button. Hover for playback controls, click to open Flutify, right-click to reload lyrics';
+      'Shown on the left when taskbar icons are centered, or just left of the system tray when left-aligned; paused on vertical taskbars. Hover for playback controls, click to open Flutify, right-click to reload lyrics';
 
   @override
   String get settingsTaskbarLyricsColor => 'Text color';

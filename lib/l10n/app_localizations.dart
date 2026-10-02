@@ -332,6 +332,42 @@ abstract class AppLocalizations {
   /// **'歌单'**
   String get typePlaylist;
 
+  /// No description provided for @typePodcast.
+  ///
+  /// In zh, this message translates to:
+  /// **'播客'**
+  String get typePodcast;
+
+  /// No description provided for @podcastEpisodeCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, other{{count} 集}}'**
+  String podcastEpisodeCount(int count);
+
+  /// No description provided for @podcastPlayed.
+  ///
+  /// In zh, this message translates to:
+  /// **'已播完'**
+  String get podcastPlayed;
+
+  /// No description provided for @podcastResumeFrom.
+  ///
+  /// In zh, this message translates to:
+  /// **'播至 {position}'**
+  String podcastResumeFrom(String position);
+
+  /// No description provided for @podcastEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个节目暂时没有单集'**
+  String get podcastEmpty;
+
+  /// No description provided for @podcastLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'节目加载失败，请检查网络后重试'**
+  String get podcastLoadFailed;
+
   /// No description provided for @typeAlbum.
   ///
   /// In zh, this message translates to:
@@ -883,6 +919,24 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'登录后才能播放'**
   String get playbackErrorSignIn;
+
+  /// No description provided for @playbackErrorWebSignIn.
+  ///
+  /// In zh, this message translates to:
+  /// **'全曲播放需要先完成 Web 登录'**
+  String get playbackErrorWebSignIn;
+
+  /// No description provided for @webLoginAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'Web 登录'**
+  String get webLoginAction;
+
+  /// No description provided for @webLoginSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'Web 登录成功，全曲播放已就绪'**
+  String get webLoginSuccess;
 
   /// No description provided for @playbackErrorUnavailable.
   ///
@@ -1679,7 +1733,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsTaskbarLyricsSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'显示在天气小组件右侧。悬停时显示播放控制，点按打开 Flutify，右键可重新获取歌词'**
+  /// **'任务栏图标居中时显示在左侧，居左时显示在系统托盘左边；任务栏竖向时自动停用。悬停显示播放控制，点按打开 Flutify，右键重新获取歌词'**
   String get settingsTaskbarLyricsSubtitle;
 
   /// No description provided for @settingsTaskbarLyricsColor.

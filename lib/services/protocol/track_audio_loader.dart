@@ -8,15 +8,18 @@ import 'access_point.dart';
 import 'audio_cache_store.dart';
 import 'audio_normalization.dart';
 import 'decrypt/decrypt_backend.dart';
+import 'episode_metadata.dart';
 import 'extended_metadata.dart';
 import 'progressive_download.dart';
 import 'spotify_id.dart';
 import 'storage_resolver.dart';
 import 'track_metadata.dart';
 import 'track_playback_exception.dart';
+import '../audio/audio_engine.dart';
 
 export 'audio_normalization.dart';
-export 'decrypt/decrypt_backend.dart' show DecryptBackend, InlineDecryptBackend, IsolateDecryptBackend;
+export 'decrypt/decrypt_backend.dart'
+    show DecryptBackend, InlineDecryptBackend, IsolateDecryptBackend;
 export 'progressive_download.dart' show ProgressiveAudio;
 export 'track_playback_exception.dart';
 
@@ -56,6 +59,9 @@ class LoadedAudio {
   /// 边下边播的音频流（[TrackAudioSource.open] 未命中缓存时）。
   final ProgressiveAudio? stream;
 
+  /// DRM 曲目的 EME 内容；非空时由 EME 引擎播放（[file] 是加密 fMP4，just_audio 不解）。
+  final EmeTrackContent? emeContent;
+
   const LoadedAudio({
     required this.file,
     required this.source,
@@ -63,6 +69,7 @@ class LoadedAudio {
     required this.trackId,
     this.normalization,
     this.stream,
+    this.emeContent,
   });
 
   String get path => file.path;
@@ -73,11 +80,17 @@ typedef AccessTokenGetter = Future<String> Function();
 /// 曲目音频来源抽象：PlaybackProvider 只依赖它，测试可用替身实现（不必真的联网）。
 abstract class TrackAudioSource {
   /// 取得一首曲目的本地可播放文件（等整首下载完）；失败抛 [TrackPlaybackException]。
-  Future<LoadedAudio> load(String trackIdOrUri, {void Function(double progress)? progress});
+  Future<LoadedAudio> load(
+    String trackIdOrUri, {
+    void Function(double progress)? progress,
+  });
 
   /// 尽快取得可播放的音频：已缓存时与 [load] 相同；否则文件头一到就返回边下边播的
   /// [LoadedAudio.stream]。失败抛 [TrackPlaybackException]。
-  Future<LoadedAudio> open(String trackIdOrUri, {void Function(double progress)? progress});
+  Future<LoadedAudio> open(
+    String trackIdOrUri, {
+    void Function(double progress)? progress,
+  });
 
   /// 预取（失败静默，不影响当前播放）。
   Future<void> prefetch(String trackIdOrUri);
@@ -155,7 +168,8 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   // 缓存管理（AudioCacheStore）
   // ---------------------------------------------------------------------------
 
-  Directory get _audioDir => Directory('$cacheDirectory${Platform.pathSeparator}audio');
+  Directory get _audioDir =>
+      Directory('$cacheDirectory${Platform.pathSeparator}audio');
 
   /// 音频缓存目录的容量上限（字节）。
   @override
@@ -174,7 +188,11 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
     return dir
         .listSync()
         .whereType<File>()
-        .where((f) => !f.path.endsWith('.part') && !f.path.endsWith('.${AudioNormalization.sidecarExtension}'))
+        .where(
+          (f) =>
+              !f.path.endsWith('.part') &&
+              !f.path.endsWith('.${AudioNormalization.sidecarExtension}'),
+        )
         .toList();
   }
 
@@ -220,7 +238,10 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
 
   Future<Map<String, String>> _headers() async {
     final token = await accessToken();
-    final headers = <String, String>{'Authorization': 'Bearer $token', 'Accept': 'application/x-protobuf'};
+    final headers = <String, String>{
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/x-protobuf',
+    };
     if (clientToken != null) {
       headers['client-token'] = await clientToken!();
     }
@@ -231,7 +252,10 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   ///
   /// [progress] 回调 0.0~1.0（下载/解密进度）。已缓存时立即返回。
   @override
-  Future<LoadedAudio> load(String trackIdOrUri, {void Function(double progress)? progress}) async {
+  Future<LoadedAudio> load(
+    String trackIdOrUri, {
+    void Function(double progress)? progress,
+  }) async {
     final session = await _session(trackIdOrUri);
     final cached = session.cached;
     if (cached != null) {
@@ -245,7 +269,10 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   /// 边下边播：已缓存时返回本地文件；否则文件头一到就返回 [LoadedAudio.stream]，
   /// 下载在后台继续并在完成后写入缓存。
   @override
-  Future<LoadedAudio> open(String trackIdOrUri, {void Function(double progress)? progress}) async {
+  Future<LoadedAudio> open(
+    String trackIdOrUri, {
+    void Function(double progress)? progress,
+  }) async {
     final session = await _session(trackIdOrUri);
     final cached = session.cached;
     if (cached != null) {
@@ -257,7 +284,11 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
     try {
       await download.ready;
     } catch (e) {
-      throw TrackPlaybackException(TrackPlaybackFailure.network, '音频下载失败，请检查网络后重试', e);
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.network,
+        '音频下载失败，请检查网络后重试',
+        e,
+      );
     }
     _protect(session.destination);
     return LoadedAudio(
@@ -276,13 +307,20 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
     try {
       id = SpotifyId.fromUri(trackIdOrUri);
     } on FormatException {
-      return Future.error(const TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌不是 Spotify 曲目，无法播放'));
+      return Future.error(
+        const TrackPlaybackException(
+          TrackPlaybackFailure.unavailable,
+          '这首歌不是 Spotify 曲目，无法播放',
+        ),
+      );
     }
-    final key = id.toBase62();
+    // 单集与曲目共用缓存键：前缀区分，避免同 base62 的不同类型互相命中
+    final isEpisode = trackIdOrUri.contains(':episode:');
+    final key = '${isEpisode ? 'episode' : 'track'}:${id.toBase62()}';
     final existing = _inFlight[key];
     if (existing != null) return existing;
 
-    final future = _startSession(id);
+    final future = _startSession(id, isEpisode: isEpisode);
     _inFlight[key] = future;
     void release() {
       if (identical(_inFlight[key], future)) _inFlight.remove(key);
@@ -293,31 +331,64 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
       if (persisted == null) {
         release();
       } else {
-        persisted.then<void>((_) {}, onError: (Object _) {}).whenComplete(release);
+        persisted
+            .then<void>((_) {}, onError: (Object _) {})
+            .whenComplete(release);
       }
     }, onError: (Object _) => release());
     return future;
   }
 
-  Future<_AudioSession> _startSession(SpotifyId id) async {
-    // 1) metadata：取各格式 file_id
-    final TrackMetadata meta;
-    try {
-      meta = await fetchTrackMetadata(id);
-    } on TrackPlaybackException {
-      rethrow;
-    } catch (e) {
-      throw TrackPlaybackException(TrackPlaybackFailure.network, '获取曲目信息失败，请检查网络', e);
+  Future<_AudioSession> _startSession(
+    SpotifyId id, {
+    bool isEpisode = false,
+  }) async {
+    // 1) metadata：取各格式 file_id（曲目走 extended-metadata；单集走 AP 上的 mercury hm://metadata/4/episode）
+    final List<({TrackAudioFile file, Uint8List gid})> candidates;
+    final bool hasAnyFile;
+    final int? durationMs;
+    if (isEpisode) {
+      final EpisodeMetadata meta;
+      try {
+        meta = await fetchEpisodeMetadata(id);
+      } on TrackPlaybackException {
+        rethrow;
+      } catch (e) {
+        throw TrackPlaybackException(
+          TrackPlaybackFailure.network,
+          '获取单集信息失败，请检查网络',
+          e,
+        );
+      }
+      candidates = meta.candidateFiles(formatPreference);
+      hasAnyFile = meta.hasAnyFile;
+      durationMs = meta.durationMs > 0 ? meta.durationMs : null;
+    } else {
+      final TrackMetadata meta;
+      try {
+        meta = await fetchTrackMetadata(id);
+      } on TrackPlaybackException {
+        rethrow;
+      } catch (e) {
+        throw TrackPlaybackException(
+          TrackPlaybackFailure.network,
+          '获取曲目信息失败，请检查网络',
+          e,
+        );
+      }
+      candidates = meta.candidateFiles(formatPreference);
+      hasAnyFile = meta.hasAnyFile;
+      durationMs = meta.durationMs > 0 ? meta.durationMs : null;
     }
-    final candidates = meta.candidateFiles(formatPreference);
     if (candidates.isEmpty) {
       // 有音频文件但都不是 OGG/MP3（FLAC / AAC 走 Widevine DRM，AP 不下发密钥）
       throw TrackPlaybackException(
         TrackPlaybackFailure.unavailable,
-        meta.hasAnyFile ? '这首歌仅提供 DRM 加密格式，暂不支持播放' : '这首歌在你所在的地区或账号下暂不可播放',
+        hasAnyFile
+            ? (isEpisode ? '这集播客仅提供 DRM 加密格式，暂不支持播放' : '这首歌仅提供 DRM 加密格式，暂不支持播放')
+            : (isEpisode ? '这集播客在你所在的地区或账号下暂不可播放' : '这首歌在你所在的地区或账号下暂不可播放'),
       );
     }
-    final durationMs = meta.durationMs > 0 ? meta.durationMs : null;
 
     // 2) 缓存命中：任一候选格式已落盘即直接使用
     for (final c in candidates) {
@@ -327,7 +398,10 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
         try {
           cached.setLastModifiedSync(DateTime.now());
         } catch (_) {}
-        return _AudioSession.cached(_loaded(cached, c.file, durationMs, id), id);
+        return _AudioSession.cached(
+          _loaded(cached, c.file, durationMs, id),
+          id,
+        );
       }
     }
 
@@ -337,10 +411,18 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
       ap = await _ensureAccessPoint();
     } on ApLoginException catch (e) {
       _disposeAccessPoint();
-      throw TrackPlaybackException(TrackPlaybackFailure.notSignedIn, '播放服务登录失败：${e.message}', e);
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.notSignedIn,
+        '播放服务登录失败：${e.message}',
+        e,
+      );
     } catch (e) {
       _disposeAccessPoint();
-      throw TrackPlaybackException(TrackPlaybackFailure.network, '无法连接 Spotify 播放服务，请检查网络', e);
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.network,
+        '无法连接 Spotify 播放服务，请检查网络',
+        e,
+      );
     }
     TrackAudioFile? file;
     Uint8List? key;
@@ -354,19 +436,37 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
         keyError = e;
       } catch (e) {
         _disposeAccessPoint();
-        throw TrackPlaybackException(TrackPlaybackFailure.network, '获取音频密钥超时，请稍后重试', e);
+        throw TrackPlaybackException(
+          TrackPlaybackFailure.network,
+          '获取音频密钥超时，请稍后重试',
+          e,
+        );
       }
     }
     if (file == null || key == null) {
-      throw TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌暂时无法播放（可能需要 Premium 或受版权限制）', keyError);
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.unavailable,
+        isEpisode
+            ? '这集播客暂时无法播放（音频密钥受限，完整播放即将支持）'
+            : '这首歌暂时无法播放（可能需要 Premium 或受版权限制）',
+        keyError,
+      );
     }
 
     // 4) CDN 解析，随后在后台下载 + 流式解密（边下边播由 open 读取同一份下载）
     final List<String> cdnUrls;
     try {
-      cdnUrls = (await resolveAudioStorage(fileIdHex: file.fileIdHex, headers: _headers, client: _client)).cdnUrls;
+      cdnUrls = (await resolveAudioStorage(
+        fileIdHex: file.fileIdHex,
+        headers: _headers,
+        client: _client,
+      )).cdnUrls;
     } catch (e) {
-      throw TrackPlaybackException(TrackPlaybackFailure.network, '音频下载失败，请检查网络后重试', e);
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.network,
+        '音频下载失败，请检查网络后重试',
+        e,
+      );
     }
     final destination = _cacheFile(file);
     final download = ProgressiveDownload(
@@ -389,7 +489,11 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
         await download.done;
         await _persist(download, destination);
       } catch (e) {
-        throw TrackPlaybackException(TrackPlaybackFailure.network, '音频下载失败，请检查网络后重试', e);
+        throw TrackPlaybackException(
+          TrackPlaybackFailure.network,
+          '音频下载失败，请检查网络后重试',
+          e,
+        );
       }
       final result = _loaded(destination, source, durationMs, id);
       _trimCache();
@@ -407,7 +511,12 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
     if (_recentPaths.length > 2) _recentPaths.removeAt(0);
   }
 
-  LoadedAudio _loaded(File cached, TrackAudioFile source, int? durationMs, SpotifyId id) {
+  LoadedAudio _loaded(
+    File cached,
+    TrackAudioFile source,
+    int? durationMs,
+    SpotifyId id,
+  ) {
     _protect(cached);
     return LoadedAudio(
       file: cached,
@@ -420,12 +529,16 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
 
   /// 落盘：写入已去掉 Spotify 私有头的音频（规则见 [SpotifyAudioHeader]），先写 `.part` 再改名，
   /// 中途失败不会留下半截缓存。私有头里的响度数据另存为 `.norm` 旁路文件。
-  static Future<void> _persist(ProgressiveDownload download, File destination) async {
+  static Future<void> _persist(
+    ProgressiveDownload download,
+    File destination,
+  ) async {
     await destination.parent.create(recursive: true);
     final tmp = File('${destination.path}.part');
     try {
       await tmp.writeAsBytes(download.playableBytes, flush: true);
-      if (destination.existsSync()) destination.deleteSync(); // Windows 上 rename 不覆盖已有文件
+      if (destination.existsSync())
+        destination.deleteSync(); // Windows 上 rename 不覆盖已有文件
       await tmp.rename(destination.path);
     } catch (_) {
       if (tmp.existsSync()) tmp.deleteSync();
@@ -446,7 +559,9 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
       final files = _audioFiles();
       var total = files.fold<int>(0, (sum, f) => sum + f.lengthSync());
       if (total <= _maxCacheBytes) return;
-      files.sort((a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()));
+      files.sort(
+        (a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()),
+      );
       for (final f in files) {
         if (total <= _maxCacheBytes) break;
         if (_isProtected(f)) continue;
@@ -481,23 +596,84 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
       }
     } on ExtendedMetadataHttpException catch (e) {
       if (e.statusCode == 401) {
-        throw const TrackPlaybackException(TrackPlaybackFailure.notSignedIn, '登录已失效，请重新登录后再播放');
+        throw const TrackPlaybackException(
+          TrackPlaybackFailure.notSignedIn,
+          '登录已失效，请重新登录后再播放',
+        );
       }
     }
 
     final res = await _client.get(
-      Uri.parse('https://spclient.wg.spotify.com/metadata/4/track/${id.toBase16()}'),
+      Uri.parse(
+        'https://spclient.wg.spotify.com/metadata/4/track/${id.toBase16()}',
+      ),
       headers: await _headers(),
     );
     switch (res.statusCode) {
       case 200:
         return TrackMetadata.parse(res.bodyBytes);
       case 401:
-        throw const TrackPlaybackException(TrackPlaybackFailure.notSignedIn, '登录已失效，请重新登录后再播放');
+        throw const TrackPlaybackException(
+          TrackPlaybackFailure.notSignedIn,
+          '登录已失效，请重新登录后再播放',
+        );
       case 404:
-        throw const TrackPlaybackException(TrackPlaybackFailure.unavailable, '找不到这首歌的音频');
+        throw const TrackPlaybackException(
+          TrackPlaybackFailure.unavailable,
+          '找不到这首歌的音频',
+        );
       default:
         throw StateError('metadata 请求失败：HTTP ${res.statusCode}');
+    }
+  }
+
+  /// 拉取单集 metadata：AP 加密通道上的 Mercury `hm://metadata/4/episode/{gid}`。
+  ///
+  /// 单集没有 HTTPS 元数据入口（spclient metadata/4/episode 已 404、extended-metadata
+  /// EPISODE_V4 对该身份返回 400），Mercury 是唯一可用来源（tool/mercury_probe.dart 验证）。
+  Future<EpisodeMetadata> fetchEpisodeMetadata(SpotifyId id) async {
+    final SpotifyAccessPoint ap;
+    try {
+      ap = await _ensureAccessPoint();
+    } on ApLoginException catch (e) {
+      _disposeAccessPoint();
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.notSignedIn,
+        '播放服务登录失败：${e.message}',
+        e,
+      );
+    } catch (e) {
+      _disposeAccessPoint();
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.network,
+        '无法连接 Spotify 播放服务，请检查网络',
+        e,
+      );
+    }
+    try {
+      final body = await ap.requestMercury(
+        'hm://metadata/4/episode/${id.toBase16()}',
+      );
+      return EpisodeMetadata.parse(body);
+    } on ApMercuryException catch (e) {
+      if (e.statusCode == 404) {
+        throw TrackPlaybackException(
+          TrackPlaybackFailure.unavailable,
+          '找不到这集播客的音频',
+          e,
+        );
+      }
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.network,
+        '获取单集信息失败，请检查网络',
+        e,
+      );
+    } on TimeoutException catch (e) {
+      throw TrackPlaybackException(
+        TrackPlaybackFailure.network,
+        '获取单集信息超时，请稍后重试',
+        e,
+      );
     }
   }
 
@@ -505,7 +681,10 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   Future<SpotifyAccessPoint> _ensureAccessPoint() async {
     Future<SpotifyAccessPoint> create() async {
       final ap = await SpotifyAccessPoint.connect(client: _client);
-      await ap.authenticate(ApCredentials.accessToken(await accessToken()), deviceId: deviceId);
+      await ap.authenticate(
+        ApCredentials.accessToken(await accessToken()),
+        deviceId: deviceId,
+      );
       return ap;
     }
 

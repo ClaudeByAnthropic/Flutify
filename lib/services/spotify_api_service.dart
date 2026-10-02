@@ -10,6 +10,7 @@ import '../models/home_feed.dart';
 import '../models/image.dart';
 import '../models/lyrics.dart';
 import '../models/playlist.dart';
+import '../models/podcast.dart';
 import '../models/track.dart';
 import '../models/track_credits.dart';
 import '../models/user_profile.dart';
@@ -21,6 +22,7 @@ import 'library/session_library_source.dart';
 import 'library/web_api_library_source.dart';
 import 'lyrics_service.dart';
 import 'pathfinder/desktop_data_source.dart';
+import 'podcast/podcast_service.dart';
 import 'storage_service.dart';
 
 /// 取数据失败（未登录、网络错误、接口返回异常）。[message] 为简体中文说明，可直接展示。
@@ -31,10 +33,13 @@ class SpotifyDataException implements Exception {
   const SpotifyDataException(this.message, [this.statusCode]);
 
   /// 需要先登录。
-  static const SpotifyDataException notSignedIn = SpotifyDataException('请先登录 Spotify 账号');
+  static const SpotifyDataException notSignedIn = SpotifyDataException(
+    '请先登录 Spotify 账号',
+  );
 
   @override
-  String toString() => statusCode == null ? message : '$message（HTTP $statusCode）';
+  String toString() =>
+      statusCode == null ? message : '$message（HTTP $statusCode）';
 }
 
 /// 数据层：只访问真实的 Spotify 接口，没有任何示例 / 离线兜底。
@@ -54,10 +59,16 @@ class SpotifyApiService {
   /// 鉴权服务；接入后每次请求前自动续期 access_token。未接入时仅使用手动填写的 Token。
   SpotifyAuthService? _auth;
 
-  late final DesktopDataSource _desktop = DesktopDataSource(_client, headers: _headers);
+  late final DesktopDataSource _desktop = DesktopDataSource(
+    _client,
+    headers: _headers,
+  );
 
   /// 歌词服务（color-lyrics）。
   late final LyricsService lyrics = LyricsService(_client, headers: _headers);
+
+  /// 播客节目页数据（open.spotify.com 的服务端渲染状态，无需鉴权、不限流）。
+  late final PodcastService _podcast = PodcastService(_client);
 
   /// Spotify Connect 遥控服务（dealer 长连接 + connect-state）；懒创建，调用 `start()` 才会联网。
   /// 只有桌面版会话可用，见 [supportsConnect]。
@@ -86,7 +97,8 @@ class SpotifyApiService {
     ),
   );
 
-  SpotifyApiService(this._storage, [http.Client? client]) : _client = client ?? http.Client();
+  SpotifyApiService(this._storage, [http.Client? client])
+    : _client = client ?? http.Client();
 
   void attachAuth(SpotifyAuthService auth) => _auth = auth;
 
@@ -117,7 +129,9 @@ class SpotifyApiService {
     };
   }
 
-  String get _baseUrl => _storage.apiBaseUrl.trim().isEmpty ? SpotifyEndpoints.defaultWebApiBase : _storage.apiBaseUrl;
+  String get _baseUrl => _storage.apiBaseUrl.trim().isEmpty
+      ? SpotifyEndpoints.defaultWebApiBase
+      : _storage.apiBaseUrl;
 
   /// 是否已有可用的 access_token（登录或手动填写）。
   bool get isConfigured => _storage.accessToken.isNotEmpty;
@@ -126,13 +140,18 @@ class SpotifyApiService {
   Future<Map<String, dynamic>> _getJson(String path) async {
     final http.Response res;
     try {
-      res = await _client.get(Uri.parse('$_baseUrl$path'), headers: await _headers());
+      res = await _client.get(
+        Uri.parse('$_baseUrl$path'),
+        headers: await _headers(),
+      );
     } catch (e) {
       throw SpotifyDataException('网络请求失败，请检查网络：$e');
     }
-    if (res.statusCode != 200) throw SpotifyDataException('请求失败', res.statusCode);
+    if (res.statusCode != 200)
+      throw SpotifyDataException('请求失败', res.statusCode);
     final json = jsonDecode(utf8.decode(res.bodyBytes));
-    if (json is! Map<String, dynamic>) throw const SpotifyDataException('服务端返回了无法识别的数据');
+    if (json is! Map<String, dynamic>)
+      throw const SpotifyDataException('服务端返回了无法识别的数据');
     return json;
   }
 
@@ -159,8 +178,12 @@ class SpotifyApiService {
       // 昵称头像已在登录时由内部资料接口获取
       return SpotifyUser(
         id: auth.username,
-        displayName: auth.displayName.isEmpty ? 'Spotify User' : auth.displayName,
-        images: auth.avatarUrl.isEmpty ? const [] : [SpotifyImage(url: auth.avatarUrl)],
+        displayName: auth.displayName.isEmpty
+            ? 'Spotify User'
+            : auth.displayName,
+        images: auth.avatarUrl.isEmpty
+            ? const []
+            : [SpotifyImage(url: auth.avatarUrl)],
       );
     }
     return SpotifyUser.fromJson(await _getJson(SpotifyEndpoints.me));
@@ -177,10 +200,15 @@ class SpotifyApiService {
     if (!isConfigured) return HomeFeed.empty;
     if (_useDesktop) return _desktopLoad(() => _desktop.home(facet: facet));
 
-    final data = await _getJson('${SpotifyEndpoints.featuredPlaylists}?limit=20');
+    final data = await _getJson(
+      '${SpotifyEndpoints.featuredPlaylists}?limit=20',
+    );
     final items = (data['playlists'] as Map<String, dynamic>?)?['items'];
     final playlists = items is List
-        ? items.whereType<Map<String, dynamic>>().map(SpotifyPlaylist.fromJson).toList()
+        ? items
+              .whereType<Map<String, dynamic>>()
+              .map(SpotifyPlaylist.fromJson)
+              .toList()
         : const [];
     if (playlists.isEmpty) return HomeFeed.empty;
     return HomeFeed(
@@ -208,9 +236,13 @@ class SpotifyApiService {
   /// 「显示全部」：某个分区的更多条目。找不到该分区（主页已刷新换了一批）时抛 [SpotifyDataException]。
   Future<HomeSection> getHomeSection(String uri, {String facet = ''}) async {
     if (!isConfigured) throw SpotifyDataException.notSignedIn;
-    if (_useDesktop) return _desktopLoad(() => _desktop.homeSection(uri, facet: facet));
+    if (_useDesktop)
+      return _desktopLoad(() => _desktop.homeSection(uri, facet: facet));
     final home = await getHome();
-    return home.sections.firstWhere((s) => s.uri == uri, orElse: () => throw const SpotifyDataException('没有找到对应的内容'));
+    return home.sections.firstWhere(
+      (s) => s.uri == uri,
+      orElse: () => throw const SpotifyDataException('没有找到对应的内容'),
+    );
   }
 
   Future<List<SpotifyCategory>> getCategories() async {
@@ -219,7 +251,12 @@ class SpotifyApiService {
 
     final data = await _getJson('${SpotifyEndpoints.categories}?limit=20');
     final items = (data['categories'] as Map<String, dynamic>?)?['items'];
-    return items is List ? items.whereType<Map<String, dynamic>>().map(SpotifyCategory.fromJson).toList() : const [];
+    return items is List
+        ? items
+              .whereType<Map<String, dynamic>>()
+              .map(SpotifyCategory.fromJson)
+              .toList()
+        : const [];
   }
 
   // ---------------------------------------------------------------------------
@@ -233,13 +270,15 @@ class SpotifyApiService {
 
   Future<SpotifyAlbum> getAlbum(String id) async {
     if (!isConfigured) throw SpotifyDataException.notSignedIn;
-    if (_useDesktop) return _desktopLoad(() async => (await _desktop.albumPage(id))?.album);
+    if (_useDesktop)
+      return _desktopLoad(() async => (await _desktop.albumPage(id))?.album);
     return SpotifyAlbum.fromJson(await _getJson('/albums/$id'));
   }
 
   Future<SpotifyArtist> getArtist(String id) async {
     if (!isConfigured) throw SpotifyDataException.notSignedIn;
-    if (_useDesktop) return _desktopLoad(() async => (await _desktop.artistPage(id))?.artist);
+    if (_useDesktop)
+      return _desktopLoad(() async => (await _desktop.artistPage(id))?.artist);
     return SpotifyArtist.fromJson(await _getJson('/artists/$id'));
   }
 
@@ -248,11 +287,15 @@ class SpotifyApiService {
   Future<List<SpotifyTrack>> getAlbumTracks(SpotifyAlbum album) async {
     if (!isConfigured) return const [];
     try {
-      if (_useDesktop) return (await _desktop.albumPage(album.id))?.tracks ?? const [];
+      if (_useDesktop)
+        return (await _desktop.albumPage(album.id))?.tracks ?? const [];
       final data = await _getJson('/albums/${album.id}/tracks?limit=50');
       final items = data['items'];
       return items is List
-          ? items.whereType<Map<String, dynamic>>().map((t) => SpotifyTrack.fromJson(t).copyWith(album: album)).toList()
+          ? items
+                .whereType<Map<String, dynamic>>()
+                .map((t) => SpotifyTrack.fromJson(t).copyWith(album: album))
+                .toList()
           : const [];
     } catch (_) {
       return const [];
@@ -263,10 +306,16 @@ class SpotifyApiService {
   Future<List<SpotifyTrack>> getArtistTopTracks(String id) async {
     if (!isConfigured) return const [];
     try {
-      if (_useDesktop) return (await _desktop.artistPage(id))?.topTracks ?? const [];
+      if (_useDesktop)
+        return (await _desktop.artistPage(id))?.topTracks ?? const [];
       final data = await _getJson('/artists/$id/top-tracks?market=from_token');
       final items = data['tracks'];
-      return items is List ? items.whereType<Map<String, dynamic>>().map(SpotifyTrack.fromJson).toList() : const [];
+      return items is List
+          ? items
+                .whereType<Map<String, dynamic>>()
+                .map(SpotifyTrack.fromJson)
+                .toList()
+          : const [];
     } catch (_) {
       return const [];
     }
@@ -289,7 +338,8 @@ class SpotifyApiService {
   /// 按 URI 取单曲完整信息（Connect 远程曲目补全艺人 / 封面用）。
   /// 只有桌面版会话可用（与 Connect 一致）；非曲目 URI 或失败时返回 null。
   Future<SpotifyTrack?> getTrackByUri(String uri) async {
-    if (!isConfigured || !_useDesktop || !uri.startsWith('spotify:track:')) return null;
+    if (!isConfigured || !_useDesktop || !uri.startsWith('spotify:track:'))
+      return null;
     try {
       final tracks = await _desktop.tracksByUris([uri]);
       return tracks.isEmpty ? null : tracks.first;
@@ -303,13 +353,31 @@ class SpotifyApiService {
     if (!isConfigured) return const [];
     try {
       if (_useDesktop) return await _desktop.artistAlbums(id);
-      final data = await _getJson('/artists/$id/albums?include_groups=album,single&limit=20');
+      final data = await _getJson(
+        '/artists/$id/albums?include_groups=album,single&limit=20',
+      );
       final items = data['items'];
-      return items is List ? items.whereType<Map<String, dynamic>>().map(SpotifyAlbum.fromJson).toList() : const [];
+      return items is List
+          ? items
+                .whereType<Map<String, dynamic>>()
+                .map(SpotifyAlbum.fromJson)
+                .toList()
+          : const [];
     } catch (_) {
       return const [];
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // 播客
+  // ---------------------------------------------------------------------------
+
+  /// 节目详情与最新单集（所有会话可用：不依赖鉴权接口）。
+  Future<PodcastShow> getPodcastShow(String id) => _podcast.fetchShow(id);
+
+  /// 单集详情（含所属节目 URI）；用于只带单集 URI 的入口（最近播放等）。
+  Future<PodcastEpisode> getPodcastEpisode(String id) =>
+      _podcast.fetchEpisode(id);
 
   // ---------------------------------------------------------------------------
   // 搜索
@@ -326,16 +394,24 @@ class SpotifyApiService {
     if (_useDesktop) {
       try {
         final r = await _desktop.search(clean);
-        return {'tracks': r.tracks, 'artists': r.artists, 'playlists': r.playlists};
+        return {
+          'tracks': r.tracks,
+          'artists': r.artists,
+          'playlists': r.playlists,
+        };
       } catch (e) {
         throw SpotifyDataException('搜索失败：$e');
       }
     }
 
-    final data = await _getJson('/search?q=${Uri.encodeComponent(clean)}&type=track,artist,playlist&limit=10');
+    final data = await _getJson(
+      '/search?q=${Uri.encodeComponent(clean)}&type=track,artist,playlist&limit=10',
+    );
     List<T> parse<T>(String key, T Function(Map<String, dynamic>) from) {
       final items = (data[key] as Map<String, dynamic>?)?['items'];
-      return items is List ? items.whereType<Map<String, dynamic>>().map(from).toList() : <T>[];
+      return items is List
+          ? items.whereType<Map<String, dynamic>>().map(from).toList()
+          : <T>[];
     }
 
     return {
@@ -356,7 +432,12 @@ class SpotifyApiService {
     try {
       final data = await _getJson(SpotifyEndpoints.playerDevices);
       final items = data['devices'];
-      return items is List ? items.whereType<Map<String, dynamic>>().map(SpotifyDevice.fromJson).toList() : const [];
+      return items is List
+          ? items
+                .whereType<Map<String, dynamic>>()
+                .map(SpotifyDevice.fromJson)
+                .toList()
+          : const [];
     } catch (_) {
       return const [];
     }

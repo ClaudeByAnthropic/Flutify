@@ -279,10 +279,15 @@ void main() {
   });
 
   group('keyboard shortcuts and media keys', () {
+    // 与主窗口一致：Ctrl 组合键走 CallbackShortcuts，空格走 Focus.onKeyEvent（见 PlaybackShortcuts.onSpaceKey）
     final host = Builder(
       builder: (context) => CallbackShortcuts(
         bindings: PlaybackShortcuts.bindings(context),
-        child: const Focus(autofocus: true, child: SizedBox(width: 10, height: 10)),
+        child: Focus(
+          autofocus: true,
+          onKeyEvent: (node, event) => PlaybackShortcuts.onSpaceKey(node.context!, event),
+          child: const SizedBox(width: 10, height: 10),
+        ),
       ),
     );
 
@@ -327,25 +332,27 @@ void main() {
       await unmount(tester);
     });
 
-    test('pausing the remote keeps control there until this device plays', () async {
+    test('remote keeps control while local is silent; local playback takes over', () async {
       final connect = ConnectProvider(service, available: () => true, resolveTrack: (_) async => null);
-      bool remote() => connect.controlsRemote(localPlaying: false, localHasTrack: true);
 
       service.push(syntheticCluster());
       await Future<void>.delayed(Duration.zero);
-      expect(remote(), isTrue);
+      // 远程出声、本机静默 → 远程
+      expect(connect.controlsRemote(localPlaying: false, localHasTrack: true), isTrue);
 
-      // 远程被暂停（空格 / 暂停键）：本机虽有上次的曲目，下一次按键仍应继续远程
+      // 远程被暂停：集群里仍有活动设备和曲目，控制权留在远程
       service.push(syntheticCluster(playing: false));
       await Future<void>.delayed(Duration.zero);
-      expect(remote(), isTrue);
+      expect(connect.controlsRemote(localPlaying: false, localHasTrack: true), isTrue);
 
-      // 本机开始播放后控制权回到本机；远程再次出声时重新接管
-      connect.localPlaybackStarted();
-      expect(remote(), isFalse);
-      service.push(syntheticCluster());
+      // 本机正在出声 → 本机优先；本机停下后回到远程
+      expect(connect.controlsRemote(localPlaying: true, localHasTrack: true), isFalse);
+      expect(connect.controlsRemote(localPlaying: false, localHasTrack: true), isTrue);
+
+      // 远程会话结束（无活动设备）→ 本机
+      service.push(syntheticCluster(withActive: false));
       await Future<void>.delayed(Duration.zero);
-      expect(remote(), isTrue);
+      expect(connect.controlsRemote(localPlaying: false, localHasTrack: true), isFalse);
       connect.dispose();
     });
 

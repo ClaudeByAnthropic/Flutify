@@ -8,7 +8,9 @@ import 'oauth_waiting_view.dart';
 
 /// 登录页的初始态：主视觉 + 标题 + 三条安心说明 + 「在浏览器中登录」主按钮。
 ///
-/// 唯一的登录方式：打开 accounts.spotify.com 官方登录页，登录完成后经本机回环回到 App。
+/// 唯一的桌面登录方式：系统浏览器打开 accounts.spotify.com 官方登录页（Google 等
+/// 第三方登录在浏览器里完成，凭据不经过应用内 WebView），登录完成后经本机回环回到 App。
+/// 登录成功后会接着引导一次应用内 Web 登录（sp_dc，全曲播放用），见 LoginScreen。
 class LoginIntroView extends StatelessWidget {
   const LoginIntroView({super.key});
 

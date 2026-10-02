@@ -17,6 +17,11 @@ class StorageService {
   static const String _keyClientTokenExpiry = 'sp_client_token_expiry'; // epoch ms
   static const String _keyClientTokenProfile = 'sp_client_token_profile';
 
+  // Web 播放器会话（Widevine 真密钥所需的 access_token 来源）
+  static const String _keySpDc = 'sp_dc'; // open.spotify.com 的登录 cookie
+  static const String _keyWebAccessToken = 'sp_web_access_token';
+  static const String _keyWebAccessTokenExpiry = 'sp_web_access_token_expiry'; // epoch ms
+
   // 会话类型与账号展示信息
   static const String _keyAuthMethod = 'sp_auth_method';
 
@@ -114,6 +119,27 @@ class StorageService {
 
   /// 标记当前凭据属于桌面版浏览器登录会话。
   Future<bool> markDesktopSession() => _prefs.setString(_keyAuthMethod, _desktopSession);
+
+  // --- Web 播放器会话（sp_dc + 铸造的 web access_token） ---
+
+  /// open.spotify.com 的 sp_dc cookie（Web 登录捕获；Widevine 真密钥的 token 来源）。
+  String get spDc => _prefs.getString(_keySpDc) ?? '';
+  Future<bool> setSpDc(String value) => _prefs.setString(_keySpDc, value);
+
+  /// 铸造的 Web 播放器 access_token（60 分钟有效，由 WebTokenService 自动续期）。
+  String get webAccessToken => _prefs.getString(_keyWebAccessToken) ?? '';
+  int get webAccessTokenExpiry => _prefs.getInt(_keyWebAccessTokenExpiry) ?? 0;
+  Future<bool> setWebAccessToken(String token, int expiryMs) async {
+    await _prefs.setString(_keyWebAccessToken, token);
+    return _prefs.setInt(_keyWebAccessTokenExpiry, expiryMs);
+  }
+
+  /// 清除 Web 会话（sp_dc + 铸造的 token）。
+  Future<void> clearWebSession() async {
+    await _prefs.remove(_keySpDc);
+    await _prefs.remove(_keyWebAccessToken);
+    await _prefs.remove(_keyWebAccessTokenExpiry);
+  }
 
   String get displayName => _prefs.getString(_keyDisplayName) ?? '';
   Future<bool> setDisplayName(String value) => _prefs.setString(_keyDisplayName, value);

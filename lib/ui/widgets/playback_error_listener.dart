@@ -7,6 +7,7 @@ import '../../l10n/l10n.dart';
 import '../../providers/playback_provider.dart';
 import '../../services/protocol/track_playback_exception.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/web_login_screen.dart';
 import 'toast/app_toast.dart';
 
 /// 订阅 [PlaybackProvider.playbackErrors]，每次播放失败弹一条 [AppToast]。
@@ -40,6 +41,19 @@ class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
     super.dispose();
   }
 
+  /// 打开统一登录页（Web 登录 + 无感桌面授权）；成功后提示并重试播放当前曲目。
+  Future<void> _openWebLogin(PlaybackProvider playback) async {
+    final result = await WebLoginScreen.open(context);
+    if (!mounted || !(result?.webSignedIn ?? false)) return;
+    AppToast.show(
+      context,
+      context.l10n.webLoginSuccess,
+      icon: Icons.check_circle_rounded,
+      tone: ToastTone.success,
+    );
+    await playback.togglePlayPause();
+  }
+
   void _show(PlaybackError error) {
     if (!mounted) return;
     final l10n = context.l10n;
@@ -67,6 +81,14 @@ class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
         ToastTone.info,
         l10n.shellSignIn,
         () => LoginScreen.open(context),
+      ),
+      // 缺 sp_dc（Web 登录态）：引导完成 Web 登录，成功后即可重试播放
+      TrackPlaybackFailure.webSignInRequired => (
+        l10n.playbackErrorWebSignIn,
+        Icons.key_rounded,
+        ToastTone.info,
+        l10n.webLoginAction,
+        () => _openWebLogin(playback),
       ),
       TrackPlaybackFailure.unavailable => (
         error.skipped ? l10n.playbackErrorSkipped(track) : l10n.playbackErrorUnavailable(track),

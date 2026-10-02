@@ -13,10 +13,19 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('ProxyEndpoint.tryParse', () {
     test('accepts host:port, scheme prefix and IPv6', () {
-      expect(ProxyEndpoint.tryParse('127.0.0.1:7890'), const ProxyEndpoint('127.0.0.1', 7890));
-      expect(ProxyEndpoint.tryParse(' http://proxy.lan:8080/ '), const ProxyEndpoint('proxy.lan', 8080));
+      expect(
+        ProxyEndpoint.tryParse('127.0.0.1:7890'),
+        const ProxyEndpoint('127.0.0.1', 7890),
+      );
+      expect(
+        ProxyEndpoint.tryParse(' http://proxy.lan:8080/ '),
+        const ProxyEndpoint('proxy.lan', 8080),
+      );
       expect(ProxyEndpoint.tryParse('[::1]:7890')?.toString(), '[::1]:7890');
-      expect(ProxyEndpoint.tryParse('http://proxy:80'), const ProxyEndpoint('proxy', 80));
+      expect(
+        ProxyEndpoint.tryParse('http://proxy:80'),
+        const ProxyEndpoint('proxy', 80),
+      );
     });
 
     test('rejects missing or invalid port', () {
@@ -42,7 +51,8 @@ void main() {
     });
 
     test('disabled proxy is treated as none', () {
-      const output = '    ProxyEnable    REG_DWORD    0x0\r\n    ProxyServer    REG_SZ    127.0.0.1:7890\r\n';
+      const output =
+          '    ProxyEnable    REG_DWORD    0x0\r\n    ProxyServer    REG_SZ    127.0.0.1:7890\r\n';
       expect(SystemProxyReader.parseRegQuery(output).isEmpty, isTrue);
     });
 
@@ -71,27 +81,41 @@ void main() {
 
   group('NetworkProxy', () {
     final spotify = Uri.parse('https://api.spotify.com/v1/me');
-    final system = SystemProxySettings.fromWindows(enabled: true, server: '127.0.0.1:7890');
+    final system = SystemProxySettings.fromWindows(
+      enabled: true,
+      server: '127.0.0.1:7890',
+    );
 
-    test('modes route requests accordingly; loopback is always direct', () async {
-      final proxy = NetworkProxy(systemReader: () async => system);
-      await proxy.configure(AppPreferences.defaults);
-      expect(proxy.findProxy(spotify), 'PROXY 127.0.0.1:7890');
-      expect(proxy.findProxy(Uri.parse('http://127.0.0.1:51234/stream')), 'DIRECT');
-      expect(proxy.findProxy(Uri.parse('http://localhost:51234/stream')), 'DIRECT');
+    test(
+      'modes route requests accordingly; loopback is always direct',
+      () async {
+        final proxy = NetworkProxy(systemReader: () async => system);
+        await proxy.configure(mode: ProxyMode.system);
+        expect(proxy.findProxy(spotify), 'PROXY 127.0.0.1:7890');
+        expect(
+          proxy.findProxy(Uri.parse('http://127.0.0.1:51234/stream')),
+          'DIRECT',
+        );
+        expect(
+          proxy.findProxy(Uri.parse('http://localhost:51234/stream')),
+          'DIRECT',
+        );
 
-      await proxy.configure(AppPreferences.defaults.copyWith(proxyMode: ProxyMode.none));
-      expect(proxy.findProxy(spotify), 'DIRECT');
+        await proxy.configure(mode: ProxyMode.none);
+        expect(proxy.findProxy(spotify), 'DIRECT');
 
-      await proxy.configure(
-        AppPreferences.defaults.copyWith(proxyMode: ProxyMode.manual, proxyHost: '10.1.1.1', proxyPort: 8888),
-      );
-      expect(proxy.findProxy(spotify), 'PROXY 10.1.1.1:8888');
-    });
+        await proxy.configure(
+          mode: ProxyMode.manual,
+          proxyHost: '10.1.1.1',
+          proxyPort: 8888,
+        );
+        expect(proxy.findProxy(spotify), 'PROXY 10.1.1.1:8888');
+      },
+    );
 
     test('manual mode without a valid address connects directly', () async {
       final proxy = NetworkProxy(systemReader: () async => system);
-      await proxy.configure(AppPreferences.defaults.copyWith(proxyMode: ProxyMode.manual));
+      await proxy.configure(mode: ProxyMode.manual);
       expect(proxy.findProxy(spotify), 'DIRECT');
     });
 
@@ -114,55 +138,87 @@ void main() {
   });
 
   group('ProxyTunnel', () {
-    test('CONNECT through an HTTP proxy, then relays bytes both ways', () async {
-      // 假代理：回 200 并在同一个包里带上目标服务器的首批字节，之后原样回显
-      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-      final requests = <String>[];
-      server.listen((client) {
-        var connected = false;
-        client.listen((data) {
-          if (!connected) {
-            connected = true;
-            requests.add(latin1.decode(data));
-            client.add(latin1.encode('HTTP/1.1 200 Connection established\r\n\r\nHELLO'));
-          } else {
-            client.add(data);
-          }
+    test(
+      'CONNECT through an HTTP proxy, then relays bytes both ways',
+      () async {
+        // 假代理：回 200 并在同一个包里带上目标服务器的首批字节，之后原样回显
+        final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        final requests = <String>[];
+        server.listen((client) {
+          var connected = false;
+          client.listen((data) {
+            if (!connected) {
+              connected = true;
+              requests.add(latin1.decode(data));
+              client.add(
+                latin1.encode(
+                  'HTTP/1.1 200 Connection established\r\n\r\nHELLO',
+                ),
+              );
+            } else {
+              client.add(data);
+            }
+          });
         });
-      });
-      addTearDown(server.close);
+        addTearDown(server.close);
 
-      final proxy = NetworkProxy(systemReader: () async => SystemProxySettings.none);
-      await proxy.configure(
-        AppPreferences.defaults.copyWith(proxyMode: ProxyMode.manual, proxyHost: '127.0.0.1', proxyPort: server.port),
-      );
-      final conn = await ProxyTunnel.connect('ap.spotify.com', 4070, timeout: const Duration(seconds: 5), proxy: proxy);
-      final received = StringBuffer();
-      final done = Completer<void>();
-      conn.input.listen((d) {
-        received.write(latin1.decode(d));
-        if (received.toString() == 'HELLOping') done.complete();
-      });
-      conn.socket.add(latin1.encode('ping'));
-      await done.future.timeout(const Duration(seconds: 5));
-      conn.socket.destroy();
+        final proxy = NetworkProxy(
+          systemReader: () async => SystemProxySettings.none,
+        );
+        await proxy.configure(
+          mode: ProxyMode.manual,
+          proxyHost: '127.0.0.1',
+          proxyPort: server.port,
+        );
+        final conn = await ProxyTunnel.connect(
+          'ap.spotify.com',
+          4070,
+          timeout: const Duration(seconds: 5),
+          proxy: proxy,
+        );
+        final received = StringBuffer();
+        final done = Completer<void>();
+        conn.input.listen((d) {
+          received.write(latin1.decode(d));
+          if (received.toString() == 'HELLOping') done.complete();
+        });
+        conn.socket.add(latin1.encode('ping'));
+        await done.future.timeout(const Duration(seconds: 5));
+        conn.socket.destroy();
 
-      expect(requests.single, startsWith('CONNECT ap.spotify.com:4070 HTTP/1.1\r\n'));
-    });
+        expect(
+          requests.single,
+          startsWith('CONNECT ap.spotify.com:4070 HTTP/1.1\r\n'),
+        );
+      },
+    );
 
     test('a non-2xx proxy response fails the connection', () async {
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((client) {
-        client.listen((_) => client.add(latin1.encode('HTTP/1.1 407 Proxy Authentication Required\r\n\r\n')));
+        client.listen(
+          (_) => client.add(
+            latin1.encode('HTTP/1.1 407 Proxy Authentication Required\r\n\r\n'),
+          ),
+        );
       });
       addTearDown(server.close);
 
-      final proxy = NetworkProxy(systemReader: () async => SystemProxySettings.none);
+      final proxy = NetworkProxy(
+        systemReader: () async => SystemProxySettings.none,
+      );
       await proxy.configure(
-        AppPreferences.defaults.copyWith(proxyMode: ProxyMode.manual, proxyHost: '127.0.0.1', proxyPort: server.port),
+        mode: ProxyMode.manual,
+        proxyHost: '127.0.0.1',
+        proxyPort: server.port,
       );
       await expectLater(
-        ProxyTunnel.connect('ap.spotify.com', 4070, timeout: const Duration(seconds: 5), proxy: proxy),
+        ProxyTunnel.connect(
+          'ap.spotify.com',
+          4070,
+          timeout: const Duration(seconds: 5),
+          proxy: proxy,
+        ),
         throwsA(isA<ProxyTunnelException>()),
       );
     });

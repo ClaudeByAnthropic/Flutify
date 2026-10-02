@@ -75,12 +75,17 @@ class OAuthLoopbackServer {
     final title = ok ? '授权完成' : '授权未完成';
     final body = ok ? '你可以关闭此页面，返回 Flutify。' : '请返回 Flutify 重试。';
     final color = ok ? '#1ED760' : '#FF6B6B';
+    // 尽力自动关闭：浏览器只允许脚本关闭「由脚本打开」的标签页，
+    // 外部程序（url_launcher）打开的标签多数情况下会被拦，所以保留手动关闭提示。
+    final script = ok
+        ? "<script>setTimeout(function(){window.open('','_self');window.close();},600)</script>"
+        : '';
     return '''<!doctype html><html lang="zh"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Flutify · $title</title>
 <body style="margin:0;height:100vh;display:grid;place-items:center;background:#121318;color:#E4E1E9;
 font-family:-apple-system,'Segoe UI','PingFang SC',sans-serif">
 <div style="text-align:center"><div style="width:56px;height:56px;margin:0 auto 20px;border-radius:50%;
 background:$color"></div><h1 style="font-size:24px;margin:0 0 8px">$title</h1>
-<p style="margin:0;color:#A5A4B2">$body</p></div></body></html>''';
+<p style="margin:0;color:#A5A4B2">$body</p></div>$script</body></html>''';
   }
 }

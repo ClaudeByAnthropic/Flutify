@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/flutify_tokens.dart';
 import '../../../models/share_target.dart';
+import '../../../services/eme/eme_player.dart';
 import 'embed_preview.dart';
 
 /// 嵌入播放器的真实渲染：用 WebView 直接加载官方嵌入页，所见即贴到网页后的效果。
@@ -103,6 +104,8 @@ class _EmbedWebViewState extends State<EmbedWebView> {
               duration: duration,
               opacity: _loaded ? 1 : 0,
               child: InAppWebView(
+                // 复用 EME 的自定义环境，避免同一用户数据目录重复建环境导致创建失败
+                webViewEnvironment: EmePlayer.cachedEnvironment,
                 initialUrlRequest: URLRequest(url: WebUri(_url)),
                 initialSettings: InAppWebViewSettings(
                   transparentBackground: true,

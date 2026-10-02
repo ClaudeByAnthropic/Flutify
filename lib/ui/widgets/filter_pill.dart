@@ -34,8 +34,9 @@ class FilterPill extends StatelessWidget {
           curve: Curves.easeOutCubic,
           // 被父级给予固定高度时（如搜索页横向列表）文字也要在胶囊内垂直居中
           alignment: Alignment.center,
+          // 扁平胶囊：上下内边距仅 10px（整体约 26px 高），与 Spotify 的紧凑筛选胶囊一致。
           // MiSans 汉字视觉重心比行框中心高约 0.03em（约 0.4px，实测字体度量），上下内边距补偿 0.5px
-          padding: const EdgeInsets.fromLTRB(16.0, 8.5, 16.0, 7.5),
+          padding: const EdgeInsets.fromLTRB(14.0, 5.5, 14.0, 4.5),
           decoration: BoxDecoration(
             color: isSelected
                 ? tokens.accent

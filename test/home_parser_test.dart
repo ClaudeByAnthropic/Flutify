@@ -4,9 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// HomeParser：结构与线上 home 查询一致的合成响应（名称 / ID 均为虚构）。
 void main() {
-  Map<String, dynamic> label(String text) => {'transformedLabel': text, 'translatedBaseText': text};
+  Map<String, dynamic> label(String text) => {
+    'transformedLabel': text,
+    'translatedBaseText': text,
+  };
 
-  Map<String, dynamic> playlistItem(String id, {String name = 'P', String description = ''}) => {
+  Map<String, dynamic> playlistItem(
+    String id, {
+    String name = 'P',
+    String description = '',
+  }) => {
     'uri': 'spotify:playlist:$id',
     'data': null,
     'content': {
@@ -20,7 +27,11 @@ void main() {
           'items': [
             {
               'sources': [
-                {'url': 'https://example.invalid/$id.jpg', 'width': 640, 'height': 640},
+                {
+                  'url': 'https://example.invalid/$id.jpg',
+                  'width': 640,
+                  'height': 640,
+                },
               ],
             },
           ],
@@ -43,7 +54,11 @@ void main() {
       'visuals': {
         'avatarImage': {
           'sources': [
-            {'url': 'https://example.invalid/$id.jpg', 'width': 160, 'height': 160},
+            {
+              'url': 'https://example.invalid/$id.jpg',
+              'width': 160,
+              'height': 160,
+            },
           ],
         },
       },
@@ -65,7 +80,10 @@ void main() {
   const liked = {
     'uri': 'spotify:user:@:collection',
     'data': null,
-    'content': {'__typename': 'UnknownType', 'uri': 'spotify:user:@:collection'},
+    'content': {
+      '__typename': 'UnknownType',
+      'uri': 'spotify:user:@:collection',
+    },
   };
 
   Map<String, dynamic> recentsList() => {
@@ -95,7 +113,11 @@ void main() {
                       'image': {
                         'data': {
                           'sources': [
-                            {'url': 'https://example.invalid/r1.jpg', 'maxWidth': 640, 'maxHeight': 640},
+                            {
+                              'url': 'https://example.invalid/r1.jpg',
+                              'maxWidth': 640,
+                              'maxHeight': 640,
+                            },
                           ],
                         },
                       },
@@ -105,10 +127,10 @@ void main() {
                 },
               },
             },
-                {
-                  'uid': 'u2',
-                  'entity': {'_uri': 'spotify:collection:tracks', 'data': {}},
-                },
+            {
+              'uid': 'u2',
+              'entity': {'_uri': 'spotify:collection:tracks', 'data': {}},
+            },
             {
               'uid': 'u3',
               'entity': {
@@ -155,7 +177,14 @@ void main() {
             section(
               'HomeGenericSectionData',
               'spotify:section:generic',
-              [playlistItem('g1', name: 'Mix', description: '<a href="x">Desc</a>'), playlistItem('g2')],
+              [
+                playlistItem(
+                  'g1',
+                  name: 'Mix',
+                  description: '<a href="x">Desc</a>',
+                ),
+                playlistItem('g2'),
+              ],
               extra: {
                 'title': label('与 Artist Y 相似'),
                 'subtitle': label(''),
@@ -182,7 +211,10 @@ void main() {
               [
                 {
                   'uri': 'spotify:artist:z',
-                  'content': {'__typename': 'ArtistResponseWrapper', 'data': artistEntity('z', 'Z')['data']},
+                  'content': {
+                    '__typename': 'ArtistResponseWrapper',
+                    'data': artistEntity('z', 'Z')['data'],
+                  },
                 },
               ],
               extra: {'title': label('ignored')},
@@ -191,10 +223,15 @@ void main() {
               'HomeFeedBaselineSectionData',
               'spotify:section:f3',
               [playlistItem('f3')],
-              extra: {'title': label('与 Artist Y 相似'), 'headerEntity': artistEntity('y', 'Artist Y')},
+              extra: {
+                'title': label('与 Artist Y 相似'),
+                'headerEntity': artistEntity('y', 'Artist Y'),
+              },
             ),
             // 不展示的类型
-            section('HomeNativeAdsSectionData', 'spotify:section:ads', [playlistItem('ad')]),
+            section('HomeNativeAdsSectionData', 'spotify:section:ads', [
+              playlistItem('ad'),
+            ]),
             section(
               'HomeGenericSectionData',
               'spotify:section:podcasts',
@@ -210,7 +247,11 @@ void main() {
                       'publisher': {'name': 'Publisher'},
                       'coverArt': {
                         'sources': [
-                          {'url': 'https://example.invalid/p1.jpg', 'width': 300, 'height': 300},
+                          {
+                            'url': 'https://example.invalid/p1.jpg',
+                            'width': 300,
+                            'height': 300,
+                          },
                         ],
                       },
                     },
@@ -253,20 +294,27 @@ void main() {
     expect(generic.items.first.imageUrl, 'https://example.invalid/g1.jpg');
 
     final feedGrid = feed.sections[2];
-    expect(feedGrid.items.map((i) => i.uri), ['spotify:playlist:f1', 'spotify:playlist:f3']);
+    expect(feedGrid.items.map((i) => i.uri), [
+      'spotify:playlist:f1',
+      'spotify:playlist:f3',
+    ]);
     expect(feedGrid.items.first.reason, '为你推荐');
     expect(feedGrid.items.last.reasonArtist?.name, 'Artist Y');
 
     final podcast = feed.sections.last.items.single;
     expect(podcast.kind, HomeItemKind.podcast);
     expect(podcast.subtitle, 'Publisher');
-    expect(podcast.isOpenable, isFalse);
+    expect(podcast.isOpenable, isTrue); // 播客节目页已支持
   });
 
   test('recently played reads trait-based entities', () {
     final recents = HomeParser.parse(response()).sections[1];
     expect(recents.title, '最近播放');
-    expect(recents.items.map((i) => i.kind), [HomeItemKind.playlist, HomeItemKind.likedSongs, HomeItemKind.album]);
+    expect(recents.items.map((i) => i.kind), [
+      HomeItemKind.playlist,
+      HomeItemKind.likedSongs,
+      HomeItemKind.album,
+    ]);
 
     final mix = recents.items.first;
     expect(mix.title, 'Recent Mix');
@@ -279,10 +327,16 @@ void main() {
   });
 
   test('section lookup by uri and empty responses', () {
-    expect(HomeParser.section(response(), 'spotify:section:generic')?.items, hasLength(2));
+    expect(
+      HomeParser.section(response(), 'spotify:section:generic')?.items,
+      hasLength(2),
+    );
     expect(HomeParser.section(response(), 'spotify:section:missing'), isNull);
     expect(HomeParser.parse({}).isEmpty, isTrue);
-    expect(HomeParser.isLikedSongsUri('spotify:user:someone:collection'), isTrue);
+    expect(
+      HomeParser.isLikedSongsUri('spotify:user:someone:collection'),
+      isTrue,
+    );
     expect(HomeParser.isLikedSongsUri('spotify:collection:tracks'), isTrue);
     expect(HomeParser.isLikedSongsUri('spotify:user:someone'), isFalse);
   });

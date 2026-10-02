@@ -22,8 +22,10 @@
 #include <mutex>
 #include <functional>
 #include <algorithm>
+#include <io.h>
 
 #include "content_decryption_module.h"
+#include "content_decryption_module_ext.h"
 
 // ---------------------------------------------------------------------------
 // 宿主对象
@@ -59,6 +61,63 @@ class HostDecryptedBlock : public cdm::DecryptedBlock {
 struct TimerItem {
   int64_t due_ms;
   void* ctx;
+};
+
+// --- 磁盘 backed FileIO（CDM 持久化存储：provisioning/证书/会话） ---
+static std::string g_storage_dir;  // 由 --storage 设置，默认 tmp\cdm_storage
+
+class HostFileIO : public cdm::FileIO {
+ public:
+  HostFileIO(cdm::FileIOClient* client, const std::string& dir)
+      : client_(client), dir_(dir) {}
+
+  void Open(const char* file_name, uint32_t file_name_size) override {
+    std::string name(file_name, file_name_size);
+    path_ = dir_ + "\\" + name;
+    fh_ = fopen(path_.c_str(), "r+b");
+    if (!fh_) fh_ = fopen(path_.c_str(), "w+b");
+    fprintf(stderr, "[cdm] FileIO.Open %s → %s\n", name.c_str(), fh_ ? "ok" : "失败");
+    client_->OnOpenComplete(fh_ ? cdm::FileIOClient::Status::kSuccess
+                                : cdm::FileIOClient::Status::kError);
+  }
+
+  void Read() override {
+    if (!fh_) { client_->OnReadComplete(cdm::FileIOClient::Status::kError, nullptr, 0); return; }
+    fseek(fh_, 0, SEEK_END);
+    long n = ftell(fh_);
+    fseek(fh_, 0, SEEK_SET);
+    data_.assign(n > 0 ? n : 0, 0);
+    if (n > 0 && fread(data_.data(), 1, n, fh_) != (size_t)n) {
+      client_->OnReadComplete(cdm::FileIOClient::Status::kError, nullptr, 0);
+      return;
+    }
+    client_->OnReadComplete(cdm::FileIOClient::Status::kSuccess,
+                            data_.empty() ? nullptr : data_.data(), (uint32_t)data_.size());
+  }
+
+  void Write(const uint8_t* data, uint32_t data_size) override {
+    if (!fh_) { client_->OnWriteComplete(cdm::FileIOClient::Status::kError); return; }
+    fseek(fh_, 0, SEEK_SET);
+    if (data_size && fwrite(data, 1, data_size, fh_) != data_size) {
+      client_->OnWriteComplete(cdm::FileIOClient::Status::kError);
+      return;
+    }
+    fflush(fh_);
+    _chsize(_fileno(fh_), (long)data_size);  // 截断到写入长度
+    client_->OnWriteComplete(cdm::FileIOClient::Status::kSuccess);
+  }
+
+  void Close() override {
+    if (fh_) fclose(fh_);
+    fh_ = nullptr;
+    delete this;
+  }
+
+ private:
+  cdm::FileIOClient* client_;
+  std::string dir_, path_;
+  FILE* fh_ = nullptr;
+  std::vector<uint8_t> data_;  // Read 回调期间保活
 };
 
 class Host : public cdm::Host_10 {
@@ -148,11 +207,20 @@ class Host : public cdm::Host_10 {
     if (cdm) cdm->OnQueryOutputProtectionStatus(cdm::kQuerySucceeded, 0, 0);
   }
   void OnDeferredInitializationDone(cdm::StreamType, cdm::Status) override {}
-  cdm::FileIO* CreateFileIO(cdm::FileIOClient*) override { return nullptr; }
-  void RequestStorageId(uint32_t version) override {
-    // 同步回调（测试宿主常用做法）：返回空 ID。
-    if (cdm) cdm->OnStorageId(version, nullptr, 0);
+  cdm::FileIO* CreateFileIO(cdm::FileIOClient* client) override {
+    // 真实磁盘存储（隐私模式/持久化会话的前提）
+    return new HostFileIO(client, g_storage_dir);
   }
+  void RequestStorageId(uint32_t version) override {
+    // 稳定设备 ID（CDM 用于加密持久化数据；固定值即可，勿外泄）
+    static const uint8_t kStorageId[16] = {
+        0x46, 0x6c, 0x75, 0x74, 0x69, 0x66, 0x79, 0x2d,
+        0x73, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x21};
+    if (cdm) cdm->OnStorageId(version ? version : 1, kStorageId, sizeof(kStorageId));
+  }
+
+  // Host_11 新增（加在末尾保持 vtable 前缀兼容 Host_10；Host_10 无此方法，不能 override）
+  virtual void ReportMetrics(cdm::MetricName, uint64_t) {}
 
   static int64_t wall_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -164,7 +232,9 @@ class Host : public cdm::Host_10 {
 static Host g_host;
 
 static void* GetHostFunc(int host_interface_version, void*) {
-  if (host_interface_version == cdm::Host_10::kVersion) return &g_host;
+  // Host_11 = Host_10 + ReportMetrics（vtable 前缀兼容），两者都回我们的 Host
+  if (host_interface_version == cdm::Host_10::kVersion ||
+      host_interface_version == 11) return &g_host;
   fprintf(stderr, "[cdm] 未知宿主接口 v%d\n", host_interface_version);
   return nullptr;
 }
@@ -424,7 +494,8 @@ static int find_key_in_memory(const uint8_t fingerprint[16]) {
 
 int wmain(int argc, wchar_t** argv) {
   std::string dll, pssh, cert, license_url, auth, client_token, samples, out, scheme = "cenc", kid_hex;
-  bool allow_distinctive = false, allow_persistent = false, find_key = false;
+  bool allow_distinctive = false, allow_persistent = false, find_key = false, verify_host = false;
+  g_storage_dir = "D:\\Flutify\\SpotifyApi\\tmp\\cdm_storage";
   for (int i = 1; i < argc - 1; i++) {
     auto val = [&]() { return std::string(); };
     std::wstring a = argv[i];
@@ -443,9 +514,14 @@ int wmain(int argc, wchar_t** argv) {
     else if (a == L"--distinctive") { allow_distinctive = (v == L"1" || v == L"true"); }
     else if (a == L"--persistent") { allow_persistent = (v == L"1" || v == L"true"); }
     else if (a == L"--find-key") { find_key = (v == L"1" || v == L"true"); }
+    else if (a == L"--storage") g_storage_dir = tos(v);
+    else if (a == L"--verify-host") { verify_host = (v == L"1" || v == L"true"); }
     else continue;
     i++;
   }
+
+  // 0) 确保 CDM 存储目录存在
+  CreateDirectoryA(g_storage_dir.c_str(), nullptr);
 
   // 1) 加载 CDM
   HMODULE mod = LoadLibraryA(dll.c_str());
@@ -459,9 +535,33 @@ int wmain(int argc, wchar_t** argv) {
   init();
   fprintf(stderr, "[cdm] version=%s\n", ver ? ver() : "?");
 
+  // 1.5) 宿主验证：向 CDM 证明我们跑在真 Chrome 里（传真实 chrome.exe 的只读句柄）
+  // 未通过验证的宿主，CDM 可能关闭隐私模式（明文 client_id → 服务器发假密钥）
+  if (verify_host) {
+    auto verify = (bool (*)(const cdm::HostFile*, uint32_t))GetProcAddress(mod, "VerifyCdmHost_0");
+    if (verify) {
+      const wchar_t* chrome_exe = L"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+      HANDLE hf = CreateFileW(chrome_exe, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+      HANDLE sf = CreateFileW(chrome_exe, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+      if (hf != INVALID_HANDLE_VALUE) {
+        cdm::HostFile host_files[1] = { cdm::HostFile(chrome_exe, hf, sf) };
+        bool v = verify(host_files, 1);
+        fprintf(stderr, "[cdm] VerifyCdmHost_0(chrome.exe) → %d\n", v);
+      } else {
+        fprintf(stderr, "[cdm] 打不开 chrome.exe: %lu\n", GetLastError());
+      }
+    } else {
+      fprintf(stderr, "[cdm] 无 VerifyCdmHost_0 导出\n");
+    }
+  }
+
   const char* ks = "com.widevine.alpha";
+  int cdm_ver = cdm::ContentDecryptionModule_10::kVersion;
+  if (getenv("CDM_VER")) cdm_ver = atoi(getenv("CDM_VER"));
   auto* cdm = (cdm::ContentDecryptionModule_10*)create(
-      cdm::ContentDecryptionModule_10::kVersion, ks, (uint32_t)strlen(ks),
+      cdm_ver, ks, (uint32_t)strlen(ks),
       &GetHostFunc, nullptr);
   if (!cdm) { fprintf(stderr, "CreateCdmInstance 失败\n"); return 1; }
   g_host.cdm = cdm;

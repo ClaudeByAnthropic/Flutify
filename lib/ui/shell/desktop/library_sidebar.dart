@@ -24,7 +24,11 @@ class LibrarySidebar extends StatefulWidget {
   /// 收起 / 展开；窗口过窄被强制收起时为 null（按钮不可用）。
   final VoidCallback? onToggleCompact;
 
-  const LibrarySidebar({super.key, required this.compact, this.onToggleCompact});
+  const LibrarySidebar({
+    super.key,
+    required this.compact,
+    this.onToggleCompact,
+  });
 
   @override
   State<LibrarySidebar> createState() => _LibrarySidebarState();
@@ -46,7 +50,9 @@ class _LibrarySidebarState extends State<LibrarySidebar> {
     final library = context.read<LibraryProvider>();
     final name = await CreatePlaylistDialog.show(
       context,
-      initialName: context.l10n.libraryNewPlaylistName(library.ownPlaylists.length + 1),
+      initialName: context.l10n.libraryNewPlaylistName(
+        library.ownPlaylists.length + 1,
+      ),
     );
     if (name == null || !mounted) return;
     AppRoutes.openPlaylist(context, library.createPlaylist(name));
@@ -57,7 +63,9 @@ class _LibrarySidebarState extends State<LibrarySidebar> {
     final signedIn = context.select<AuthProvider, bool>((a) => a.isSignedIn);
     // 整个媒体库对象参与构建，任何收藏变化都会刷新；列表是写时复制的，开销可控
     final library = context.watch<LibraryProvider>();
-    final playingUri = context.select<PlaybackProvider, String>((p) => p.playbackContext.uri);
+    final playingUri = context.select<PlaybackProvider, String>(
+      (p) => p.playbackContext.uri,
+    );
     final l10n = context.l10n;
 
     final entries = signedIn
@@ -80,7 +88,10 @@ class _LibrarySidebarState extends State<LibrarySidebar> {
             onCreate: signedIn ? _createPlaylist : null,
           ),
           if (!widget.compact && signedIn) ...[
-            _FilterRow(selected: _filter, onSelected: (k) => setState(() => _filter = k)),
+            _FilterRow(
+              selected: _filter,
+              onSelected: (k) => setState(() => _filter = k),
+            ),
             _SearchSortRow(
               searching: _searching,
               controller: _query,
@@ -95,9 +106,16 @@ class _LibrarySidebarState extends State<LibrarySidebar> {
           ],
           Expanded(
             child: !signedIn
-                ? (widget.compact ? const SizedBox.shrink() : const _SignInCard())
+                ? (widget.compact
+                      ? const SizedBox.shrink()
+                      : const _SignInCard())
                 : ListView.builder(
-                    padding: EdgeInsets.fromLTRB(widget.compact ? 6 : 8, 0, widget.compact ? 6 : 8, 12),
+                    padding: EdgeInsets.fromLTRB(
+                      widget.compact ? 6 : 8,
+                      0,
+                      widget.compact ? 6 : 8,
+                      12,
+                    ),
                     itemCount: entries.length,
                     itemExtent: 60,
                     itemBuilder: (context, i) {
@@ -106,7 +124,8 @@ class _LibrarySidebarState extends State<LibrarySidebar> {
                         key: ValueKey('${entry.kind.name}_${entry.id}'),
                         entry: entry,
                         compact: widget.compact,
-                        playing: playingUri.isNotEmpty && playingUri == entry.uri,
+                        playing:
+                            playingUri.isNotEmpty && playingUri == entry.uri,
                       );
                     },
                   ),
@@ -123,7 +142,11 @@ class _Header extends StatelessWidget {
   final VoidCallback? onToggle;
   final VoidCallback? onCreate;
 
-  const _Header({required this.compact, required this.onToggle, required this.onCreate});
+  const _Header({
+    required this.compact,
+    required this.onToggle,
+    required this.onCreate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -175,9 +198,17 @@ class _Header extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Row(
                   children: [
-                    Icon(Icons.library_music_rounded, color: colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.library_music_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 12),
-                    Text(l10n.navLibrary, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(
+                      l10n.navLibrary,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -221,7 +252,9 @@ class _FilterRow extends StatelessWidget {
                 fixedSize: const Size(32, 32),
                 minimumSize: const Size(32, 32),
                 padding: EdgeInsets.zero,
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
               ),
             ),
             const SizedBox(width: 8),
@@ -233,7 +266,8 @@ class _FilterRow extends StatelessWidget {
                 child: FilterPill(
                   label: entry.value,
                   isSelected: selected == entry.key,
-                  onTap: () => onSelected(selected == entry.key ? null : entry.key),
+                  onTap: () =>
+                      onSelected(selected == entry.key ? null : entry.key),
                 ),
               ),
         ],
@@ -265,7 +299,9 @@ class _SearchSortRow extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = context.l10n;
-    final sortLabel = sort == LibrarySort.recent ? l10n.librarySortRecent : l10n.librarySortAlphabetical;
+    final sortLabel = sort == LibrarySort.recent
+        ? l10n.librarySortRecent
+        : l10n.librarySortAlphabetical;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
@@ -289,11 +325,18 @@ class _SearchSortRow extends StatelessWidget {
                       onPressed: onSearchToggle,
                     ),
                     contentPadding: EdgeInsets.zero,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                    enabledBorder:
-                        OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                    focusedBorder:
-                        OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 ),
               ),
@@ -313,8 +356,14 @@ class _SearchSortRow extends StatelessWidget {
             onSelected: onSortChanged,
             position: PopupMenuPosition.under,
             itemBuilder: (_) => [
-              PopupMenuItem(value: LibrarySort.recent, child: Text(l10n.librarySortRecent)),
-              PopupMenuItem(value: LibrarySort.alphabetical, child: Text(l10n.librarySortAlphabetical)),
+              PopupMenuItem(
+                value: LibrarySort.recent,
+                child: Text(l10n.librarySortRecent),
+              ),
+              PopupMenuItem(
+                value: LibrarySort.alphabetical,
+                child: Text(l10n.librarySortAlphabetical),
+              ),
             ],
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -322,9 +371,18 @@ class _SearchSortRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (!searching)
-                    Text(sortLabel, style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+                    Text(
+                      sortLabel,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   const SizedBox(width: 6),
-                  Icon(Icons.sort_rounded, size: 18, color: colorScheme.onSurfaceVariant),
+                  Icon(
+                    Icons.sort_rounded,
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ],
               ),
             ),
@@ -357,16 +415,29 @@ class _SignInCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(l10n.shellSignInTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              l10n.shellSignInTitle,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(l10n.shellSignInMessage, style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+            Text(
+              l10n.shellSignInMessage,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () => LoginScreen.open(context),
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.onSurface,
                 foregroundColor: colorScheme.surface,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
               ),
               child: Text(l10n.shellSignIn),
             ),

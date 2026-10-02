@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.flutify.music" "\0"
-            VALUE "FileDescription", "flutify_app" "\0"
+            VALUE "CompanyName", "Flutify" "\0"
+            VALUE "FileDescription", "Flutify" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "flutify_app" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.flutify.music. All rights reserved." "\0"
+            VALUE "InternalName", "Flutify" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Flutify. All rights reserved." "\0"
             VALUE "OriginalFilename", "flutify_app.exe" "\0"
-            VALUE "ProductName", "flutify_app" "\0"
+            VALUE "ProductName", "Flutify" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -39,15 +39,22 @@ class SystemProxySettings {
       }
       // 环境变量常见写法「.example.com」：匹配其子域名与自身
       final pattern = rule.startsWith('.') ? '*$rule' : rule;
-      final regex = RegExp('^${RegExp.escape(pattern).replaceAll(r'\*', '.*')}\$');
-      if (regex.hasMatch(h) || (rule.startsWith('.') && h == rule.substring(1))) return true;
+      final regex = RegExp(
+        '^${RegExp.escape(pattern).replaceAll(r'\*', '.*')}\$',
+      );
+      if (regex.hasMatch(h) || (rule.startsWith('.') && h == rule.substring(1)))
+        return true;
     }
     return false;
   }
 
   /// 解析 Windows 的 ProxyServer：`host:port`（所有协议）或 `http=h:p;https=h:p;socks=h:p`。
   /// SOCKS 不支持（Dart 的 HttpClient 只能走 HTTP 代理），忽略。
-  static SystemProxySettings fromWindows({required bool enabled, required String server, String override = ''}) {
+  static SystemProxySettings fromWindows({
+    required bool enabled,
+    required String server,
+    String override = '',
+  }) {
     if (!enabled || server.trim().isEmpty) return none;
     ProxyEndpoint? http;
     ProxyEndpoint? https;
@@ -63,14 +70,22 @@ class SystemProxySettings {
     } else {
       http = https = ProxyEndpoint.tryParse(server);
     }
-    return SystemProxySettings(http: http, https: https ?? http, bypass: override.split(';'));
+    return SystemProxySettings(
+      http: http,
+      https: https ?? http,
+      bypass: override.split(';'),
+    );
   }
 
   static SystemProxySettings fromEnvironment(Map<String, String> env) {
     String? read(String name) => env[name] ?? env[name.toUpperCase()];
     final http = ProxyEndpoint.tryParse(read('http_proxy') ?? '');
     final https = ProxyEndpoint.tryParse(read('https_proxy') ?? '') ?? http;
-    return SystemProxySettings(http: http, https: https, bypass: (read('no_proxy') ?? '').split(','));
+    return SystemProxySettings(
+      http: http,
+      https: https,
+      bypass: (read('no_proxy') ?? '').split(','),
+    );
   }
 }
 
@@ -78,12 +93,17 @@ class SystemProxySettings {
 class SystemProxyReader {
   SystemProxyReader._();
 
-  static const String _registryKey = r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings';
+  static const String _registryKey =
+      r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings';
 
   static Future<SystemProxySettings> read() async {
-    if (!Platform.isWindows) return SystemProxySettings.fromEnvironment(Platform.environment);
+    if (!Platform.isWindows)
+      return SystemProxySettings.fromEnvironment(Platform.environment);
     try {
-      final result = await Process.run('reg', ['query', _registryKey]).timeout(const Duration(seconds: 2));
+      final result = await Process.run('reg', [
+        'query',
+        _registryKey,
+      ]).timeout(const Duration(seconds: 2));
       if (result.exitCode != 0) return SystemProxySettings.none;
       return parseRegQuery(result.stdout as String);
     } catch (_) {

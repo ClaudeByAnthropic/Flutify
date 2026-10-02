@@ -9,7 +9,7 @@ import '../models/playback_error.dart';
 import '../models/playback_session.dart';
 import '../models/playback_state.dart';
 import '../models/track.dart';
-import '../services/audio_player_service.dart';
+import '../services/audio/audio_engine.dart';
 import '../services/playback_session_store.dart';
 import '../services/protocol/track_audio_loader.dart';
 import '../services/storage_service.dart';
@@ -27,7 +27,11 @@ class QueueEntry {
 
 /// 远程播放接管：见 [PlaybackProvider.remotePlay]。
 typedef RemotePlayHandler =
-    Future<bool> Function(PlaybackContext context, List<SpotifyTrack> tracks, SpotifyTrack? start);
+    Future<bool> Function(
+      PlaybackContext context,
+      List<SpotifyTrack> tracks,
+      SpotifyTrack? start,
+    );
 
 /// 播放状态与队列管理。
 ///
@@ -41,7 +45,7 @@ typedef RemotePlayHandler =
 /// - [userQueue]：用户手动 "Add to queue" 的曲目，优先播放（Next in queue）。
 /// - [upNext]：当前上下文（歌单/专辑等）中剩余的曲目（Next from: ...）。
 class PlaybackProvider extends ChangeNotifier {
-  final AudioPlayerService _audio;
+  final AudioEngine _audio;
   final StorageService _storage;
 
   /// 协议链路完整曲目加载器（AP 密钥 + CDN 解密）；为空（未接入）时任何曲目都无法播放，
@@ -83,7 +87,8 @@ class PlaybackProvider extends ChangeNotifier {
   /// 最近一次播放失败（成功开始播放新曲目或调用 [clearPlaybackError] 后为 null）。
   PlaybackError? _playbackError;
   int _errorSerial = 0;
-  final StreamController<PlaybackError> _errorController = StreamController<PlaybackError>.broadcast();
+  final StreamController<PlaybackError> _errorController =
+      StreamController<PlaybackError>.broadcast();
 
   /// 曲目下载 / 解密进度（0~1），仅在 [isBuffering] 且走完整加载时有意义。
   final ValueNotifier<double> loadProgressNotifier = ValueNotifier(0);
@@ -134,13 +139,19 @@ class PlaybackProvider extends ChangeNotifier {
   StreamSubscription<Duration?>? _durSub;
   StreamSubscription<PlayerState>? _stateSub;
 
-  PlaybackProvider(this._audio, this._storage, {Random? random, this.audioLoader, this.sessionStore})
-    : _random = random ?? Random(),
-      _pauseAfterFailures = _storage.pauseAfterFailures,
-      _volume = _storage.volume,
-      _volumeBeforeMute = _storage.volume > 0 ? _storage.volume : 0.8,
-      _normalize = _storage.normalizeVolume,
-      _fadeSeconds = _storage.fadeSeconds.clamp(0, maxFadeSeconds) {
+  PlaybackProvider(
+    AudioEngine audio,
+    this._storage, {
+    Random? random,
+    this.audioLoader,
+    this.sessionStore,
+  })  : _audio = audio,
+        _random = random ?? Random(),
+       _pauseAfterFailures = _storage.pauseAfterFailures,
+       _volume = _storage.volume,
+       _volumeBeforeMute = _storage.volume > 0 ? _storage.volume : 0.8,
+       _normalize = _storage.normalizeVolume,
+       _fadeSeconds = _storage.fadeSeconds.clamp(0, maxFadeSeconds) {
     _initAudioListeners();
     _applyVolume();
     // 有上次会话时还原为「暂停在上次的位置」；否则没有当前曲目，播放器条隐藏，直到用户点播一首歌
@@ -185,7 +196,10 @@ class PlaybackProvider extends ChangeNotifier {
   /// 上下文中接下来要播放的曲目（按实际播放顺序），uid 为其在上下文中的下标。
   List<QueueEntry> get upNext {
     if (_order.isEmpty || _orderPos + 1 >= _order.length) return const [];
-    return [for (final i in _order.sublist(_orderPos + 1)) QueueEntry(i, _contextTracks[i])];
+    return [
+      for (final i in _order.sublist(_orderPos + 1))
+        QueueEntry(i, _contextTracks[i]),
+    ];
   }
 
   /// 当前曲目播完后暂停、不接下一首（睡眠定时器「本首结束时」）；生效一次后自动复位。
@@ -206,7 +220,8 @@ class PlaybackProvider extends ChangeNotifier {
   bool isCurrent(String trackId) => _currentTrack?.id == trackId;
 
   /// 当前是否正在播放给定上下文（用于详情页大播放按钮的 播放/暂停 状态）。
-  bool isPlayingContext(String contextUri) => _isPlaying && contextUri.isNotEmpty && _context.uri == contextUri;
+  bool isPlayingContext(String contextUri) =>
+      _isPlaying && contextUri.isNotEmpty && _context.uri == contextUri;
 
   // ---------------------------------------------------------------------------
   // Audio engine listeners
@@ -217,7 +232,8 @@ class PlaybackProvider extends ChangeNotifier {
       if (_loadedTrackId == null && _resumeAt != null) return;
       positionNotifier.value = pos;
       if (_fadeSeconds > 0) _updateFade(pos);
-      if ((pos - _savedPosition).abs() >= _positionSaveInterval) _scheduleSave();
+      if ((pos - _savedPosition).abs() >= _positionSaveInterval)
+        _scheduleSave();
     });
 
     _durSub = _audio.durationStream.listen((dur) {
@@ -230,7 +246,8 @@ class PlaybackProvider extends ChangeNotifier {
     _stateSub = _audio.playerStateStream.listen((state) {
       final ps = state.processingState;
       final playing = state.playing && ps != ProcessingState.completed;
-      final buffering = ps == ProcessingState.loading || ps == ProcessingState.buffering;
+      final buffering =
+          ps == ProcessingState.loading || ps == ProcessingState.buffering;
 
       if (_isPlaying != playing || _isBuffering != buffering) {
         // 暂停时记下进度：之后关掉 App 也能从这里继续
@@ -241,7 +258,8 @@ class PlaybackProvider extends ChangeNotifier {
       }
 
       // 只在「进入 completed」的那一刻处理，避免重复事件导致连跳多首。
-      if (ps == ProcessingState.completed && _lastProcessingState != ProcessingState.completed) {
+      if (ps == ProcessingState.completed &&
+          _lastProcessingState != ProcessingState.completed) {
         _handleTrackEnded();
       }
       _lastProcessingState = ps;
@@ -326,13 +344,23 @@ class PlaybackProvider extends ChangeNotifier {
     try {
       final loader = audioLoader;
       if (loader == null) {
-        throw const TrackPlaybackException(TrackPlaybackFailure.notSignedIn, '请先登录 Spotify 账号再播放');
+        throw const TrackPlaybackException(
+          TrackPlaybackFailure.notSignedIn,
+          '请先登录 Spotify 账号再播放',
+        );
       }
       if (!track.isPlayable) {
-        throw const TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌在你所在的地区暂不可播放');
+        throw const TrackPlaybackException(
+          TrackPlaybackFailure.unavailable,
+          '这首歌在你所在的地区暂不可播放',
+        );
       }
+      // 单集必须传完整 URI（加载器按 spotify:episode: 前缀走 mercury 单集链路）；
+      // 曲目优先传 id（缓存键与历史行为一致）。
       final audio = await loader.open(
-        track.id.isNotEmpty ? track.id : track.uri,
+        track.uri.startsWith('spotify:episode:')
+            ? track.uri
+            : (track.id.isNotEmpty ? track.id : track.uri),
         progress: (p) {
           if (generation == _loadGeneration) loadProgressNotifier.value = p;
         },
@@ -344,8 +372,12 @@ class PlaybackProvider extends ChangeNotifier {
       _normalization = audio.normalization;
       _updateFade(resumeAt ?? Duration.zero);
       _applyVolume();
+      final eme = audio.emeContent;
       final stream = audio.stream;
-      if (stream != null) {
+      if (eme != null) {
+        // DRM 曲目：走 EME 引擎（WebView2 Widevine 解密播放）
+        await _audio.playEme(eme, initialPosition: resumeAt);
+      } else if (stream != null) {
         await _audio.playStream(stream, initialPosition: resumeAt);
         _watchStream(stream, track, generation);
       } else {
@@ -368,7 +400,11 @@ class PlaybackProvider extends ChangeNotifier {
       if (generation != _loadGeneration) return;
       final failure = e is TrackPlaybackException
           ? e
-          : TrackPlaybackException(TrackPlaybackFailure.network, '播放失败，请稍后重试', e);
+          : TrackPlaybackException(
+              TrackPlaybackFailure.network,
+              '播放失败，请稍后重试',
+              e,
+            );
       await _handleLoadFailure(track, failure);
     }
   }
@@ -378,14 +414,20 @@ class PlaybackProvider extends ChangeNotifier {
   /// 上限有两层：
   /// - 开启 [pauseAfterFailures]（默认）：连续第 [failureLimit] 首仍不可播放时停下，标记 autoPaused；
   /// - 始终：跳过次数不超过一轮上下文长度，避免整个歌单都不可播时死循环。
-  Future<void> _handleLoadFailure(SpotifyTrack track, TrackPlaybackException failure) async {
+  Future<void> _handleLoadFailure(
+    SpotifyTrack track,
+    TrackPlaybackException failure,
+  ) async {
     final failures = _consecutiveSkips + 1;
-    final hitLimit = failure.shouldSkip && _pauseAfterFailures && failures >= failureLimit;
+    final hitLimit =
+        failure.shouldSkip && _pauseAfterFailures && failures >= failureLimit;
     final canSkip =
         failure.shouldSkip &&
         !hitLimit &&
         _consecutiveSkips < max(max(_order.length, _userQueue.length + 1), 1) &&
-        (_userQueue.isNotEmpty || _orderPos + 1 < _order.length || _repeatMode == SpotifyRepeatMode.context);
+        (_userQueue.isNotEmpty ||
+            _orderPos + 1 < _order.length ||
+            _repeatMode == SpotifyRepeatMode.context);
     _playbackError = PlaybackError(
       serial: ++_errorSerial,
       track: track,
@@ -412,7 +454,11 @@ class PlaybackProvider extends ChangeNotifier {
 
   /// 边下边播途中下载彻底失败（已自动续传、换 CDN 仍不行）：已缓冲的部分会播完，
   /// 这里提示网络错误，并让下次点播放重新加载（不自动跳歌）。
-  void _watchStream(ProgressiveAudio stream, SpotifyTrack track, int generation) {
+  void _watchStream(
+    ProgressiveAudio stream,
+    SpotifyTrack track,
+    int generation,
+  ) {
     stream.done.catchError((Object e) {
       if (generation != _loadGeneration) return;
       _loadedTrackId = null;
@@ -420,7 +466,11 @@ class PlaybackProvider extends ChangeNotifier {
       _playbackError = PlaybackError(
         serial: ++_errorSerial,
         track: track,
-        exception: TrackPlaybackException(TrackPlaybackFailure.network, '音频下载中断，请检查网络后重试', e),
+        exception: TrackPlaybackException(
+          TrackPlaybackFailure.network,
+          '音频下载中断，请检查网络后重试',
+          e,
+        ),
         skipped: false,
         autoPaused: false,
         consecutiveFailures: 1,
@@ -440,7 +490,11 @@ class PlaybackProvider extends ChangeNotifier {
     } else if (_orderPos + 1 < _order.length) {
       next = _contextTracks[_order[_orderPos + 1]];
     }
-    if (next != null && next.isPlayable && next.id.isNotEmpty) {
+    // 单集不预取：音频密钥当前拿不到，预取只会白费一次 metadata 请求
+    if (next != null &&
+        next.isPlayable &&
+        next.id.isNotEmpty &&
+        !next.uri.startsWith('spotify:episode:')) {
       unawaited(loader.prefetch(next.id));
     }
   }
@@ -458,15 +512,31 @@ class PlaybackProvider extends ChangeNotifier {
 
   /// 播放指定曲目。[contextQueue] 为所在列表（歌单/专辑/搜索结果），
   /// 未提供时以单曲作为上下文。
-  Future<void> playTrack(SpotifyTrack track, {List<SpotifyTrack>? contextQueue, PlaybackContext? context}) async {
+  Future<void> playTrack(
+    SpotifyTrack track, {
+    List<SpotifyTrack>? contextQueue,
+    PlaybackContext? context,
+  }) async {
     final remote = remotePlay;
-    if (remote != null && await remote(context ?? PlaybackContext.none, contextQueue ?? [track], track)) return;
+    if (remote != null &&
+        await remote(
+          context ?? PlaybackContext.none,
+          contextQueue ?? [track],
+          track,
+        ))
+      return;
     await _playLocal(track, contextQueue: contextQueue, context: context);
   }
 
   /// 在本机播放（不经远程接管）。
-  Future<void> _playLocal(SpotifyTrack track, {List<SpotifyTrack>? contextQueue, PlaybackContext? context}) async {
-    var tracks = (contextQueue == null || contextQueue.isEmpty) ? [track] : List.of(contextQueue);
+  Future<void> _playLocal(
+    SpotifyTrack track, {
+    List<SpotifyTrack>? contextQueue,
+    PlaybackContext? context,
+  }) async {
+    var tracks = (contextQueue == null || contextQueue.isEmpty)
+        ? [track]
+        : List.of(contextQueue);
     var index = tracks.indexWhere((t) => t.id == track.id);
     if (index == -1) {
       tracks = [track, ...tracks];
@@ -479,7 +549,10 @@ class PlaybackProvider extends ChangeNotifier {
   }
 
   /// 从头播放整个上下文（详情页大播放按钮）。随机模式下从随机曲目开始。
-  Future<void> playContext(List<SpotifyTrack> tracks, PlaybackContext context) async {
+  Future<void> playContext(
+    List<SpotifyTrack> tracks,
+    PlaybackContext context,
+  ) async {
     if (tracks.isEmpty) return;
     // 远程设备按它自己的随机 / 循环设置从头播放
     final remote = remotePlay;
@@ -540,11 +613,18 @@ class PlaybackProvider extends ChangeNotifier {
 
   Future<void> seekTo(Duration pos) async {
     final maxMs = _duration.inMilliseconds;
-    final clamped = Duration(milliseconds: pos.inMilliseconds.clamp(0, maxMs > 0 ? maxMs : pos.inMilliseconds));
+    final clamped = Duration(
+      milliseconds: pos.inMilliseconds.clamp(
+        0,
+        maxMs > 0 ? maxMs : pos.inMilliseconds,
+      ),
+    );
     positionNotifier.value = clamped;
     _scheduleSave();
     // 音频还没加载（还原的会话 / 上次加载失败）：记下位置，点播放时从这里开始
-    if (_currentTrack != null && _loadedTrackId != _currentTrack!.id && !_isLoadingTrack) {
+    if (_currentTrack != null &&
+        _loadedTrackId != _currentTrack!.id &&
+        !_isLoadingTrack) {
       _resumeAt = clamped;
       return;
     }
@@ -590,7 +670,9 @@ class PlaybackProvider extends ChangeNotifier {
       _userQueue.add(QueueEntry(_nextQueueUid++, t));
     }
     final maxMs = _duration.inMilliseconds;
-    final position = maxMs > 0 && session.position.inMilliseconds >= maxMs ? Duration.zero : session.position;
+    final position = maxMs > 0 && session.position.inMilliseconds >= maxMs
+        ? Duration.zero
+        : session.position;
     positionNotifier.value = position;
     _savedPosition = position;
     _resumeAt = position > Duration.zero ? position : null;
@@ -612,7 +694,9 @@ class PlaybackProvider extends ChangeNotifier {
       tracks: tracks,
       index: index,
       current: current,
-      userQueue: [for (final e in _userQueue.take(PlaybackSession.maxUserQueue)) e.track],
+      userQueue: [
+        for (final e in _userQueue.take(PlaybackSession.maxUserQueue)) e.track,
+      ],
       context: _context,
       position: positionNotifier.value,
       shuffle: _shuffle,

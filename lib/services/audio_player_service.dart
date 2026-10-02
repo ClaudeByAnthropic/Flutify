@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'package:just_audio/just_audio.dart';
 
+import 'audio/audio_engine.dart';
 import 'downloading_audio_source.dart';
 import 'protocol/progressive_download.dart';
 import 'protocol/track_playback_exception.dart';
 
 /// just_audio 的薄封装。上层只依赖这里暴露的流与方法，
 /// 便于在测试中用 Fake 实现替换（不直接暴露 AudioPlayer 实例）。
-class AudioPlayerService {
+class AudioPlayerService implements AudioEngine {
   final AudioPlayer _player;
 
   AudioPlayerService([AudioPlayer? player]) : _player = player ?? AudioPlayer();
@@ -49,6 +50,12 @@ class AudioPlayerService {
     }
     // just_audio 的 play() 要到播放结束 / 暂停才完成，不能 await，否则会阻塞后续切歌逻辑
     if (autoplay) unawaited(_player.play().catchError((Object _) {}));
+  }
+
+  /// EME（DRM 曲目）在 just_audio 引擎上不可用；由路由引擎转发到 EME 引擎。
+  @override
+  Future<void> playEme(EmeTrackContent content, {Duration? initialPosition, bool autoplay = true}) {
+    throw UnimplementedError('just_audio 引擎不支持 EME 播放');
   }
 
   Future<void> play() => _player.play();

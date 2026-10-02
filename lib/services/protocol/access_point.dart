@@ -21,6 +21,9 @@ class ApPacketType {
   static const int login = 0xab;
   static const int apWelcome = 0xac;
   static const int authFailure = 0xad;
+
+  /// Mercury 请求 / 响应（hm:// 内部接口，如 metadata/4/episode）。
+  static const int mercuryReq = 0xb2;
 }
 
 /// AP 登录凭据（`authentication.proto` LoginCredentials）。
@@ -38,19 +41,30 @@ class ApCredentials {
   final int authType;
   final Uint8List authData;
 
-  const ApCredentials({this.username, required this.authType, required this.authData});
+  const ApCredentials({
+    this.username,
+    required this.authType,
+    required this.authData,
+  });
 
-  factory ApCredentials.accessToken(String token) =>
-      ApCredentials(authType: typeSpotifyToken, authData: Uint8List.fromList(token.codeUnits));
+  factory ApCredentials.accessToken(String token) => ApCredentials(
+    authType: typeSpotifyToken,
+    authData: Uint8List.fromList(token.codeUnits),
+  );
 
-  factory ApCredentials.password(String username, String password) => ApCredentials(
+  factory ApCredentials.password(String username, String password) =>
+      ApCredentials(
         username: username,
         authType: typeUserPass,
         authData: Uint8List.fromList(password.codeUnits),
       );
 
   factory ApCredentials.storedBlob(String username, Uint8List blob) =>
-      ApCredentials(username: username, authType: typeStoredCredentials, authData: blob);
+      ApCredentials(
+        username: username,
+        authType: typeStoredCredentials,
+        authData: blob,
+      );
 }
 
 /// APWelcome 中的登录结果。
@@ -95,6 +109,15 @@ class ApLoginException implements Exception {
   String toString() => message;
 }
 
+/// Mercury 请求返回非 200 状态。
+class ApMercuryException implements Exception {
+  final int statusCode;
+  const ApMercuryException(this.statusCode);
+
+  @override
+  String toString() => 'Mercury 请求失败（状态 $statusCode）';
+}
+
 /// 取音频密钥失败。
 class ApKeyException implements Exception {
   final int code;
@@ -104,7 +127,8 @@ class ApKeyException implements Exception {
   ApKeyException(this.code, [Uint8List? raw]) : raw = raw ?? Uint8List(0);
 
   @override
-  String toString() => '获取音频密钥失败（错误码 $code${raw.isEmpty ? '' : ' raw=${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}'}）';
+  String toString() =>
+      '获取音频密钥失败（错误码 $code${raw.isEmpty ? '' : ' raw=${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}'}）';
 }
 
 /// Spotify Access Point 会话：握手（DH + Shannon）→ 登录 → 取音频密钥。
@@ -117,11 +141,16 @@ class SpotifyAccessPoint {
 
   /// 单订阅 socket 的常驻接收：握手期收明文帧，之后喂给 [ApCodec]。
   final BytesBuilder _preCodecBuffer = BytesBuilder();
-  final List<Completer<({Uint8List payload, Uint8List raw})>> _handshakeFrames = [];
+  final List<Completer<({Uint8List payload, Uint8List raw})>> _handshakeFrames =
+      [];
   ApCodec? _codec;
 
   final Map<int, Completer<Uint8List>> _pendingKeys = {};
   int _keySeq = 0;
+
+  /// 进行中的 Mercury 请求（seq → 结果）。
+  final Map<int, Completer<Uint8List>> _pendingMercury = {};
+  int _mercurySeq = 0;
 
   Completer<ApWelcome>? _loginWaiter;
   Timer? _pongTimer;
@@ -151,14 +180,17 @@ class SpotifyAccessPoint {
   // -------------------------------------------------------------------------
 
   /// 解析接入点，返回单个随机候选（兼容旧调用）。
-  static Future<({String host, int port})> resolveAccessPoint({http.Client? client}) async =>
-      (await resolveAccessPoints(client: client)).first;
+  static Future<({String host, int port})> resolveAccessPoint({
+    http.Client? client,
+  }) async => (await resolveAccessPoints(client: client)).first;
 
   /// 解析全部接入点（`https://apresolve.spotify.com/?type=accesspoint`）。
   ///
   /// 排序规则：端口 4070 → 443 → 80（部分代理 / TUN 环境会丢弃 :80 的非 HTTP 流量），
   /// 同端口内随机打散，分摊负载。
-  static Future<List<({String host, int port})>> resolveAccessPoints({http.Client? client}) async {
+  static Future<List<({String host, int port})>> resolveAccessPoints({
+    http.Client? client,
+  }) async {
     final c = client ?? http.Client();
     try {
       final res = await c
@@ -167,16 +199,23 @@ class SpotifyAccessPoint {
             headers: {'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 10));
-      final match = RegExp(r'"accesspoint"\s*:\s*\[([^\]]*)\]').firstMatch(res.body);
+      final match = RegExp(
+        r'"accesspoint"\s*:\s*\[([^\]]*)\]',
+      ).firstMatch(res.body);
       final entries = RegExp(r'"([^"]+)"')
           .allMatches(match?.group(1) ?? '')
           .map((m) => m.group(1)!)
           .where((s) => s.contains(':'))
           .toList();
       if (entries.isEmpty) throw StateError('apresolve 未返回接入点');
-      int rank(int port) => switch (port) { 4070 => 0, 443 => 1, _ => 2 };
+      int rank(int port) => switch (port) {
+        4070 => 0,
+        443 => 1,
+        _ => 2,
+      };
       final parsed = [
-        for (final e in entries) (host: e.split(':')[0], port: int.parse(e.split(':')[1])),
+        for (final e in entries)
+          (host: e.split(':')[0], port: int.parse(e.split(':')[1])),
       ]..shuffle(Random.secure());
       parsed.sort((a, b) => rank(a.port).compareTo(rank(b.port)));
       return parsed;
@@ -226,11 +265,35 @@ class SpotifyAccessPoint {
   static const int _maxAttempts = 6;
 
   /// 对单个接入点完成握手。
-  static Future<SpotifyAccessPoint> _connectTo(String host, int port, Duration timeout) async {
+  static Future<SpotifyAccessPoint> _connectTo(
+    String host,
+    int port,
+    Duration timeout,
+  ) async {
     final connection = await ProxyTunnel.connect(host, port, timeout: timeout);
-    final socket = connection.socket;
-    final ap = SpotifyAccessPoint._(socket, connection.input);
+    return _handshake(
+      SpotifyAccessPoint._(connection.socket, connection.input),
+      connection.socket,
+      timeout,
+    );
+  }
 
+  /// 直连接入点并完成握手（探针 / 命令行工具用：不走代理隧道，避免引入 Flutter 侧依赖）。
+  static Future<SpotifyAccessPoint> connectDirect(
+    String host,
+    int port, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final socket = await Socket.connect(host, port, timeout: timeout);
+    return _handshake(SpotifyAccessPoint._(socket, socket), socket, timeout);
+  }
+
+  /// ClientHello → APResponse → ClientResponsePlaintext 握手（含 DH 签名验证与密钥安装）。
+  static Future<SpotifyAccessPoint> _handshake(
+    SpotifyAccessPoint ap,
+    Socket socket,
+    Duration timeout,
+  ) async {
     try {
       // 1) ClientHello：[0x00,0x04] + u32be(6+len) + payload
       final dh = ap_crypto.DhLocalKeys.random();
@@ -254,7 +317,8 @@ class SpotifyAccessPoint {
         ..bytes(70, Uint8List.fromList([0x1e]));
       final helloBytes = hello.toBytes();
       final helloFrame = Uint8List.fromList([
-        0x00, 0x04,
+        0x00,
+        0x04,
         ..._u32be(6 + helloBytes.length),
         ...helloBytes,
       ]);
@@ -277,7 +341,8 @@ class SpotifyAccessPoint {
                 if (df.number == 10 && df.wireType == 2) {
                   df.asMessage.forEach((dd) {
                     if (dd.number == 10 && dd.wireType == 2) gs = dd.bytesValue;
-                    if (dd.number == 30 && dd.wireType == 2) gsSignature = dd.bytesValue;
+                    if (dd.number == 30 && dd.wireType == 2)
+                      gsSignature = dd.bytesValue;
                   });
                 }
               });
@@ -332,13 +397,18 @@ class SpotifyAccessPoint {
   }
 
   /// 握手期读取一个明文帧：u32be(整包长) + payload（返回值含原始帧字节）。
-  Future<({Uint8List payload, Uint8List raw})> _readHandshakeFrame(Duration timeout) {
+  Future<({Uint8List payload, Uint8List raw})> _readHandshakeFrame(
+    Duration timeout,
+  ) {
     final completer = Completer<({Uint8List payload, Uint8List raw})>();
     _handshakeFrames.add(completer);
-    return completer.future.timeout(timeout, onTimeout: () {
-      _handshakeFrames.remove(completer);
-      throw TimeoutException('等待 AP 握手响应超时');
-    });
+    return completer.future.timeout(
+      timeout,
+      onTimeout: () {
+        _handshakeFrames.remove(completer);
+        throw TimeoutException('等待 AP 握手响应超时');
+      },
+    );
   }
 
   void _installCodec(Uint8List sendKey, Uint8List recvKey) {
@@ -353,7 +423,10 @@ class SpotifyAccessPoint {
   // -------------------------------------------------------------------------
 
   /// 在加密通道上登录（cmd 0xab），成功返回 [ApWelcome]。
-  Future<ApWelcome> authenticate(ApCredentials credentials, {String? deviceId}) async {
+  Future<ApWelcome> authenticate(
+    ApCredentials credentials, {
+    String? deviceId,
+  }) async {
     final os = switch (Platform.operatingSystem) {
       'windows' => 1, // OS_WINDOWS
       'macos' => 2, // OS_OSX
@@ -383,7 +456,10 @@ class SpotifyAccessPoint {
     try {
       final welcome = await waiter.future.timeout(const Duration(seconds: 15));
       canonicalUsername = welcome.canonicalUsername;
-      reusableCredentials = (type: welcome.reusableAuthType, blob: welcome.reusableAuth);
+      reusableCredentials = (
+        type: welcome.reusableAuthType,
+        blob: welcome.reusableAuth,
+      );
       return welcome;
     } finally {
       if (identical(_loginWaiter, waiter)) _loginWaiter = null;
@@ -398,7 +474,10 @@ class SpotifyAccessPoint {
   ///
   /// 请求 payload = `file_id(20) + gid(16) + seq(4 BE) + 0x0000(2)`；
   /// 响应 payload = `seq(4) + key(16)`。
-  Future<Uint8List> requestAudioKey(Uint8List fileId, Uint8List trackGid) async {
+  Future<Uint8List> requestAudioKey(
+    Uint8List fileId,
+    Uint8List trackGid,
+  ) async {
     if (fileId.length != 20) throw ArgumentError('fileId must be 20 bytes');
     if (trackGid.length != 16) throw ArgumentError('gid must be 16 bytes');
 
@@ -421,6 +500,91 @@ class SpotifyAccessPoint {
   }
 
   // -------------------------------------------------------------------------
+  // Mercury（hm:// 内部接口）
+  // -------------------------------------------------------------------------
+
+  /// 发送 Mercury GET 请求（如 `hm://metadata/4/episode/{gid}`），返回响应体。
+  ///
+  /// 协议（对照 librespot `mercury/mod.rs` + `mercury/types.rs` + `mercury.proto`）：
+  /// 请求与响应都是 cmd 0xb2，负载 = `seq_len(2 BE) + seq(8 BE) + flags(1) + count(2 BE)
+  /// + [len(2 BE) + part]…`；首个 part 是 `mercury.Header`（uri=1 / method=3 字符串 /
+  /// status_code=4 sint32），其余为响应体分片。非 200 状态抛 [ApMercuryException]。
+  Future<Uint8List> requestMercury(
+    String uri, {
+    Duration timeout = const Duration(seconds: 10),
+  }) {
+    final seq = _mercurySeq++;
+    final completer = Completer<Uint8List>();
+    _pendingMercury[seq] = completer;
+
+    // mercury.Header：uri=1，method=3（字符串 "GET"）
+    final header = ProtoWriter()
+      ..string(1, uri)
+      ..string(3, 'GET');
+    final headerBytes = header.toBytes();
+
+    final out = BytesBuilder()
+      ..add(_u16be(8)) // seq 长度前缀
+      ..add(_u64be(seq))
+      ..addByte(1) // flags：FINAL
+      ..add(_u16be(1)) // 只有 header 一个 part（GET 无请求体）
+      ..add(_u16be(headerBytes.length))
+      ..add(headerBytes);
+    _send(ApPacketType.mercuryReq, out.toBytes());
+
+    return completer.future.timeout(
+      timeout,
+      onTimeout: () {
+        _pendingMercury.remove(seq);
+        throw TimeoutException('Mercury 请求超时：$uri');
+      },
+    );
+  }
+
+  /// 解析 Mercury 响应包并完成对应请求。
+  void _onMercuryReply(Uint8List payload) {
+    if (payload.length < 4) return;
+    final seqLen = (payload[0] << 8) | payload[1];
+    if (payload.length < 2 + seqLen + 3) return;
+    final seq = _u64beAt(payload, 2);
+    var offset = 2 + seqLen;
+    final flags = payload[offset++]; // 1=FINAL（0x2 表示末个 part 未完，待续包）
+    if (flags != 1) return; // 分片续传：本 App 的用途（metadata）响应都很小，不实现拼包
+    final count = (payload[offset] << 8) | payload[offset + 1];
+    offset += 2;
+    final parts = <Uint8List>[];
+    for (var i = 0; i < count && offset + 2 <= payload.length; i++) {
+      final len = (payload[offset] << 8) | payload[offset + 1];
+      offset += 2;
+      if (offset + len > payload.length) return;
+      parts.add(Uint8List.sublistView(payload, offset, offset + len));
+      offset += len;
+    }
+    if (parts.isEmpty) return;
+
+    // 首个 part 是 mercury.Header：status_code = 字段 4（sint32，zigzag 编码）
+    var status = 200;
+    ProtoReader(parts.first).forEach((f) {
+      if (f.number == 4 && f.wireType == 0) {
+        final v = f.varintValue;
+        status = (v >> 1) ^ -(v & 1);
+      }
+    });
+
+    final completer = _pendingMercury.remove(seq);
+    if (completer == null || completer.isCompleted) return;
+    if (status != 200) {
+      completer.completeError(ApMercuryException(status));
+    } else {
+      final body = BytesBuilder();
+      for (final part in parts.skip(1)) {
+        body.add(part);
+      }
+      completer.complete(body.toBytes());
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // 收发
   // -------------------------------------------------------------------------
 
@@ -439,7 +603,8 @@ class SpotifyAccessPoint {
       final all = _preCodecBuffer.takeBytes();
       var offset = 0;
       while (all.length - offset >= 4) {
-        final size = (all[offset] << 24) |
+        final size =
+            (all[offset] << 24) |
             (all[offset + 1] << 16) |
             (all[offset + 2] << 8) |
             all[offset + 3];
@@ -451,7 +616,8 @@ class SpotifyAccessPoint {
           _handshakeFrames.removeAt(0).complete((payload: payload, raw: raw));
         }
       }
-      if (offset < all.length) _preCodecBuffer.add(Uint8List.sublistView(all, offset));
+      if (offset < all.length)
+        _preCodecBuffer.add(Uint8List.sublistView(all, offset));
       return;
     }
 
@@ -482,7 +648,9 @@ class SpotifyAccessPoint {
       case ApPacketType.aesKeyError:
         final seq = _u32beAt(packet.payload, 0);
         final code = packet.payload.length > 4 ? packet.payload[4] : -1;
-        _pendingKeys.remove(seq)?.completeError(ApKeyException(code, packet.payload));
+        _pendingKeys
+            .remove(seq)
+            ?.completeError(ApKeyException(code, packet.payload));
         break;
       case ApPacketType.ping:
         // 对照 librespot：延迟 60s 回 4 字节零负载 Pong（服务端随后回 PongAck）
@@ -505,12 +673,17 @@ class SpotifyAccessPoint {
         });
         final waiter = _loginWaiter;
         if (waiter != null && !waiter.isCompleted) {
-          waiter.complete(ApWelcome(
-            canonicalUsername: username,
-            reusableAuthType: reusableType,
-            reusableAuth: reusable,
-          ));
+          waiter.complete(
+            ApWelcome(
+              canonicalUsername: username,
+              reusableAuthType: reusableType,
+              reusableAuth: reusable,
+            ),
+          );
         }
+        break;
+      case ApPacketType.mercuryReq:
+        _onMercuryReply(packet.payload);
         break;
       case ApPacketType.authFailure:
         final reader = ProtoReader(packet.payload);
@@ -531,14 +704,22 @@ class SpotifyAccessPoint {
     }
   }
 
+  /// 调试钩子：连接异常断开时回调真实原因（探针用，默认空）。
+  static void Function(Object error)? onAbort;
+
   void _abort(Object error, [StackTrace? st]) {
     if (_closed) return;
     _closed = true;
+    onAbort?.call(error);
     _pongTimer?.cancel();
     for (final waiter in _pendingKeys.values) {
       if (!waiter.isCompleted) waiter.completeError(error, st);
     }
     _pendingKeys.clear();
+    for (final waiter in _pendingMercury.values) {
+      if (!waiter.isCompleted) waiter.completeError(error, st);
+    }
+    _pendingMercury.clear();
     final login = _loginWaiter;
     if (login != null && !login.isCompleted) login.completeError(error, st);
     for (final frame in _handshakeFrames) {
@@ -559,6 +740,10 @@ class SpotifyAccessPoint {
       if (!waiter.isCompleted) waiter.completeError(StateError('AP 会话已关闭'));
     }
     _pendingKeys.clear();
+    for (final waiter in _pendingMercury.values) {
+      if (!waiter.isCompleted) waiter.completeError(StateError('AP 会话已关闭'));
+    }
+    _pendingMercury.clear();
     final login = _loginWaiter;
     if (login != null && !login.isCompleted) {
       login.completeError(StateError('AP 会话已关闭'));
@@ -572,10 +757,32 @@ class SpotifyAccessPoint {
     } catch (_) {}
   }
 
-  static List<int> _u32be(int v) => [(v >> 24) & 0xff, (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
+  static List<int> _u32be(int v) => [
+    (v >> 24) & 0xff,
+    (v >> 16) & 0xff,
+    (v >> 8) & 0xff,
+    v & 0xff,
+  ];
+
+  static List<int> _u16be(int v) => [(v >> 8) & 0xff, v & 0xff];
+
+  static List<int> _u64be(int v) => [
+    for (var i = 7; i >= 0; i--) (v >> (i * 8)) & 0xff,
+  ];
+
+  static int _u64beAt(Uint8List data, int offset) {
+    var v = 0;
+    for (var i = 0; i < 8; i++) {
+      v = (v << 8) | data[offset + i];
+    }
+    return v;
+  }
 
   static int _u32beAt(Uint8List data, int offset) =>
-      (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
+      (data[offset] << 24) |
+      (data[offset + 1] << 16) |
+      (data[offset + 2] << 8) |
+      data[offset + 3];
 }
 
 extension on Random {
