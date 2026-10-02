@@ -40,7 +40,7 @@ class HomeChipBar extends StatelessWidget {
 
   /// 标签行高度：胶囊（上下各 8 内边距 + 实测一行文字）与头像取大者，再加上下留白。
   static double extentOf(BuildContext context) {
-    final pill = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 16;
+    final pill = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 10;
     return math.max(pill, _leadingSize) + _verticalPadding * 2;
   }
 
@@ -60,13 +60,13 @@ class HomeChipBar extends StatelessWidget {
 
     final pills = <Widget>[
       if (parent == null) ...[
-        FilterPill(label: l10n.filterAll, isSelected: true, onTap: () => onSelected('')),
-        for (final chip in chips) FilterPill(label: chip.label, isSelected: false, onTap: () => onSelected(chip.id)),
+        FilterPill(compact: true, label: l10n.filterAll, isSelected: true, onTap: () => onSelected('')),
+        for (final chip in chips) FilterPill(compact: true, label: chip.label, isSelected: false, onTap: () => onSelected(chip.id)),
       ] else ...[
         _ClearPill(tooltip: l10n.homeClearFilter, onTap: () => onSelected('')),
-        FilterPill(label: parent.label, isSelected: selected == parent.id, onTap: () => onSelected(parent.id)),
+        FilterPill(compact: true, label: parent.label, isSelected: selected == parent.id, onTap: () => onSelected(parent.id)),
         for (final sub in parent.subChips)
-          FilterPill(label: sub.label, isSelected: selected == sub.id, onTap: () => onSelected(sub.id)),
+          FilterPill(compact: true, label: sub.label, isSelected: selected == sub.id, onTap: () => onSelected(sub.id)),
       ],
     ];
 
@@ -129,7 +129,7 @@ class _ClearPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final size = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 16;
+    final size = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 10;
     return Tooltip(
       message: tooltip,
       child: HoverBuilder(
@@ -151,3 +151,4 @@ class _ClearPill extends StatelessWidget {
     );
   }
 }
+

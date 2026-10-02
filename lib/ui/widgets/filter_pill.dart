@@ -12,11 +12,15 @@ class FilterPill extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
+  /// 紧凑尺寸（主页筛选条）：上下内边距共减 6px，左右各减 2px。
+  final bool compact;
+
   const FilterPill({
     super.key,
     required this.label,
     required this.isSelected,
     required this.onTap,
+    this.compact = false,
   });
 
   @override
@@ -35,7 +39,9 @@ class FilterPill extends StatelessWidget {
           // 被父级给予固定高度时（如搜索页横向列表）文字也要在胶囊内垂直居中
           alignment: Alignment.center,
           // MiSans 汉字视觉重心比行框中心高约 0.03em（约 0.4px，实测字体度量），上下内边距补偿 0.5px
-          padding: const EdgeInsets.fromLTRB(16.0, 8.5, 16.0, 7.5),
+          padding: compact
+              ? const EdgeInsets.fromLTRB(14.0, 5.5, 14.0, 4.5)
+              : const EdgeInsets.fromLTRB(16.0, 8.5, 16.0, 7.5),
           decoration: BoxDecoration(
             color: isSelected
                 ? tokens.accent
@@ -63,3 +69,4 @@ class FilterPill extends StatelessWidget {
     );
   }
 }
+
