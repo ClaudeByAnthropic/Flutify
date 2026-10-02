@@ -33,7 +33,8 @@ class NowPlayingDetails extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      // 底部留白随播放栏占位（MediaQuery 底部 padding）：末尾卡片不被悬浮胶囊遮住
+      padding: EdgeInsets.fromLTRB(16, 4, 16, 24 + MediaQuery.paddingOf(context).bottom),
       children: [
         // 大封面：正方形，随面板宽度缩放
         AspectRatio(

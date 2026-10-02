@@ -349,6 +349,11 @@
   "settingsConnectSection": "Spotify Connect",
   "settingsConnectEnabled": "Enable Spotify Connect",
   "settingsConnectEnabledSubtitle": "Show and control playback on your other devices",
+  "settingsConnectDeviceName": "Device name",
+  "settingsConnectDeviceNameSubtitle": "How Flutify appears in your other devices' device list. Leave empty for the default",
+  "settingsConnectUseDeviceName": "Use device name",
+  "settingsConnectReportOnLaunch": "Sync playback on launch",
+  "settingsConnectReportOnLaunchSubtitle": "Show Flutify's current track on your other devices as soon as it opens, even before playing (takes over an idle session)",
   "settingsRemoteLyricsLead": "Remote lyrics lead",
   "settingsRemoteLyricsLeadSubtitle": "When another device is playing: raise it if lyrics lag behind the singing, lower it if they run ahead",
 

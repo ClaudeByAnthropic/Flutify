@@ -45,7 +45,8 @@ class NowPlayingPanel extends StatelessWidget {
       );
     } else if (expanded) {
       body = Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        // 底部留白随播放栏占位：放大歌词不被悬浮胶囊压住最后一行
+        padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + MediaQuery.paddingOf(context).bottom),
         child: PanelLyricsCard(track: track, remote: remote, expanded: true),
       );
     } else {

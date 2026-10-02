@@ -44,6 +44,12 @@ class AppPreferences {
   /// 是否接入 Spotify Connect（关闭后不再显示 / 遥控其他设备）。
   final bool connectEnabled;
 
+  /// 启动后即使未播放，也把本机当前曲目（暂停）同步给 Connect，让其他设备看到 Flutify 的状态。
+  final bool connectReportOnLaunch;
+
+  /// 本机在其他设备「设备列表」里显示的名字；空表示默认「Flutify」。
+  final String connectDeviceName;
+
   /// 远程播放时歌词的提前量（毫秒）：正数让歌词更早切行，负数推迟。只影响歌词，不影响进度条。
   final int remoteLyricsLeadMs;
 
@@ -76,6 +82,8 @@ class AppPreferences {
     this.startPage = StartPage.home,
     this.rememberWindow = true,
     this.connectEnabled = true,
+    this.connectReportOnLaunch = false,
+    this.connectDeviceName = '',
     this.remoteLyricsLeadMs = 0,
     this.compactTrackList = false,
     this.proxyMode = ProxyMode.system,
@@ -105,6 +113,8 @@ class AppPreferences {
     StartPage? startPage,
     bool? rememberWindow,
     bool? connectEnabled,
+    bool? connectReportOnLaunch,
+    String? connectDeviceName,
     int? remoteLyricsLeadMs,
     bool? compactTrackList,
     ProxyMode? proxyMode,
@@ -124,6 +134,8 @@ class AppPreferences {
       startPage: startPage ?? this.startPage,
       rememberWindow: rememberWindow ?? this.rememberWindow,
       connectEnabled: connectEnabled ?? this.connectEnabled,
+      connectReportOnLaunch: connectReportOnLaunch ?? this.connectReportOnLaunch,
+      connectDeviceName: connectDeviceName ?? this.connectDeviceName,
       remoteLyricsLeadMs: remoteLyricsLeadMs ?? this.remoteLyricsLeadMs,
       compactTrackList: compactTrackList ?? this.compactTrackList,
       proxyMode: proxyMode ?? this.proxyMode,
@@ -146,6 +158,8 @@ class AppPreferences {
     'startPage': startPage.name,
     'rememberWindow': rememberWindow,
     'connectEnabled': connectEnabled,
+    'connectReportOnLaunch': connectReportOnLaunch,
+    'connectDeviceName': connectDeviceName,
     'remoteLyricsLeadMs': remoteLyricsLeadMs,
     'compactTrackList': compactTrackList,
     'proxyMode': proxyMode.name,
@@ -183,6 +197,8 @@ class AppPreferences {
       startPage: pick(StartPage.values, json['startPage'], d.startPage),
       rememberWindow: flag(json['rememberWindow'], d.rememberWindow),
       connectEnabled: flag(json['connectEnabled'], d.connectEnabled),
+      connectReportOnLaunch: flag(json['connectReportOnLaunch'], d.connectReportOnLaunch),
+      connectDeviceName: json['connectDeviceName'] is String ? (json['connectDeviceName'] as String).trim() : d.connectDeviceName,
       remoteLyricsLeadMs: lead is int
           ? lead.clamp(-maxRemoteLyricsLeadMs, maxRemoteLyricsLeadMs)
           : 0,
@@ -235,6 +251,8 @@ class AppPreferences {
       other.startPage == startPage &&
       other.rememberWindow == rememberWindow &&
       other.connectEnabled == connectEnabled &&
+      other.connectReportOnLaunch == connectReportOnLaunch &&
+      other.connectDeviceName == connectDeviceName &&
       other.remoteLyricsLeadMs == remoteLyricsLeadMs &&
       other.compactTrackList == compactTrackList &&
       other.proxyMode == proxyMode &&
@@ -255,6 +273,8 @@ class AppPreferences {
     startPage,
     rememberWindow,
     connectEnabled,
+    connectReportOnLaunch,
+    connectDeviceName,
     remoteLyricsLeadMs,
     compactTrackList,
     proxyMode,

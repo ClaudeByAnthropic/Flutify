@@ -8,9 +8,8 @@ import 'hover_builder.dart';
 
 /// 播放栏左侧封面（本机 / 远程播放栏共用），与官方桌面端一致：
 ///
-/// - 三栏框架下右栏没有显示「播放状态」时：悬停浮出右上角展开箭头，点击打开右栏「正在播放」；
-/// - 右栏已显示时：点击执行 [onOpenFallback]（本机为全屏播放器，远程为空 = 不响应）；
-/// - 没有框架（[layout] 为 null）时同样执行 [onOpenFallback]。
+/// - 三栏框架下：点击打开 / 关闭右栏「正在播放」；右栏未显示时悬停浮出右上角展开箭头；
+/// - 没有框架（[layout] 为 null，即手机布局）时执行 [onOpenFallback]（全屏播放器）。
 class PlayerBarCover extends StatelessWidget {
   static const double size = 56;
 
@@ -24,7 +23,7 @@ class PlayerBarCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final layout = this.layout;
     final canExpand = layout != null && !layout.playbackStatusVisible;
-    final onTap = canExpand ? layout.togglePlaybackStatus : onOpenFallback;
+    final onTap = layout != null ? layout.togglePlaybackStatus : onOpenFallback;
     final radius = BorderRadius.circular(8);
 
     final cover = HoverBuilder(
@@ -47,7 +46,7 @@ class PlayerBarCover extends StatelessWidget {
 
     if (onTap == null) return cover;
     return Tooltip(
-      message: canExpand ? context.l10n.shellPlaybackStatus : context.l10n.openNowPlaying,
+      message: layout != null ? context.l10n.shellPlaybackStatus : context.l10n.openNowPlaying,
       child: InkWell(borderRadius: radius, onTap: onTap, child: cover),
     );
   }

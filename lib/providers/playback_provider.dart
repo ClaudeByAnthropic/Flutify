@@ -309,11 +309,16 @@ class PlaybackProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _startTrack(SpotifyTrack track, {bool isRetry = false}) async {
+  Future<void> _startTrack(
+    SpotifyTrack track, {
+    bool isRetry = false,
+    Duration? startAt,
+    bool deferLoad = false,
+  }) async {
     _currentTrack = track;
     _duration = Duration(milliseconds: track.durationMs);
-    positionNotifier.value = Duration.zero;
-    _resumeAt = null;
+    positionNotifier.value = startAt ?? Duration.zero;
+    _resumeAt = startAt;
     _scheduleSave();
     if (!isRetry) {
       _consecutiveSkips = 0;
@@ -321,6 +326,13 @@ class PlaybackProvider extends ChangeNotifier {
       _playbackError = null;
     }
     notifyListeners();
+    if (deferLoad) {
+      // 只切到这首歌、暂停在 startAt，点播放时才加载（_loadedTrackId 不匹配 → 重新加载）
+      ++_loadGeneration;
+      _loadedTrackId = null;
+      await _audio.pause();
+      return;
+    }
     await _playAudio(track);
   }
 
@@ -528,11 +540,31 @@ class PlaybackProvider extends ChangeNotifier {
     await _playLocal(track, contextQueue: contextQueue, context: context);
   }
 
+  /// 在本机播放，不经 [remotePlay]：Connect 播放端收到远程命令时用，避免又转发回远程。
+  /// 从 [startAt] 开始；[paused] 时加载完停在该处。
+  Future<void> playLocal(
+    SpotifyTrack track, {
+    List<SpotifyTrack>? contextQueue,
+    PlaybackContext? context,
+    Duration? startAt,
+    bool paused = false,
+  }) async {
+    await _playLocal(
+      track,
+      contextQueue: contextQueue,
+      context: context,
+      startAt: startAt,
+      deferLoad: paused,
+    );
+  }
+
   /// 在本机播放（不经远程接管）。
   Future<void> _playLocal(
     SpotifyTrack track, {
     List<SpotifyTrack>? contextQueue,
     PlaybackContext? context,
+    Duration? startAt,
+    bool deferLoad = false,
   }) async {
     var tracks = (contextQueue == null || contextQueue.isEmpty)
         ? [track]
@@ -545,7 +577,7 @@ class PlaybackProvider extends ChangeNotifier {
     _contextTracks = tracks;
     _context = context ?? PlaybackContext.none;
     _rebuildOrder(index);
-    await _startTrack(track);
+    await _startTrack(track, startAt: startAt, deferLoad: deferLoad);
   }
 
   /// 从头播放整个上下文（详情页大播放按钮）。随机模式下从随机曲目开始。
@@ -634,6 +666,19 @@ class PlaybackProvider extends ChangeNotifier {
   void toggleShuffle() {
     _shuffle = !_shuffle;
     if (_order.isNotEmpty) _rebuildOrder(_order[_orderPos]);
+    _scheduleSave();
+    notifyListeners();
+  }
+
+  /// 直接设定随机（Connect 远程命令用）；与当前相同时不重排。
+  void setShuffle(bool value) {
+    if (value != _shuffle) toggleShuffle();
+  }
+
+  /// 直接设定循环方式（Connect 远程命令用）。
+  void setRepeatMode(SpotifyRepeatMode mode) {
+    if (mode == _repeatMode) return;
+    _repeatMode = mode;
     _scheduleSave();
     notifyListeners();
   }

@@ -1030,6 +1030,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show and control playback on your other devices';
 
   @override
+  String get settingsConnectDeviceName => 'Device name';
+
+  @override
+  String get settingsConnectDeviceNameSubtitle =>
+      'How Flutify appears in your other devices\' device list. Leave empty for the default';
+
+  @override
+  String get settingsConnectUseDeviceName => 'Use device name';
+
+  @override
+  String get settingsConnectReportOnLaunch => 'Sync playback on launch';
+
+  @override
+  String get settingsConnectReportOnLaunchSubtitle =>
+      'Show Flutify\'s current track on your other devices as soon as it opens, even before playing (takes over an idle session)';
+
+  @override
   String get settingsRemoteLyricsLead => 'Remote lyrics lead';
 
   @override

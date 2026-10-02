@@ -427,6 +427,11 @@
   "settingsConnectSection": "Spotify Connect",
   "settingsConnectEnabled": "启用 Spotify Connect",
   "settingsConnectEnabledSubtitle": "显示并遥控同一账号在其他设备上的播放",
+  "settingsConnectDeviceName": "设备名称",
+  "settingsConnectDeviceNameSubtitle": "其他设备的设备列表里显示的名字，留空使用默认名",
+  "settingsConnectUseDeviceName": "使用设备名称",
+  "settingsConnectReportOnLaunch": "启动时同步播放状态",
+  "settingsConnectReportOnLaunchSubtitle": "打开 Flutify 后即使还没播放，也让其他设备看到 Flutify 上的当前歌曲（会接管正在空闲的播放会话）",
   "settingsRemoteLyricsLead": "远程歌词提前",
   "settingsRemoteLyricsLeadSubtitle": "其他设备上播放时，歌词比演唱慢就调大，快就调小",
 

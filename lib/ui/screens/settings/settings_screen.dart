@@ -85,7 +85,8 @@ class _MobileSettings extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 720),
           child: ListView(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+            // 末尾留白 = 底部播放栏 / 导航占位（MediaQuery 底部 padding）+ 基础间距
+            padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.paddingOf(context).bottom + 40),
             children: [..._accountCards(context), const SizedBox(height: 28), ..._singleColumn],
           ),
         ),
@@ -158,7 +159,8 @@ class _DesktopSettings extends StatelessWidget {
                 );
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(32, 28, 32, 48),
+            // 末尾留白 = 悬浮播放栏占位（MediaQuery 底部 padding）+ 基础间距
+            padding: EdgeInsets.fromLTRB(32, 28, 32, MediaQuery.paddingOf(context).bottom + 48),
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(

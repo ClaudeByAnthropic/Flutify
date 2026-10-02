@@ -174,8 +174,12 @@ class _LyricsViewState extends State<LyricsView> {
     final free = _viewportHeight - lineHeight;
     final alignment = free <= 0 ? 0.0 : ((_focusCenterY - lineHeight / 2) / free).clamp(0.0, 1.0);
 
-    Scrollable.ensureVisible(
-      ctx,
+    // 只滚歌词自己的滚动区：静态的 Scrollable.ensureVisible 会沿嵌套滚动容器一路向外滚
+    // （右栏详情 ListView 会跟着歌词切行整体滑动），改用本滚动区 position 的 ensureVisible。
+    final position = _scroll.hasClients ? _scroll.position : null;
+    if (position == null) return;
+    position.ensureVisible(
+      box,
       alignment: alignment,
       duration: animate && !context.reduceMotion ? const Duration(milliseconds: 500) : Duration.zero,
       curve: Curves.easeOutCubic,

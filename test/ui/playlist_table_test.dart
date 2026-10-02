@@ -129,6 +129,24 @@ void main() {
     expect(rows(tester), hasLength(3));
   });
 
+  testWidgets('phone portrait: in-playlist search opens a full-width, tappable field', (tester) async {
+    await open(tester, const Size(390, 844));
+    await tester.tap(find.byTooltip(zh.trackSearchHint));
+    await settle(tester);
+
+    final field = find.byType(TextField).last;
+    final size = tester.getSize(field);
+    expect(size.width, greaterThan(180), reason: '手机竖屏下输入框应铺满工具行，不再是几十像素的小框');
+    expect(size.height, greaterThanOrEqualTo(44), reason: '触控目标不小于 44');
+
+    // 真的点得进去、输得了字
+    await tester.tap(field);
+    await tester.enterText(field, 'bravo');
+    await settle(tester);
+    expect(rows(tester), ['Bravo']);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('compact view: no covers, artist column, remembered', (tester) async {
     await open(tester, const Size(1600, 900));
     expect(find.descendant(of: find.byType(TrackTile), matching: find.byType(CoverImage)), findsWidgets);

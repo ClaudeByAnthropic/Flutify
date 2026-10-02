@@ -998,6 +998,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsConnectEnabledSubtitle => '显示并遥控同一账号在其他设备上的播放';
 
   @override
+  String get settingsConnectDeviceName => '设备名称';
+
+  @override
+  String get settingsConnectDeviceNameSubtitle => '其他设备的设备列表里显示的名字，留空使用默认名';
+
+  @override
+  String get settingsConnectUseDeviceName => '使用设备名称';
+
+  @override
+  String get settingsConnectReportOnLaunch => '启动时同步播放状态';
+
+  @override
+  String get settingsConnectReportOnLaunchSubtitle =>
+      '打开 Flutify 后即使还没播放，也让其他设备看到 Flutify 上的当前歌曲（会接管正在空闲的播放会话）';
+
+  @override
   String get settingsRemoteLyricsLead => '远程歌词提前';
 
   @override

@@ -1,4 +1,4 @@
-# Flutify 进度与待办（2026-10-01 更新）
+# Flutify 进度与待办（2026-10-02 更新）
 
 > 新对话开始时先读本文件与 `README.md`。Flutter SDK：`D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat`。
 > Git 仓库在 `D:\Flutify\app`（基线提交 `6c8e00a`，之后按「后端 / 前端」分两次提交）。
@@ -26,7 +26,7 @@
 - [ ] 实测完整播放：`dart run tool/live_probe.dart play`，确认音频密钥 → CDN 解密 → 可播放
 - [ ] 实测媒体库：`dart run tool/live_probe.dart library`，核对 `collection/v2/paging` 的 protobuf 字段号与 rootlist 结构（目前按桌面端 xpui 定义推断，未验证）
 - [ ] 主页「热门专辑 / 艺人」货架目前以用户媒体库内容填充，应改为取主页官方分区
-- [ ] 分类页（browsePage）尚未接入，点分类目前打开空歌单
+- [x] 分类页（browsePage）已接入（见「已完成 ⑦」）
 - [ ] 歌单的新建 / 保存 / 取消保存尚未同步到账号（Playlist4 写协议未验证）；目前仅本机
 - [x] 完整曲目整首下载完才开始播放 → 已改为边下边播（见「已完成 ⑤」）
 - [ ] 专辑 / 艺人曲目请求失败时数据层返回空列表，界面只能显示「没有曲目」；如需区分网络错误，数据层要改为抛异常
@@ -169,16 +169,62 @@ Spotify 新版桌面三栏布局 + MD3E 质感；跟随系统深浅色；自绘�
 - [ ] Android（本机无 SDK，**未编译验证**）：通知栏 / 锁屏播放控件、耳机线控；Android 13+ 首次是否请求通知权限
 - [ ] 下载 320k 曲目时界面是否不再掉帧
 
+## 已完成 ⑦：统一登录修复 + 待办收尾（测试全部通过，Release 编译通过，**待用户实机复测**）
+
+- [x] 统一登录页卡在 `open.spotify.com`：`WebLoginScreen` 的 `CookieManager` 未绑定 `EmePlayer` 的 WebViewEnvironment，
+      读 cookie 一直抛 `ERROR_INVALID_STATE`。现改为可测试的流程状态机：轮询读取 sp_dc（多 URL 兜底）→ 换 Web token 验证 →
+      未授权时同一 WebView 会话后台完成桌面 OAuth（12 秒未自动完成则露出授权页手动同意）
+- [x] 分类页 browsePage（hash 取自 gql_ops，复用主页卡片）；Pathfinder hash 失效（PersistedQueryNotFound）提示更新
+- [x] 登出 / 切换账号清除上次播放会话（内存 + 磁盘）
+- [x] 音乐库「按字母顺序」中文按拼音排序（左栏 + 移动端，`pinyin` 包）
+- [x] Connect 远程模式点按打开全屏播放器（曲目 / 进度 / 控制台 / 滑动切歌全走远程）
+- [x] 主页顶部渐变随快捷入口悬停取色
+- [x] 修好 WIP 重构后 15 个测试文件的编译
+
+## 已完成 ⑧：实机反馈修复（代码已改，**未提交**，回归测试补写中）
+
+- [x] 右栏歌词换行时整个右栏跟着滚：`Scrollable.ensureVisible` 会沿嵌套滚动容器向外滚，
+      `LyricsView._scrollToActive` 改用歌词自身的 `position.ensureVisible`（新测试 `test/ui/lyrics_auto_scroll_test.dart`）
+- [x] 横屏下底部播放栏遮挡左栏 / 右栏最底部内容（BUG-2b）：两栏滚动末尾留出播放栏高度（新测试 `test/ui/sidebar_bottom_inset_test.dart`）
+- [x] 手机竖屏歌单内搜索框太小点不进去：窄布局工具条独占一行，点开搜索后输入框优先（高 44），排序键截断
+
+- [x] 横屏（桌面三栏）下右栏已打开时点击播放栏左下角封面，会弹出手机端的全屏播放器。
+      `PlayerBarCover` 改为：有三栏框架时始终切换（打开 / 关闭）右栏「正在播放」，只有手机布局才打开全屏播放器（待实机复测）
+
+## 调研：Connect 播放端（让 Flutify 出现在手机设备列表里、可被遥控）
+
+两套协议，选 **A（网页版同款）**：
+
+- **A. track-playback（Web 播放器 / harmony SDK 用的）**：服务器维护播放状态机，客户端只播放和汇报。
+  - 注册：`POST @webgate/track-playback/v1/devices`，JSON
+    `{device, connection_id, client_version, volume, outro_endcontent_snooping:false, previous_session_state}`；
+    `device` = `{brand, capabilities, device_id, device_type, metadata, model, name, platform_name, platform_identifier, is_group, is_public, correlation_id, client_version}`。
+    429 = 连接数已满；403 + `PREMIUM_REQUIRED` = 非会员不能注册（网页版免费账号能用，需实测我们的 Web token 是否同样放行）
+  - 命令（dealer 推送，`_onTrackPlaybackMessage` → `payloads[0].type`）只有 4 种：
+    `replace_state`（新状态机 + `state_ref` + `prev_state_ref` + 可选 `seek_to`，播放 / 暂停 / 切歌 / 换歌单全走它）、`set_volume`（0–65535）、`log_out`、`ping`
+  - 汇报：`PUT …/devices/{id}/state`，`{seq_num, state_ref:{state_machine_id, state_id, paused}, sub_state:{playback_speed, position, duration, media_type, bitrate, audio_quality, format}, previous_position, debug_source}`；
+    事件 `debug_source` 取 REGISTER / BEFORE_TRACK_LOAD / STARTED_PLAYING / PROGRESS / PAUSE / RESUME / SEEK / PLAYED_THRESHOLD_REACHED / TRACK_DATA_FINALIZED / STATE_CLEAR / PING 等；
+    `prev_state_ref` 对不上时 `POST …/state_conflict` 拒绝；音量 `PUT …/volume`；注销 `DELETE …/devices/{id}`
+  - 源码位置：`vendor~web-player.*.js` 中 `_performCommand` / `_replaceState` / `_generateStatePayload` / `register()`
+- **B. connect-state（官方桌面端 / librespot 用的）**：客户端自己维护歌单上下文、队列、随机、循环；
+  `PUT connect-state/v1/devices/{id}`（protobuf PutStateRequest），dealer `request` 命令 13+ 种
+  （transfer 带 base64 TransferState、play、pause、seek_to、skip_next…），需回 `{"type":"reply","key":…,"payload":{"success":true}}`。
+  工作量约为 A 的数倍；设备信息模板见 `tool/probe_out/connect_cluster.json`
+- 现有可复用：`services/connect/dealer_client.dart`（需补 `request` 类型与回执）、`connect_state_client.dart`、Web token / client-token
+
+### 与全曲播放 429 相关的发现（限流解除后先验证）
+
+- 网页版播放时还会发 `melody/v1/msg/batch` 的 `track_stream_verification`，并通过 `track-playback/v1/devices/{id}/state` 汇报播放状态；
+  我们从未发过。抓包见 `SpotifyApi/tmp/web_license_capture.log`。许可证服务器可能据此判断「真实播放」，缺失时按异常限流
+- 每首歌 HLS.js 开 3 个密钥会话 × 重试，约 9 次 license 请求（网页版 1 次）：需改为每首只申请一次、429 不重试不跳歌
+
 ## 其他待办 / 优化
 
-- [ ] 分类页（browsePage）：需要从桌面端 `xpui.spa` 提取 `browsePage` 查询 hash（本轮未做）
 - [ ] 新的音频解密方法（研究中）：按上文「新解密方法接入」实现 `DecryptSpec`
-- [ ] 登出 / 切换账号时清除上次播放会话
-
-- [ ] 主页顶部渐变：随快捷入口悬停的封面取色变化（官方桌面端效果）
+- [ ] 补完并跑通 ⑧ 的回归测试后提交：`sidebar_bottom_inset_test.dart` 两条仍失败（测试搭建问题：
+      左栏找不到 ListView、右栏取 `ShellLayoutController` 抛 ProviderNotFound）；另补封面点击切换右栏的测试
+- [ ] 实测：Web 登录一条龙是否自动完成；sp_dc 到手后 DRM 曲目整曲能否出声
 - [ ] 主页播客 / 单集：目前只展示，点按提示暂不支持
-- [ ] 音乐库「按字母顺序」改为按拼音排序（左栏 `library_sidebar_entry.dart` 与移动端 `library_screen.dart` 两处）
 - [ ] 登录页的中文文案迁入 ARB（账号卡片已完成）
 - [ ] 外观设置跨设备同步（目前仅本机）；沉浸式歌词支持逐字歌词（需 color-lyrics 的 syllable 数据）
-- [ ] Connect：远程模式下打开全屏播放器（目前点按打开设备面板）；本机作为可被遥控的播放端（需要实现 Connect 播放端协议）
-- [ ] 桌面客户端升级后 Pathfinder hash 失效检测与提示
+- [ ] Connect：本机作为可被遥控的播放端（需要实现 Connect 播放端协议）

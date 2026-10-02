@@ -51,6 +51,11 @@ class ConnectActions {
     final track = connect.remoteTrack;
     final position = connect.player.positionAt(connect.serverNowMs);
     return _guard(report, () async {
+      // 本机播放端在线：用 Connect 转移，其他设备能看到「正在 Flutify 上播放」
+      if (connect.receiverOnline) {
+        await connect.transferToReceiver();
+        return;
+      }
       await connect.pause();
       if (track == null) return;
       await playback.playTrack(track);

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../audio/audio_engine.dart';
+import '../eme/segmented_download.dart';
 import '../eme/streaming_download.dart';
 import 'audio_cache_store.dart';
 import 'spotify_id.dart';
@@ -110,8 +111,16 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
     }
     debugPrint('[eme-src] 选定 file_id=${file.fileIdHex.substring(0, 16)}… br=${file.bitrate}');
 
-    // 2) sneaktables policy=1 取 HLS 清单（含 PSSH + 分段结构）
+    // 2) sneaktables 取 HLS 清单，同时 storage-resolve 取 CDN 地址（两者互不依赖，并行省一个往返）
     progress?.call(0.15);
+    final dest = _cacheFile(file.fileIdHex);
+    final doneMarker = File('${dest.path}.done');
+    final complete = dest.existsSync() && doneMarker.existsSync() && dest.lengthSync() > 0;
+    final cdnUrls = complete
+        ? null
+        : resolveAudioStorage(fileIdHex: file.fileIdHex, headers: _headers, client: _client)
+            .then((r) => r.cdnUrls);
+    cdnUrls?.ignore(); // 清单失败时没人等它，避免未处理异常
     final String m3u8;
     try {
       m3u8 = await fetchHlsManifest(file.fileIdHex, headers: _headers, client: _client);
@@ -122,13 +131,10 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
     }
 
     // 3) 下载加密 m4a：完整缓存命中直接用；否则后台下载、init 段就绪即返回（流式起播）
-    final dest = _cacheFile(file.fileIdHex);
-    final doneMarker = File('${dest.path}.done');
-    final complete = dest.existsSync() && doneMarker.existsSync() && dest.lengthSync() > 0;
-    if (!complete) {
+    if (cdnUrls != null) {
       progress?.call(0.25);
       // 后台下载；init 段 + 首段就绪即返回，剩余边下边播
-      final dl = _startStreamingDownload(file.fileIdHex, dest, doneMarker, progress);
+      final dl = _startStreamingDownload(cdnUrls, dest, doneMarker, progress);
       await dl.readyForPlayback; // 等到可起播的字节数
       debugPrint('[eme-src] init 段就绪，流式起播（后台继续下载）');
     } else {
@@ -148,49 +154,31 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
   /// 启动流式下载：后台顺序写入 [dest]，init 段 + 首段就绪后 [readyForPlayback] 完成。
   /// 进度登记到 [StreamingDownloads]，供 EME 播放器的本地服务按区间等待。
   _StreamingDownloadHandle _startStreamingDownload(
-      String fileIdHex, File dest, File doneMarker, void Function(double)? progress) {
+      Future<List<String>> cdnUrls, File dest, File doneMarker, void Function(double)? progress) {
     final handle = _StreamingDownloadHandle();
     final registration = StreamingDownloads.begin(dest.path);
     () async {
       try {
-        final urls = (await resolveAudioStorage(
-                fileIdHex: fileIdHex, headers: _headers, client: _client))
-            .cdnUrls;
+        final urls = await cdnUrls;
         debugPrint('[eme-src] storage-resolve 得 ${urls.length} 个 CDN');
-        Object? lastErr;
-        var ok = false;
-        for (final url in urls) {
-          try {
-            final req = await _client.send(http.Request('GET', Uri.parse(url))
-              ..headers['User-Agent'] = 'Spotify/130100234 Win32_x86_64/0 (PC desktop)');
-            if (req.statusCode != 200) {
-              lastErr = 'HTTP ${req.statusCode}';
-              continue;
-            }
-            await dest.parent.create(recursive: true);
-            final sink = dest.openWrite();
-            final total = req.contentLength ?? 0;
+        if (urls.isEmpty) throw StateError('无可用 CDN');
+        // 多连接分段：按偏移顺序分配，从头连续可用的字节增长最快；报告语义与顺序下载一致
+        await SegmentedDownload(
+          client: _client,
+          urls: urls,
+          dest: dest,
+          headers: const {'User-Agent': 'Spotify/130100234 Win32_x86_64/0 (PC desktop)'},
+          // 首段小一点：起播只需 init 段 + 首个媒体段
+          segmentBytes: _kMinBytesToPlay,
+          onContiguous: (got, total) {
             registration.expectedTotal = total;
-            var got = 0;
-            await for (final chunk in req.stream) {
-              sink.add(chunk);
-              got += chunk.length;
-              registration.report(got);
-              // init 段 + 首个媒体段（约 200KB）就绪即允许起播
-              if (!handle._ready.isCompleted && got >= _kMinBytesToPlay) {
-                handle._ready.complete();
-              }
-              if (total > 0) progress?.call(0.25 + 0.75 * got / total);
+            registration.report(got);
+            if (!handle._ready.isCompleted && got >= _kMinBytesToPlay) {
+              handle._ready.complete();
             }
-            await sink.close();
-            ok = true;
-            break;
-          } catch (e) {
-            debugPrint('[eme-src] CDN 下载异常: $e');
-            lastErr = e;
-          }
-        }
-        if (!ok) throw lastErr ?? StateError('无可用 CDN');
+            if (total > 0) progress?.call(0.25 + 0.75 * got / total);
+          },
+        ).run();
         // 完成：写 .done 标记
         await doneMarker.writeAsString('${dest.lengthSync()}');
         registration.finish();

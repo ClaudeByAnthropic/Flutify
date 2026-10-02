@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'core/utils/file_log.dart';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -14,6 +18,7 @@ import 'core/utils/error_placeholder.dart';
 import 'core/utils/orientation_policy.dart';
 import 'l10n/app_locale.dart';
 import 'models/app_preferences.dart';
+import 'models/playback_state.dart';
 import 'providers/appearance_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/connect_provider.dart';
@@ -31,6 +36,8 @@ import 'services/eme/eme_audio_engine.dart';
 import 'services/eme/eme_player.dart';
 import 'services/connect/connect_play_request.dart';
 import 'services/connect/connect_service.dart';
+import 'services/connect/receiver/connect_receiver.dart';
+import 'services/connect/receiver/playback_receiver_host.dart';
 import 'services/lyrics/lrclib_client.dart';
 import 'services/lyrics/lrclib_lyrics_source.dart';
 import 'services/lyrics/lyrics_disk_cache.dart';
@@ -57,6 +64,7 @@ import 'ui/widgets/taskbar_lyrics_binding.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installFileLog();
   installErrorPlaceholder();
 
   // just_audio 自身没有 Windows / Linux 实现，需在创建任何 AudioPlayer 之前
@@ -375,15 +383,36 @@ class FlutifyApp extends StatelessWidget {
             playback.remotePlay = (context, tracks, start) async {
               // 存在活动的远程设备且本机没在出声就一律走远程。不再依赖 controlsRemote 的“最后出声方”推断：
               // 切换曲目瞬间远程会短暂处于暂停 / 缓冲状态，那会误判为本机并回退到本机播放。
-              if (connect.activeDevice == null || playback.isPlaying)
-                return false;
               final request = ConnectPlayRequest.from(
                 context: context,
                 tracks: tracks,
                 start: start,
                 username: ctx.read<SpotifyAuthService>().username,
               );
+              final toRemote = connect.activeDevice != null && !playback.isPlaying;
+              debugPrint(
+                '[Connect] 点歌：request=${request == null ? 'null' : 'ok'} '
+                'active=${connect.activeDevice?.name} localPlaying=${playback.isPlaying} '
+                'receiverOnline=${connect.receiverOnline}',
+              );
               if (request == null) return false;
+              if (!toRemote) {
+                // 本机播放端在线：经 Connect 下发给自己，同账号其他设备才能同步看到
+                if (!connect.receiverOnline) {
+                  debugPrint(
+                    '[Connect] 本机播放端不在设备列表（${connect.receiverDeviceId}），'
+                    '列表：${connect.cluster.devices.map((d) => '${d.name}=${d.id}').join(', ')}',
+                  );
+                  return false;
+                }
+                try {
+                  await connect.playOnReceiver(request);
+                  return true;
+                } on ConnectException catch (e) {
+                  debugPrint('[Connect] 下发到本机播放端失败，直接本机播放：$e');
+                  return false;
+                }
+              }
               try {
                 await connect.play(request);
                 return true;
@@ -392,6 +421,7 @@ class FlutifyApp extends StatelessWidget {
                 return false;
               }
             };
+            _startConnectReceiver(ctx, connect, playback);
             return connect;
           },
         ),
@@ -418,6 +448,103 @@ class FlutifyApp extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Connect 播放端：让 Flutify 出现在其他设备的设备列表里。
+/// 需要 Web 登录态（sp_dc），随设置里的「Spotify Connect」开关启停；关窗前注销设备。
+void _startConnectReceiver(
+  BuildContext ctx,
+  ConnectProvider connect,
+  PlaybackProvider playback,
+) {
+  final tokens = ctx.read<WebTokenService?>();
+  if (tokens == null) return;
+  final preferences = ctx.read<PreferencesProvider>();
+  final deviceId =
+      md5.convert(utf8.encode('flutify-receiver:${Platform.localHostname}')).toString() +
+      sha1.convert(utf8.encode('flutify')).toString().substring(0, 8);
+  final host = PlaybackReceiverHost(playback);
+  String nameOf() {
+    final name = preferences.prefs.connectDeviceName;
+    return name.isEmpty ? ConnectReceiver.defaultDeviceName : name;
+  }
+
+  final receiver = ConnectReceiver(
+    host: host,
+    deviceName: nameOf,
+    client: http.Client(),
+    webToken: tokens.ensureWebAccessToken,
+    deviceId: deviceId,
+  );
+  host.receiver = receiver;
+  connect.receiverDeviceId = deviceId;
+  Future<void> handOver(int positionMs, {bool paused = false}) async {
+    final current = playback.currentTrack;
+    if (current == null || !connect.receiverOnline) return;
+    final request = ConnectPlayRequest.from(
+      context: playback.playbackContext,
+      tracks: [current, for (final e in playback.upNext) e.track],
+      start: current,
+      username: ctx.read<SpotifyAuthService>().username,
+    );
+    if (request == null) return;
+    debugPrint('[Receiver] 交接给 Connect：${current.name} @${positionMs}ms paused=$paused');
+    try {
+      await connect.playOnReceiver(request, seekToMs: positionMs, paused: paused);
+    } catch (e) {
+      debugPrint('[Receiver] 交接失败：$e');
+    }
+  }
+
+  host.handOver = handOver;
+  host.onLocalOptions = (shuffle, repeat) {
+    unawaited(
+      connect
+          .setReceiverOptions(
+            shuffle: shuffle,
+            repeatContext: repeat != SpotifyRepeatMode.off,
+            repeatTrack: repeat == SpotifyRepeatMode.track,
+          )
+          .catchError((Object e) => debugPrint('[Receiver] 同步随机 / 循环失败：$e')),
+    );
+  };
+
+  // 「启动时同步播放状态」：每次启动只做一次。注册后要等设备出现在 cluster 里（推送有延迟），
+  // 本机未播放、其他设备也没在出声时，把上次的曲目以暂停状态同步出去
+  var launchSynced = false;
+  receiver.onRegistered = () async {
+    if (launchSynced || !preferences.prefs.connectReportOnLaunch) return;
+    launchSynced = true;
+    for (var i = 0; i < 20 && !connect.receiverOnline; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    final remoteAudible = connect.activeDevice != null && connect.player.isAudible;
+    if (playback.isPlaying || receiver.isActive || remoteAudible) return;
+    await handOver(playback.position.inMilliseconds, paused: true);
+  };
+
+  var running = false;
+  var name = nameOf();
+  void apply() {
+    final want = tokens.hasSpDc && preferences.prefs.connectEnabled;
+    // 改名：注销后用新名字重新注册
+    if (running && want && nameOf() != name) {
+      name = nameOf();
+      unawaited(receiver.stop().then((_) => receiver.start()));
+      return;
+    }
+    name = nameOf();
+    if (want == running) return;
+    running = want;
+    unawaited(want ? receiver.start() : receiver.stop());
+  }
+
+  preferences.addListener(apply);
+  apply();
+  DesktopWindow.addBeforeCloseHook(
+    receiver.stop,
+    timeout: const Duration(seconds: 3),
+  );
 }
 
 /// 代理相关偏好的指纹，用于判断是否需要重配 [NetworkProxy]。

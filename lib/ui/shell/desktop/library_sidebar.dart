@@ -114,7 +114,9 @@ class _LibrarySidebarState extends State<LibrarySidebar> {
                       widget.compact ? 6 : 8,
                       0,
                       widget.compact ? 6 : 8,
-                      12,
+                      // 末尾留白随底部播放栏占位（MediaQuery 底部 padding）：
+                      // 悬浮胶囊盖在内容之上，不加的话最底部一条会被它遮住
+                      12 + MediaQuery.paddingOf(context).bottom,
                     ),
                     itemCount: entries.length,
                     itemExtent: 60,

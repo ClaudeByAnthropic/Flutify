@@ -1,0 +1,102 @@
+# 构建 Windows 与 Android 安装包。
+# - 推送 v* 标签：两端构建完成后发布到 GitHub Releases（标签含 beta / alpha / rc 时标为预发布）；
+# - 手动运行（Actions → Build → Run workflow）或推送到 main：只构建，产物在本次运行的 Artifacts 里。
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.0'
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # 目前用 debug 签名（见 android/app/build.gradle.kts），正式发布前换成自己的签名
+      - name: Build APK（按 ABI 拆分 + 通用包）
+        run: |
+          flutter build apk --release --split-per-abi
+          flutter build apk --release
+
+      - name: Rename
+        run: |
+          cd build/app/outputs/flutter-apk
+          for f in app-*-release.apk; do
+            abi="${f#app-}"; abi="${abi%-release.apk}"
+            mv "$f" "Flutify-${GITHUB_REF_NAME//\//-}-android-$abi.apk"
+          done
+          mv app-release.apk "Flutify-${GITHUB_REF_NAME//\//-}-android-universal.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: build/app/outputs/flutter-apk/Flutify-*.apk
+
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter build windows --release
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          $name = "Flutify-$($env:GITHUB_REF_NAME -replace '/','-')-windows-x64.zip"
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $name
+          "ZIP_NAME=$name" >> $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: ${{ env.ZIP_NAME }}
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Flutify ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: true
+          files: dist/*

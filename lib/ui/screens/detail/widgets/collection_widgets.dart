@@ -118,15 +118,24 @@ class CollectionActionRow extends StatelessWidget {
             ],
           );
         }
-        // 窄：工具紧跟自定义按钮，可压缩，随机 + 播放键始终完整
-        return Row(
+        // 窄（手机竖屏）：按钮一行，工具（搜索 / 排序）单独一行铺满宽度——
+        // 挤在同一行时输入框只剩几十像素（前缀 / 后缀图标都不够放），手指点不进去
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ...leading,
-            if (trailing != null) Flexible(child: Align(alignment: Alignment.centerLeft, child: trailing)),
-            const Spacer(),
-            shuffle,
-            const SizedBox(width: 8),
-            play,
+            Row(
+              children: [
+                ...leading,
+                const Spacer(),
+                shuffle,
+                const SizedBox(width: 8),
+                play,
+              ],
+            ),
+            if (trailing != null) ...[
+              const SizedBox(height: 8),
+              Align(alignment: Alignment.centerLeft, child: trailing),
+            ],
           ],
         );
       },

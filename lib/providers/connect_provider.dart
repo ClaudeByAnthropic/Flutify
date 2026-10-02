@@ -58,10 +58,46 @@ class ConnectProvider extends ChangeNotifier {
 
   ConnectStatus get status => _status;
   ConnectCluster get cluster => _cluster;
-  List<ConnectDevice> get devices => _cluster.devices;
+  /// 其他设备（不含本机注册的播放端，它在界面上就是「此设备」）。
+  List<ConnectDevice> get devices => [
+    for (final d in _cluster.devices)
+      if (d.id != receiverDeviceId) d,
+  ];
+
+  /// 本机作为 Connect 播放端注册的设备 id：它被选中时声音就在本机，不算「远程」设备。
+  String? receiverDeviceId;
+
+  /// 本机播放端已出现在账号的设备列表里：本机点歌改为经 Connect 下发给自己，其他设备才能同步。
+  bool get receiverOnline =>
+      receiverDeviceId != null && _cluster.devices.any((d) => d.id == receiverDeviceId);
+
+  /// 在本机播放端上播放（服务端随后推 replace_state 给本机）。
+  Future<void> playOnReceiver(ConnectPlayRequest request, {int? seekToMs, bool paused = false}) => _service!.play(
+    receiverDeviceId!,
+    contextUri: request.contextUri,
+    trackUris: request.trackUris,
+    trackUri: request.trackUri,
+    trackIndex: request.trackIndex,
+    seekToMs: seekToMs,
+    paused: paused,
+  );
+
+  /// 本机播放端上改随机 / 循环：发给服务端，其他设备随之更新。
+  Future<void> setReceiverOptions({required bool shuffle, required bool repeatContext, required bool repeatTrack}) async {
+    final id = receiverDeviceId!;
+    await _service!.setShuffle(id, shuffle);
+    await _service.setRepeat(id, context: repeatContext, track: repeatTrack);
+  }
+
+  /// 把远程设备上的播放转到本机播放端（同一首、同一进度）。
+  Future<void> transferToReceiver() => _service!.transfer(receiverDeviceId!);
 
   /// 正在使用的（远程）设备；没有活动设备时为 null。
-  ConnectDevice? get activeDevice => _cluster.activeDevice;
+
+  ConnectDevice? get activeDevice {
+    final device = _cluster.activeDevice;
+    return device != null && device.id == receiverDeviceId ? null : device;
+  }
   ConnectPlayerState get player => _cluster.player;
 
   /// 有远程设备且它上面有曲目（播放中或已暂停）。

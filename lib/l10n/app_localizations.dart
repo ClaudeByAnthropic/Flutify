@@ -1922,6 +1922,36 @@ abstract class AppLocalizations {
   /// **'显示并遥控同一账号在其他设备上的播放'**
   String get settingsConnectEnabledSubtitle;
 
+  /// No description provided for @settingsConnectDeviceName.
+  ///
+  /// In zh, this message translates to:
+  /// **'设备名称'**
+  String get settingsConnectDeviceName;
+
+  /// No description provided for @settingsConnectDeviceNameSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'其他设备的设备列表里显示的名字，留空使用默认名'**
+  String get settingsConnectDeviceNameSubtitle;
+
+  /// No description provided for @settingsConnectUseDeviceName.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用设备名称'**
+  String get settingsConnectUseDeviceName;
+
+  /// No description provided for @settingsConnectReportOnLaunch.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动时同步播放状态'**
+  String get settingsConnectReportOnLaunch;
+
+  /// No description provided for @settingsConnectReportOnLaunchSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开 Flutify 后即使还没播放，也让其他设备看到 Flutify 上的当前歌曲（会接管正在空闲的播放会话）'**
+  String get settingsConnectReportOnLaunchSubtitle;
+
   /// No description provided for @settingsRemoteLyricsLead.
   ///
   /// In zh, this message translates to:

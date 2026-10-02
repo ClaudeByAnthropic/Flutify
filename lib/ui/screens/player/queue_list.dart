@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../l10n/l10n.dart';
 import '../../../providers/playback_provider.dart';
+import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/cover_image.dart';
 
 /// 播放队列列表：正在播放 / 队列中的下一首 / 接下来播放（上下文）。
@@ -98,7 +99,8 @@ class QueueList extends StatelessWidget {
             ),
           ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        // 末尾留白随底部播放栏占位（ContentBottomSpacer：MediaQuery 底部 padding + 基础间距）
+        const ContentBottomSpacer(),
       ],
     );
   }

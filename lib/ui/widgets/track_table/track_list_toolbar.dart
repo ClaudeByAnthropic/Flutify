@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../l10n/l10n.dart';
+import '../../shell/shell_breakpoints.dart';
 import '../menu/desktop_menu.dart';
 import 'track_sort.dart';
 
@@ -128,6 +129,39 @@ class _TrackListToolbarState extends State<TrackListToolbar> {
     final scheme = theme.colorScheme;
     final muted = scheme.onSurfaceVariant;
 
+    // 输入框本体：桌面 34 高（密集），触屏 44 高（手指点得到）。
+    Widget field({required double height}) => SizedBox(
+          height: height,
+          child: CallbackShortcuts(
+            bindings: {const SingleActivator(LogicalKeyboardKey.escape): _closeSearch},
+            child: TextField(
+              controller: _controller,
+              focusNode: _focus,
+              onChanged: widget.onQueryChanged,
+              style: theme.textTheme.bodyMedium,
+              textAlignVertical: TextAlignVertical.center,
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: scheme.onSurface.withAlpha(20),
+                hintText: l10n.trackSearchHint,
+                contentPadding: EdgeInsets.zero,
+                prefixIcon: Icon(Icons.search_rounded, size: 20, color: muted),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  color: muted,
+                  tooltip: l10n.trackSearchClose,
+                  onPressed: _closeSearch,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        );
+
     final search = AnimatedSize(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
@@ -135,34 +169,7 @@ class _TrackListToolbarState extends State<TrackListToolbar> {
       child: _open
           ? ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: _fieldWidth),
-              child: SizedBox(
-                height: 34,
-                child: CallbackShortcuts(
-                  bindings: {const SingleActivator(LogicalKeyboardKey.escape): _closeSearch},
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focus,
-                    onChanged: widget.onQueryChanged,
-                    style: theme.textTheme.bodyMedium,
-                    textAlignVertical: TextAlignVertical.center,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      filled: true,
-                      fillColor: scheme.onSurface.withAlpha(20),
-                      hintText: l10n.trackSearchHint,
-                      contentPadding: EdgeInsets.zero,
-                      prefixIcon: Icon(Icons.search_rounded, size: 20, color: muted),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        color: muted,
-                        tooltip: l10n.trackSearchClose,
-                        onPressed: _closeSearch,
-                      ),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                    ),
-                  ),
-                ),
-              ),
+              child: field(height: _fieldHeight(context)),
             )
           : IconButton(
               icon: const Icon(Icons.search_rounded),
@@ -194,13 +201,28 @@ class _TrackListToolbarState extends State<TrackListToolbar> {
       ),
     );
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(child: search),
-        const SizedBox(width: 4),
-        Flexible(child: sortButton),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 空间紧张（被挤进窄槽位）：挤在排序键旁边只剩几十像素，手指点不进输入框。
+        // 点开搜索后改为独占整行，收起后回到「搜索键 + 排序键」并排。
+        final tight = constraints.maxWidth < 320;
+        if (_open && tight) {
+          return SizedBox(width: double.infinity, child: field(height: _fieldHeight(context)));
+        }
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 输入框优先：要多少占多少（封顶 _fieldWidth）；空间不够时排序键截断文字
+            search,
+            const SizedBox(width: 4),
+            Flexible(child: sortButton),
+          ],
+        );
+      },
     );
   }
+
+  /// 输入框高度：桌面 34（密集），手机 44（触控目标不能小于它）。
+  static double _fieldHeight(BuildContext context) =>
+      MediaQuery.sizeOf(context).width < ShellBreakpoints.desktop ? 44 : 34;
 }

@@ -168,6 +168,8 @@ class ConnectService {
     List<String> trackUris = const [],
     String? trackUri,
     int? trackIndex,
+    int? seekToMs,
+    bool paused = false,
   }) => _command(deviceId, 'play', {
     'context': contextUri.isNotEmpty
         ? {'uri': contextUri, 'url': 'context://$contextUri', 'metadata': <String, Object?>{}}
@@ -187,6 +189,8 @@ class ConnectService {
     'options': {
       'license': 'on-demand',
       'skip_to': {'track_uri': ?trackUri, 'track_index': ?trackIndex},
+      'seek_to': ?seekToMs,
+      if (paused) 'initially_paused': true,
       'player_options_override': <String, Object?>{},
     },
   });

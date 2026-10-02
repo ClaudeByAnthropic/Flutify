@@ -1,5 +1,14 @@
 # Flutify 🎵 - Spotify-Style Music Player (Google Material 3 Expressive)
 
+> **当前版本：v0.01 Beta**（首个公开测试版）· 支持 Windows x64 与 Android
+>
+> 下载：[Releases](../../releases) 页面。Windows 解压后运行 `flutify_app.exe`（需要 WebView2 运行时，Win11 自带）；
+> Android 一般选 `arm64-v8a`，不确定时选 `universal`。
+> 安装包由 GitHub Actions 自动构建（`.github/workflows/build.yml`），推送 `v*` 标签即发布。
+>
+> Beta 说明：Android 端尚未完成适配（全曲播放、Connect 播放端等依赖 Windows WebView2 的功能暂不可用）；
+> 全曲播放可能遇到 Spotify 的许可证限流（HTTP 429），稍候再试即可。
+
 Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打造的高保真 Spotify 风格在线音乐播放器。专为**逆向 Spotify 移动端/桌面端协议与 API** 而设计，提供完整解耦的 API 数据层、真实曲目播放、账号媒体库、歌词同步与播放队列管理。
 
 ---
@@ -110,7 +119,9 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 任务栏歌词（仅 Windows）：开关、文字颜色、不透明度；
   - 播放：音量均衡（读取 Spotify 文件头里的响度数据，只衰减偏响的歌）、歌曲间淡入淡出（0 – 12 秒，单播放器实现，两首不重叠）；
   - 启动：打开主页 / 音乐库 / 上次位置；桌面端记住窗口大小、位置与最大化状态（显示器变化导致不可见时回到居中，`screen_retriever` 枚举显示器）；
-  - Spotify Connect：总开关、远程歌词提前量（±2 秒，只影响歌词切行）；
+  - Spotify Connect：总开关、设备名称（可一键使用本机设备名）、启动时同步播放状态、远程歌词提前量（±2 秒，只影响歌词切行）；
+    本机同时作为 **Connect 播放端**（track-playback 协议，`services/connect/receiver/`）出现在同账号其他设备的设备列表里，
+    可被手机 / 桌面版选中并遥控（播放、暂停、切歌、循环、随机、音量），本机的播放状态也会同步给其他设备；
   - 网络：代理「系统代理 / 不使用 / 手动」，即时生效、无需重启；「测试连接」请求一次 apresolve 显示耗时。
     全局 `HttpOverrides` 接管所有 HTTP / WebSocket，接入点的 TCP 连接经 HTTP CONNECT 隧道（`services/network/`）；
     系统代理在 Windows 读注册表 `Internet Settings`（含绕过列表，30 秒重读，Clash 等开关系统代理后自动跟随），其他平台读 `https_proxy` 等环境变量；
@@ -385,3 +396,18 @@ cd d:\Flutify\app
 $env:FLUTIFY_AUDIT='1'; & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" test --update-goldens test/audit; $env:FLUTIFY_AUDIT=$null
 ```
 > 测试环境下阴影不做模糊（`debugDisableShadows`），封面下方的实色"台阶"是测试渲染特有的，实机为柔和投影。
+
+### 5. 云端构建（GitHub Actions）
+本地没有 Android 开发环境也能出包：推送到 `main` 或手动运行 **Actions → Build** 只构建（产物在本次运行的 Artifacts 里）；
+推送 `v*` 标签（如 `v0.01-beta`）构建完成后自动发布到 Releases，标签带 `beta` / `alpha` / `rc` 时标为预发布。
+
+---
+
+## ⚠️ 声明
+
+本项目仅供学习与研究 Spotify 客户端协议，与 Spotify AB 无任何关联。以官方客户端身份登录与播放违反 Spotify 服务条款，
+存在账号风控风险，请使用测试账号，并支持正版订阅。
+
+## 🙏 致谢
+
+感谢 <a href="https://linux.do">LINUX DO</a> 社区。
