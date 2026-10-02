@@ -408,6 +408,11 @@ $env:FLUTIFY_AUDIT='1'; & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" test -
 本项目仅供学习与研究 Spotify 客户端协议，与 Spotify AB 无任何关联。以官方客户端身份登录与播放违反 Spotify 服务条款，
 存在账号风控风险，请使用测试账号，并支持正版订阅。
 
+## 📄 许可证
+
+源代码以 [MIT License](LICENSE) 发布。随附的第三方组件（MiSans 字体、hls.js、Windows 版中的 libmpv / FFmpeg 等）
+遵循各自的许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
 ## 🙏 致谢
 
 感谢 <a href="https://linux.do">LINUX DO</a> 社区。
