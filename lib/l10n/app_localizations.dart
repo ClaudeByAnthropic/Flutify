@@ -2605,6 +2605,84 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'目录绝对路径'**
   String get settingsCacheLocationHint;
+
+  /// No description provided for @settingsCacheChooseDirectory.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择文件夹'**
+  String get settingsCacheChooseDirectory;
+
+  /// No description provided for @settingsCachePickerFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法打开系统文件夹选择器，请重试或手动输入路径。'**
+  String get settingsCachePickerFailed;
+
+  /// No description provided for @settingsGatewayAutomatic.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动开关反代'**
+  String get settingsGatewayAutomatic;
+
+  /// No description provided for @settingsGatewayAutomaticHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动、网络变化、回到应用及每 2 分钟通过 Cloudflare 查询出口国家/地区；遵循已选择的系统或手动代理。查询失败保留当前状态。'**
+  String get settingsGatewayAutomaticHelp;
+
+  /// No description provided for @settingsGatewayDirectCountries.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许直连的国家代码'**
+  String get settingsGatewayDirectCountries;
+
+  /// No description provided for @settingsGatewayDirectCountriesHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'可选，填写两位代码，以逗号或空格分隔。留空：CN 开启反代，其余直连；填写后：仅列表内国家直连，其余开启反代。'**
+  String get settingsGatewayDirectCountriesHelp;
+
+  /// No description provided for @settingsGatewayCountriesInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入两位国家代码，例如 US、JP、HK。'**
+  String get settingsGatewayCountriesInvalid;
+
+  /// No description provided for @settingsGatewayLookupFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'国家/地区查询失败，已保留当前连接方式。'**
+  String get settingsGatewayLookupFailed;
+
+  /// No description provided for @settingsGatewayCountryPending.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待查询网络所在国家/地区，暂时保留当前连接方式。'**
+  String get settingsGatewayCountryPending;
+
+  /// No description provided for @settingsGatewayCountryStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络所在国家/地区：{country} · {route}'**
+  String settingsGatewayCountryStatus(String country, String route);
+
+  /// No description provided for @settingsGatewayRouteProxy.
+  ///
+  /// In zh, this message translates to:
+  /// **'反代已开启'**
+  String get settingsGatewayRouteProxy;
+
+  /// No description provided for @settingsGatewayRouteDirect.
+  ///
+  /// In zh, this message translates to:
+  /// **'直连'**
+  String get settingsGatewayRouteDirect;
+
+  /// No description provided for @settingsGatewayRecheck.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新查询国家/地区'**
+  String get settingsGatewayRecheck;
 }
 
 class _AppLocalizationsDelegate

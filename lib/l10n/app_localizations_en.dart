@@ -1441,4 +1441,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsCacheLocationHint => 'Absolute directory path';
+
+  @override
+  String get settingsCacheChooseDirectory => 'Choose folder';
+
+  @override
+  String get settingsCachePickerFailed =>
+      'Couldn\'t open the folder picker. Try again or enter a path.';
+
+  @override
+  String get settingsGatewayAutomatic => 'Switch gateway automatically';
+
+  @override
+  String get settingsGatewayAutomaticHelp =>
+      'Check the network\'s exit country using Cloudflare on startup, network changes, resume and every 2 minutes. Uses your selected system/manual proxy. Failed checks keep the current route.';
+
+  @override
+  String get settingsGatewayDirectCountries =>
+      'Countries allowed to connect directly';
+
+  @override
+  String get settingsGatewayDirectCountriesHelp =>
+      'Optional two-letter codes separated by commas or spaces. Empty: CN uses the gateway, all others connect directly. Filled: only listed countries connect directly; all others use the gateway.';
+
+  @override
+  String get settingsGatewayCountriesInvalid =>
+      'Use two-letter country codes, for example US, JP, HK.';
+
+  @override
+  String get settingsGatewayLookupFailed =>
+      'Country lookup failed; keeping the current route.';
+
+  @override
+  String get settingsGatewayCountryPending =>
+      'Waiting for the network\'s country; keeping the current route.';
+
+  @override
+  String settingsGatewayCountryStatus(String country, String route) {
+    return 'Network country: $country · $route';
+  }
+
+  @override
+  String get settingsGatewayRouteProxy => 'Gateway enabled';
+
+  @override
+  String get settingsGatewayRouteDirect => 'Direct connection';
+
+  @override
+  String get settingsGatewayRecheck => 'Check country again';
 }

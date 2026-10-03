@@ -9,6 +9,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart'
 import 'package:path/path.dart' as p;
 
 import '../storage_service.dart';
+import 'cache_directory_access.dart';
 
 enum CacheCategory { audio, artwork, lyrics }
 
@@ -224,6 +225,9 @@ class CacheLocation extends ChangeNotifier {
           );
         }
         await prepare(target);
+        if (choice.preset == CachePreset.custom) {
+          await CacheDirectoryAccess.remember(choice.customPath.trim());
+        }
         if (p.equals(old, target)) return _migrate(category);
         final previous = selection(category);
         final previousOld = {...?_old[category]};

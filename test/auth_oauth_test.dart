@@ -16,6 +16,17 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// Cancellation needs a real listener, but must not contend with the running app.
+class _EphemeralOAuthLoopback extends OAuthLoopbackServer {
+  @override
+  Future<Future<String>> start({
+    required String expectedState,
+    String path = '/callback',
+    int port = OAuthClientConfig.redirectPort,
+    Duration timeout = const Duration(minutes: 5),
+  }) => super.start(expectedState: expectedState, path: path, port: 0, timeout: timeout);
+}
+
 /// 按 client-token / OAuth 线协议模拟服务端，验证唯一的登录方式「在浏览器中登录」（桌面版 OAuth PKCE）：
 /// 授权码换令牌、桌面身份 client-token、资料拉取、续期、吊销、回环回调，以及旧版本会话的清理。
 void main() {
@@ -252,12 +263,16 @@ void main() {
     });
 
     test('浏览器授权：进入等待态 → 取消回到未登录；登出回调会话变化', () async {
-      final provider = AuthProvider(desktopAuth());
+      final provider = AuthProvider(SpotifyAuthService(
+        storage, fakeServer(), _EphemeralOAuthLoopback(), (_, _) async => 'desktop-user',
+      ));
+      addTearDown(provider.dispose);
+      addTearDown(provider.cancelOAuth);
       var sessionChanges = 0;
       provider.onSessionChanged = () => sessionChanges++;
 
       final url = await provider.beginOAuth();
-      expect(url, isNotNull);
+      expect(url, isNotNull, reason: provider.error);
       expect(provider.status, AuthStatus.authorizing);
       expect(provider.authorizeUrl, url);
       expect(await provider.beginOAuth(), isNull, reason: '等待中不重复发起');

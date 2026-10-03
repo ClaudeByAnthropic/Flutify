@@ -1,12 +1,18 @@
 /// HTTPS reverse proxy for Spotify APIs/media; browser login remains on Spotify.
 class SpotifyGateway {
   final bool enabled;
+  final bool automatic;
+
+  /// Empty: CN uses the gateway. Otherwise only listed countries connect direct.
+  final String directCountries;
   final String baseUrl;
   final String username;
   final String password;
 
   const SpotifyGateway({
     this.enabled = false,
+    this.automatic = false,
+    this.directCountries = '',
     this.baseUrl = '',
     this.username = '',
     this.password = '',
@@ -35,6 +41,28 @@ class SpotifyGateway {
     'X-Proxy-User': username,
     'X-Proxy-Pass': password,
   };
+
+  static String normalizeCountries(String value) {
+    final codes =
+        value
+            .toUpperCase()
+            .split(RegExp(r'[\s,;，；]+'))
+            .where((s) => s.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    if (codes.any((s) => !RegExp(r'^[A-Z]{2}$').hasMatch(s))) {
+      throw const FormatException('Expected two-letter country codes');
+    }
+    return codes.join(', ');
+  }
+
+  bool enabledForCountry(String country) {
+    final codes = normalizeCountries(directCountries);
+    return codes.isEmpty
+        ? country == 'CN'
+        : !codes.split(', ').contains(country);
+  }
 
   static bool supports(Uri uri) {
     if (!const ['http', 'https', 'ws', 'wss'].contains(uri.scheme) ||
@@ -113,17 +141,23 @@ class SpotifyGateway {
 
   SpotifyGateway copyWith({
     bool? enabled,
+    bool? automatic,
+    String? directCountries,
     String? baseUrl,
     String? username,
     String? password,
   }) => SpotifyGateway(
     enabled: enabled ?? this.enabled,
+    automatic: automatic ?? this.automatic,
+    directCountries: directCountries ?? this.directCountries,
     baseUrl: baseUrl ?? this.baseUrl,
     username: username ?? this.username,
     password: password ?? this.password,
   );
   Map<String, dynamic> toJson() => {
     'enabled': enabled,
+    'automatic': automatic,
+    'directCountries': directCountries,
     'baseUrl': baseUrl,
     'username': username,
     'password': password,
@@ -133,6 +167,8 @@ class SpotifyGateway {
     String read(String key) => value[key] is String ? value[key] as String : '';
     return SpotifyGateway(
       enabled: value['enabled'] == true,
+      automatic: value['automatic'] == true,
+      directCountries: read('directCountries'),
       baseUrl: read('baseUrl'),
       username: read('username'),
       password: read('password'),
@@ -142,11 +178,20 @@ class SpotifyGateway {
   bool operator ==(Object other) =>
       other is SpotifyGateway &&
       other.enabled == enabled &&
+      other.automatic == automatic &&
+      other.directCountries == directCountries &&
       other.baseUrl == baseUrl &&
       other.username == username &&
       other.password == password;
   @override
-  int get hashCode => Object.hash(enabled, baseUrl, username, password);
+  int get hashCode => Object.hash(
+    enabled,
+    automatic,
+    directCountries,
+    baseUrl,
+    username,
+    password,
+  );
   @override
   String toString() => 'SpotifyGateway(enabled: $enabled)';
 }

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../../core/utils/byte_size.dart';
+import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../services/protocol/audio_cache_store.dart';
 import '../../../../services/cache/cache_location.dart';
@@ -221,25 +224,31 @@ class _StorageSectionState extends State<StorageSection> {
     final colorScheme = Theme.of(context).colorScheme;
     final limitBytes = _limitMb * ByteSize.mb;
     final used = _usedBytes;
-    final location = Provider.of<CacheLocation?>(context, listen: false);
+    final location = context.watch<CacheLocation?>();
 
     return SettingsSection(
       title: l10n.settingsStorageSection,
       children: [
         if (location != null) ...[
-          for (final category in CacheCategory.values)
-            SettingsTile(
-              title: switch (category) {
-                CacheCategory.audio => l10n.settingsAudioCacheLocation,
-                CacheCategory.artwork => l10n.settingsArtworkCacheLocation,
-                CacheCategory.lyrics => l10n.settingsLyricsCacheLocation,
-              },
-              subtitle: location.directory(category),
-              trailing: const Icon(Icons.folder_open_rounded),
-              onTap: _clearing
-                  ? null
-                  : () => _changeLocation(location, category),
-            ),
+          if (!kIsWeb &&
+              const {
+                TargetPlatform.windows,
+                TargetPlatform.linux,
+                TargetPlatform.macOS,
+              }.contains(defaultTargetPlatform))
+            for (final category in CacheCategory.values)
+              SettingsTile(
+                title: switch (category) {
+                  CacheCategory.audio => l10n.settingsAudioCacheLocation,
+                  CacheCategory.artwork => l10n.settingsArtworkCacheLocation,
+                  CacheCategory.lyrics => l10n.settingsLyricsCacheLocation,
+                },
+                subtitle: location.directory(category),
+                trailing: const Icon(Icons.folder_open_rounded),
+                onTap: _clearing
+                    ? null
+                    : () => _changeLocation(location, category),
+              ),
           SettingsTile(
             title: l10n.settingsClearAllCache,
             subtitle: l10n.settingsClearAllCacheHelp,
@@ -307,6 +316,29 @@ class _LocationDialogState extends State<_LocationDialog> {
   late final _controller = TextEditingController(
     text: widget.selection.customPath,
   );
+  bool _picking = false;
+  bool _pickerFailed = false;
+
+  Future<void> _pickDirectory() async {
+    setState(() {
+      _picking = true;
+      _pickerFailed = false;
+    });
+    try {
+      final path = await getDirectoryPath(
+        initialDirectory: p.isAbsolute(_controller.text)
+            ? _controller.text
+            : null,
+        confirmButtonText: context.l10n.settingsCacheChooseDirectory,
+      );
+      if (path != null && mounted) setState(() => _controller.text = path);
+    } catch (_) {
+      if (mounted) setState(() => _pickerFailed = true);
+    } finally {
+      if (mounted) setState(() => _picking = false);
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -327,39 +359,91 @@ class _LocationDialogState extends State<_LocationDialog> {
             children: [
               Text(l10n.settingsCacheLocationHelp),
               const SizedBox(height: 16),
-              DropdownButtonFormField<CachePreset>(
-                initialValue: _preset,
-                isExpanded: true,
-                items: [
-                  DropdownMenuItem(
-                    value: CachePreset.appData,
-                    child: Text(l10n.settingsCacheAppData),
+              DropdownMenu<CachePreset>(
+                key: const ValueKey('cache-preset'),
+                initialSelection: _preset,
+                expandedInsets: EdgeInsets.zero,
+                enabled: !_picking,
+                requestFocusOnTap: false,
+                label: Text(l10n.settingsCacheLocation),
+                inputDecorationTheme: InputDecorationThemeData(
+                  filled: true,
+                  fillColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: context.tokens.radius(16),
+                    borderSide: BorderSide.none,
                   ),
-                  if (Platform.isWindows ||
-                      Platform.isLinux ||
-                      Platform.isMacOS)
-                    DropdownMenuItem(
-                      value: CachePreset.application,
-                      child: Text(l10n.settingsCacheApplication),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: context.tokens.radius(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: context.tokens.radius(16),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 2,
                     ),
-                  DropdownMenuItem(
+                  ),
+                ),
+                menuStyle: MenuStyle(
+                  backgroundColor: WidgetStatePropertyAll(
+                    Theme.of(context).colorScheme.surfaceContainer,
+                  ),
+                  shape: WidgetStatePropertyAll(
+                    RoundedRectangleBorder(
+                      borderRadius: context.tokens.radius(16),
+                    ),
+                  ),
+                  padding: const WidgetStatePropertyAll(EdgeInsets.all(8)),
+                ),
+                dropdownMenuEntries: [
+                  DropdownMenuEntry(
+                    value: CachePreset.appData,
+                    label: l10n.settingsCacheAppData,
+                    leadingIcon: const Icon(Icons.storage_rounded),
+                  ),
+                  DropdownMenuEntry(
+                    value: CachePreset.application,
+                    label: l10n.settingsCacheApplication,
+                    leadingIcon: const Icon(Icons.apps_rounded),
+                  ),
+                  DropdownMenuEntry(
                     value: CachePreset.custom,
-                    child: Text(l10n.settingsCacheCustom),
+                    label: l10n.settingsCacheCustom,
+                    leadingIcon: const Icon(Icons.folder_open_rounded),
                   ),
                 ],
-                onChanged: (value) {
+                onSelected: (value) {
                   if (value != null) setState(() => _preset = value);
                 },
               ),
               if (_preset == CachePreset.custom) ...[
                 const SizedBox(height: 16),
                 TextField(
+                  key: const ValueKey('cache-custom-path'),
                   controller: _controller,
                   autocorrect: false,
+                  enabled: !_picking,
+                  onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     hintText: l10n.settingsCacheLocationHint,
                   ),
                 ),
+                const SizedBox(height: 8),
+                FilledButton.tonalIcon(
+                  onPressed: _picking ? null : _pickDirectory,
+                  icon: const Icon(Icons.folder_open_rounded),
+                  label: Text(l10n.settingsCacheChooseDirectory),
+                ),
+                if (_pickerFailed)
+                  Text(
+                    l10n.settingsCachePickerFailed,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
               ],
             ],
           ),
@@ -367,14 +451,19 @@ class _LocationDialogState extends State<_LocationDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _picking ? null : () => Navigator.pop(context),
           child: Text(l10n.commonCancel),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(
-            context,
-            CacheSelection(_preset, _controller.text.trim()),
-          ),
+          onPressed:
+              _picking ||
+                  (_preset == CachePreset.custom &&
+                      !p.isAbsolute(_controller.text.trim()))
+              ? null
+              : () => Navigator.pop(
+                  context,
+                  CacheSelection(_preset, _controller.text.trim()),
+                ),
           child: Text(l10n.settingsApply),
         ),
       ],
