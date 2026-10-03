@@ -54,6 +54,7 @@ import 'services/network/windows_trust_store.dart';
 import 'services/playback_session_store.dart';
 import 'services/protocol/audio_cache_store.dart';
 import 'services/cache/cache_location.dart';
+import 'services/cache/cache_directory_access.dart';
 import 'services/cache/artwork_cache.dart';
 import 'services/protocol/eme_track_audio_source.dart';
 import 'services/protocol/track_audio_loader.dart';
@@ -65,6 +66,7 @@ import 'ui/screens/main_shell.dart';
 import 'ui/shell/desktop/desktop_window.dart';
 import 'ui/shell/desktop/window_frame.dart';
 import 'ui/widgets/dynamic_accent_sync.dart';
+import 'ui/widgets/automatic_gateway_binding.dart';
 import 'ui/widgets/playback_session_keeper.dart';
 import 'ui/widgets/taskbar_lyrics_binding.dart';
 
@@ -85,6 +87,7 @@ Future<void> main() async {
 
   // Initialize Core Services
   final storageService = await StorageService.init();
+  await CacheDirectoryAccess.restore();
 
   // 网络代理须在任何网络客户端创建前就位；系统代理最多等 1.5 秒，读不到就先直连、后台补读
   ProxyHttpOverrides.install(NetworkProxy.instance);
@@ -293,7 +296,7 @@ class FlutifyApp extends StatelessWidget {
         if (webTokenService != null)
           Provider<WebTokenService>.value(value: webTokenService!),
         Provider<NetworkProxy?>.value(value: networkProxy),
-        Provider<CacheLocation?>.value(value: audioCacheLocation),
+        ListenableProvider<CacheLocation?>.value(value: audioCacheLocation),
         // 非惰性：启动即接入 API 层，首屏请求就能自动续期 access_token
         Provider<SpotifyAuthService>(
           lazy: false,
@@ -470,7 +473,9 @@ class FlutifyApp extends StatelessWidget {
         ),
       ],
       child: const PlaybackSessionKeeper(
-        child: DynamicAccentSync(child: _ThemedApp()),
+        child: AutomaticGatewayBinding(
+          child: DynamicAccentSync(child: _ThemedApp()),
+        ),
       ),
     );
   }

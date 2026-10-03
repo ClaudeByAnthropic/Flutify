@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 
 import 'proxy_endpoint.dart';
 import 'proxy_mode.dart';
@@ -16,8 +17,11 @@ import 'gateway_http_client.dart';
 ///
 /// 本机回环地址（localhost / 127.x / ::1）始终直连：播放器经本机端口读取解密后的音频。
 class NetworkProxy {
-  NetworkProxy({Future<SystemProxySettings> Function()? systemReader})
-    : _systemReader = systemReader ?? SystemProxyReader.read;
+  NetworkProxy({
+    Future<SystemProxySettings> Function()? systemReader,
+    Future<String> Function()? countryReader,
+  }) : _systemReader = systemReader ?? SystemProxyReader.read,
+       _countryReader = countryReader;
 
   /// App 使用的唯一实例（main 里按偏好配置，设置页修改时更新）。
   static final NetworkProxy instance = NetworkProxy();
@@ -25,6 +29,16 @@ class NetworkProxy {
   static const Duration systemTtl = Duration(seconds: 30);
 
   final Future<SystemProxySettings> Function() _systemReader;
+  final Future<String> Function()? _countryReader;
+  final _gatewayChanges = StreamController<void>.broadcast(sync: true);
+  Stream<void> get gatewayChanges => _gatewayChanges.stream;
+  String? gatewayCountry;
+  bool gatewayChecking = false;
+  bool gatewayLookupFailed = false;
+  SpotifyGateway _gatewaySettings = const SpotifyGateway();
+  int _generation = 0;
+  Future<void>? _countryCheck;
+  bool _configured = false;
 
   ProxyMode _mode = ProxyMode.system;
   ProxyEndpoint? _manual;
@@ -48,12 +62,113 @@ class NetworkProxy {
     int proxyPort = 0,
     SpotifyGateway gateway = const SpotifyGateway(),
   }) {
-    this.gateway = gateway;
+    final changed =
+        _gatewaySettings != gateway ||
+        _mode != mode ||
+        _manual?.toString() != (proxyPort > 0 ? '$proxyHost:$proxyPort' : null);
+    if (changed) {
+      _generation++;
+      _countryCheck = null;
+      gatewayChecking = false;
+      gatewayLookupFailed = false;
+    }
+    // The stored manual choice is not overwritten by an automatic decision.
+    final enabled = gateway.automatic && _configured
+        ? this.gateway.enabled
+        : gateway.enabled;
+    _configured = true;
+    _gatewaySettings = gateway;
+    this.gateway = gateway.copyWith(enabled: enabled);
     _mode = mode;
     _manual = proxyPort > 0
         ? ProxyEndpoint.tryParse('$proxyHost:$proxyPort')
         : null;
-    return _mode == ProxyMode.system ? refreshSystem() : Future.value();
+    _gatewayChanges.add(null);
+    return () async {
+      if (_mode == ProxyMode.system) await refreshSystem();
+      if (changed) await refreshGatewayCountry();
+    }();
+  }
+
+  /// Recheck on startup, network change, resume and a periodic timer.
+  /// Failed/obsolete lookups never change the last effective route.
+  Future<void> refreshGatewayCountry({bool networkChanged = false}) {
+    if (!_gatewaySettings.automatic || !_gatewaySettings.isValid) {
+      return Future.value();
+    }
+    if (networkChanged) {
+      _generation++;
+      _countryCheck = null;
+    }
+    final generation = _generation;
+    // Defer execution so even an immediately throwing reader clears the future.
+    return _countryCheck ??= Future<void>(() => _checkCountry(generation));
+  }
+
+  Future<void> _checkCountry(int generation) async {
+    if (generation != _generation) return;
+    gatewayChecking = true;
+    _gatewayChanges.add(null);
+    try {
+      if (_mode == ProxyMode.system) await refreshSystem();
+      final country = await (_countryReader?.call() ?? _readCountry()).timeout(
+        const Duration(seconds: 8),
+      );
+      if (!RegExp(r'^[A-Z]{2}$').hasMatch(country) || country == 'XX') {
+        throw const FormatException('Invalid country');
+      }
+      if (generation != _generation) return;
+      final enabled = _gatewaySettings.enabledForCountry(country);
+      gatewayCountry = country;
+      gatewayLookupFailed = false;
+      gateway = _gatewaySettings.copyWith(enabled: enabled);
+    } catch (_) {
+      if (generation == _generation) gatewayLookupFailed = true;
+    } finally {
+      if (generation == _generation) {
+        gatewayChecking = false;
+        _countryCheck = null;
+        _gatewayChanges.add(null);
+      }
+    }
+  }
+
+  static String countryFromTrace(String trace) {
+    final matches = RegExp(
+      r'^loc=([A-Z]{2})\r?$',
+      multiLine: true,
+    ).allMatches(trace).toList();
+    if (matches.length != 1 || matches.single.group(1) == 'XX') {
+      throw const FormatException('Missing or invalid trace country');
+    }
+    return matches.single.group(1)!;
+  }
+
+  Future<String> _readCountry() async {
+    // Bypass the Spotify gateway while honoring the selected forward proxy.
+    final client = HttpClient()..findProxy = findProxy;
+    client.connectionTimeout = const Duration(seconds: 8);
+    try {
+      return await (() async {
+        final request = await client.getUrl(
+          Uri.parse('https://cloudflare.com/cdn-cgi/trace'),
+        );
+        request.followRedirects = false;
+        final response = await request.close();
+        if (response.statusCode != HttpStatus.ok) {
+          throw const HttpException('Country lookup failed');
+        }
+        final bytes = <int>[];
+        await for (final chunk in response) {
+          bytes.addAll(chunk);
+          if (bytes.length > 16384)
+            throw const FormatException('Trace too large');
+        }
+        return countryFromTrace(utf8.decode(bytes));
+      })().timeout(const Duration(seconds: 8));
+    } finally {
+      client.close(force: true);
+    }
   }
 
   /// 重新读取系统代理（并发调用合并为一次）。

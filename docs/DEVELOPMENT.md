@@ -1,12 +1,12 @@
 # Flutify 🎵 - Spotify-Style Music Player (Google Material 3 Expressive)
 
-> **当前版本：v0.01 Beta**（首个公开测试版）· 支持 Windows x64 与 Android
+> **当前版本：[最新发布（含 Beta）](https://github.com/is-hp-is-mad/Flutify/releases)** · 支持 Windows x64、Windows ARM64 与 Android
 >
 > 下载：[Releases](../../releases) 页面。Windows 解压后运行 `Flutify.exe`（需要 WebView2 运行时，Win11 自带）；
 > Android 一般选 `arm64-v8a`，不确定时选 `universal`。
-> 安装包由 GitHub Actions 自动构建（`.github/workflows/build.yml`），推送 `v*` 标签即发布。
+> 安装包由 GitHub Actions 自动构建（`.github/workflows/build.yml`），支持标签发布与手动指定版本发布。
 >
-> Beta 说明：Android 端尚未完成适配（全曲播放、Connect 播放端等依赖 Windows WebView2 的功能暂不可用）；
+> Android 使用 Media3 / 系统 Widevine 原生播放，Windows 播放使用 WebView2；
 > 全曲播放可能遇到 Spotify 的许可证限流（HTTP 429），稍候再试即可。
 
 Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打造的高保真 Spotify 风格在线音乐播放器。专为**逆向 Spotify 移动端/桌面端协议与 API** 而设计，提供完整解耦的 API 数据层、真实曲目播放、账号媒体库、歌词同步与播放队列管理。
@@ -399,7 +399,13 @@ $env:FLUTIFY_AUDIT='1'; & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" test -
 
 ### 5. 云端构建（GitHub Actions）
 本地没有 Android 开发环境也能出包：推送到 `main` 或手动运行 **Actions → Build** 只构建（产物在本次运行的 Artifacts 里）；
-推送 `v*` 标签（如 `v0.01-beta`）构建完成后自动发布到 Releases，标签带 `beta` / `alpha` / `rc` 时标为预发布。
+推送 `v*` 标签（如 `v0.04-beta`）构建完成后自动发布到 Releases，标签带 `beta` / `alpha` / `rc` 时标为预发布。
+
+手动发布：在 **Actions → Build → Run workflow** 选择要发布的分支或标签，勾选 `publish_release`，填写 `release_tag`（例如 `v0.04-beta`）。
+若该标签已存在，必须指向本次构建的提交。Windows x64、原生 ARM64 和 Android 全部构建及校验通过后才执行 **Publish release**，
+发布两个 Windows 便携包、两个安装包、四个 Android APK 和 `SHA256SUMS.txt`。不勾选发布时跳过发布 Job 是预期行为。
+
+桌面原生 Widevine 播放的跨平台评估见 [WIDEVINE.md](WIDEVINE.md)。
 
 ---
 

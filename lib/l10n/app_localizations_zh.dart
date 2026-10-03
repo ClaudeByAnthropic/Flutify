@@ -1375,4 +1375,47 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsCacheLocationHint => '目录绝对路径';
+
+  @override
+  String get settingsCacheChooseDirectory => '选择文件夹';
+
+  @override
+  String get settingsCachePickerFailed => '无法打开系统文件夹选择器，请重试或手动输入路径。';
+
+  @override
+  String get settingsGatewayAutomatic => '自动开关反代';
+
+  @override
+  String get settingsGatewayAutomaticHelp =>
+      '启动、网络变化、回到应用及每 2 分钟通过 Cloudflare 查询出口国家/地区；遵循已选择的系统或手动代理。查询失败保留当前状态。';
+
+  @override
+  String get settingsGatewayDirectCountries => '允许直连的国家代码';
+
+  @override
+  String get settingsGatewayDirectCountriesHelp =>
+      '可选，填写两位代码，以逗号或空格分隔。留空：CN 开启反代，其余直连；填写后：仅列表内国家直连，其余开启反代。';
+
+  @override
+  String get settingsGatewayCountriesInvalid => '请输入两位国家代码，例如 US、JP、HK。';
+
+  @override
+  String get settingsGatewayLookupFailed => '国家/地区查询失败，已保留当前连接方式。';
+
+  @override
+  String get settingsGatewayCountryPending => '等待查询网络所在国家/地区，暂时保留当前连接方式。';
+
+  @override
+  String settingsGatewayCountryStatus(String country, String route) {
+    return '网络所在国家/地区：$country · $route';
+  }
+
+  @override
+  String get settingsGatewayRouteProxy => '反代已开启';
+
+  @override
+  String get settingsGatewayRouteDirect => '直连';
+
+  @override
+  String get settingsGatewayRecheck => '重新查询国家/地区';
 }

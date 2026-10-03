@@ -1,6 +1,7 @@
 # 构建 Windows 与 Android 安装包。
 # - 推送 v* 标签：两端构建完成后发布到 GitHub Releases（标签含 beta / alpha / rc 时标为预发布）；
-# - 手动运行（Actions → Build → Run workflow）或推送到 main：只构建，产物在本次运行的 Artifacts 里。
+# - 手动运行默认只构建；勾选 publish_release 并填写 release_tag 后，全部构建成功才发布。
+# - 推送到 main：只构建，产物在本次运行的 Artifacts 里。
 name: Build
 
 on:
@@ -10,6 +11,19 @@ on:
     # 只改文档时不构建（标签推送不受影响）
     paths-ignore: ['**.md', 'docs/**', 'LICENSE']
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish after all platform builds pass'
+        type: boolean
+        default: false
+      release_tag:
+        description: 'Release tag (required when publishing, e.g. v0.04-beta)'
+        type: string
+        default: ''
+
+concurrency:
+  group: build-${{ github.event_name }}-${{ github.ref }}-${{ inputs.release_tag || '' }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -18,8 +32,29 @@ env:
   FLUTTER_VERSION: '3.44.0'
 
 jobs:
+  prepare:
+    name: Validate build and release target
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.config.outputs.publish }}
+      tag: ${{ steps.config.outputs.tag }}
+      label: ${{ steps.config.outputs.label }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: node --test tool/test_release_config.cjs
+      - id: config
+        env:
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: node tool/release_config.cjs
+
   android:
     name: Android APK
+    needs: prepare
+    env:
+      BUILD_LABEL: ${{ needs.prepare.outputs.label }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -86,9 +121,9 @@ jobs:
           cd build/app/outputs/flutter-apk
           for f in app-*-release.apk; do
             abi="${f#app-}"; abi="${abi%-release.apk}"
-            mv "$f" "Flutify-${GITHUB_REF_NAME//\//-}-android-$abi.apk"
+            mv "$f" "Flutify-${BUILD_LABEL}-android-$abi.apk"
           done
-          mv app-release.apk "Flutify-${GITHUB_REF_NAME//\//-}-android-universal.apk"
+          mv app-release.apk "Flutify-${BUILD_LABEL}-android-universal.apk"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -97,6 +132,9 @@ jobs:
 
   windows:
     name: Windows ${{ matrix.arch }}
+    needs: prepare
+    env:
+      BUILD_LABEL: ${{ needs.prepare.outputs.label }}
     strategy:
       fail-fast: false
       matrix:
@@ -164,7 +202,7 @@ jobs:
       - name: Package portable ZIP and installer
         shell: pwsh
         run: |
-          ./tool/package_windows.ps1 -Arch '${{ matrix.arch }}' -Label $env:GITHUB_REF_NAME -Compiler $env:INNO_COMPILER
+          ./tool/package_windows.ps1 -Arch '${{ matrix.arch }}' -Label $env:BUILD_LABEL -Compiler $env:INNO_COMPILER
 
       - uses: actions/upload-artifact@v4
         with:
@@ -175,8 +213,8 @@ jobs:
 
   release:
     name: Publish release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [android, windows]
+    if: needs.prepare.outputs.publish == 'true'
+    needs: [prepare, android, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -184,11 +222,26 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Verify all packages and generate checksums
+        env:
+          BUILD_LABEL: ${{ needs.prepare.outputs.label }}
+        run: |
+          cd dist
+          for suffix in windows-x64.zip windows-x64-setup.exe windows-arm64.zip windows-arm64-setup.exe android-arm64-v8a.apk android-armeabi-v7a.apk android-x86_64.apk android-universal.apk; do
+            test -s "Flutify-${BUILD_LABEL}-${suffix}" || { echo "Missing package: ${suffix}"; exit 1; }
+          done
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 8
+          sha256sum Flutify-* > SHA256SUMS.txt
+
       - uses: softprops/action-gh-release@v2
         with:
-          name: Flutify ${{ github.ref_name }}
-          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Flutify ${{ needs.prepare.outputs.tag }}
+          prerelease: ${{ contains(needs.prepare.outputs.tag, 'beta') || contains(needs.prepare.outputs.tag, 'alpha') || contains(needs.prepare.outputs.tag, 'rc') }}
           body: |
-            > ⚠️ **未经实机测试**：本产物仅本地 Windows 编译与 CI 构建通过，尚未在真机/实机验证，请谨慎用于生产环境。
+            Windows x64 / ARM64 提供安装版和便携版；Android 提供三种 ABI 与通用 APK。全部平台构建及产物校验通过后发布，校验和见 SHA256SUMS.txt。
+            构建通过不代表所有设备兼容性问题已完成实机验证，已知问题见 README。
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: dist/*
