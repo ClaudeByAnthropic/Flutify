@@ -102,7 +102,7 @@ include(InstallRequiredSystemLibraries)
 # The ARM64 redist also ships the x64 EH4 companion for emulated/ARM64EC
 # clients. Native ARM64 uses vcruntime140.dll; it must not bundle that x64 DLL.
 if(MSVC_CXX_ARCHITECTURE_ID STREQUAL "ARM64")
-  list(FILTER CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS EXCLUDE
+  list(FILTER CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS EXCLUDE REGEX
     "/vcruntime140_1d?\\.dll$")
   # Remove leftovers when rebuilding an existing bundle after this fix.
   install(CODE "file(REMOVE \"${INSTALL_BUNDLE_LIB_DIR}/vcruntime140_1.dll\")"
