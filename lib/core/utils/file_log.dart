@@ -14,12 +14,19 @@ void installFileLog() {
     return;
   }
   _sink = sink;
+  var failed = false;
+  // openWrite reports filesystem failures asynchronously through done.
+  // Logging must not turn a recoverable startup error into an unhandled error.
+  sink.done.catchError((Object _) {
+    failed = true;
+    if (identical(_sink, sink)) _sink = null;
+  });
   var written = 0;
   const maxBytes = 8 * 1024 * 1024;
   final original = debugPrint;
   debugPrint = (String? message, {int? wrapWidth}) {
     original(message, wrapWidth: wrapWidth);
-    if (message == null || written > maxBytes) return;
+    if (message == null || written > maxBytes || failed) return;
     final now = DateTime.now();
     final line = '${now.toIso8601String().substring(11, 23)} $message\n';
     written += line.length;
@@ -30,14 +37,17 @@ void installFileLog() {
 IOSink? _sink;
 
 /// 本次运行的日志文件。
-File get logFile => File('${Directory.systemTemp.path}${Platform.pathSeparator}flutify.log');
+File get logFile =>
+    File('${Directory.systemTemp.path}${Platform.pathSeparator}flutify.log');
 
 /// 读取日志末尾最多 [maxChars] 个字符（先把缓冲刷到磁盘），供「复制日志」使用；没有日志时返回空串。
 Future<String> readLogTail({int maxChars = 200 * 1024}) async {
   try {
     await _sink?.flush();
     final text = await logFile.readAsString();
-    return text.length <= maxChars ? text : text.substring(text.length - maxChars);
+    return text.length <= maxChars
+        ? text
+        : text.substring(text.length - maxChars);
   } catch (_) {
     return '';
   }

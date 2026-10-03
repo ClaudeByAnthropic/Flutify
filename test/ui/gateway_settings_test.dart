@@ -88,7 +88,9 @@ void main() {
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Use two-letter country codes, for example US, JP, HK.'),
+        find.text(
+          'Use two-letter country/region codes, for example US, JP, HK.',
+        ),
         findsOneWidget,
       );
       expect(prefs.prefs.gateway.automatic, isFalse);
@@ -99,22 +101,22 @@ void main() {
       expect(saved.automatic, isTrue);
       expect(saved.directCountries, 'JP, US');
       expect(
-        find.text('Network country: CN · Gateway enabled'),
+        find.text('Network country/region: CN · Gateway enabled'),
         findsOneWidget,
       );
       expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
       country = 'JP';
-      await tester.tap(find.byTooltip('Check country again'));
+      await tester.tap(find.byTooltip('Check country/region again'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Network country: JP · Direct connection'),
+        find.text('Network country/region: JP · Direct connection'),
         findsOneWidget,
       );
       offline = true;
-      await tester.tap(find.byTooltip('Check country again'));
+      await tester.tap(find.byTooltip('Check country/region again'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Country lookup failed; keeping the current route.'),
+        find.text('Country/region lookup failed; keeping the current route.'),
         findsOneWidget,
       );
       expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);

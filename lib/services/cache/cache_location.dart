@@ -48,9 +48,12 @@ class CacheLock {
 /// Owns only disposable category directories, never their selected parent.
 class CacheLocation extends ChangeNotifier {
   final StorageService storage;
-  final String defaultRoot;
+  String _defaultRoot;
+  String get defaultRoot => _defaultRoot;
   final String applicationRoot;
-  final String? legacyArtworkDirectory;
+  String? _legacyArtworkDirectory;
+  String? get legacyArtworkDirectory => _legacyArtworkDirectory;
+  final Map<String, String> _platformRootAliases = {};
   final lock = CacheLock();
   final Map<CacheCategory, CacheSelection> _selections = {};
   final Map<CacheCategory, Set<String>> _old = {};
@@ -64,10 +67,12 @@ class CacheLocation extends ChangeNotifier {
 
   CacheLocation(
     this.storage,
-    this.defaultRoot, {
+    String defaultRoot, {
     String? applicationRoot,
-    this.legacyArtworkDirectory,
-  }) : applicationRoot =
+    String? legacyArtworkDirectory,
+  }) : _defaultRoot = defaultRoot,
+       _legacyArtworkDirectory = legacyArtworkDirectory,
+       applicationRoot =
            applicationRoot ?? File(Platform.resolvedExecutable).parent.path;
 
   static String folder(CacheCategory category) => switch (category) {
@@ -95,6 +100,17 @@ class CacheLocation extends ChangeNotifier {
   };
 
   Future<void> initialize() async {
+    // path_provider can return OS aliases (e.g. Android /data/user/0 or
+    // macOS /var). Resolve only the platform-owned roots, before appending
+    // owned cache folders. Custom roots and cache children remain link-checked.
+    _defaultRoot = await _resolvePlatformRoot(defaultRoot);
+    final legacy = legacyArtworkDirectory;
+    if (legacy != null) {
+      _legacyArtworkDirectory = p.join(
+        await _resolvePlatformRoot(p.dirname(legacy)),
+        p.basename(legacy),
+      );
+    }
     try {
       final saved =
           jsonDecode(storage.cacheLocationsJson) as Map<String, dynamic>;
@@ -108,6 +124,7 @@ class CacheLocation extends ChangeNotifier {
         _selections[category] = choice;
         _old[category] = (data['old'] as List<dynamic>? ?? [])
             .whereType<String>()
+            .map(_canonicalPlatformPath)
             .where(
               (path) =>
                   _valid(path) &&
@@ -158,6 +175,23 @@ class CacheLocation extends ChangeNotifier {
       }
     }
     await _save();
+  }
+
+  Future<String> _resolvePlatformRoot(String path) async {
+    final directory = await Directory(path).create(recursive: true);
+    final canonical = await directory.resolveSymbolicLinks();
+    _platformRootAliases[p.normalize(path)] = canonical;
+    return canonical;
+  }
+
+  String _canonicalPlatformPath(String path) {
+    for (final alias in _platformRootAliases.entries) {
+      if (p.equals(alias.key, path)) return alias.value;
+      if (p.isWithin(alias.key, path)) {
+        return p.join(alias.value, p.relative(path, from: alias.key));
+      }
+    }
+    return path;
   }
 
   static bool _valid(String path) =>

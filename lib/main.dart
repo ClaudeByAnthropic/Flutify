@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'core/utils/file_log.dart';
+import 'core/widgets/app_startup.dart';
 
 import 'package:crypto/crypto.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -74,6 +75,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installFileLog();
   installErrorPlaceholder();
+  runApp(AppStartup(initialize: _initializeApp));
+}
+
+Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
+  reportStage('准备运行环境');
   await WindowsTrustStore.initialize();
 
   // just_audio 自身没有 Windows / Linux 实现，需在创建任何 AudioPlayer 之前
@@ -81,16 +87,18 @@ Future<void> main() async {
   JustAudioMediaKit.ensureInitialized();
 
   // 系统栏透明、内容铺满（edge-to-edge）；图标深浅由 FlutifyApp 按当前主题设置
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   // 手机锁定竖屏（平板 / 桌面不限制）
   await OrientationPolicy.apply();
 
   // Initialize Core Services
+  reportStage('读取设置');
   final storageService = await StorageService.init();
   await CacheDirectoryAccess.restore();
 
   // 网络代理须在任何网络客户端创建前就位；系统代理最多等 1.5 秒，读不到就先直连、后台补读
   ProxyHttpOverrides.install(NetworkProxy.instance);
+  reportStage('配置网络');
   final initialPrefs = AppPreferences.decode(storageService.preferencesJson);
   await NetworkProxy.instance
       .configure(
@@ -101,6 +109,7 @@ Future<void> main() async {
       )
       .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
 
+  reportStage('初始化音频服务');
   final audioPlayerService = AudioPlayerService();
   final spotifyApiService = SpotifyApiService(storageService);
   final authService = SpotifyAuthService(storageService);
@@ -110,6 +119,7 @@ Future<void> main() async {
   final webTokenService = WebTokenService(storageService);
   // 本地回环服务宿主：两类 DRM 引擎共用（清单/加密音频供给 + license·证书反代）
   final emePlayer = EmePlayer();
+  reportStage('启动本地播放服务');
   await emePlayer.init(); // 先起本地服务
   // license 反代：CDM 请求体 → Spotify（用 Web token + client-token）。
   // 多入口：手机网络下 gae2-spclient 等域名会被掐 TLS 握手，spclient.wg 实测可达，
@@ -149,6 +159,7 @@ Future<void> main() async {
   );
 
   // 上次播放会话（曲目 / 队列 / 进度）：单独的 JSON 文件，不放进 SharedPreferences
+  reportStage('读取应用目录');
   final supportDir = await getApplicationSupportDirectory();
   final legacyArtworkDirectory =
       '${(await getTemporaryDirectory()).path}${Platform.pathSeparator}libCachedImageData';
@@ -157,16 +168,19 @@ Future<void> main() async {
     supportDir.path,
     legacyArtworkDirectory: legacyArtworkDirectory,
   );
+  reportStage('准备缓存目录');
   await audioCacheLocation.initialize();
   final sessionStore = FilePlaybackSessionStore(
     File('${supportDir.path}${Platform.pathSeparator}playback_session.json'),
   );
 
   // 桌面端：隐藏系统标题栏（由顶栏自绘）、设置最小窗口尺寸、还原上次的窗口位置
+  reportStage('准备窗口');
   await DesktopWindow.init(storageService);
 
   // 系统媒体控制：Windows SMTC（任务栏 / 锁屏媒体卡片、媒体键），Android / iOS 通知栏与锁屏。
   // Windows 上再挂一个任务栏歌词，二者共用同一套本机 / 远程切换与按键路由
+  reportStage('连接系统媒体控制');
   final systemControls = await SystemMediaControls.create();
   final taskbarLyrics = Platform.isWindows
       ? TaskbarLyricsControls(MethodChannelTaskbarLyrics())
@@ -206,7 +220,8 @@ Future<void> main() async {
 
   audioCacheLocation.audioInUse = emeTrackSource.isCacheFileInUse;
   audioCacheLocation.prepareLegacyArtwork = () =>
-      ArtworkCache.prepareLegacy(legacyArtworkDirectory);
+      ArtworkCache.prepareLegacy(audioCacheLocation.legacyArtworkDirectory!);
+  reportStage('迁移旧缓存');
   await audioCacheLocation.resumeMigrations();
   emeTrackSource.maxCacheBytes = storageService.audioCacheLimitMb * 1024 * 1024;
   audioCacheLocation.addListener(() => unawaited(emeTrackSource.trimCache()));
@@ -214,22 +229,20 @@ Future<void> main() async {
   audioCacheLocation.artworkMaintenance = artworkCache.maintain;
   CachedNetworkImageProvider.defaultCacheManager = artworkCache;
 
-  runApp(
-    FlutifyApp(
-      storageService: storageService,
-      audioEngine: audioEngine,
-      emePlayer: emePlayer,
-      spotifyApiService: spotifyApiService,
-      authService: authService,
-      webTokenService: webTokenService,
-      trackAudioLoader: emeTrackSource,
-      playbackSessionStore: sessionStore,
-      mediaControls: mediaControls,
-      networkProxy: NetworkProxy.instance,
-      audioCacheLocation: audioCacheLocation,
-      lyricsFallback: lyricsFallback,
-      taskbarLyrics: taskbarLyrics,
-    ),
+  return FlutifyApp(
+    storageService: storageService,
+    audioEngine: audioEngine,
+    emePlayer: emePlayer,
+    spotifyApiService: spotifyApiService,
+    authService: authService,
+    webTokenService: webTokenService,
+    trackAudioLoader: emeTrackSource,
+    playbackSessionStore: sessionStore,
+    mediaControls: mediaControls,
+    networkProxy: NetworkProxy.instance,
+    audioCacheLocation: audioCacheLocation,
+    lyricsFallback: lyricsFallback,
+    taskbarLyrics: taskbarLyrics,
   );
 }
 

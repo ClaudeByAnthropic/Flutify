@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -35,6 +36,98 @@ void main() {
     await Directory(dir).create(recursive: true);
     return File(p.join(dir, name)).writeAsBytes(data, flush: true);
   }
+
+  Future<void> linkDirectory(String target, String alias) async {
+    if (Platform.isWindows) {
+      // Junctions do not require Windows Developer Mode or symlink privileges.
+      final result = await Process.run('cmd.exe', [
+        '/c',
+        'mklink',
+        '/J',
+        alias,
+        target,
+      ]);
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    } else {
+      await Link(alias).create(target);
+    }
+    expect(
+      await FileSystemEntity.type(alias, followLinks: false),
+      FileSystemEntityType.link,
+    );
+  }
+
+  test(
+    'system directory aliases allow startup and legacy cache migration',
+    () async {
+      final real = await Directory(p.join(sandbox.path, 'real')).create();
+      final alias = p.join(sandbox.path, 'system-alias');
+      await linkDirectory(real.path, alias);
+      try {
+        final support = p.join(alias, 'files');
+        final legacy = p.join(alias, 'cache', 'libCachedImageData');
+        await seed(p.join(support, 'audio'), 'old.mp4', [1, 2]);
+        await seed(legacy, 'cover.png', [3, 4]);
+        await storage.setCacheLocationsJson(
+          jsonEncode({
+            'artwork': {
+              'preset': 'appData',
+              'old': [legacy],
+            },
+          }),
+        );
+        location.dispose();
+        location = CacheLocation(
+          storage,
+          support,
+          legacyArtworkDirectory: legacy,
+        );
+        await location.initialize();
+        expect((await location.resumeMigrations()).failed, 0);
+        expect(
+          await File(p.join(location.audioPath, 'old.mp4')).readAsBytes(),
+          [1, 2],
+        );
+        expect(
+          await File(
+            p.join(location.imageDirectory.path, 'cover.png'),
+          ).readAsBytes(),
+          [3, 4],
+        );
+        expect((await location.clearCategory(CacheCategory.audio)).failed, 0);
+        expect(
+          await File(p.join(location.audioPath, 'old.mp4')).exists(),
+          false,
+        );
+      } finally {
+        await Link(alias).delete();
+      }
+    },
+  );
+
+  test('cache child links and custom root links remain rejected', () async {
+    final outside = await Directory(p.join(sandbox.path, 'outside')).create();
+    final sentinel = await seed(outside.path, 'keep', [9]);
+    final child = p.join(location.defaultRoot, 'linked-cache');
+    await linkDirectory(outside.path, child);
+    try {
+      await expectLater(
+        CacheLocation.prepare(child),
+        throwsA(isA<FileSystemException>()),
+      );
+      await expectLater(
+        location.change(
+          CacheCategory.audio,
+          CacheSelection(CachePreset.custom, child),
+        ),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect((await CacheLocation.clearDirectory(child)).failed, 1);
+      expect(await sentinel.readAsBytes(), [9]);
+    } finally {
+      await Link(child).delete();
+    }
+  });
 
   test(
     'category selection migrates bytes, removes originals and persists',
