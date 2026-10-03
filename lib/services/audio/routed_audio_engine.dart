@@ -71,6 +71,8 @@ class RoutedAudioEngine implements AudioEngine {
   Stream<Duration?> get durationStream => _durationController.stream;
   @override
   Stream<PlayerState> get playerStateStream => _stateController.stream;
+  @override
+  Stream<EmePlaybackException> get emeErrors => _eme.emeErrors;
 
   @override
   Duration get position => _current.position;

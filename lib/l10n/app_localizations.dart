@@ -956,6 +956,12 @@ abstract class AppLocalizations {
   /// **'「{track}」加载失败，请检查网络'**
   String playbackErrorNetwork(String track);
 
+  /// No description provided for @playbackErrorWidevine.
+  ///
+  /// In zh, this message translates to:
+  /// **'「{track}」无法解密播放：此设备缺少 Widevine 组件'**
+  String playbackErrorWidevine(String track);
+
   /// No description provided for @playbackErrorAutoPaused.
   ///
   /// In zh, this message translates to:

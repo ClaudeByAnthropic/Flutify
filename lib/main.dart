@@ -34,6 +34,8 @@ import 'services/auth/web_token_service.dart';
 import 'services/eme/eme_audio_engine.dart';
 import 'services/eme/eme_player.dart';
 import 'services/eme/license_client.dart';
+import 'services/eme/native_drm_audio_engine.dart';
+import 'services/eme/native_drm_player.dart';
 import 'services/connect/connect_play_request.dart';
 import 'services/connect/connect_service.dart';
 import 'services/connect/receiver/connect_receiver.dart';
@@ -97,14 +99,9 @@ Future<void> main() async {
   // --- EME（Widevine）全曲播放链路 ---
   // Web token 服务：sp_dc + TOTP 铸造 Web 播放器 access_token（Widevine 真密钥所需）
   final webTokenService = WebTokenService(storageService);
-  // 无头 WebView2 播放器（空白页 + HLS.js，不进 widget 树、不渲染 open.spotify.com）
+  // 本地回环服务宿主：两类 DRM 引擎共用（清单/加密音频供给 + license·证书反代）
   final emePlayer = EmePlayer();
-  // 加载 HLS.js 引擎（资产打包，供隐藏页用）
-  EmePlayer.hlsJsSource = await rootBundle.loadString('assets/js/hls.min.js');
   await emePlayer.init(); // 先起本地服务
-  // 自定义 WebView2 环境（关自动播放手势限制，无头页无用户手势）
-  await EmePlayer.ensureEnvironment();
-  await emePlayer.start(); // 启动无头 WebView（窗口缩放/布局切换不影响播放）
   // license 反代：CDM 请求体 → Spotify（用 Web token + client-token）。
   // 多入口：手机网络下 gae2-spclient 等域名会被掐 TLS 握手，spclient.wg 实测可达，
   // WidevineLicenseClient 按入口列表换域名重试（同一服务，路径一致）。
@@ -112,13 +109,32 @@ Future<void> main() async {
     webToken: webTokenService.ensureWebAccessToken,
     clientToken: authService.ensureClientToken,
   );
-  final emeEngine = EmeAudioEngine(
-    player: emePlayer,
-    licensePoster: licenseClient.postLicense,
-    certFetcher: licenseClient.fetchCert,
-  );
-  // 路由引擎：本地文件/流式 → just_audio；DRM 曲目 → EME
-  final audioEngine = RoutedAudioEngine(local: audioPlayerService, eme: emeEngine);
+  // DRM 播放引擎按平台选：
+  // - Android 真机证实 WebView EME 不可用（createMediaKeys 永不 settle），
+  //   走原生 ExoPlayer + MediaDrm（下载/协议/反代层全复用，WebView 不起）；
+  // - 桌面照旧无头 WebView2 + HLS.js。
+  final AudioEngine drmEngine;
+  if (Platform.isAndroid) {
+    drmEngine = NativeDrmAudioEngine(
+      server: emePlayer,
+      player: NativeDrmPlayer(),
+      licensePoster: licenseClient.postLicense,
+      certFetcher: licenseClient.fetchCert,
+    );
+  } else {
+    // 加载 HLS.js 引擎（资产打包，供隐藏页用）
+    EmePlayer.hlsJsSource = await rootBundle.loadString('assets/js/hls.min.js');
+    // 自定义 WebView2 环境（关自动播放手势限制，无头页无用户手势）
+    await EmePlayer.ensureEnvironment();
+    await emePlayer.start(); // 启动无头 WebView（窗口缩放/布局切换不影响播放）
+    drmEngine = EmeAudioEngine(
+      player: emePlayer,
+      licensePoster: licenseClient.postLicense,
+      certFetcher: licenseClient.fetchCert,
+    );
+  }
+  // 路由引擎：本地文件/流式 → just_audio；DRM 曲目 → EME / 原生 DRM
+  final audioEngine = RoutedAudioEngine(local: audioPlayerService, eme: drmEngine);
 
   // 上次播放会话（曲目 / 队列 / 进度）：单独的 JSON 文件，不放进 SharedPreferences
   final supportDir = await getApplicationSupportDirectory();

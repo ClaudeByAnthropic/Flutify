@@ -29,6 +29,9 @@ class FakeAudioPlayerService implements AudioPlayerService {
   Stream<PlayerState> get playerStateStream => stateController.stream;
 
   @override
+  Stream<EmePlaybackException> get emeErrors => const Stream.empty();
+
+  @override
   Duration get position => Duration.zero;
   @override
   Duration? get duration => null;

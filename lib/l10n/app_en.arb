@@ -171,6 +171,7 @@
   "playbackErrorUnavailable": "\"{track}\" isn't available right now",
   "playbackErrorSkipped": "\"{track}\" isn't available right now, skipped",
   "playbackErrorNetwork": "Couldn't load \"{track}\". Check your connection.",
+  "playbackErrorWidevine": "Can't decrypt \"{track}\": Widevine DRM is unavailable on this device",
   "playbackErrorAutoPaused": "{count} songs in a row couldn't play, so playback paused",
   "detailSignInRequired": "Sign in to see what's here",
   "detailLoadFailed": "Couldn't load this. Check your connection and try again.",

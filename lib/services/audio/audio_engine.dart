@@ -17,6 +17,34 @@ class EmeTrackContent {
   const EmeTrackContent({required this.m4aPath, required this.m3u8});
 }
 
+/// EME 播放的运行期错误（license 换取失败 / HLS.js 致命错误 / Widevine 不可用等）。
+///
+/// 与加载失败不同，这类错误在音源就位后才暴露，经 [AudioEngine.emeErrors]
+/// 冒泡给 PlaybackProvider，转成用户可见的提示（不再静默停在 0:00）。
+class EmePlaybackException implements Exception {
+  /// 错误细节（HLS.js details / license 失败原因），主要用于排查与归类。
+  final String message;
+
+  /// 设备缺 Widevine / CDM：解密无从谈起，重试无意义。
+  final bool isWidevineMissing;
+
+  /// sp_dc（Web 登录态）疑似失效（license / token 铸造被拒 401/403）：建议重新 Web 登录。
+  final bool webSignInSuggested;
+
+  /// 原始错误，仅用于日志排查。
+  final Object? cause;
+
+  const EmePlaybackException(
+    this.message, {
+    this.isWidevineMissing = false,
+    this.webSignInSuggested = false,
+    this.cause,
+  });
+
+  @override
+  String toString() => message;
+}
+
 /// 统一音频引擎抽象：PlaybackProvider 只依赖它，不关心底层是 just_audio 还是 EME。
 ///
 /// 流与方法对齐 just_audio 的语义（PlayerState / ProcessingState 复用 just_audio 的类型），
@@ -25,6 +53,10 @@ abstract class AudioEngine {
   Stream<Duration> get positionStream;
   Stream<Duration?> get durationStream;
   Stream<PlayerState> get playerStateStream;
+
+  /// EME 运行期错误流（license 换取失败 / HLS 致命错误 / Widevine 不可用）。
+  /// 仅 EME 引擎产生事件；本地（just_audio）引擎保持空流。
+  Stream<EmePlaybackException> get emeErrors;
 
   Duration get position;
   Duration? get duration;

@@ -112,6 +112,10 @@ class WebTokenService {
       'Accept': 'application/json',
     }).timeout(const Duration(seconds: 10));
     if (res.statusCode != 200) {
+      // 401/403 = sp_dc 失效：异常会沿 license 反代冒泡为「需重新 Web 登录」的提示
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        debugPrint('[web-token] 铸造被拒（HTTP ${res.statusCode}）：sp_dc 疑似失效，需要重新 Web 登录');
+      }
       throw StateError('铸造 Web token 失败：HTTP ${res.statusCode} ${res.body}');
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;

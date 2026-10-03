@@ -483,6 +483,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String playbackErrorWidevine(String track) {
+    return '「$track」无法解密播放：此设备缺少 Widevine 组件';
+  }
+
+  @override
   String playbackErrorAutoPaused(int count) {
     return '连续 $count 首无法播放，已暂停';
   }

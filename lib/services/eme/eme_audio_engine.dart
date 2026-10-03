@@ -43,6 +43,7 @@ class EmeAudioEngine implements AudioEngine {
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
   final _stateController = StreamController<PlayerState>.broadcast();
+  final _errorController = StreamController<EmePlaybackException>.broadcast();
 
   Duration _position = Duration.zero;
   Duration? _duration;
@@ -63,6 +64,14 @@ class EmeAudioEngine implements AudioEngine {
       case EmePlayerState.error:
         _playing = false;
         _processing = ProcessingState.idle;
+        if (_hasSource) {
+          // 运行期错误（license / HLS fatal 等，在 play 返回后才暴露）：
+          // 带上 [_player.lastError] 的原因上报给 PlaybackProvider 转成用户可见提示，
+          // 并把 _hasSource 复位，让上层知道要重试必须重新整载
+          _hasSource = false;
+          _errorController.add(
+              _player.lastError ?? const EmePlaybackException('unknown'));
+        }
     }
     _emit();
   }
@@ -77,6 +86,8 @@ class EmeAudioEngine implements AudioEngine {
   Stream<Duration?> get durationStream => _durationController.stream;
   @override
   Stream<PlayerState> get playerStateStream => _stateController.stream;
+  @override
+  Stream<EmePlaybackException> get emeErrors => _errorController.stream;
 
   @override
   Duration get position => _position;
