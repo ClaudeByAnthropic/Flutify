@@ -169,7 +169,9 @@ class TpStateMachine {
     while (cur != null && out.length < limit && !out.contains(i)) {
       out.add(i);
       // 单曲循环的 advance 指回自身，但手动下一首仍需展示后续曲目。
-      final next = cur.advance?.stateIndex == i ? cur.skipNext : cur.advance;
+      final next = cur.advance == null || cur.advance?.stateIndex == i
+          ? cur.skipNext
+          : cur.advance;
       if (next == null) break;
       i = next.stateIndex;
       cur = state(i);

@@ -37,6 +37,12 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Test playback recovery and authorization
+        run: |
+          flutter test test/connect test/playback_provider_test.dart test/ui/connect_ui_test.dart test/ui/responsive_layout_test.dart test/web_login_flow_test.dart test/auth_oauth_test.dart
+          node --test tool/test_consent_auto_approve.cjs
+          python3 -m unittest discover -s tool -p test_verify_android_apks.py
+
       # flutter_inappwebview_android 1.1.3 仍引用 proguard-android.txt，AGP 9 起直接报错；换成等价的 optimize 版
       - name: Patch flutter_inappwebview_android for AGP 9
         run: |

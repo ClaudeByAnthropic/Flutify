@@ -19,6 +19,13 @@ class CertificateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_certificate('\n'.join(lines) + '\nSigner #2 certificate SHA-256 digest: ' + 'cd' * 32, self.pinned)
 
+    def test_apksigner_v2_v3_labels(self):
+        lines = [f'{label} certificate SHA-256 digest: {self.pinned}'
+                 for label in ('V2 Signer:', 'V3 Signer:', 'V3.1 Signer:')]
+        verify_certificate('Verifies\nNumber of signers: 1\n' + '\n'.join(lines), self.pinned)
+        with self.assertRaises(ValueError):
+            verify_certificate('\n'.join(lines) + '\nV3 Signer: certificate SHA-256 digest: ' + 'cd' * 32, self.pinned)
+
     def test_missing_wrong_malformed_or_other_hashes_fail(self):
         for output in ('', 'Signer #1 certificate SHA-256 digest: broken',
                        'Signer #1 certificate SHA-256 digest: ' + 'cd' * 32,

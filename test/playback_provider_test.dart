@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutify_app/models/playback_context.dart';
@@ -70,6 +71,29 @@ void main() {
   });
 
   group('remotePlay hook', () {
+    test(
+      'late remote failure cannot override a newer local track or pause',
+      () async {
+        final response = Completer<bool>();
+        playback.remotePlay = (_, _, _) => response.future;
+        final pending = playback.playTrack(a);
+        await playback.playLocal(b);
+        response.complete(false);
+        await pending;
+        expect(playback.currentTrack?.id, b.id);
+        expect(loader.loaded, [b.id]);
+
+        final contextResponse = Completer<bool>();
+        playback.remotePlay = (_, _, _) => contextResponse.future;
+        final pendingContext = playback.playContext([a, c], ctx);
+        await playback.pause();
+        contextResponse.complete(false);
+        await pendingContext;
+        expect(loader.loaded, [b.id]);
+        expect(audio.isPlaying, isFalse);
+      },
+    );
+
     test('handled remotely: nothing is loaded or played locally', () async {
       final calls = <(PlaybackContext, String, String?)>[];
       playback.remotePlay = (context, tracks, start) async {

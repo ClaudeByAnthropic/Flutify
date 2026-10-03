@@ -25,7 +25,8 @@ class ConnectException implements Exception {
   }
 
   @override
-  String toString() => statusCode == null ? message : '$message（HTTP $statusCode）';
+  String toString() =>
+      statusCode == null ? message : '$message（HTTP $statusCode）';
 }
 
 /// spclient `connect-state/v1` 接口：注册 / 注销隐藏观察者，以及转移、播放命令、音量。
@@ -50,7 +51,10 @@ class ConnectStateClient {
   });
 
   /// 注册隐藏观察者（只收状态，不出现在别的设备的列表里）并返回全量 cluster。
-  Future<ConnectCluster> registerObserver(String observerId, String connectionId) async {
+  Future<ConnectCluster> registerObserver(
+    String observerId,
+    String connectionId,
+  ) async {
     final res = await _send(
       'PUT',
       '/connect-state/v1/devices/${Uri.encodeComponent(observerId)}',
@@ -59,21 +63,29 @@ class ConnectStateClient {
         'member_type': 'CONNECT_STATE',
         'device': {
           'device_info': {
-            'capabilities': {'can_be_player': false, 'hidden': true, 'needs_full_player_state': true},
+            'capabilities': {
+              'can_be_player': false,
+              'hidden': true,
+              'needs_full_player_state': true,
+            },
           },
         },
       },
     );
     try {
       final json = jsonDecode(utf8.decode(res.bodyBytes));
-      if (json is Map) return ConnectCluster.fromJson(json.cast<String, dynamic>());
+      if (json is Map)
+        return ConnectCluster.fromJson(json.cast<String, dynamic>());
     } catch (_) {}
     throw ConnectException(res.statusCode, '无法解析设备状态');
   }
 
   /// 注销观察者（204）。
-  Future<void> unregister(String observerId, String connectionId) =>
-      _send('DELETE', '/connect-state/v1/devices/${Uri.encodeComponent(observerId)}', connectionId: connectionId);
+  Future<void> unregister(String observerId, String connectionId) => _send(
+    'DELETE',
+    '/connect-state/v1/devices/${Uri.encodeComponent(observerId)}',
+    connectionId: connectionId,
+  );
 
   /// 把播放转移到 [to]；[play] 为 false 时到达后保持暂停。
   Future<void> transfer(String from, String to, {bool play = true}) => _send(
@@ -85,7 +97,12 @@ class ConnectStateClient {
   );
 
   /// 向 [to] 发播放命令：`{"command":{"endpoint":…, ...extra}}`。
-  Future<void> command(String from, String to, String endpoint, {Map<String, Object?> extra = const {}}) => _send(
+  Future<void> command(
+    String from,
+    String to,
+    String endpoint, {
+    Map<String, Object?> extra = const {},
+  }) => _send(
     'POST',
     '/connect-state/v1/player/command/from/${Uri.encodeComponent(from)}/to/${Uri.encodeComponent(to)}',
     body: {
@@ -102,27 +119,41 @@ class ConnectStateClient {
 
   String _requireConnectionId() {
     final id = _connectionId();
-    if (id == null || id.isEmpty) throw const ConnectException(null, '尚未连接到 Spotify Connect');
+    if (id == null || id.isEmpty)
+      throw const ConnectException(null, '尚未连接到 Spotify Connect');
     return id;
   }
 
   /// [connectionId] 为空时取当前 dealer 连接 id。
-  Future<http.Response> _send(String method, String path, {String? connectionId, Map<String, Object?>? body}) async {
-    final request = http.Request(method, Uri.parse('https://${_spclientHost()}$path'));
-    request.headers.addAll({
-      ...await _headers(),
-      'Content-Type': 'application/json',
-      'X-Spotify-Connection-Id': connectionId ?? _requireConnectionId(),
-    });
-    if (body != null) request.body = jsonEncode(body);
-
+  Future<http.Response> _send(
+    String method,
+    String path, {
+    String? connectionId,
+    Map<String, Object?>? body,
+  }) async {
+    final request = http.Request(
+      method,
+      Uri.parse('https://${_spclientHost()}$path'),
+    );
     final http.Response res;
     try {
-      res = await http.Response.fromStream(await _client.send(request));
+      request.headers.addAll({
+        ...await _headers().timeout(const Duration(seconds: 10)),
+        'Content-Type': 'application/json',
+        'X-Spotify-Connection-Id': connectionId ?? _requireConnectionId(),
+      });
+      if (body != null) request.body = jsonEncode(body);
+      res = await _client
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(const Duration(seconds: 10));
+    } on ConnectException {
+      rethrow;
     } catch (_) {
       throw const ConnectException(null, '网络错误，无法连接 Spotify');
     }
-    if (res.statusCode < 200 || res.statusCode >= 300) throw ConnectException.fromStatus(res.statusCode);
+    if (res.statusCode < 200 || res.statusCode >= 300)
+      throw ConnectException.fromStatus(res.statusCode);
     return res;
   }
 }

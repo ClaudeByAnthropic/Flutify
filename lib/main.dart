@@ -392,10 +392,16 @@ class FlutifyApp extends StatelessWidget {
                   );
                   return false;
                 }
+                final queueTicket = playback.prepareReceiverQueue(
+                  context,
+                  tracks,
+                  start,
+                );
                 try {
                   await connect.playOnReceiver(request);
                   return true;
                 } on ConnectException catch (e) {
+                  playback.cancelReceiverQueue(queueTicket);
                   debugPrint('[Connect] 下发到本机播放端失败，直接本机播放：$e');
                   return false;
                 }
@@ -467,16 +473,16 @@ void _startConnectReceiver(
   );
   host.receiver = receiver;
   connect.receiverDeviceId = deviceId;
-  Future<void> handOver(int positionMs, {bool paused = false}) async {
+  Future<bool> handOver(int positionMs, {bool paused = false}) async {
     final current = playback.currentTrack;
-    if (current == null || !connect.receiverOnline) return;
+    if (current == null || !connect.receiverOnline) return false;
     final request = ConnectPlayRequest.from(
       context: playback.playbackContext,
       tracks: [current, for (final e in playback.upNext) e.track],
       start: current,
       username: ctx.read<SpotifyAuthService>().username,
     );
-    if (request == null) return;
+    if (request == null) return false;
     debugPrint(
       '[Receiver] 交接给 Connect：${current.name} @${positionMs}ms paused=$paused',
     );
@@ -486,8 +492,10 @@ void _startConnectReceiver(
         seekToMs: positionMs,
         paused: paused,
       );
+      return true;
     } catch (e) {
       debugPrint('[Receiver] 交接失败：$e');
+      return false;
     }
   }
 
@@ -508,6 +516,12 @@ void _startConnectReceiver(
   // 本机未播放、其他设备也没在出声时，把上次的曲目以暂停状态同步出去
   var launchSynced = false;
   receiver.onRegistered = () async {
+    try {
+      await connect.refresh();
+    } on ConnectException catch (_) {
+      // 播放端可能先于观察者恢复连接；后续状态推送仍会更新设备列表。
+    }
+    host.onReceiverRegistered();
     if (launchSynced || !preferences.prefs.connectReportOnLaunch) return;
     launchSynced = true;
     for (var i = 0; i < 20 && !connect.receiverOnline; i++) {

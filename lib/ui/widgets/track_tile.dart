@@ -16,6 +16,7 @@ import 'connect/connect_actions.dart';
 import 'connect/now_playing_source.dart';
 import 'cover_image.dart';
 import 'hover_builder.dart';
+import 'menu/desktop_menu.dart';
 import 'track_hotkeys.dart';
 import 'track_menu.dart';
 import 'track_table/track_table_columns.dart';
@@ -52,7 +53,11 @@ class TrackTile extends StatelessWidget {
   });
 
   void _play(BuildContext context) {
-    context.read<PlaybackProvider>().playTrack(track, contextQueue: contextQueue, context: playbackContext);
+    context.read<PlaybackProvider>().playTrack(
+      track,
+      contextQueue: contextQueue,
+      context: playbackContext,
+    );
   }
 
   /// 悬停播放键：当前曲目 → 播放 / 暂停切换（远程模式下切换远程设备）；其它曲目 → 从这首开始播放。
@@ -72,12 +77,22 @@ class TrackTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // 菜单打开后鼠标会离开行，悬停按钮随即卸载。后续分享 / 二级菜单
+    // 必须使用曲目行的 context，按钮 context 只用于同步计算锚点。
+    final actionContext = context;
     final colorScheme = theme.colorScheme;
-    final hoverCapable = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+    final hoverCapable = ShellBreakpoints.isDesktop(
+      MediaQuery.sizeOf(context).width,
+    );
 
     // 遥控远程设备时按远程曲目高亮（与播放栏一致）
-    final (isCurrent, isPlaying) = NowPlayingSource.trackState(context, track.id);
-    final isLiked = context.select<LibraryProvider, bool>((l) => l.isLiked(track.id));
+    final (isCurrent, isPlaying) = NowPlayingSource.trackState(
+      context,
+      track.id,
+    );
+    final isLiked = context.select<LibraryProvider, bool>(
+      (l) => l.isLiked(track.id),
+    );
     final columns = this.columns;
     final showCover = columns != null ? !columns.compact : this.showCover;
     // 紧凑视图且艺人单独成列：标题只占一行
@@ -86,7 +101,9 @@ class TrackTile extends StatelessWidget {
     return HoverBuilder(
       builder: (context, hovered) {
         final revealed = hovered || !hoverCapable;
-        final playIcon = isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded;
+        final playIcon = isPlaying
+            ? Icons.pause_rounded
+            : Icons.play_arrow_rounded;
         final secondary = theme.textTheme.bodySmall?.copyWith(
           color: hovered ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
         );
@@ -94,7 +111,8 @@ class TrackTile extends StatelessWidget {
         final row = InkWell(
           onTap: onTap ?? () => _play(context),
           onLongPress: () => TrackMenu.show(context, track),
-          onSecondaryTapUp: (details) => TrackMenu.show(context, track, position: details.globalPosition),
+          onSecondaryTapUp: (details) =>
+              TrackMenu.show(context, track, position: details.globalPosition),
           borderRadius: context.tokens.radius(MD3EShapes.radiusMedium),
           child: Padding(
             padding: EdgeInsets.symmetric(
@@ -115,7 +133,10 @@ class TrackTile extends StatelessWidget {
                               onTap: () => _playOrToggle(context, isCurrent),
                             )
                           : isCurrent
-                          ? WaveformVisualizer(isPlaying: isPlaying, color: colorScheme.primary)
+                          ? WaveformVisualizer(
+                              isPlaying: isPlaying,
+                              color: colorScheme.primary,
+                            )
                           : Text(
                               '$index',
                               style: theme.textTheme.bodyMedium?.copyWith(
@@ -132,18 +153,29 @@ class TrackTile extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        CoverImage(url: track.coverUrl, size: 48, borderRadius: context.tokens.radius(8)),
+                        CoverImage(
+                          url: track.coverUrl,
+                          size: 48,
+                          borderRadius: context.tokens.radius(8),
+                        ),
                         if (isCurrent || hovered)
                           DecoratedBox(
-                            decoration: BoxDecoration(color: Colors.black54, borderRadius: context.tokens.radius(8)),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: context.tokens.radius(8),
+                            ),
                             child: Center(
                               child: hovered
                                   ? _HoverPlayIcon(
                                       icon: playIcon,
                                       color: Colors.white,
-                                      onTap: () => _playOrToggle(context, isCurrent),
+                                      onTap: () =>
+                                          _playOrToggle(context, isCurrent),
                                     )
-                                  : WaveformVisualizer(isPlaying: isPlaying, color: colorScheme.primary),
+                                  : WaveformVisualizer(
+                                      isPlaying: isPlaying,
+                                      color: colorScheme.primary,
+                                    ),
                             ),
                           ),
                       ],
@@ -160,13 +192,16 @@ class TrackTile extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          if (track.explicit && !artistInline) const _ExplicitBadge(),
+                          if (track.explicit && !artistInline)
+                            const _ExplicitBadge(),
                           Flexible(
                             child: Text(
                               track.name,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: isCurrent ? colorScheme.primary : colorScheme.onSurface,
+                                color: isCurrent
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -196,22 +231,40 @@ class TrackTile extends StatelessWidget {
 
                 if (columns != null) ...[
                   if (columns.artist)
-                    _TextCell(flex: TrackTableColumns.artistFlex, text: track.artistNames, style: secondary),
+                    _TextCell(
+                      flex: TrackTableColumns.artistFlex,
+                      text: track.artistNames,
+                      style: secondary,
+                    ),
                   if (columns.album)
                     _TextCell(
                       flex: TrackTableColumns.albumFlex,
                       text: track.album?.name ?? '',
                       style: secondary,
                       // 点专辑名打开专辑页（与官方一致）
-                      onTap: TrackMenu.isAvailable(context, track, TrackAction.album)
-                          ? () => TrackMenu.perform(context, track, TrackAction.album)
+                      onTap:
+                          TrackMenu.isAvailable(
+                            context,
+                            track,
+                            TrackAction.album,
+                          )
+                          ? () => TrackMenu.perform(
+                              context,
+                              track,
+                              TrackAction.album,
+                            )
                           : null,
                     ),
                   if (columns.addedAt)
                     SizedBox(
                       width: TrackTableColumns.addedAtWidth,
                       child: Text(
-                        track.addedAt == null ? '' : AddedDateFormat.format(context.l10n, track.addedAt!),
+                        track.addedAt == null
+                            ? ''
+                            : AddedDateFormat.format(
+                                context.l10n,
+                                track.addedAt!,
+                              ),
                         style: secondary,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -223,15 +276,28 @@ class TrackTile extends StatelessWidget {
                 _Reveal(
                   visible: revealed,
                   fixedExtent: hoverCapable,
-                  idle: isLiked ? Icon(Icons.favorite_rounded, color: colorScheme.primary, size: 22) : null,
+                  idle: isLiked
+                      ? Icon(
+                          Icons.favorite_rounded,
+                          color: colorScheme.primary,
+                          size: 22,
+                        )
+                      : null,
                   child: IconButton(
                     icon: Icon(
-                      isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: isLiked ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      isLiked
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      color: isLiked
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
                       size: 22,
                     ),
-                    tooltip: isLiked ? context.l10n.likeRemove : context.l10n.likeAdd,
-                    onPressed: () => context.read<LibraryProvider>().toggleLike(track),
+                    tooltip: isLiked
+                        ? context.l10n.likeRemove
+                        : context.l10n.likeAdd,
+                    onPressed: () =>
+                        context.read<LibraryProvider>().toggleLike(track),
                   ),
                 ),
 
@@ -253,10 +319,19 @@ class TrackTile extends StatelessWidget {
                   child: Builder(
                     // 独立 context：桌面菜单锚定在按钮下方
                     builder: (buttonContext) => IconButton(
-                      icon: Icon(hoverCapable ? Icons.more_horiz_rounded : Icons.more_vert_rounded, size: 20),
+                      icon: Icon(
+                        hoverCapable
+                            ? Icons.more_horiz_rounded
+                            : Icons.more_vert_rounded,
+                        size: 20,
+                      ),
                       color: colorScheme.onSurfaceVariant,
                       tooltip: context.l10n.commonMoreOptions,
-                      onPressed: () => TrackMenu.show(buttonContext, track),
+                      onPressed: () => TrackMenu.show(
+                        actionContext,
+                        track,
+                        position: DesktopMenu.anchorOf(buttonContext),
+                      ),
                     ),
                   ),
                 ),
@@ -277,8 +352,9 @@ class TrackTile extends StatelessWidget {
 }
 
 /// 表格模式下时长固定列宽（与列表头的时钟图标对齐）；普通行保持自然宽度。
-Widget _maybeFixedWidth(bool fixed, Widget child) =>
-    fixed ? SizedBox(width: TrackTableColumns.durationWidth, child: child) : child;
+Widget _maybeFixedWidth(bool fixed, Widget child) => fixed
+    ? SizedBox(width: TrackTableColumns.durationWidth, child: child)
+    : child;
 
 /// 表格里的文字列（艺人 / 专辑）：单行省略，右侧留出列间距；[onTap] 非空时悬停下划线、可点击。
 class _TextCell extends StatelessWidget {
@@ -287,11 +363,21 @@ class _TextCell extends StatelessWidget {
   final TextStyle? style;
   final VoidCallback? onTap;
 
-  const _TextCell({required this.flex, required this.text, this.style, this.onTap});
+  const _TextCell({
+    required this.flex,
+    required this.text,
+    this.style,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final label = Text(text, style: style, maxLines: 1, overflow: TextOverflow.ellipsis);
+    final label = Text(
+      text,
+      style: style,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
     final tap = onTap;
     return Expanded(
       flex: flex,
@@ -307,7 +393,9 @@ class _TextCell extends StatelessWidget {
                     onTap: tap,
                     child: Text(
                       text,
-                      style: style?.copyWith(decoration: hovered ? TextDecoration.underline : null),
+                      style: style?.copyWith(
+                        decoration: hovered ? TextDecoration.underline : null,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -335,7 +423,12 @@ class _Reveal extends StatelessWidget {
   final Widget? idle;
   final Widget child;
 
-  const _Reveal({required this.visible, required this.fixedExtent, required this.child, this.idle});
+  const _Reveal({
+    required this.visible,
+    required this.fixedExtent,
+    required this.child,
+    this.idle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +446,11 @@ class _HoverPlayIcon extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _HoverPlayIcon({required this.icon, required this.color, required this.onTap});
+  const _HoverPlayIcon({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -383,7 +480,11 @@ class _ExplicitBadge extends StatelessWidget {
       ),
       child: Text(
         'E',
-        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: colorScheme.onSurface),
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: colorScheme.onSurface,
+        ),
       ),
     );
   }

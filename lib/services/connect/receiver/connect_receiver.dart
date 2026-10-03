@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -58,6 +59,13 @@ class ConnectReceiver {
 
   StreamSubscription<String>? _idSub;
   StreamSubscription<DealerMessage>? _msgSub;
+  StreamSubscription<DealerStatus>? _statusSub;
+  final Duration registerRetryDelay;
+  Timer? _registerRetry;
+  String? _registrationId;
+  Future<void>? _registration;
+  int _registrationEpoch = 0;
+  int _registerAttempts = 0;
   bool _started = false;
   bool _registered = false;
 
@@ -76,6 +84,7 @@ class ConnectReceiver {
     required Future<String> Function() webToken,
     required String deviceId,
     DealerClient? dealer,
+    this.registerRetryDelay = const Duration(seconds: 2),
   }) : _api = TrackPlaybackApi(
          client: client,
          webToken: webToken,
@@ -104,6 +113,9 @@ class ConnectReceiver {
     _started = true;
     _idSub = _dealer.connectionIds.listen(_register);
     _msgSub = _dealer.messages.listen(_onMessage);
+    _statusSub = _dealer.statusChanges.listen((status) {
+      if (status != DealerStatus.online) _resetRegistration();
+    });
     try {
       await _dealer.connect();
     } catch (e) {
@@ -114,13 +126,15 @@ class ConnectReceiver {
   Future<void> stop() async {
     if (!_started) return;
     _started = false;
+    final wasRegistered = _registered;
+    _resetRegistration();
     await _idSub?.cancel();
     await _msgSub?.cancel();
+    await _statusSub?.cancel();
     _clear();
-    if (_registered) {
-      _registered = false;
+    if (wasRegistered) {
       try {
-        await _api.deregister();
+        await _api.deregister().timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[Receiver] 注销失败：$e');
       }
@@ -128,24 +142,59 @@ class ConnectReceiver {
     await _dealer.close();
   }
 
-  Future<void> _register(String connectionId) async {
+  void _resetRegistration() {
+    ++_registrationEpoch;
+    ++_revision;
+    _registerRetry?.cancel();
+    _registerRetry = null;
+    _registrationId = null;
+    _registration = null;
+    _registered = false;
+    _registerAttempts = 0;
+  }
+
+  Future<void> _register(String connectionId) {
+    if (!_started) return Future.value();
+    if (_registrationId == connectionId && _registration != null)
+      return _registration!;
+    _registerRetry?.cancel();
+    _registrationId = connectionId;
+    final epoch = ++_registrationEpoch;
+    return _registration = _doRegister(connectionId, epoch);
+  }
+
+  Future<void> _doRegister(String connectionId, int epoch) async {
+    bool current() =>
+        _started &&
+        epoch == _registrationEpoch &&
+        _dealer.connectionId == connectionId;
     try {
       final name = deviceName();
       await _api.register(
         connectionId: connectionId,
         name: name,
         volume: 65535,
+        isCurrent: current,
       );
+      if (!current()) return;
       _registered = true;
+      _registerAttempts = 0;
       debugPrint('[Receiver] 已注册为 Connect 设备「$name」');
       onRegistered?.call();
     } catch (e) {
+      if (!current()) return;
+      _registration = null;
+      _registered = false;
       debugPrint('[Receiver] 注册失败：$e');
+      final delay = registerRetryDelay * (1 << min(_registerAttempts++, 4));
+      _registerRetry = Timer(delay, () {
+        if (current()) unawaited(_register(connectionId));
+      });
     }
   }
 
   void _onMessage(DealerMessage message) {
-    if (message.uri != 'hm://track-playback/v1/command') return;
+    if (!_started || message.uri != 'hm://track-playback/v1/command') return;
     for (final raw in message.payloads) {
       if (raw is! Map) continue;
       final payload = raw.cast<String, dynamic>();

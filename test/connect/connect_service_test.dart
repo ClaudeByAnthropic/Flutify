@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutify_app/models/connect_cluster.dart';
@@ -13,7 +14,11 @@ const _deviceId = '0123456789abcdef0123456789abcdef01234567';
 const _observerId = 'hobs_$_deviceId';
 const _clusterUri = 'hm://connect-state/v1/cluster';
 
-Map<String, Object?> _cluster({String active = 'dev-1', int devices = 2, int serverMs = 1700000000000}) => {
+Map<String, Object?> _cluster({
+  String active = 'dev-1',
+  int devices = 2,
+  int serverMs = 1700000000000,
+}) => {
   'active_device_id': active,
   'server_timestamp_ms': '$serverMs',
   'devices': {
@@ -40,6 +45,8 @@ class _Harness {
 
   /// 控制命令（POST / 音量 PUT）的响应状态码。
   int commandStatus = 200;
+  Future<http.Response> Function(http.Request)? command;
+  Future<http.Response> Function()? registration;
   Map<String, Object?> registerBody = _cluster();
 
   late final MockClient client = MockClient((request) async {
@@ -53,7 +60,9 @@ class _Harness {
         200,
       );
     }
-    if (request.method == 'PUT' && request.url.path.startsWith('/connect-state/v1/devices/')) {
+    if (request.method == 'PUT' &&
+        request.url.path.startsWith('/connect-state/v1/devices/')) {
+      if (registration != null) return registration!();
       if (failRegisterTimes > 0) {
         failRegisterTimes--;
         return http.Response('err', 500);
@@ -61,17 +70,21 @@ class _Harness {
       // 实测响应不带 content-type
       return http.Response.bytes(utf8.encode(jsonEncode(registerBody)), 200);
     }
-    if (request.method == 'DELETE') return http.Response('', failDelete ? 500 : 204);
-    return http.Response('', commandStatus);
+    if (request.method == 'DELETE')
+      return http.Response('', failDelete ? 500 : 204);
+    return command?.call(request) ?? http.Response('', commandStatus);
   });
 
   late final ConnectService service = () {
-    Future<Map<String, String>> headers() async => {'Authorization': 'Bearer test-token'};
+    Future<Map<String, String>> headers() async => {
+      'Authorization': 'Bearer test-token',
+    };
     return ConnectService(
       client: client,
       headers: headers,
       deviceId: () => _deviceId,
       registerRetryDelay: const Duration(milliseconds: 10),
+      confirmationTimeout: const Duration(milliseconds: 20),
       dealer: DealerClient(
         client: client,
         headers: headers,
@@ -84,7 +97,11 @@ class _Harness {
   }();
 
   Iterable<http.Request> where(String method, [String? pathPart]) =>
-      requests.where((r) => r.method == method && (pathPart == null || r.url.path.contains(pathPart)));
+      requests.where(
+        (r) =>
+            r.method == method &&
+            (pathPart == null || r.url.path.contains(pathPart)),
+      );
 }
 
 void main() {
@@ -106,7 +123,10 @@ void main() {
 
       expect(h.service.status, ConnectStatus.online);
       final put = h.where('PUT').single;
-      expect(put.url.toString(), 'https://spclient.test/connect-state/v1/devices/$_observerId');
+      expect(
+        put.url.toString(),
+        'https://spclient.test/connect-state/v1/devices/$_observerId',
+      );
       expect(put.headers['X-Spotify-Connection-Id'], 'conn-id-1');
       expect(h.service.current.activeDeviceId, 'dev-1');
       expect(h.service.current.devices, hasLength(2));
@@ -168,7 +188,11 @@ void main() {
     test('observerId：设备 id 是 40 位 hex 时派生，否则随机但本次固定', () {
       expect(h.service.observerId, _observerId);
 
-      final random = ConnectService(client: h.client, headers: () async => {}, deviceId: () => 'not-hex');
+      final random = ConnectService(
+        client: h.client,
+        headers: () async => {},
+        deviceId: () => 'not-hex',
+      );
       addTearDown(random.dispose);
       expect(random.observerId, matches(RegExp(r'^hobs_[0-9a-f]{40}$')));
       expect(random.observerId, random.observerId);
@@ -198,7 +222,13 @@ void main() {
       final before = h.service.current;
       final channel = h.server.channels.single;
 
-      channel.push(jsonEncode({'type': 'message', 'uri': _clusterUri, 'payloads': <Object?>[]}));
+      channel.push(
+        jsonEncode({
+          'type': 'message',
+          'uri': _clusterUri,
+          'payloads': <Object?>[],
+        }),
+      );
       channel.push(
         jsonEncode({
           'type': 'message',
@@ -216,7 +246,9 @@ void main() {
         }),
       );
       channel.push('not json at all');
-      channel.pushJson('hm://other/topic', {'cluster': _cluster(active: 'ignored')});
+      channel.pushJson('hm://other/topic', {
+        'cluster': _cluster(active: 'ignored'),
+      });
       // 最后一条有效推送用来确认前面的都已被处理
       channel.pushJson(_clusterUri, {'cluster': _cluster(active: 'dev-2')});
       await until(() => h.service.current.activeDeviceId == 'dev-2');
@@ -252,9 +284,16 @@ void main() {
       h.service.statusChanges.listen(statuses.add);
 
       h.server.channels.first.drop();
-      await until(() => h.where('PUT').length == 2 && h.service.status == ConnectStatus.online);
+      await until(
+        () =>
+            h.where('PUT').length == 2 &&
+            h.service.status == ConnectStatus.online,
+      );
 
-      expect(h.where('PUT').last.headers['X-Spotify-Connection-Id'], 'conn-id-2');
+      expect(
+        h.where('PUT').last.headers['X-Spotify-Connection-Id'],
+        'conn-id-2',
+      );
       expect(statuses.first, ConnectStatus.offline);
       expect(statuses.last, ConnectStatus.online);
     });
@@ -284,9 +323,178 @@ void main() {
   });
 
   group('控制命令', () {
+    test(
+      '200 without a state change retries once and confirms the target',
+      () async {
+        await h.service.start();
+        var commands = 0;
+        h.command = (_) async {
+          if (++commands == 2) {
+            h.server.channels.single.pushJson(
+              _clusterUri,
+              _cluster(active: 'dev-2'),
+            );
+          }
+          return http.Response('', 200);
+        };
+        await h.service.transfer('dev-2', confirm: true);
+        expect(commands, 2);
+        expect(h.service.current.activeDeviceId, 'dev-2');
+      },
+    );
+
+    test(
+      'confirmation push arriving before HTTP response is retained',
+      () async {
+        await h.service.start();
+        h.command = (_) async {
+          h.server.channels.single.pushJson(
+            _clusterUri,
+            _cluster(active: 'dev-2'),
+          );
+          await until(() => h.service.current.activeDeviceId == 'dev-2');
+          return http.Response('', 200);
+        };
+        await h.service.transfer('dev-2', confirm: true);
+        expect(h.where('POST'), hasLength(1));
+      },
+    );
+
+    test(
+      'refresh recovers a lost confirmation push without resending',
+      () async {
+        await h.service.start();
+        h.command = (_) async {
+          h.registerBody = _cluster(active: 'dev-2');
+          return http.Response('', 200);
+        };
+        await h.service.transfer('dev-2', confirm: true);
+        expect(h.where('POST'), hasLength(1));
+        expect(h.service.current.activeDeviceId, 'dev-2');
+      },
+    );
+
+    test(
+      'new intent supersedes old retries, serializes sends and drops queued stale play',
+      () async {
+        await h.service.start();
+        final first = Completer<http.Response>();
+        h.command = (_) => first.future;
+        final old = h.service.play(
+          'dev-1',
+          trackUri: 'spotify:track:old',
+          confirm: true,
+        );
+        await until(() => h.where('POST').length == 1);
+        final middle = h.service.play(
+          'dev-1',
+          trackUri: 'spotify:track:middle',
+          confirm: true,
+        );
+        final latest = h.service.play(
+          'dev-2',
+          trackUri: 'spotify:track:new',
+          confirm: true,
+        );
+        expect(h.where('POST'), hasLength(1));
+        h.command = (_) async {
+          h.server.channels.single.pushJson(_clusterUri, {
+            ..._cluster(active: 'dev-2'),
+            'player_state': {
+              'track': {'uri': 'spotify:track:new'},
+              'is_playing': true,
+              'is_paused': false,
+            },
+          });
+          return http.Response('', 200);
+        };
+        first.complete(http.Response('', 500));
+        await Future.wait([old, middle, latest]);
+        expect(h.where('POST'), hasLength(2));
+        expect(
+          jsonDecode(
+            h.where('POST').last.body,
+          )['command']['options']['skip_to']['track_uri'],
+          'spotify:track:new',
+        );
+      },
+    );
+
+    test(
+      'pause cancels an unconfirmed play retry and follows its send',
+      () async {
+        await h.service.start();
+        final first = Completer<http.Response>();
+        h.command = (_) => first.future;
+        final play = h.service.play(
+          'dev-1',
+          trackUri: 'spotify:track:a',
+          confirm: true,
+        );
+        await until(() => h.where('POST').length == 1);
+        final pause = h.service.pause('dev-1');
+        h.command = (_) async => http.Response('', 200);
+        first.complete(http.Response('', 200));
+        await Future.wait([play, pause]);
+        expect(h.where('POST'), hasLength(2));
+        expect(
+          jsonDecode(h.where('POST').last.body)['command']['endpoint'],
+          'pause',
+        );
+      },
+    );
+
+    test(
+      'unconfirmed command fails after two attempts; 403 never retries',
+      () async {
+        await h.service.start();
+        await expectLater(
+          h.service.transfer('dev-2', confirm: true),
+          throwsA(isA<ConnectException>()),
+        );
+        expect(h.where('POST'), hasLength(2));
+        h.requests.clear();
+        h.commandStatus = 403;
+        await expectLater(
+          h.service.transfer('dev-2', confirm: true),
+          throwsA(
+            isA<ConnectException>().having((e) => e.statusCode, 'status', 403),
+          ),
+        );
+        expect(h.where('POST'), hasLength(1));
+      },
+    );
+
+    test(
+      'late refresh and older timestamp cannot overwrite a newer push',
+      () async {
+        await h.service.start();
+        final response = Completer<http.Response>();
+        h.registration = () => response.future;
+        final refresh = h.service.refresh();
+        await until(() => h.where('PUT').length == 2);
+        h.server.channels.single.pushJson(
+          _clusterUri,
+          _cluster(active: 'dev-2', serverMs: 1700000000010),
+        );
+        await until(() => h.service.current.activeDeviceId == 'dev-2');
+        response.complete(http.Response(jsonEncode(_cluster()), 200));
+        await refresh;
+        h.server.channels.single.pushJson(_clusterUri, _cluster());
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        expect(h.service.current.activeDeviceId, 'dev-2');
+      },
+    );
+
     test('未 online 时抛 ConnectException，不发请求', () async {
-      await expectLater(h.service.pause('dev-1'), throwsA(isA<ConnectException>()));
-      await expectLater(h.service.transfer('dev-1'), throwsA(isA<ConnectException>()));
+      await expectLater(
+        h.service.pause('dev-1'),
+        throwsA(isA<ConnectException>()),
+      );
+      await expectLater(
+        h.service.transfer('dev-1'),
+        throwsA(isA<ConnectException>()),
+      );
       await expectLater(h.service.refresh(), throwsA(isA<ConnectException>()));
       expect(h.requests, isEmpty);
     });
@@ -307,9 +515,17 @@ void main() {
       await h.service.setVolume('dev-1', 0.5);
       await h.service.setVolume('dev-1', 2);
 
-      expect(h.requests.every((r) => r.headers['X-Spotify-Connection-Id'] == 'conn-id-1'), isTrue);
+      expect(
+        h.requests.every(
+          (r) => r.headers['X-Spotify-Connection-Id'] == 'conn-id-1',
+        ),
+        isTrue,
+      );
       expect(h.requests[0].method, 'POST');
-      expect(h.requests[0].url.path, '/connect-state/v1/connect/transfer/from/$_observerId/to/dev-2');
+      expect(
+        h.requests[0].url.path,
+        '/connect-state/v1/connect/transfer/from/$_observerId/to/dev-2',
+      );
       expect(jsonDecode(h.requests[0].body), {
         'transfer_options': {'restore_paused': 'restore'},
       });
@@ -320,7 +536,10 @@ void main() {
       final commands = h.requests.skip(2).take(7).toList();
       for (final r in commands) {
         expect(r.method, 'POST');
-        expect(r.url.path, '/connect-state/v1/player/command/from/$_observerId/to/dev-1');
+        expect(
+          r.url.path,
+          '/connect-state/v1/player/command/from/$_observerId/to/dev-1',
+        );
       }
       expect(commands.map((r) => jsonDecode(r.body)['command']), [
         {'endpoint': 'pause'},
@@ -329,12 +548,19 @@ void main() {
         {'endpoint': 'skip_prev'},
         {'endpoint': 'seek_to', 'value': 12345},
         {'endpoint': 'set_shuffling_context', 'value': true},
-        {'endpoint': 'set_options', 'repeating_context': true, 'repeating_track': false},
+        {
+          'endpoint': 'set_options',
+          'repeating_context': true,
+          'repeating_track': false,
+        },
       ]);
 
       final volumes = h.requests.skip(9).toList();
       expect(volumes.map((r) => r.method).toSet(), {'PUT'});
-      expect(volumes.first.url.path, '/connect-state/v1/connect/volume/from/$_observerId/to/dev-1');
+      expect(
+        volumes.first.url.path,
+        '/connect-state/v1/connect/volume/from/$_observerId/to/dev-1',
+      );
       expect(volumes.map((r) => jsonDecode(r.body)['volume']), [32768, 65535]);
     });
 
@@ -342,21 +568,35 @@ void main() {
       await h.service.start();
       h.requests.clear();
 
-      await h.service.play('dev-1', contextUri: 'spotify:album:a1', trackUri: 'spotify:track:t2');
-      await h.service.play('dev-1', trackUris: ['spotify:track:t1', 'spotify:track:t2'], trackIndex: 1);
+      await h.service.play(
+        'dev-1',
+        contextUri: 'spotify:album:a1',
+        trackUri: 'spotify:track:t2',
+      );
+      await h.service.play(
+        'dev-1',
+        trackUris: ['spotify:track:t1', 'spotify:track:t2'],
+        trackIndex: 1,
+      );
 
       expect(h.requests.map((r) => r.url.path).toSet(), {
         '/connect-state/v1/player/command/from/$_observerId/to/dev-1',
       });
-      final withContext = jsonDecode(h.requests[0].body)['command'] as Map<String, dynamic>;
+      final withContext =
+          jsonDecode(h.requests[0].body)['command'] as Map<String, dynamic>;
       expect(withContext['endpoint'], 'play');
-      expect(withContext['context'], {'uri': 'spotify:album:a1', 'url': 'context://spotify:album:a1', 'metadata': {}});
+      expect(withContext['context'], {
+        'uri': 'spotify:album:a1',
+        'url': 'context://spotify:album:a1',
+        'metadata': {},
+      });
       expect(withContext['options'], {
         'license': 'on-demand',
         'skip_to': {'track_uri': 'spotify:track:t2'},
         'player_options_override': {},
       });
-      final adHoc = jsonDecode(h.requests[1].body)['command'] as Map<String, dynamic>;
+      final adHoc =
+          jsonDecode(h.requests[1].body)['command'] as Map<String, dynamic>;
       expect(adHoc['context'], {
         'uri': '',
         'url': '',
@@ -379,9 +619,18 @@ void main() {
 
       await expectLater(
         h.service.pause('dev-1'),
-        throwsA(isA<ConnectException>().having((e) => e.statusCode, 'statusCode', 403)),
+        throwsA(
+          isA<ConnectException>().having(
+            (e) => e.statusCode,
+            'statusCode',
+            403,
+          ),
+        ),
       );
-      await expectLater(h.service.transfer('dev-2'), throwsA(isA<ConnectException>()));
+      await expectLater(
+        h.service.transfer('dev-2'),
+        throwsA(isA<ConnectException>()),
+      );
       // 命令失败不影响连接状态
       expect(h.service.status, ConnectStatus.online);
     });

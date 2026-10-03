@@ -8,10 +8,11 @@ import sys
 
 
 def verify_certificate(output, expected):
-    # apksigner uses SDK-range labels for v3.1, not the older "Signer #1".
+    # New apksigner versions prefix labels with the signature scheme (V2 Signer:).
     # Inspect certificate digests only (never public-key or source-stamp hashes).
     lines = [line.strip() for line in output.splitlines()
-             if line.startswith('Signer ') and ' certificate SHA-256 digest:' in line]
+             if re.match(r'^(?:Signer |V\d+(?:\.\d+)? Signer:)', line.strip())
+             and ' certificate SHA-256 digest:' in line]
     certificates = [line.rsplit(':', 1)[-1].strip().lower() for line in lines]
     if not certificates or any(cert != expected for cert in certificates):
         raise ValueError(f'signing certificate mismatch: expected {expected}, got {certificates}')

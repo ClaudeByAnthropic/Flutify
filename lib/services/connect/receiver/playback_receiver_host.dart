@@ -3,7 +3,6 @@ import 'dart:async';
 import '../../../models/album.dart';
 import '../../../models/artist.dart';
 import '../../../models/image.dart';
-import '../../../models/playback_context.dart';
 import '../../../models/playback_state.dart';
 import '../../../models/track.dart';
 import '../../../providers/playback_provider.dart';
@@ -11,7 +10,7 @@ import 'connect_receiver.dart';
 import 'track_playback_state.dart';
 
 /// 把 [ConnectReceiver] 接到本机 [PlaybackProvider]：
-/// - 远程命令 → 本机播放（[playLocal] 不经远程转发）；
+/// - 远程命令 → 本机播放（[PlaybackProvider.playReceiverQueue] 不经远程转发）；
 /// - 本机状态变化（切歌 / 暂停 / 拖动 / 播满 30 秒 / 音量）→ 回报给 [ConnectReceiver]。
 ///
 /// 本机按状态机的「播完自动进入」顺序排队，播完一首由 PlaybackProvider 自己接下一首，
@@ -31,9 +30,15 @@ class PlaybackReceiverHost implements ReceiverHost {
 
   /// 本机在 Connect 之外开始出声（继续上次的歌、本地队列切歌等）时调用：把当前曲目、待播与进度
   /// 交给服务端，服务端再以 replace_state 下发回本机。和官方客户端一样，任何播放都对其他设备可见。
-  Future<void> Function(int positionMs)? handOver;
+  Future<bool> Function(int positionMs)? handOver;
   bool _handingOver = false;
   String? _handedOverUri;
+  String? _handoverTrackUri;
+  int _handoverAttempts = 0;
+  Timer? _handoverRetry;
+  bool _disposed = false;
+  final Duration handoverRetryDelay;
+  int _commandGeneration = 0;
 
   /// 本机改了随机 / 循环时调用：经 Connect 命令发给服务端（本机即目标设备），其他设备同步显示。
   void Function(bool shuffle, SpotifyRepeatMode repeat)? onLocalOptions;
@@ -41,12 +46,17 @@ class PlaybackReceiverHost implements ReceiverHost {
   late bool _lastShuffle = playback.shuffle;
   late SpotifyRepeatMode _lastRepeat = playback.repeatMode;
 
-  PlaybackReceiverHost(this.playback) : _lastVolume = playback.volume {
+  PlaybackReceiverHost(
+    this.playback, {
+    this.handoverRetryDelay = const Duration(seconds: 2),
+  }) : _lastVolume = playback.volume {
     playback.addListener(_onPlaybackChanged);
     playback.positionNotifier.addListener(_onPosition);
   }
 
   void dispose() {
+    _disposed = true;
+    _handoverRetry?.cancel();
     playback.removeListener(_onPlaybackChanged);
     playback.positionNotifier.removeListener(_onPosition);
   }
@@ -58,6 +68,7 @@ class PlaybackReceiverHost implements ReceiverHost {
     required int positionMs,
     required bool paused,
   }) async {
+    final generation = ++_commandGeneration;
     final tracks = [
       for (final i in order)
         if (machine.trackOf(machine.states[i]) case final t?) _toTrack(t),
@@ -71,15 +82,16 @@ class PlaybackReceiverHost implements ReceiverHost {
     }
     await _apply(() async {
       _lastTrackUri = tracks.first.uri;
-      await playback.playLocal(
-        tracks.first,
-        contextQueue: tracks,
-        context: PlaybackContext.none,
+      await playback.playReceiverQueue(
+        tracks,
         startAt: Duration(milliseconds: positionMs),
         paused: paused,
       );
       // 服务端已经排过随机顺序，本机不要再随机一次。
-      playback.updateReceiverQueue(tracks);
+      if (generation == _commandGeneration &&
+          playback.currentTrack?.uri == tracks.first.uri) {
+        playback.updateReceiverQueue(tracks);
+      }
     });
   }
 
@@ -123,18 +135,65 @@ class PlaybackReceiverHost implements ReceiverHost {
   }
 
   @override
-  Future<void> sync({required int? positionMs, required bool paused}) =>
-      _apply(() async {
-        if (positionMs != null &&
-            (playback.position.inMilliseconds - positionMs).abs() > 2000) {
-          await playback.seekTo(Duration(milliseconds: positionMs));
-        }
-        if (paused) {
-          await playback.pause();
-        } else if (!playback.isPlaying) {
-          await playback.togglePlayPause();
-        }
-      });
+  Future<void> sync({required int? positionMs, required bool paused}) {
+    final generation = ++_commandGeneration;
+    return _apply(() async {
+      if (positionMs != null &&
+          (playback.position.inMilliseconds - positionMs).abs() > 2000) {
+        await playback.seekTo(Duration(milliseconds: positionMs));
+      }
+      if (generation != _commandGeneration) return;
+      if (paused) {
+        await playback.pause();
+      } else if (!playback.isPlaying) {
+        await playback.togglePlayPause();
+      }
+    });
+  }
+
+  /// 注册恢复后重新尝试同步仍在本机播放的歌曲。
+  void onReceiverRegistered() {
+    if (_disposed) return;
+    _handoverRetry?.cancel();
+    _handedOverUri = null;
+    _handoverAttempts = 0;
+    _tryHandOver();
+  }
+
+  void _tryHandOver() {
+    if (_disposed ||
+        _applying ||
+        _handingOver ||
+        (_handoverRetry?.isActive ?? false))
+      return;
+    final track = playback.currentTrack;
+    if (!playback.isPlaying || receiver.isActive || track == null) return;
+    if (_handoverTrackUri != track.uri) {
+      _handoverTrackUri = track.uri;
+      _handoverAttempts = 0;
+    }
+    final hand = handOver;
+    if (hand == null || _handedOverUri == track.uri || _handoverAttempts >= 3)
+      return;
+    _handoverRetry?.cancel();
+    _handingOver = true;
+    _handoverAttempts++;
+    unawaited(() async {
+      var succeeded = false;
+      try {
+        succeeded = await hand(playback.position.inMilliseconds);
+      } catch (_) {
+        // 注册尚未可见或临时网络错误：最多再尝试两次。
+      } finally {
+        _handingOver = false;
+      }
+      if (_disposed) return;
+      if (succeeded) _handedOverUri = track.uri;
+      if (!succeeded || playback.currentTrack?.uri != track.uri) {
+        _handoverRetry = Timer(handoverRetryDelay, _tryHandOver);
+      }
+    }());
+  }
 
   @override
   void setVolume(double volume) {
@@ -143,7 +202,10 @@ class PlaybackReceiverHost implements ReceiverHost {
   }
 
   @override
-  Future<void> stop() => _apply(playback.pause);
+  Future<void> stop() {
+    ++_commandGeneration;
+    return _apply(playback.pause);
+  }
 
   Future<void> _apply(Future<void> Function() action) async {
     _applyingCount++;
@@ -165,19 +227,13 @@ class PlaybackReceiverHost implements ReceiverHost {
       _lastTrackUri = track.uri;
       receiver.onLocalTrackChanged(track.uri, durationMs: durationMs);
     }
-    // 出声了但服务端不知道：交接一次（同一首只交接一次，失败不反复重试）
-    if (playback.isPlaying &&
-        !receiver.isActive &&
-        track != null &&
-        !_handingOver &&
-        _handedOverUri != track.uri) {
-      final hand = handOver;
-      if (hand != null) {
-        _handingOver = true;
-        _handedOverUri = track.uri;
-        unawaited(hand(position).whenComplete(() => _handingOver = false));
-      }
+    // 出声了但服务端不知道：失败允许有限重试，成功后不重复交接。
+    if (!playback.isPlaying && !playback.isBuffering) {
+      _handedOverUri = null;
+      _handoverAttempts = 0;
+      _handoverRetry?.cancel();
     }
+    _tryHandOver();
     // 加载 / 缓冲中的「未播放」不算暂停
     if (!playback.isBuffering && playback.isPlaying != _lastPlaying) {
       _lastPlaying = playback.isPlaying;

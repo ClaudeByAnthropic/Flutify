@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "media_identity.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -13,6 +14,9 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+
+  // Bind the HWND before either plugins or native SMTC create a media session.
+  media_identity::RegisterWindow(GetHandle());
 
   RECT frame = GetClientArea();
 

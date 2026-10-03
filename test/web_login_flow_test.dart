@@ -13,7 +13,8 @@ void main() {
     List<int> finished,
     void Function() setCookie,
     void Function() dropCookie,
-  }) build({
+  })
+  build({
     bool desktopSignedIn = true,
     bool mintFails = false,
     bool beginFails = false,
@@ -37,7 +38,9 @@ void main() {
       beginDesktopOAuth: () async {
         beginCalls.add(1);
         if (beginFails) throw StateError('端口被占用');
-        return Uri.parse('https://accounts.spotify.com/authorize?client_id=abc&state=s1');
+        return Uri.parse(
+          'https://accounts.spotify.com/authorize?client_id=abc&state=s1',
+        );
       },
       cancelDesktopOAuth: () async {},
       onAuthorizeUrl: authorizeUrls.add,
@@ -143,19 +146,58 @@ void main() {
   });
 
   test('isConsentPageUrl：只认 accounts.spotify.com 的授权页', () {
-    expect(isConsentPageUrl('https://accounts.spotify.com/authorize?client_id=1'), isTrue);
-    expect(isConsentPageUrl('https://accounts.spotify.com/zh-hans/authorize?client_id=1'), isTrue);
-    expect(isConsentPageUrl('https://accounts.spotify.com/login?continue=x'), isFalse);
-    expect(isConsentPageUrl('https://accounts.spotify.com/login?client_id=1'), isTrue,
-        reason: '带 client_id 的授权入口（含跳转后的登录）也在授权流程里');
-    expect(isConsentPageUrl('https://open.spotify.com/authorize?client_id=1'), isFalse);
+    expect(
+      isConsentPageUrl('https://accounts.spotify.com/authorize?client_id=1'),
+      isTrue,
+    );
+    expect(
+      isConsentPageUrl(
+        'https://accounts.spotify.com/zh-hans/authorize?client_id=1',
+      ),
+      isTrue,
+    );
+    expect(
+      isConsentPageUrl('https://accounts.spotify.com/login?continue=x'),
+      isFalse,
+    );
+    expect(
+      isConsentPageUrl('https://accounts.spotify.com/login?client_id=1'),
+      isFalse,
+    );
+    expect(isConsentPageUrl('http://accounts.spotify.com/authorize'), isFalse);
+    expect(
+      isConsentPageUrl('https://accounts.spotify.com:8443/authorize'),
+      isFalse,
+    );
+    expect(
+      isSpotifyAccountsPageUrl('https://accounts.spotify.com/en/status'),
+      isTrue,
+    );
+    expect(
+      isSpotifyAccountsPageUrl(
+        'https://accounts.spotify.com.evil.test/authorize',
+      ),
+      isFalse,
+    );
+    expect(
+      isConsentPageUrl('https://accounts.spotify.com/authorize-other'),
+      isFalse,
+    );
+    expect(
+      isConsentPageUrl('https://open.spotify.com/authorize?client_id=1'),
+      isFalse,
+    );
     expect(isConsentPageUrl(null), isFalse);
   });
 
   test('isLoopbackRedirect：认 127.0.0.1 回环回调', () {
-    expect(isLoopbackRedirect('http://127.0.0.1:8898/login?code=x&state=s'), isTrue);
+    expect(
+      isLoopbackRedirect('http://127.0.0.1:8898/login?code=x&state=s'),
+      isTrue,
+    );
     expect(isLoopbackRedirect('http://localhost:8898/login?code=x'), isTrue);
     expect(isLoopbackRedirect('http://127.0.0.1:8898/other'), isFalse);
+    expect(isLoopbackRedirect('https://127.0.0.1:8898/login'), isFalse);
     expect(isLoopbackRedirect('https://open.spotify.com/'), isFalse);
     expect(isLoopbackRedirect(null), isFalse);
   });

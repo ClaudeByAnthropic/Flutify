@@ -35,7 +35,11 @@ class ConnectProvider extends ChangeNotifier {
 
   bool _disposed = false;
 
-  ConnectProvider(this._service, {required this._available, required this._resolveTrack}) {
+  ConnectProvider(
+    this._service, {
+    required this._available,
+    required this._resolveTrack,
+  }) {
     final service = _service;
     if (service == null) return;
     // 广播流不会重放：先取服务当前快照，再订阅后续变化
@@ -58,6 +62,7 @@ class ConnectProvider extends ChangeNotifier {
 
   ConnectStatus get status => _status;
   ConnectCluster get cluster => _cluster;
+
   /// 其他设备（不含本机注册的播放端，它在界面上就是「此设备」）。
   List<ConnectDevice> get devices => [
     for (final d in _cluster.devices)
@@ -66,38 +71,83 @@ class ConnectProvider extends ChangeNotifier {
 
   /// 本机作为 Connect 播放端注册的设备 id：它被选中时声音就在本机，不算「远程」设备。
   String? receiverDeviceId;
+  String? _pendingTarget;
+  int _targetRevision = 0;
+  Future<void>? _receiverTransfer;
+
+  /// 切换设备期间立即按用户选中的目标路由后续点歌，不再使用旧 PC 快照。
+  Future<void> _withTarget(
+    String target,
+    Future<void> Function() action,
+  ) async {
+    final revision = ++_targetRevision;
+    _pendingTarget = target;
+    _notify();
+    try {
+      await action();
+    } finally {
+      if (revision == _targetRevision) {
+        _pendingTarget = null;
+        _notify();
+      }
+    }
+  }
 
   /// 本机播放端已出现在账号的设备列表里：本机点歌改为经 Connect 下发给自己，其他设备才能同步。
   bool get receiverOnline =>
-      receiverDeviceId != null && _cluster.devices.any((d) => d.id == receiverDeviceId);
+      receiverDeviceId != null &&
+      _cluster.devices.any((d) => d.id == receiverDeviceId);
 
   /// 在本机播放端上播放（服务端随后推 replace_state 给本机）。
-  Future<void> playOnReceiver(ConnectPlayRequest request, {int? seekToMs, bool paused = false}) => _service!.play(
+  Future<void> playOnReceiver(
+    ConnectPlayRequest request, {
+    int? seekToMs,
+    bool paused = false,
+  }) => _withTarget(
     receiverDeviceId!,
-    contextUri: request.contextUri,
-    trackUris: request.trackUris,
-    trackUri: request.trackUri,
-    trackIndex: request.trackIndex,
-    seekToMs: seekToMs,
-    paused: paused,
+    () => _service!.play(
+      receiverDeviceId!,
+      contextUri: request.contextUri,
+      trackUris: request.trackUris,
+      trackUri: request.trackUri,
+      trackIndex: request.trackIndex,
+      seekToMs: seekToMs,
+      paused: paused,
+      confirm: true,
+    ),
   );
 
   /// 本机播放端上改随机 / 循环：发给服务端，其他设备随之更新。
-  Future<void> setReceiverOptions({required bool shuffle, required bool repeatContext, required bool repeatTrack}) async {
+  Future<void> setReceiverOptions({
+    required bool shuffle,
+    required bool repeatContext,
+    required bool repeatTrack,
+  }) async {
     final id = receiverDeviceId!;
     await _service!.setShuffle(id, shuffle);
     await _service.setRepeat(id, context: repeatContext, track: repeatTrack);
   }
 
   /// 把远程设备上的播放转到本机播放端（同一首、同一进度）。
-  Future<void> transferToReceiver() => _service!.transfer(receiverDeviceId!);
+  Future<void> transferToReceiver() => _receiverTransfer ??= _withTarget(
+    receiverDeviceId!,
+    () => _service!.transfer(receiverDeviceId!, confirm: true),
+  ).whenComplete(() => _receiverTransfer = null);
 
   /// 正在使用的（远程）设备；没有活动设备时为 null。
 
   ConnectDevice? get activeDevice {
+    final pending = _pendingTarget;
+    if (pending == receiverDeviceId && pending != null) return null;
+    if (pending != null) {
+      for (final device in _cluster.devices) {
+        if (device.id == pending) return device;
+      }
+    }
     final device = _cluster.activeDevice;
     return device != null && device.id == receiverDeviceId ? null : device;
   }
+
   ConnectPlayerState get player => _cluster.player;
 
   /// 有远程设备且它上面有曲目（播放中或已暂停）。
@@ -106,7 +156,10 @@ class ConnectProvider extends ChangeNotifier {
   /// 播放控制（播放栏、快捷键、媒体键）是否应发给远程设备，即播放栏是否为远程模式：
   /// 以集群状态为准 —— 只要集群里有活动设备且带曲目（播放中或已暂停）就归远程；
   /// 仅当本机正在出声（[localPlaying]）时才归本机。不再推断「最后出声方」。
-  bool controlsRemote({required bool localPlaying, required bool localHasTrack}) =>
+  bool controlsRemote({
+    required bool localPlaying,
+    required bool localHasTrack,
+  }) =>
       // 以集群状态为准：本 App 只是观察者、自己不是 Connect 设备，只要集群里有活动设备且带曲目，
       // 播放的就是那台设备；仅当本机正在出声（本地文件等）才归本机。不再推断“最后出声方”。
       hasRemoteSession && !localPlaying;
@@ -136,7 +189,8 @@ class ConnectProvider extends ChangeNotifier {
   Timer? _positionTimer;
 
   /// 服务端当前时间，用于推算远程播放进度。
-  int get serverNowMs => _service?.serverNowMs ?? DateTime.now().millisecondsSinceEpoch;
+  int get serverNowMs =>
+      _service?.serverNowMs ?? DateTime.now().millisecondsSinceEpoch;
 
   /// 远程设备当前音量（拖动中优先返回本地值）。
   double get volume => _pendingVolume ?? activeDevice?.volume ?? 1;
@@ -174,7 +228,8 @@ class ConnectProvider extends ChangeNotifier {
     // 只在远程「开始出声」时接管：本机播放期间远程一直在响的快照不应抢走控制权
     final wasAudible = hasRemoteSession && player.isAudible;
     _cluster = cluster;
-    if (!wasAudible && hasRemoteSession && player.isAudible) _remoteInControl = true;
+    if (!wasAudible && hasRemoteSession && player.isAudible)
+      _remoteInControl = true;
     if (_pendingVolume != null && _volumeTimer == null) _pendingVolume = null;
     _resolveRemoteTrack(cluster.player.trackUri);
     _updateDisplayTrack();
@@ -183,13 +238,19 @@ class ConnectProvider extends ChangeNotifier {
   }
 
   void _resolveRemoteTrack(String uri) {
-    if (uri.isEmpty || _tracks.containsKey(uri) || _resolving.contains(uri)) return;
+    if (uri.isEmpty || _tracks.containsKey(uri) || _resolving.contains(uri))
+      return;
     _resolving.add(uri);
-    _resolveTrack(uri).then((track) => _tracks[uri] = track, onError: (_) => _tracks[uri] = null).whenComplete(() {
-      _resolving.remove(uri);
-      _updateDisplayTrack();
-      _notify();
-    });
+    _resolveTrack(uri)
+        .then(
+          (track) => _tracks[uri] = track,
+          onError: (_) => _tracks[uri] = null,
+        )
+        .whenComplete(() {
+          _resolving.remove(uri);
+          _updateDisplayTrack();
+          _notify();
+        });
   }
 
   void _updateDisplayTrack() {
@@ -206,7 +267,9 @@ class ConnectProvider extends ChangeNotifier {
         uri: p.trackUri,
         durationMs: p.durationMs,
         album: SpotifyAlbum(
-          id: p.albumUri.startsWith('spotify:album:') ? p.albumUri.substring(14) : '',
+          id: p.albumUri.startsWith('spotify:album:')
+              ? p.albumUri.substring(14)
+              : '',
           name: p.albumTitle,
           uri: p.albumUri,
           images: [if (p.imageUrl.isNotEmpty) SpotifyImage(url: p.imageUrl)],
@@ -221,14 +284,18 @@ class ConnectProvider extends ChangeNotifier {
     _tickPosition();
     final ticking = hasRemoteSession && player.isAudible;
     if (ticking && _positionTimer == null) {
-      _positionTimer = Timer.periodic(const Duration(milliseconds: 250), (_) => _tickPosition());
+      _positionTimer = Timer.periodic(
+        const Duration(milliseconds: 250),
+        (_) => _tickPosition(),
+      );
     } else if (!ticking) {
       _positionTimer?.cancel();
       _positionTimer = null;
     }
   }
 
-  void _tickPosition() => _position.value = Duration(milliseconds: player.positionAt(serverNowMs));
+  void _tickPosition() =>
+      _position.value = Duration(milliseconds: player.positionAt(serverNowMs));
 
   // ---------------------------------------------------------------------------
   // 远程控制：全部作用于当前活动设备
@@ -237,7 +304,10 @@ class ConnectProvider extends ChangeNotifier {
   String? get _target => activeDevice?.id;
 
   /// 把播放转移到 [device]（保持原播放 / 暂停状态之外，默认继续播放）。
-  Future<void> transferTo(ConnectDevice device) => _service!.transfer(device.id);
+  Future<void> transferTo(ConnectDevice device) => _withTarget(
+    device.id,
+    () => _service!.transfer(device.id, confirm: true),
+  );
 
   /// 在活动设备上播放新内容（本机点歌时由 PlaybackProvider 的远程接管钩子调用）。
   /// 发出后视为远程掌握控制权，播放栏保持远程模式。
@@ -250,6 +320,7 @@ class ConnectProvider extends ChangeNotifier {
       trackUris: request.trackUris,
       trackUri: request.trackUri,
       trackIndex: request.trackIndex,
+      confirm: true,
     );
     _remoteInControl = true;
     _notify();
@@ -258,7 +329,9 @@ class ConnectProvider extends ChangeNotifier {
   Future<void> togglePlayPause() async {
     final target = _target;
     if (target == null) return;
-    player.isAudible ? await _service!.pause(target) : await _service!.resume(target);
+    player.isAudible
+        ? await _service!.pause(target)
+        : await _service!.resume(target);
   }
 
   Future<void> pause() async {
@@ -290,7 +363,10 @@ class ConnectProvider extends ChangeNotifier {
   Future<void> cycleRepeat() async {
     final target = _target;
     if (target == null) return;
-    final (context, track) = switch ((player.repeatContext, player.repeatTrack)) {
+    final (context, track) = switch ((
+      player.repeatContext,
+      player.repeatTrack,
+    )) {
       (false, false) => (true, false),
       (true, false) => (true, true),
       _ => (false, false),
