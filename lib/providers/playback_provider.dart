@@ -623,12 +623,14 @@ class PlaybackProvider extends ChangeNotifier {
     final existing = [for (final i in _order) _contextTracks[i]];
     final matchesCurrent =
         existing.isNotEmpty && existing[_orderPos].uri == _currentTrack?.uri;
-    final history = matchesCurrent
-        ? existing.take(_orderPos).toList()
-        : <SpotifyTrack>[];
+    // 插队曲目播放时，_orderPos 仍指向上一首上下文曲目。
+    // 该位置也属于历史，不能因为当前曲目不在上下文中就清空历史和尾部。
+    final history = existing
+        .take(matchesCurrent ? _orderPos : _orderPos + 1)
+        .toList();
     final remaining = matchesCurrent
         ? existing.sublist(_orderPos)
-        : <SpotifyTrack>[];
+        : [currentAndNext.first, ...existing.skip(_orderPos + 1)];
     final isPrefix =
         currentAndNext.length <= remaining.length &&
         List.generate(

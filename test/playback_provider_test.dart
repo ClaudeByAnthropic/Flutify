@@ -135,6 +135,22 @@ void main() {
   );
 
   test(
+    'receiver update during a queued song keeps history and context tail',
+    () async {
+      await playback.playLocal(a, contextQueue: [a, b, c]);
+      playback.addToQueue(x);
+      await playback.nextTrack();
+      playback.updateReceiverQueue([x, b]);
+
+      expect(playback.currentTrack?.id, x.id);
+      expect(playback.upNext.map((e) => e.track.id), [b.id, c.id]);
+      expect(loader.loaded, [a.id, x.id]);
+      await playback.previousTrack();
+      expect(playback.currentTrack?.id, a.id);
+    },
+  );
+
+  test(
     'shuffle keeps the current track and queues every other track once',
     () async {
       await playback.playTrack(b, contextQueue: [a, b, c, x], context: ctx);
