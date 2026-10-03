@@ -142,6 +142,10 @@ jobs:
       - name: Verify native binary architecture
         run: python tool/verify_windows_arch.py build/windows/${{ matrix.arch }}/runner/Release ${{ matrix.arch }}
 
+      - name: Verify app-local VC runtime dependencies
+        shell: pwsh
+        run: ./tool/verify_windows_runtime.ps1 -Directory build/windows/${{ matrix.arch }}/runner/Release -BuildDirectory build/windows/${{ matrix.arch }}
+
       - name: Install Inno Setup compiler
         shell: pwsh
         run: |
