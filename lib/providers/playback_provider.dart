@@ -138,6 +138,7 @@ class PlaybackProvider extends ChangeNotifier {
   StreamSubscription<Duration>? _posSub;
   StreamSubscription<Duration?>? _durSub;
   StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<EmePlaybackException>? _emeErrSub;
 
   PlaybackProvider(
     AudioEngine audio,
@@ -264,6 +265,10 @@ class PlaybackProvider extends ChangeNotifier {
       }
       _lastProcessingState = ps;
     });
+
+    // EME 运行期错误（license / HLS fatal 等在加载成功后才暴露）：
+    // 转成可见的播放错误，不再静默停在 0:00
+    _emeErrSub = _audio.emeErrors.listen(_onEmeError);
   }
 
   void _handleTrackEnded() {
@@ -456,6 +461,29 @@ class PlaybackProvider extends ChangeNotifier {
     } else {
       notifyListeners();
     }
+  }
+
+  /// EME 引擎运行期错误（license 换取失败 / HLS 致命错误 / Widevine 不可用）：
+  /// 加载已成功、播放建立后才暴露的失败，复用 [_handleLoadFailure] 转成可见提示；
+  /// 清掉 [_loadedTrackId] 并记下进度，下次点播放重新整载。
+  void _onEmeError(EmePlaybackException err) {
+    final track = _currentTrack;
+    // 残留事件（已切歌 / 已换源）与重复事件（一次失败多次 HLS error）忽略
+    if (track == null || _loadedTrackId != track.id) return;
+    _loadedTrackId = null;
+    _resumeAt = positionNotifier.value;
+    final failure = err.webSignInSuggested
+        ? TrackPlaybackException(
+            TrackPlaybackFailure.webSignInRequired,
+            'Web 登录态已失效，请重新完成 Web 登录',
+            err,
+          )
+        : TrackPlaybackException(
+            TrackPlaybackFailure.network,
+            '全曲播放失败，请重试',
+            err,
+          );
+    unawaited(_handleLoadFailure(track, failure));
   }
 
   void _setLoading(bool value) {
@@ -935,6 +963,7 @@ class PlaybackProvider extends ChangeNotifier {
     _posSub?.cancel();
     _durSub?.cancel();
     _stateSub?.cancel();
+    _emeErrSub?.cancel();
     _errorController.close();
     positionNotifier.dispose();
     loadProgressNotifier.dispose();

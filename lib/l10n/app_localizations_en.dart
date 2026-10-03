@@ -496,6 +496,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String playbackErrorWidevine(String track) {
+    return 'Can\'t decrypt \"$track\": Widevine DRM is unavailable on this device';
+  }
+
+  @override
   String playbackErrorAutoPaused(int count) {
     return '$count songs in a row couldn\'t play, so playback paused';
   }

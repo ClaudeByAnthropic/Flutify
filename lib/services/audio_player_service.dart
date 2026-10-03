@@ -17,6 +17,10 @@ class AudioPlayerService implements AudioEngine {
   Stream<Duration?> get durationStream => _player.durationStream;
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
 
+  /// just_audio 链路没有 EME 运行期错误。
+  @override
+  Stream<EmePlaybackException> get emeErrors => const Stream.empty();
+
   Duration get position => _player.position;
   Duration? get duration => _player.duration;
   bool get isPlaying => _player.playing;

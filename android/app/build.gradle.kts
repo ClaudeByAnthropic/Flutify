@@ -43,3 +43,12 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Android 原生 DRM 播放：Media3 ExoPlayer + 设备 Widevine（纯音频）。
+    // 部分机型 WebView EME 不可用（createMediaKeys 永不 settle，真机实测），
+    // DRM 曲目在 Android 上改走原生播放器；HLS/清单/license 反代仍复用 Dart 侧本地回环服务。
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.11.1")
+    implementation("androidx.media3:media3-datasource:1.11.1")
+}

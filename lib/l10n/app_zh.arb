@@ -219,6 +219,10 @@
   "@playbackErrorNetwork": {
     "placeholders": { "track": { "type": "String" } }
   },
+  "playbackErrorWidevine": "「{track}」无法解密播放：此设备缺少 Widevine 组件",
+  "@playbackErrorWidevine": {
+    "placeholders": { "track": { "type": "String" } }
+  },
   "playbackErrorAutoPaused": "连续 {count} 首无法播放，已暂停",
   "@playbackErrorAutoPaused": {
     "placeholders": { "count": { "type": "int" } }
