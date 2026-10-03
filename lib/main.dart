@@ -5,6 +5,7 @@ import 'dart:io';
 import 'core/utils/file_log.dart';
 
 import 'package:crypto/crypto.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -49,8 +50,11 @@ import 'services/media_controls/media_controls_sync.dart';
 import 'services/media_controls/multi_media_controls.dart';
 import 'services/media_controls/system_media_controls.dart';
 import 'services/network/network_proxy.dart';
+import 'services/network/windows_trust_store.dart';
 import 'services/playback_session_store.dart';
 import 'services/protocol/audio_cache_store.dart';
+import 'services/cache/cache_location.dart';
+import 'services/cache/artwork_cache.dart';
 import 'services/protocol/eme_track_audio_source.dart';
 import 'services/protocol/track_audio_loader.dart';
 import 'services/spotify_api_service.dart';
@@ -68,6 +72,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installFileLog();
   installErrorPlaceholder();
+  await WindowsTrustStore.initialize();
 
   // just_audio 自身没有 Windows / Linux 实现，需在创建任何 AudioPlayer 之前
   // 注册 media_kit 后端；Android / iOS 仍使用 just_audio 原生实现。
@@ -89,6 +94,7 @@ Future<void> main() async {
         mode: initialPrefs.proxyMode,
         proxyHost: initialPrefs.proxyHost,
         proxyPort: initialPrefs.proxyPort,
+        gateway: initialPrefs.gateway,
       )
       .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
 
@@ -134,10 +140,21 @@ Future<void> main() async {
     );
   }
   // 路由引擎：本地文件/流式 → just_audio；DRM 曲目 → EME / 原生 DRM
-  final audioEngine = RoutedAudioEngine(local: audioPlayerService, eme: drmEngine);
+  final audioEngine = RoutedAudioEngine(
+    local: audioPlayerService,
+    eme: drmEngine,
+  );
 
   // 上次播放会话（曲目 / 队列 / 进度）：单独的 JSON 文件，不放进 SharedPreferences
   final supportDir = await getApplicationSupportDirectory();
+  final legacyArtworkDirectory =
+      '${(await getTemporaryDirectory()).path}${Platform.pathSeparator}libCachedImageData';
+  final audioCacheLocation = CacheLocation(
+    storageService,
+    supportDir.path,
+    legacyArtworkDirectory: legacyArtworkDirectory,
+  );
+  await audioCacheLocation.initialize();
   final sessionStore = FilePlaybackSessionStore(
     File('${supportDir.path}${Platform.pathSeparator}playback_session.json'),
   );
@@ -159,7 +176,9 @@ Future<void> main() async {
   final lyricsFallback = LrclibLyricsSource(
     LrclibClient(http.Client()),
     cache: LyricsDiskCache(
-      Directory('${supportDir.path}${Platform.pathSeparator}lyrics_lrc'),
+      audioCacheLocation.lyricsDirectory,
+      directoryProvider: () => audioCacheLocation.lyricsDirectory,
+      lock: audioCacheLocation.lock,
     ),
   );
 
@@ -167,6 +186,10 @@ Future<void> main() async {
   // 当前账号 AP RequestKey 全线被拒，EME 是全曲播放的主链路。
   final emeTrackSource = EmeTrackAudioSource(
     cacheDirectory: supportDir.path,
+    cacheDirectoryProvider: () =>
+        audioCacheLocation.rootFor(CacheCategory.audio),
+    playingPath: () => emePlayer.currentAudioPath,
+    cacheLock: audioCacheLocation.lock,
     // 缺 sp_dc（Web 登录态）时在下载前拦截，引导用户完成 Web 登录
     webSessionReady: () => webTokenService.hasSpDc,
     accessToken: () async {
@@ -177,6 +200,16 @@ Future<void> main() async {
     },
     clientToken: () => authService.ensureClientToken(),
   );
+
+  audioCacheLocation.audioInUse = emeTrackSource.isCacheFileInUse;
+  audioCacheLocation.prepareLegacyArtwork = () =>
+      ArtworkCache.prepareLegacy(legacyArtworkDirectory);
+  await audioCacheLocation.resumeMigrations();
+  emeTrackSource.maxCacheBytes = storageService.audioCacheLimitMb * 1024 * 1024;
+  audioCacheLocation.addListener(() => unawaited(emeTrackSource.trimCache()));
+  final artworkCache = ArtworkCache(audioCacheLocation);
+  audioCacheLocation.artworkMaintenance = artworkCache.maintain;
+  CachedNetworkImageProvider.defaultCacheManager = artworkCache;
 
   runApp(
     FlutifyApp(
@@ -190,6 +223,7 @@ Future<void> main() async {
       playbackSessionStore: sessionStore,
       mediaControls: mediaControls,
       networkProxy: NetworkProxy.instance,
+      audioCacheLocation: audioCacheLocation,
       lyricsFallback: lyricsFallback,
       taskbarLyrics: taskbarLyrics,
     ),
@@ -221,6 +255,7 @@ class FlutifyApp extends StatelessWidget {
 
   /// 网络代理策略；为空时设置页只显示模式、不探测系统代理（测试默认）。
   final NetworkProxy? networkProxy;
+  final CacheLocation? audioCacheLocation;
 
   /// LRCLIB 歌词补全；为空时只用 Spotify 官方歌词（测试默认）。
   final LrclibLyricsSource? lyricsFallback;
@@ -240,6 +275,7 @@ class FlutifyApp extends StatelessWidget {
     this.playbackSessionStore,
     this.mediaControls,
     this.networkProxy,
+    this.audioCacheLocation,
     this.lyricsFallback,
     this.taskbarLyrics,
   });
@@ -254,8 +290,10 @@ class FlutifyApp extends StatelessWidget {
         Provider<AudioEngine>.value(value: audioEngine),
         Provider<EmePlayer>.value(value: emePlayer),
         Provider<SpotifyApiService>.value(value: spotifyApiService),
-        if (webTokenService != null) Provider<WebTokenService>.value(value: webTokenService!),
+        if (webTokenService != null)
+          Provider<WebTokenService>.value(value: webTokenService!),
         Provider<NetworkProxy?>.value(value: networkProxy),
+        Provider<CacheLocation?>.value(value: audioCacheLocation),
         // 非惰性：启动即接入 API 层，首屏请求就能自动续期 access_token
         Provider<SpotifyAuthService>(
           lazy: false,
@@ -315,6 +353,7 @@ class FlutifyApp extends StatelessWidget {
                   mode: preferences.prefs.proxyMode,
                   proxyHost: preferences.prefs.proxyHost,
                   proxyPort: preferences.prefs.proxyPort,
+                  gateway: preferences.prefs.gateway,
                 ),
               );
             });
@@ -369,7 +408,8 @@ class FlutifyApp extends StatelessWidget {
                 start: start,
                 username: ctx.read<SpotifyAuthService>().username,
               );
-              final toRemote = connect.activeDevice != null && !playback.isPlaying;
+              final toRemote =
+                  connect.activeDevice != null && !playback.isPlaying;
               debugPrint(
                 '[Connect] 点歌：request=${request == null ? 'null' : 'ok'} '
                 'active=${connect.activeDevice?.name} localPlaying=${playback.isPlaying} '
@@ -385,10 +425,16 @@ class FlutifyApp extends StatelessWidget {
                   );
                   return false;
                 }
+                final queueTicket = playback.prepareReceiverQueue(
+                  context,
+                  tracks,
+                  start,
+                );
                 try {
                   await connect.playOnReceiver(request);
                   return true;
                 } on ConnectException catch (e) {
+                  playback.cancelReceiverQueue(queueTicket);
                   debugPrint('[Connect] 下发到本机播放端失败，直接本机播放：$e');
                   return false;
                 }
@@ -441,7 +487,9 @@ void _startConnectReceiver(
   if (tokens == null) return;
   final preferences = ctx.read<PreferencesProvider>();
   final deviceId =
-      md5.convert(utf8.encode('flutify-receiver:${Platform.localHostname}')).toString() +
+      md5
+          .convert(utf8.encode('flutify-receiver:${Platform.localHostname}'))
+          .toString() +
       sha1.convert(utf8.encode('flutify')).toString().substring(0, 8);
   final host = PlaybackReceiverHost(playback);
   String nameOf() {
@@ -458,21 +506,29 @@ void _startConnectReceiver(
   );
   host.receiver = receiver;
   connect.receiverDeviceId = deviceId;
-  Future<void> handOver(int positionMs, {bool paused = false}) async {
+  Future<bool> handOver(int positionMs, {bool paused = false}) async {
     final current = playback.currentTrack;
-    if (current == null || !connect.receiverOnline) return;
+    if (current == null || !connect.receiverOnline) return false;
     final request = ConnectPlayRequest.from(
       context: playback.playbackContext,
       tracks: [current, for (final e in playback.upNext) e.track],
       start: current,
       username: ctx.read<SpotifyAuthService>().username,
     );
-    if (request == null) return;
-    debugPrint('[Receiver] 交接给 Connect：${current.name} @${positionMs}ms paused=$paused');
+    if (request == null) return false;
+    debugPrint(
+      '[Receiver] 交接给 Connect：${current.name} @${positionMs}ms paused=$paused',
+    );
     try {
-      await connect.playOnReceiver(request, seekToMs: positionMs, paused: paused);
+      await connect.playOnReceiver(
+        request,
+        seekToMs: positionMs,
+        paused: paused,
+      );
+      return true;
     } catch (e) {
       debugPrint('[Receiver] 交接失败：$e');
+      return false;
     }
   }
 
@@ -493,12 +549,19 @@ void _startConnectReceiver(
   // 本机未播放、其他设备也没在出声时，把上次的曲目以暂停状态同步出去
   var launchSynced = false;
   receiver.onRegistered = () async {
+    try {
+      await connect.refresh();
+    } on ConnectException catch (_) {
+      // 播放端可能先于观察者恢复连接；后续状态推送仍会更新设备列表。
+    }
+    host.onReceiverRegistered();
     if (launchSynced || !preferences.prefs.connectReportOnLaunch) return;
     launchSynced = true;
     for (var i = 0; i < 20 && !connect.receiverOnline; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
-    final remoteAudible = connect.activeDevice != null && connect.player.isAudible;
+    final remoteAudible =
+        connect.activeDevice != null && connect.player.isAudible;
     if (playback.isPlaying || receiver.isActive || remoteAudible) return;
     await handOver(playback.position.inMilliseconds, paused: true);
   };
@@ -528,8 +591,8 @@ void _startConnectReceiver(
 }
 
 /// 代理相关偏好的指纹，用于判断是否需要重配 [NetworkProxy]。
-(ProxyMode, String, int) _proxyKey(AppPreferences prefs) =>
-    (prefs.proxyMode, prefs.proxyHost, prefs.proxyPort);
+Object _proxyKey(AppPreferences prefs) =>
+    (prefs.proxyMode, prefs.proxyHost, prefs.proxyPort, prefs.gateway);
 
 /// 按外观设置生成主题；字号缩放与减弱动效通过 MediaQuery 下发给整棵树。
 class _ThemedApp extends StatelessWidget {
@@ -572,9 +635,7 @@ class _ThemedApp extends StatelessWidget {
           child: AnnotatedRegion<SystemUiOverlayStyle>(
             value: systemBarsStyle(Theme.of(context).brightness),
             // 桌面：窗口按钮 / 窄窗口标题条覆盖在所有路由之上
-            child: TaskbarLyricsBinding(
-              child: WindowFrame(child: child!),
-            ),
+            child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
           ),
         );
       },

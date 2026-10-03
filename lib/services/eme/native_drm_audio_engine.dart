@@ -31,10 +31,10 @@ class NativeDrmAudioEngine implements AudioEngine {
     required NativeDrmPlayer player,
     required Future<Uint8List> Function(Uint8List request) licensePoster,
     required Future<Uint8List> Function() certFetcher,
-  })  : _server = server,
-        _player = player,
-        _licensePoster = licensePoster,
-        _certFetcher = certFetcher {
+  }) : _server = server,
+       _player = player,
+       _licensePoster = licensePoster,
+       _certFetcher = certFetcher {
     _player.positionStream.listen((p) {
       _position = p;
       _positionController.add(p);
@@ -65,6 +65,9 @@ class NativeDrmAudioEngine implements AudioEngine {
         _processing = ProcessingState.ready;
       case EmePlayerState.buffering:
         _processing = ProcessingState.buffering;
+      case EmePlayerState.paused:
+        _playing = false;
+        _processing = ProcessingState.ready;
       case EmePlayerState.ended:
         _playing = false;
         _processing = ProcessingState.completed;
@@ -77,7 +80,8 @@ class NativeDrmAudioEngine implements AudioEngine {
           // 并把 _hasSource 复位，让上层知道要重试必须重新整载
           _hasSource = false;
           _errorController.add(
-              _player.lastError ?? const EmePlaybackException('unknown'));
+            _player.lastError ?? const EmePlaybackException('unknown'),
+          );
         }
     }
     _emit();
@@ -106,8 +110,11 @@ class NativeDrmAudioEngine implements AudioEngine {
   bool get hasSource => _hasSource;
 
   @override
-  Future<void> playEme(EmeTrackContent content,
-      {Duration? initialPosition, bool autoplay = true}) async {
+  Future<void> playEme(
+    EmeTrackContent content, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) async {
     _processing = ProcessingState.loading;
     _emit();
     // 起本地回环服务（清单按 ExoPlayer 需要把 KEYFORMAT 改写为 Widevine UUID）
@@ -130,11 +137,17 @@ class NativeDrmAudioEngine implements AudioEngine {
 
   // just_audio 路径在本引擎上不可用（路由层保证不调用）
   @override
-  Future<void> playFile(String path, {Duration? initialPosition, bool autoplay = true}) =>
-      throw UnimplementedError('原生 DRM 引擎不支持本地文件');
+  Future<void> playFile(
+    String path, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) => throw UnimplementedError('原生 DRM 引擎不支持本地文件');
   @override
-  Future<void> playStream(ProgressiveAudio audio, {Duration? initialPosition, bool autoplay = true}) =>
-      throw UnimplementedError('原生 DRM 引擎不支持流式下载');
+  Future<void> playStream(
+    ProgressiveAudio audio, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) => throw UnimplementedError('原生 DRM 引擎不支持流式下载');
 
   @override
   Future<void> play() async {
@@ -155,7 +168,8 @@ class NativeDrmAudioEngine implements AudioEngine {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> setVolume(double volume) => _player.setVolume(volume.clamp(0.0, 1.0));
+  Future<void> setVolume(double volume) =>
+      _player.setVolume(volume.clamp(0.0, 1.0));
 
   @override
   Future<void> stop() async {

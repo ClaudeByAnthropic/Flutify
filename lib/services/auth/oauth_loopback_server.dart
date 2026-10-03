@@ -25,14 +25,26 @@ class OAuthLoopbackServer {
       throw OAuthException('本机端口 $port 被占用，无法接收授权回调');
     }
     final completer = _completer = Completer<String>();
-    _server!.listen((request) => _handle(request, path, expectedState, completer));
+    _server!.listen(
+      (request) => _handle(request, path, expectedState, completer),
+    );
 
-    return completer.future.timeout(timeout, onTimeout: () {
-      throw const OAuthException('等待授权超时，请重试');
-    }).whenComplete(close);
+    return completer.future
+        .timeout(
+          timeout,
+          onTimeout: () {
+            throw const OAuthException('等待授权超时，请重试');
+          },
+        )
+        .whenComplete(close);
   }
 
-  Future<void> _handle(HttpRequest request, String path, String expectedState, Completer<String> completer) async {
+  Future<void> _handle(
+    HttpRequest request,
+    String path,
+    String expectedState,
+    Completer<String> completer,
+  ) async {
     // 服务收到回调后即关闭，不能让客户端复用该连接
     request.response.persistentConnection = false;
     if (request.uri.path != path) {
@@ -44,7 +56,8 @@ class OAuthLoopbackServer {
     final params = request.uri.queryParameters;
     final error = params['error'];
     final code = params['code'];
-    final ok = error == null && code != null && params['state'] == expectedState;
+    final ok =
+        error == null && code != null && params['state'] == expectedState;
 
     request.response.headers.contentType = ContentType.html;
     request.response.write(_page(ok));
@@ -72,8 +85,8 @@ class OAuthLoopbackServer {
   }
 
   static String _page(bool ok) {
-    final title = ok ? '授权完成' : '授权未完成';
-    final body = ok ? '你可以关闭此页面，返回 Flutify。' : '请返回 Flutify 重试。';
+    final title = ok ? '已收到授权回调' : '授权未完成';
+    final body = ok ? '请返回 Flutify 查看登录结果，应用仍需完成凭据验证。' : '请返回 Flutify 重试。';
     final color = ok ? '#1ED760' : '#FF6B6B';
     // 尽力自动关闭：浏览器只允许脚本关闭「由脚本打开」的标签页，
     // 外部程序（url_launcher）打开的标签多数情况下会被拦，所以保留手动关闭提示。

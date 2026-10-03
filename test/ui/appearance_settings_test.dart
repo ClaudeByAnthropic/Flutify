@@ -25,7 +25,11 @@ import '../fixtures/sample_catalog.dart';
 void main() {
   late StorageService storage;
 
-  Future<void> pumpApp(WidgetTester tester, Size size, {Map<String, SpotifyLyrics> lyrics = const {}}) async {
+  Future<void> pumpApp(
+    WidgetTester tester,
+    Size size, {
+    Map<String, SpotifyLyrics> lyrics = const {},
+  }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -51,9 +55,12 @@ void main() {
     }
   }
 
-  BuildContext settingsContext(WidgetTester tester) => tester.element(find.byType(SettingsScreen));
+  BuildContext settingsContext(WidgetTester tester) =>
+      tester.element(find.byType(SettingsScreen));
 
-  testWidgets('settings: appearance options apply instantly and persist', (tester) async {
+  testWidgets('settings: appearance options apply instantly and persist', (
+    tester,
+  ) async {
     await pumpApp(tester, const Size(500, 2400));
     Navigator.of(
       tester.element(find.byType(MainShell)),
@@ -61,8 +68,10 @@ void main() {
     ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
     await settle(tester);
 
-    // 调试信息已移除：没有凭据输入框
-    expect(find.byType(TextField), findsNothing);
+    // 唯一输入框用于 Connect 设备名，不再展示凭据输入框。
+    final fields = tester.widgetList<TextField>(find.byType(TextField));
+    expect(fields, hasLength(1));
+    expect(fields.single.decoration?.hintText, 'Flutify');
 
     // 主题模式 → 深色；纯黑背景
     await tester.tap(find.text('深色'));
@@ -94,35 +103,44 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
-  testWidgets('desktop: immersive lyrics opens from the player bar and closes with Esc', (tester) async {
-    await pumpApp(
-      tester,
-      const Size(1440, 900),
-      lyrics: {
-        SampleCatalog.track1.id: const SpotifyLyrics(
-          lines: [
-            LyricLine(startTimeMs: 0, words: 'Immersive first line'),
-            LyricLine(startTimeMs: 4000, words: 'Immersive second line'),
-          ],
+  testWidgets(
+    'desktop: immersive lyrics opens from the player bar and closes with Esc',
+    (tester) async {
+      await pumpApp(
+        tester,
+        const Size(1440, 900),
+        lyrics: {
+          SampleCatalog.track1.id: const SpotifyLyrics(
+            lines: [
+              LyricLine(startTimeMs: 0, words: 'Immersive first line'),
+              LyricLine(startTimeMs: 4000, words: 'Immersive second line'),
+            ],
+          ),
+        },
+      );
+      final playback = Provider.of<PlaybackProvider>(
+        tester.element(find.byType(MainShell)),
+        listen: false,
+      );
+      await playback.playTrack(
+        SampleCatalog.track1,
+        contextQueue: const [SampleCatalog.track1, SampleCatalog.track2],
+        context: const PlaybackContext.playlist(
+          'Synthetic Mix',
+          uri: 'spotify:playlist:synthetic',
         ),
-      },
-    );
-    final playback = Provider.of<PlaybackProvider>(tester.element(find.byType(MainShell)), listen: false);
-    await playback.playTrack(
-      SampleCatalog.track1,
-      contextQueue: const [SampleCatalog.track1, SampleCatalog.track2],
-      context: const PlaybackContext.playlist('Synthetic Mix', uri: 'spotify:playlist:synthetic'),
-    );
-    await settle(tester);
+      );
+      await settle(tester);
 
-    await tester.tap(find.byTooltip('沉浸式歌词').first);
-    await settle(tester);
-    expect(find.byType(ImmersiveLyricsScreen), findsOneWidget);
-    expect(find.text('Immersive first line'), findsOneWidget);
-    expect(find.byTooltip('退出全屏歌词（Esc）'), findsOneWidget);
+      await tester.tap(find.byTooltip('沉浸式歌词').first);
+      await settle(tester);
+      expect(find.byType(ImmersiveLyricsScreen), findsOneWidget);
+      expect(find.text('Immersive first line'), findsOneWidget);
+      expect(find.byTooltip('退出全屏歌词（Esc）'), findsOneWidget);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await settle(tester);
-    expect(find.byType(ImmersiveLyricsScreen), findsNothing);
-  });
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(find.byType(ImmersiveLyricsScreen), findsNothing);
+    },
+  );
 }

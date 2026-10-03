@@ -41,6 +41,10 @@ class ConnectService {
   final DealerClient _dealer;
   late final ConnectStateClient _state;
   final Duration _registerRetryDelay;
+  final Duration confirmationTimeout;
+  int _snapshotRevision = 0;
+  int _commandGeneration = 0;
+  Future<void> _commandTail = Future.value();
 
   final _clusters = StreamController<ConnectCluster>.broadcast();
   final _statusChanges = StreamController<ConnectStatus>.broadcast();
@@ -72,11 +76,20 @@ class ConnectService {
     Uri? apresolve,
     DealerClient? dealer,
     this._registerRetryDelay = const Duration(seconds: 3),
-  }) : _dealer = dealer ?? DealerClient(client: client, headers: headers, connector: connector, apresolve: apresolve) {
+    this.confirmationTimeout = const Duration(seconds: 2),
+  }) : _dealer =
+           dealer ??
+           DealerClient(
+             client: client,
+             headers: headers,
+             connector: connector,
+             apresolve: apresolve,
+           ) {
     _state = ConnectStateClient(
       client: client,
       headers: headers,
-      spclientHost: () => _dealer.spclientHost ?? DealerClient.defaultSpclientHost,
+      spclientHost: () =>
+          _dealer.spclientHost ?? DealerClient.defaultSpclientHost,
       connectionId: () => _dealer.connectionId,
     );
     _subscriptions
@@ -130,13 +143,16 @@ class ConnectService {
   Future<void> stop() async {
     if (!_running) return;
     _running = false;
+    ++_commandGeneration;
     final id = _dealer.connectionId;
     final wasRegistered = _registered;
     _resetRegistration();
     _refreshStatus();
     if (wasRegistered && id != null) {
       try {
-        await _state.unregister(observerId, id).timeout(const Duration(seconds: 3));
+        await _state
+            .unregister(observerId, id)
+            .timeout(const Duration(seconds: 3));
       } catch (_) {}
     }
     await _dealer.close();
@@ -147,15 +163,25 @@ class ConnectService {
   /// 重新注册观察者以取全量 cluster。
   Future<void> refresh() async {
     final id = _requireOnline();
+    final revision = _snapshotRevision;
     final cluster = await _state.registerObserver(observerId, id);
-    if (_running) _applyCluster(cluster);
+    if (_running && _dealer.connectionId == id && revision == _snapshotRevision)
+      _applyCluster(cluster);
   }
 
   /// 把播放转移到 [toDeviceId]；[play] 为 false 时到达后保持暂停。
-  Future<void> transfer(String toDeviceId, {bool play = true}) async {
-    _requireOnline();
-    await _state.transfer(observerId, toDeviceId, play: play);
-  }
+  Future<void> transfer(
+    String toDeviceId, {
+    bool play = true,
+    bool confirm = false,
+  }) => _runPlaybackCommand(
+    () async {
+      _requireOnline();
+      await _state.transfer(observerId, toDeviceId, play: play);
+    },
+    (cluster) => cluster.activeDeviceId == toDeviceId,
+    confirm: confirm,
+  );
 
   /// 在 [deviceId] 上播放新内容。
   ///
@@ -170,50 +196,148 @@ class ConnectService {
     int? trackIndex,
     int? seekToMs,
     bool paused = false,
-  }) => _command(deviceId, 'play', {
-    'context': contextUri.isNotEmpty
-        ? {'uri': contextUri, 'url': 'context://$contextUri', 'metadata': <String, Object?>{}}
-        : {
-            'uri': '',
-            'url': '',
-            'metadata': <String, Object?>{},
-            'pages': [
-              {
-                'tracks': [
-                  for (final uri in trackUris) {'uri': uri},
-                ],
-              },
-            ],
-          },
-    'play_origin': {'feature_identifier': 'flutify'},
-    'options': {
-      'license': 'on-demand',
-      'skip_to': {'track_uri': ?trackUri, 'track_index': ?trackIndex},
-      'seek_to': ?seekToMs,
-      if (paused) 'initially_paused': true,
-      'player_options_override': <String, Object?>{},
-    },
+    bool confirm = false,
+  }) => _runPlaybackCommand(
+    () => _command(deviceId, 'play', {
+      'context': contextUri.isNotEmpty
+          ? {
+              'uri': contextUri,
+              'url': 'context://$contextUri',
+              'metadata': <String, Object?>{},
+            }
+          : {
+              'uri': '',
+              'url': '',
+              'metadata': <String, Object?>{},
+              'pages': [
+                {
+                  'tracks': [
+                    for (final uri in trackUris) {'uri': uri},
+                  ],
+                },
+              ],
+            },
+      'play_origin': {'feature_identifier': 'flutify'},
+      'options': {
+        'license': 'on-demand',
+        'skip_to': {'track_uri': ?trackUri, 'track_index': ?trackIndex},
+        'seek_to': ?seekToMs,
+        if (paused) 'initially_paused': true,
+        'player_options_override': <String, Object?>{},
+      },
+    }),
+    (cluster) =>
+        cluster.activeDeviceId == deviceId &&
+        ((trackUri == null && (contextUri.isNotEmpty || trackUris.isEmpty)) ||
+            cluster.player.trackUri ==
+                (trackUri ??
+                    trackUris[(trackIndex ?? 0).clamp(
+                      0,
+                      trackUris.length - 1,
+                    )])) &&
+        (paused ? cluster.player.isPaused : cluster.player.isAudible),
+    confirm: confirm,
+  );
+
+  /// 点歌 / 转移按发送顺序执行；只重试仍然是最新意图的请求。
+  /// HTTP 成功后等待设备状态，推送遗漏时拉取快照，最多补发一次。
+  Future<void> _runPlaybackCommand(
+    Future<void> Function() send,
+    bool Function(ConnectCluster) matches, {
+    required bool confirm,
+  }) async {
+    final generation = ++_commandGeneration;
+    bool current() => !_disposed && generation == _commandGeneration;
+    var revision = _snapshotRevision;
+    for (var attempt = 0; attempt < (confirm ? 2 : 1); attempt++) {
+      if (!current()) return;
+      final sent = _commandTail.then((_) async {
+        if (!current()) return;
+        revision = _snapshotRevision;
+        await send();
+      });
+      _commandTail = sent.catchError((Object _) {});
+      try {
+        await sent;
+      } on ConnectException catch (e) {
+        if (!current()) return;
+        final retryable =
+            e.statusCode == null ||
+            e.statusCode == 404 ||
+            (e.statusCode ?? 0) >= 500;
+        if (!confirm || !retryable || attempt == 1) rethrow;
+      }
+      if (!confirm || !current()) return;
+      bool applied() => _snapshotRevision > revision && matches(_current);
+      if (applied()) return;
+      await _waitForState(() => !current() || applied());
+      if (!current() || applied()) return;
+      try {
+        await refresh();
+      } on ConnectException catch (_) {
+        // 下面的重试仍由连接状态检查约束。
+      }
+      if (!current() || applied()) return;
+    }
+    throw const ConnectException(null, '设备尚未确认播放指令，请检查连接后重试');
+  }
+
+  Future<void> _waitForState(bool Function() done) async {
+    if (done()) return;
+    final ready = Completer<void>();
+    final subscription = clusters.listen((_) {
+      if (done() && !ready.isCompleted) ready.complete();
+    });
+    final timer = Timer(confirmationTimeout, () {
+      if (!ready.isCompleted) ready.complete();
+    });
+    try {
+      await ready.future;
+    } finally {
+      timer.cancel();
+      await subscription.cancel();
+    }
+  }
+
+  Future<void> _transport(String deviceId, String endpoint) {
+    ++_commandGeneration;
+    final sent = _commandTail.then((_) => _command(deviceId, endpoint));
+    _commandTail = sent.catchError((Object _) {});
+    return sent;
+  }
+
+  Future<void> pause(String deviceId) => _transport(deviceId, 'pause');
+
+  Future<void> resume(String deviceId) => _transport(deviceId, 'resume');
+
+  Future<void> skipNext(String deviceId) => _transport(deviceId, 'skip_next');
+
+  Future<void> skipPrevious(String deviceId) =>
+      _transport(deviceId, 'skip_prev');
+
+  Future<void> seekTo(String deviceId, int positionMs) =>
+      _command(deviceId, 'seek_to', {'value': max(0, positionMs)});
+
+  Future<void> setShuffle(String deviceId, bool value) =>
+      _command(deviceId, 'set_shuffling_context', {'value': value});
+
+  Future<void> setRepeat(
+    String deviceId, {
+    required bool context,
+    required bool track,
+  }) => _command(deviceId, 'set_options', {
+    'repeating_context': context,
+    'repeating_track': track,
   });
-
-  Future<void> pause(String deviceId) => _command(deviceId, 'pause');
-
-  Future<void> resume(String deviceId) => _command(deviceId, 'resume');
-
-  Future<void> skipNext(String deviceId) => _command(deviceId, 'skip_next');
-
-  Future<void> skipPrevious(String deviceId) => _command(deviceId, 'skip_prev');
-
-  Future<void> seekTo(String deviceId, int positionMs) => _command(deviceId, 'seek_to', {'value': max(0, positionMs)});
-
-  Future<void> setShuffle(String deviceId, bool value) => _command(deviceId, 'set_shuffling_context', {'value': value});
-
-  Future<void> setRepeat(String deviceId, {required bool context, required bool track}) =>
-      _command(deviceId, 'set_options', {'repeating_context': context, 'repeating_track': track});
 
   /// [volume] 为 0 – 1，换算成服务端的 0 – 65535。
   Future<void> setVolume(String deviceId, double volume) async {
     _requireOnline();
-    await _state.setVolume(observerId, deviceId, (volume.clamp(0.0, 1.0) * 65535).round());
+    await _state.setVolume(
+      observerId,
+      deviceId,
+      (volume.clamp(0.0, 1.0) * 65535).round(),
+    );
   }
 
   /// 释放全部资源；之后不可再用。
@@ -228,7 +352,8 @@ class ConnectService {
       sub.cancel().ignore();
     }
     // 注销是尽力而为，不等结果
-    if (wasRegistered && id != null) _state.unregister(observerId, id).catchError((Object _) {}).ignore();
+    if (wasRegistered && id != null)
+      _state.unregister(observerId, id).catchError((Object _) {}).ignore();
     unawaited(
       _dealer.dispose().whenComplete(() {
         _clusters.close();
@@ -237,7 +362,11 @@ class ConnectService {
     );
   }
 
-  Future<void> _command(String deviceId, String endpoint, [Map<String, Object?> extra = const {}]) async {
+  Future<void> _command(
+    String deviceId,
+    String endpoint, [
+    Map<String, Object?> extra = const {},
+  ]) async {
     _requireOnline();
     await _state.command(observerId, deviceId, endpoint, extra: extra);
   }
@@ -254,7 +383,8 @@ class ConnectService {
   // ---- dealer 事件 ----
 
   void _onDealerMessage(DealerMessage message) {
-    if (!_running || message.uri != _clusterUri || message.payloads.isEmpty) return;
+    if (!_running || message.uri != _clusterUri || message.payloads.isEmpty)
+      return;
     final payload = message.payloads.first;
     if (payload is! Map) return;
     try {
@@ -309,10 +439,12 @@ class ConnectService {
 
   void _scheduleRegisterRetry(String id) {
     var delay = _registerRetryDelay * (1 << min(_registerAttempts, 10));
-    if (delay > const Duration(seconds: 60)) delay = const Duration(seconds: 60);
+    if (delay > const Duration(seconds: 60))
+      delay = const Duration(seconds: 60);
     _registerAttempts++;
     _registerRetryTimer = Timer(delay, () {
-      if (_running && !_registered && _dealer.connectionId == id) _register(id).ignore();
+      if (_running && !_registered && _dealer.connectionId == id)
+        _register(id).ignore();
     });
   }
 
@@ -329,6 +461,11 @@ class ConnectService {
   // ---- 状态与快照 ----
 
   void _applyCluster(ConnectCluster cluster) {
+    if (cluster != ConnectCluster.empty &&
+        cluster.serverTimestampMs > 0 &&
+        cluster.serverTimestampMs < _current.serverTimestampMs)
+      return;
+    ++_snapshotRevision;
     _current = cluster;
     _sinceSnapshot
       ..reset()
@@ -340,7 +477,8 @@ class ConnectService {
     final next = !_running
         ? ConnectStatus.idle
         : switch (_dealer.status) {
-            DealerStatus.idle || DealerStatus.connecting => ConnectStatus.connecting,
+            DealerStatus.idle ||
+            DealerStatus.connecting => ConnectStatus.connecting,
             DealerStatus.offline => ConnectStatus.offline,
             DealerStatus.online =>
               _registered

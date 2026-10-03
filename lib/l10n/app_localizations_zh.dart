@@ -9,6 +9,16 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String playbackRetryWaiting(int attempt, int total, int seconds) {
+    return '网络连接失败，$seconds 秒后第 $attempt/$total 次重试';
+  }
+
+  @override
+  String playbackRetryRunning(int attempt, int total) {
+    return '正在重新连接，第 $attempt/$total 次重试';
+  }
+
+  @override
   String get appTitle => 'Flutify';
 
   @override
@@ -693,6 +703,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareEmbedCopy => '复制代码';
 
   @override
+  String get shareEmbedUnavailable => '此设备的系统 WebView 暂不可用，仍可复制下方嵌入代码。';
+
+  @override
+  String get shareEmbedFailed => 'Spotify 嵌入播放器加载失败，请检查网络后重试。';
+
+  @override
   String toastAddedTo(String name) {
     return '已添加到「$name」';
   }
@@ -1286,4 +1302,77 @@ class AppLocalizationsZh extends AppLocalizations {
   String addedWeeksAgo(int count) {
     return '$count 周前';
   }
+
+  @override
+  String get settingsGateway => 'Spotify 反代';
+
+  @override
+  String get settingsGatewayDescription =>
+      '通过自建服务器连接 Spotify API、媒体和 Connect。浏览器登录仍使用 Spotify 原站；保存后新连接生效。';
+
+  @override
+  String get settingsGatewayUrl => '反代地址（包含路径）';
+
+  @override
+  String get settingsGatewayUser => '反代用户名';
+
+  @override
+  String get settingsGatewayPassword => '反代密码';
+
+  @override
+  String get settingsGatewayInvalid => '请填写有效的 HTTPS 地址、单段路径及用户名和密码。';
+
+  @override
+  String get settingsApply => '保存';
+
+  @override
+  String get settingsCacheLocation => '缓存位置';
+
+  @override
+  String get settingsAudioCacheLocation => '音频缓存位置';
+
+  @override
+  String get settingsArtworkCacheLocation => '封面缓存位置';
+
+  @override
+  String get settingsLyricsCacheLocation => '歌词缓存位置';
+
+  @override
+  String get settingsCacheAppData => '应用数据目录（AppData）';
+
+  @override
+  String get settingsCacheApplication => '安装 / 便携程序目录';
+
+  @override
+  String get settingsCacheCustom => '自定义目录';
+
+  @override
+  String get settingsClearAllCache => '清理所有缓存';
+
+  @override
+  String get settingsClearAllCacheHelp =>
+      '清理音频、封面、歌词和浏览器临时缓存，保留登录、设置、收藏和播放记录。正在播放或下载的音频会保留。';
+
+  @override
+  String get settingsCacheLocationHelp =>
+      '已有缓存会迁移到新位置，校验成功后删除旧文件。正在播放或下载的音频将在释放后继续迁移。自定义位置使用所选目录下的 FlutifyCache 文件夹。';
+
+  @override
+  String settingsCacheMigrated(int files, int deferred, int failed) {
+    return '已迁移 $files 个文件，$deferred 个使用中，$failed 个未成功';
+  }
+
+  @override
+  String settingsCacheCleared(String size, int deferred, int failed) {
+    return '已释放 $size，$deferred 个使用中，$failed 个未成功';
+  }
+
+  @override
+  String get settingsCacheLocationInvalid => '目录不可写或路径无效，请选择应用有权访问的本地目录。';
+
+  @override
+  String get settingsCacheLocationSaved => '缓存位置已更新';
+
+  @override
+  String get settingsCacheLocationHint => '目录绝对路径';
 }

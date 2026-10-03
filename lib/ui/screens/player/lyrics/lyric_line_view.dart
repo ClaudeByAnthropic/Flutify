@@ -47,7 +47,9 @@ class LyricLineView extends StatelessWidget {
     final isActive = distance == 0;
 
     // 相邻句 1.0、隔一句 2.0 …… 上限 3.5：近处可辨认，远处退为氛围；再乘用户设置的强度
-    final blur = focusAll || isActive ? 0.0 : (d * 1.0).clamp(0.0, _maxBlur) * blurScale;
+    final blur = focusAll || isActive
+        ? 0.0
+        : (d * 1.0).clamp(0.0, _maxBlur) * blurScale;
     final opacity = focusAll
         ? (isActive ? 1.0 : 0.62)
         : isActive
@@ -66,7 +68,12 @@ class LyricLineView extends StatelessWidget {
           curve: Curves.easeOutCubic,
           builder: (context, v, _) {
             // 透明度直接写进文字颜色，省去 Opacity 的离屏图层
-            Widget result = _LineText(text: text, opacity: v.opacity, fontSize: fontSize, centered: centered);
+            Widget result = _LineText(
+              text: text,
+              opacity: v.opacity,
+              fontSize: fontSize,
+              centered: centered,
+            );
             // sigma 过小时跳过滤镜，避免无意义的离屏渲染
             if (v.blur > 0.05) {
               result = ImageFiltered(
@@ -93,7 +100,12 @@ class _LineText extends StatelessWidget {
   final double fontSize;
   final bool centered;
 
-  const _LineText({required this.text, required this.opacity, required this.fontSize, required this.centered});
+  const _LineText({
+    required this.text,
+    required this.opacity,
+    required this.fontSize,
+    required this.centered,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +137,17 @@ class _LineVisual {
   final double scale;
 
   const _LineVisual(this.blur, this.opacity, this.scale);
+
+  // 已经到达模糊/透明度上限的远处歌词无需每次切行重启动画。
+  @override
+  bool operator ==(Object other) =>
+      other is _LineVisual &&
+      other.blur == blur &&
+      other.opacity == opacity &&
+      other.scale == scale;
+
+  @override
+  int get hashCode => Object.hash(blur, opacity, scale);
 }
 
 class _LineVisualTween extends Tween<_LineVisual> {

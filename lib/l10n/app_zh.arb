@@ -1,4 +1,8 @@
 {
+  "playbackRetryWaiting": "网络连接失败，{seconds} 秒后第 {attempt}/{total} 次重试",
+  "@playbackRetryWaiting": {"placeholders": {"attempt": {"type": "int"}, "total": {"type": "int"}, "seconds": {"type": "int"}}},
+  "playbackRetryRunning": "正在重新连接，第 {attempt}/{total} 次重试",
+  "@playbackRetryRunning": {"placeholders": {"attempt": {"type": "int"}, "total": {"type": "int"}}},
   "@@locale": "zh",
 
   "appTitle": "Flutify",
@@ -307,6 +311,8 @@
   "shareEmbedCompact": "紧凑",
   "shareEmbedDark": "深色",
   "shareEmbedCopy": "复制代码",
+  "shareEmbedUnavailable": "此设备的系统 WebView 暂不可用，仍可复制下方嵌入代码。",
+  "shareEmbedFailed": "Spotify 嵌入播放器加载失败，请检查网络后重试。",
   "toastAddedTo": "已添加到「{name}」",
   "@toastAddedTo": {
     "placeholders": { "name": { "type": "String" } }
@@ -556,5 +562,29 @@
   "addedWeeksAgo": "{count} 周前",
   "@addedWeeksAgo": {
     "placeholders": { "count": { "type": "int" } }
-  }
+  },
+  "settingsGateway": "Spotify 反代",
+  "settingsGatewayDescription": "通过自建服务器连接 Spotify API、媒体和 Connect。浏览器登录仍使用 Spotify 原站；保存后新连接生效。",
+  "settingsGatewayUrl": "反代地址（包含路径）",
+  "settingsGatewayUser": "反代用户名",
+  "settingsGatewayPassword": "反代密码",
+  "settingsGatewayInvalid": "请填写有效的 HTTPS 地址、单段路径及用户名和密码。",
+  "settingsApply": "保存",
+  "settingsCacheLocation": "缓存位置",
+  "settingsAudioCacheLocation": "音频缓存位置",
+  "settingsArtworkCacheLocation": "封面缓存位置",
+  "settingsLyricsCacheLocation": "歌词缓存位置",
+  "settingsCacheAppData": "应用数据目录（AppData）",
+  "settingsCacheApplication": "安装 / 便携程序目录",
+  "settingsCacheCustom": "自定义目录",
+  "settingsClearAllCache": "清理所有缓存",
+  "settingsClearAllCacheHelp": "清理音频、封面、歌词和浏览器临时缓存，保留登录、设置、收藏和播放记录。正在播放或下载的音频会保留。",
+  "settingsCacheLocationHelp": "已有缓存会迁移到新位置，校验成功后删除旧文件。正在播放或下载的音频将在释放后继续迁移。自定义位置使用所选目录下的 FlutifyCache 文件夹。",
+  "settingsCacheMigrated": "已迁移 {files} 个文件，{deferred} 个使用中，{failed} 个未成功",
+  "@settingsCacheMigrated": {"placeholders": {"files": {"type": "int"}, "deferred": {"type": "int"}, "failed": {"type": "int"}}},
+  "settingsCacheCleared": "已释放 {size}，{deferred} 个使用中，{failed} 个未成功",
+  "@settingsCacheCleared": {"placeholders": {"size": {"type": "String"}, "deferred": {"type": "int"}, "failed": {"type": "int"}}},
+  "settingsCacheLocationInvalid": "目录不可写或路径无效，请选择应用有权访问的本地目录。",
+  "settingsCacheLocationSaved": "缓存位置已更新",
+  "settingsCacheLocationHint": "目录绝对路径"
 }

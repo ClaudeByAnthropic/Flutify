@@ -94,6 +94,25 @@ endif()
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
 
+# App-local MSVC runtimes let portable and per-user installs run on a clean
+# Windows machine without requiring an administrator to install VC Redist.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${INSTALL_BUNDLE_LIB_DIR}")
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+include(InstallRequiredSystemLibraries)
+# The ARM64 redist also ships the x64 EH4 companion for emulated/ARM64EC
+# clients. Native ARM64 uses vcruntime140.dll; it must not bundle that x64 DLL.
+if(MSVC_CXX_ARCHITECTURE_ID STREQUAL "ARM64")
+  list(FILTER CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS EXCLUDE REGEX
+    "/vcruntime140_1d?\\.dll$")
+  # Remove leftovers when rebuilding an existing bundle after this fix.
+  install(CODE "file(REMOVE \"${INSTALL_BUNDLE_LIB_DIR}/vcruntime140_1.dll\")"
+    COMPONENT Runtime)
+endif()
+if(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+  install(PROGRAMS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+endif()
+
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 

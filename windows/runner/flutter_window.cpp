@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "media_identity.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -13,6 +14,9 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+
+  // Bind the HWND before either plugins or native SMTC create a media session.
+  media_identity::RegisterWindow(GetHandle());
 
   RECT frame = GetClientArea();
 
@@ -28,6 +32,7 @@ bool FlutterWindow::OnCreate() {
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   auto* messenger = flutter_controller_->engine()->messenger();
+  trust_store_ = CreateWindowsTrustStoreChannel(messenger);
   media_controls_ = std::make_unique<MediaControls>(GetHandle(), messenger);
   snap_layout_ = std::make_unique<SnapLayout>(GetHandle(), flutter_controller_->view()->GetNativeWindow(), messenger);
   taskbar_lyrics_ = std::make_unique<TaskbarLyrics>(GetHandle(), messenger);
@@ -47,6 +52,7 @@ bool FlutterWindow::OnCreate() {
 void FlutterWindow::OnDestroy() {
   // 先于引擎释放：它们持有引擎的 MethodChannel
   taskbar_lyrics_ = nullptr;
+  trust_store_ = nullptr;
   snap_layout_ = nullptr;
   media_controls_ = nullptr;
   if (flutter_controller_) {

@@ -37,6 +37,12 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Test playback recovery and authorization
+        run: |
+          flutter test
+          node --test tool/test_consent_auto_approve.cjs
+          python3 -m unittest discover -s tool -p test_verify_android_apks.py
+
       # flutter_inappwebview_android 1.1.3 仍引用 proguard-android.txt，AGP 9 起直接报错；换成等价的 optimize 版
       - name: Patch flutter_inappwebview_android for AGP 9
         run: |
@@ -45,11 +51,35 @@ jobs:
           sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" "$root/android/build.gradle"
           grep -n "proguard" "$root/android/build.gradle"
 
-      # 目前用 debug 签名（见 android/app/build.gradle.kts），正式发布前换成自己的签名
-      - name: Build APK（按 ABI 拆分 + 通用包）
+      - name: Restore fixed beta signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          flutter build apk --release --split-per-abi
-          flutter build apk --release
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo 'Missing Android signing secrets'; exit 1; }
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/flutify-beta.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/flutify-beta.jks" >> "$GITHUB_ENV"
+          # Flutter 给 ABI 拆分包增加 1000/2000/3000/4000。批次间隔 10000，
+          # 使新通用包也能覆盖上一批的拆分包；重跑同一批时递增 attempt。
+          echo "ANDROID_BUILD_NUMBER=$(( (100 + GITHUB_RUN_NUMBER) * 10000 + GITHUB_RUN_ATTEMPT ))" >> "$GITHUB_ENV"
+
+      - name: Build APK（按 ABI 拆分 + 通用包）
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          flutter build apk --release --split-per-abi --build-number="$ANDROID_BUILD_NUMBER"
+          flutter build apk --release --build-number="$ANDROID_BUILD_NUMBER"
+
+      - name: Verify APK signatures, version codes, and media icons
+        env:
+          ANDROID_SIGNING_CERT_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
+        run: python3 tool/verify_android_apks.py build/app/outputs/flutter-apk "$ANDROID_BUILD_NUMBER"
+
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/flutify-beta.jks"
 
       - name: Rename
         run: |
@@ -66,34 +96,82 @@ jobs:
           path: build/app/outputs/flutter-apk/Flutify-*.apk
 
   windows:
-    name: Windows x64
-    runs-on: windows-latest
+    name: Windows ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
+        if: matrix.arch == 'x64'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+          architecture: ${{ matrix.arch }}
+
+      # 3.44.0 发布清单没有 Windows ARM64 SDK 压缩包；官方源码启动脚本支持
+      # 在 ARM64 宿主下载原生 Dart。不能给 flutter-action 传 arm64 后期待它找到压缩包。
+      - name: Bootstrap native Flutter SDK on Windows ARM64
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          if ($env:PROCESSOR_ARCHITECTURE -ne 'ARM64') { throw 'Expected native ARM64 runner shell' }
+          $sdk = Join-Path $env:RUNNER_TEMP 'flutter-arm64'
+          git clone --depth 1 --branch $env:FLUTTER_VERSION https://github.com/flutter/flutter.git $sdk
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter clone failed' }
+          $revision = git -C $sdk rev-parse HEAD
+          if ($revision -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') { throw 'Unexpected Flutter 3.44.0 revision' }
+          & "$sdk/bin/flutter.bat" --version
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter bootstrap failed' }
+          $dartVersion = & "$sdk/bin/dart.bat" --version 2>&1
+          if ($dartVersion -notmatch 'windows_arm64') { throw "Expected ARM64 Dart: $dartVersion" }
+          "$sdk/bin" >> $env:GITHUB_PATH
 
       - run: flutter pub get
 
       - run: flutter build windows --release
 
-      - name: Zip
+      - name: Verify native binary architecture
+        run: python tool/verify_windows_arch.py build/windows/${{ matrix.arch }}/runner/Release ${{ matrix.arch }}
+
+      - name: Verify app-local VC runtime dependencies
+        shell: pwsh
+        run: ./tool/verify_windows_runtime.ps1 -Directory build/windows/${{ matrix.arch }}/runner/Release -BuildDirectory build/windows/${{ matrix.arch }}
+
+      - name: Install Inno Setup compiler
         shell: pwsh
         run: |
-          # 附上许可证与第三方声明（libmpv 为 LGPL，须随二进制提供声明）
-          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md build/windows/x64/runner/Release/
-          $name = "Flutify-$($env:GITHUB_REF_NAME -replace '/','-')-windows-x64.zip"
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $name
-          "ZIP_NAME=$name" >> $env:GITHUB_ENV
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          $compilerDir = Join-Path $env:RUNNER_TEMP 'inno-6.7.3'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $installer
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash -ne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') { throw 'Inno Setup checksum mismatch' }
+          # The x86 compiler runs on both Windows x64 and ARM64. Portable mode
+          # avoids depending on Chocolatey or the runner's preinstalled version.
+          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/PORTABLE=1', "/DIR=`"$compilerDir`"") -WindowStyle Hidden -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Inno Setup extraction failed: $($install.ExitCode)" }
+          $compiler = Join-Path $compilerDir 'ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler missing' }
+          "INNO_COMPILER=$compiler" >> $env:GITHUB_ENV
+
+      - name: Package portable ZIP and installer
+        shell: pwsh
+        run: |
+          ./tool/package_windows.ps1 -Arch '${{ matrix.arch }}' -Label $env:GITHUB_REF_NAME -Compiler $env:INNO_COMPILER
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windows
-          path: ${{ env.ZIP_NAME }}
+          name: windows-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
 
   release:
     name: Publish release

@@ -10,7 +10,7 @@ import '../desktop/desktop_window.dart';
 /// 移动端底部区域：悬浮胶囊迷你播放器 + 悬浮药丸式液态玻璃底部导航（iOS 风格）。
 ///
 /// 配合 `Scaffold(extendBody: true)` 使用：内容滚动到导航药丸下方时透过模糊可见；
-/// 迷你播放器背后铺一层淡淡的渐变遮罩，保证其边缘的文字 / 封面不与内容混在一起。
+/// 渐变遮罩放在导航区域，避免迷你播放器下缘出现一条矩形白边。
 /// 整体高度通过 MediaQuery 底部 padding 传给页面（见 ContentBottomSpacer）。
 class MobileBottomBar extends StatelessWidget {
   final int selectedIndex;
@@ -29,6 +29,8 @@ class MobileBottomBar extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const MiniPlayer(),
+        const SizedBox(height: 10),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -40,12 +42,10 @@ class MobileBottomBar extends StatelessWidget {
               ],
             ),
           ),
-          child: const MiniPlayer(),
-        ),
-        const SizedBox(height: 10),
-        _GlassNavigationPill(
-          selectedIndex: selectedIndex,
-          onSelected: onSelected,
+          child: _GlassNavigationPill(
+            selectedIndex: selectedIndex,
+            onSelected: onSelected,
+          ),
         ),
       ],
     );
@@ -134,7 +134,12 @@ class _GlassNavigationPill extends StatelessWidget {
                     width: 0.5,
                   ),
                 ),
-                child: nav,
+                // 安全区已经留在药丸外，避免 NavigationBar 再在内部垫高底部。
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeBottom: true,
+                  child: nav,
+                ),
               );
               if (transitioning) return fill;
               return BackdropFilter(

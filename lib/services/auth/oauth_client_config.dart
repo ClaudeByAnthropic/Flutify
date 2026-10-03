@@ -2,8 +2,9 @@ import 'auth_constants.dart';
 
 /// 浏览器 OAuth 授权所用的客户端配置：桌面版 client_id、本机回调地址与权限范围。
 ///
-/// 回调 `http://127.0.0.1:8898/login` 与权限范围对齐 librespot 的 OAuth 实现（已在该 client_id 下登记），
-/// 无需用户申请开发者应用。
+/// 官方 Windows 桌面程序使用 `127.0.0.1` 与 `http://%s/login` 回环回调。
+/// 这里采用同样的地址 / 路径，固定端口 8898 与 librespot 的已登记实现保持兼容。
+/// 回调形式相同不代表客户端身份无法被识别。
 class OAuthClientConfig {
   static const int redirectPort = 8898;
 

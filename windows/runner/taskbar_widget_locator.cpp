@@ -4,6 +4,7 @@
 #include <oleauto.h>
 
 #include <algorithm>
+#include <string>
 
 namespace {
 
@@ -32,9 +33,18 @@ class ComPtr {
   T* ptr_ = nullptr;
 };
 
-// 每轮间隔与「重新完整查找」的周期（轮数）。
 constexpr int kIntervalMs = 1000;
-constexpr int kRefindRounds = 15;
+
+std::wstring CachedString(IUIAutomationElement* element, PROPERTYID property) {
+  VARIANT value;
+  VariantInit(&value);
+  std::wstring result;
+  if (SUCCEEDED(element->GetCachedPropertyValue(property, &value)) && value.vt == VT_BSTR && value.bstrVal) {
+    result = value.bstrVal;
+  }
+  VariantClear(&value);
+  return result;
+}
 
 }  // namespace
 
@@ -50,59 +60,85 @@ void TaskbarWidgetLocator::Stop() {
   if (thread_.joinable()) thread_.join();
 }
 
+TaskbarWidgetLocator::Bounds TaskbarWidgetLocator::bounds() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return bounds_;
+}
+
 void TaskbarWidgetLocator::Run() {
   if (FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED))) return;
   {
     ComPtr<IUIAutomation> uia;
     ComPtr<IUIAutomationCondition> condition;
+    ComPtr<IUIAutomationCacheRequest> cache;
     if (SUCCEEDED(CoCreateInstance(__uuidof(CUIAutomation), nullptr, CLSCTX_INPROC_SERVER, __uuidof(IUIAutomation),
                                    reinterpret_cast<void**>(uia.Put())))) {
-      VARIANT id;
-      VariantInit(&id);
-      id.vt = VT_BSTR;
-      id.bstrVal = SysAllocString(L"WidgetsButton");
-      uia->CreatePropertyCondition(UIA_AutomationIdPropertyId, id, condition.Put());
-      VariantClear(&id);
+      uia->CreateTrueCondition(condition.Put());
+      if (SUCCEEDED(uia->CreateCacheRequest(cache.Put()))) {
+        cache->AddProperty(UIA_AutomationIdPropertyId);
+        cache->AddProperty(UIA_ClassNamePropertyId);
+        cache->AddProperty(UIA_BoundingRectanglePropertyId);
+        cache->AddProperty(UIA_IsOffscreenPropertyId);
+        cache->put_AutomationElementMode(AutomationElementMode_None);
+      }
     }
 
-    ComPtr<IUIAutomationElement> tray;
-    ComPtr<IUIAutomationElement> widget;
     int null_runs = 0;
-    int since_find = kRefindRounds;
+    HWND previous_tray = nullptr;
     while (running_) {
-      if (uia && condition) {
+      Bounds next;
+      if (uia && condition && cache) {
         HWND tray_hwnd = FindWindowW(L"Shell_TrayWnd", nullptr);
-        bool ok = tray_hwnd != nullptr;
-        if (ok && (!tray || since_find >= kRefindRounds)) {
-          since_find = 0;
-          widget.Reset();
-          ok = SUCCEEDED(uia->ElementFromHandle(tray_hwnd, tray.Put())) && tray &&
-               SUCCEEDED(tray->FindFirst(TreeScope_Descendants, condition.Get(), widget.Put()));
-        }
-        since_find++;
-        if (!ok) {
-          // 元素失效（资源管理器重启等）：下一轮重找
-          widget_right_ = kUnknown;
-          null_runs = 0;
-          tray.Reset();
-        } else if (!widget) {
-          since_find = kRefindRounds;
-          if (++null_runs >= 2) widget_right_ = kNone;
-        } else {
-          RECT box{};
-          RECT tray_rect{};
-          BOOL offscreen = FALSE;
-          if (SUCCEEDED(widget->get_CurrentBoundingRectangle(&box)) &&
-              SUCCEEDED(widget->get_CurrentIsOffscreen(&offscreen)) && GetWindowRect(tray_hwnd, &tray_rect)) {
-            if (box.right > box.left && !offscreen) {
-              widget_right_ = (std::max)(0L, box.right - tray_rect.left);
+        if (tray_hwnd != previous_tray) null_runs = 0;
+        previous_tray = tray_hwnd;
+        RECT tray_rect{};
+        ComPtr<IUIAutomationElement> tray;
+        ComPtr<IUIAutomationElementArray> elements;
+        if (tray_hwnd && GetWindowRect(tray_hwnd, &tray_rect) &&
+            SUCCEEDED(uia->ElementFromHandle(tray_hwnd, tray.Put())) && tray &&
+            SUCCEEDED(tray->FindAllBuildCache(TreeScope_Descendants, condition.Get(), cache.Get(), elements.Put())) && elements) {
+          next.taskbar = tray_hwnd;
+          next.width = tray_rect.right - tray_rect.left;
+          next.height = tray_rect.bottom - tray_rect.top;
+          int count = 0;
+          elements->get_Length(&count);
+          for (int i = 0; i < count; ++i) {
+            ComPtr<IUIAutomationElement> element;
+            RECT box{};
+            BOOL offscreen = TRUE;
+            if (FAILED(elements->GetElement(i, element.Put())) || !element ||
+                FAILED(element->get_CachedBoundingRectangle(&box)) ||
+                FAILED(element->get_CachedIsOffscreen(&offscreen)) || offscreen ||
+                box.right <= box.left || box.bottom <= box.top ||
+                box.bottom <= tray_rect.top || box.top >= tray_rect.bottom) continue;
+            const auto id = CachedString(element.Get(), UIA_AutomationIdPropertyId);
+            const auto cls = CachedString(element.Get(), UIA_ClassNamePropertyId);
+            const int left = (std::max)(0L, box.left - tray_rect.left);
+            const int right = (std::min)(static_cast<LONG>(next.width), box.right - tray_rect.left);
+            if (id == L"WidgetsButton") {
+              next.widget_left = left;
+              next.widget_right = right;
+            } else if (cls == L"Taskbar.TaskListButtonAutomationPeer" || id.rfind(L"Appid:", 0) == 0 ||
+                       id == L"StartButton" || id == L"SearchButton" || id == L"TaskViewButton" ||
+                       id == L"CopilotButton" || id == L"ChatButton" || id == L"OverflowButton") {
+              next.icons_left = next.icons_left < 0 ? left : (std::min)(next.icons_left, left);
+              next.icons_right = (std::max)(next.icons_right, right);
+            } else if (cls.rfind(L"SystemTray.", 0) == 0) {
+              next.tray_left = next.tray_left < 0 ? left : (std::min)(next.tray_left, left);
             }
-            null_runs = 0;
-          } else {
-            widget_right_ = kUnknown;
-            tray.Reset();
           }
+          if (next.widget_right < 0) {
+            if (++null_runs >= 2) next.widget_right = kNone;
+          } else {
+            null_runs = 0;
+          }
+        } else {
+          null_runs = 0;
         }
+      }
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        bounds_ = next;
       }
       for (int waited = 0; waited < kIntervalMs && running_; waited += 100) Sleep(100);
     }

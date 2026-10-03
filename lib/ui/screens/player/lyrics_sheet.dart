@@ -10,6 +10,7 @@ import '../../widgets/player_controls.dart';
 import 'lyrics/lyrics_backdrop.dart';
 import 'lyrics/lyrics_glass_controls.dart';
 import 'lyrics/lyrics_view.dart';
+import 'player_modal.dart';
 
 /// 同步歌词面板（Apple Music iOS 风格，手机 / 窄窗口使用）。
 /// 遥控远程设备时同样可用（手机上点远程迷你播放器即打开它）。
@@ -25,16 +26,21 @@ class LyricsSheet extends StatelessWidget {
   static const double _headerHeight = 104;
   static const double _controlsHeight = 150;
 
-  static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      showDragHandle: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const LyricsSheet(),
-    );
-  }
+  static Future<void> show(BuildContext context) =>
+      PlayerModal.show(context, (captureRoute) {
+        return showModalBottomSheet(
+          context: context,
+          useRootNavigator: true,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: false,
+          backgroundColor: Colors.transparent,
+          builder: (sheetContext) {
+            captureRoute(sheetContext);
+            return const LyricsSheet();
+          },
+        );
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +77,12 @@ class LyricsSheet extends StatelessWidget {
               ),
             Positioned(left: 0, right: 0, top: 0, child: _Header(track: track)),
             if (track != null)
-              Positioned(left: 16, right: 16, bottom: 16 + bottomSafe, child: const LyricsGlassControls()),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16 + bottomSafe,
+                child: const LyricsGlassControls(),
+              ),
           ],
         ),
       ),
@@ -95,7 +106,10 @@ class _Header extends StatelessWidget {
           Container(
             width: 36,
             height: 5,
-            decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(3)),
+            decoration: BoxDecoration(
+              color: Colors.white38,
+              borderRadius: BorderRadius.circular(3),
+            ),
           ),
           const SizedBox(height: 12),
           LiquidGlass(
@@ -103,7 +117,11 @@ class _Header extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
             child: Row(
               children: [
-                CoverImage(url: track?.coverUrl ?? '', size: 44, borderRadius: tokens.radius(10)),
+                CoverImage(
+                  url: track?.coverUrl ?? '',
+                  size: 44,
+                  borderRadius: tokens.radius(10),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -112,23 +130,40 @@ class _Header extends StatelessWidget {
                     children: [
                       Text(
                         track?.name ?? context.l10n.lyricsTitle,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         track?.artistNames ?? context.l10n.lyricsNotPlaying,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                if (track != null) LikeButton(track: track!, size: 22, inactiveColor: Colors.white70),
+                if (track != null)
+                  LikeButton(
+                    track: track!,
+                    size: 22,
+                    inactiveColor: Colors.white70,
+                  ),
                 IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 28),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                   tooltip: context.l10n.commonClose,
                   onPressed: () => Navigator.pop(context),
                 ),

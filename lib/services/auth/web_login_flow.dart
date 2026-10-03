@@ -262,46 +262,97 @@ enum WebLoginStage {
   failed,
 }
 
-/// 授权页 URL 判定：只在 OAuth 授权页上自动点「同意」，登录页等其它页面绝不代点。
+/// 自动确认仅限 Spotify 的 HTTPS 账号页面。
+bool isSpotifyAccountsPageUrl(String? url) {
+  final uri = Uri.tryParse(url ?? '');
+  return uri != null &&
+      uri.scheme == 'https' &&
+      uri.host == 'accounts.spotify.com' &&
+      uri.port == 443 &&
+      uri.userInfo.isEmpty;
+}
+
+/// 「同意」仅在授权页匹配；登录后明确的「继续使用应用」可在账号站的中间页匹配。
 bool isConsentPageUrl(String? url) {
   final uri = Uri.tryParse(url ?? '');
-  if (uri == null) return false;
-  if (uri.host != 'accounts.spotify.com') return false;
-  return uri.path.toLowerCase().contains('/authorize') || uri.queryParameters.containsKey('client_id');
+  if (uri == null || !isSpotifyAccountsPageUrl(url)) return false;
+  return uri.pathSegments.any((s) => s == 'authorize' || s == 'consent');
 }
 
 /// 回环回调判定：`http://127.0.0.1:<port><path>?code=…`（授权码已在路上）。
-bool isLoopbackRedirect(String? url, {int port = 8898, String path = '/login'}) {
+bool isLoopbackRedirect(
+  String? url, {
+  int port = 8898,
+  String path = '/login',
+}) {
   final uri = Uri.tryParse(url ?? '');
   if (uri == null) return false;
-  return (uri.host == '127.0.0.1' || uri.host == 'localhost') && uri.port == port && uri.path == path;
+  return uri.scheme == 'http' &&
+      uri.userInfo.isEmpty &&
+      (uri.host == '127.0.0.1' || uri.host == 'localhost') &&
+      uri.port == port &&
+      uri.path == path;
 }
 
-/// 同意页自动点击脚本：只点「同意 / Agree」这类确认按钮，绝不点「取消」；
-/// 按钮还没渲染出来就挂 MutationObserver 等它出现（React 页面晚于 onLoadStop 渲染）。
+/// 多语言授权确认：匹配完整文字，检查可见 / 可点击状态；同一节点只点击一次。
+/// React 异步渲染由限时 MutationObserver 处理，每次点击前重新校验地址。
 const String kConsentAutoApproveScript = r'''
 (() => {
-  const labels = ['agree', 'agree and continue', 'agree & continue', 'agree to continue',
-                  'allow access', '同意', '同意并继续', '允许访问', '授权'];
-  const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const trusted = () => location.protocol === 'https:' && location.hostname === 'accounts.spotify.com' &&
+    (!location.port || location.port === '443') && !location.username && !location.password;
+  if (!trusted()) return '';
+  const consentPage = () => location.pathname.split('/').some(p => p === 'authorize' || p === 'consent');
+  const agree = ['agree', 'agree and continue', 'agree & continue', 'agree to continue', 'allow access',
+    '同意', '同意并继续', '同意並繼續', '允许访问', '允許存取', '授权', '授權',
+    'zustimmen', 'j’accepte', "j'accepte", 'accepter', 'aceptar', 'acepto', 'concordo', 'aceitar',
+    'accetto', 'accetta', 'akkoord', 'godkänn', 'godta', 'accepterer', 'hyväksyn',
+    'zgadzam się', 'souhlasím', 'elfogadom', 'kabul et', 'согласен', '同意する', '동의', 'setuju'];
+  const proceed = ['continue to app', 'continue to the app', 'continue using the app',
+    '继续使用应用', '继续使用此应用', '继续前往应用', '繼續使用應用程式', '繼續使用應用', '繼續前往應用程式',
+    'weiter zur app', 'zur app', 'continuer vers l’application', "continuer vers l'application",
+    'continuer sur l’application', "continuer sur l'application", 'accéder à l’application', "accéder à l'application",
+    'continuar a la aplicación', 'continuar en la aplicación', 'ir a la aplicación',
+    'continuar para o aplicativo', 'continuar para a aplicação', 'continuar no aplicativo',
+    'continua nell’app', "continua nell'app", 'vai all’app', "vai all'app", 'doorgaan naar app',
+    'doorgaan naar de app', 'fortsätt till appen', 'fortsett til appen', 'fortsæt til appen',
+    'jatka sovellukseen', 'przejdź do aplikacji', 'pokračovat do aplikace', 'tovább az alkalmazáshoz',
+    'uygulamaya devam et', 'перейти в приложение', 'продовжити в застосунку',
+    'アプリに進む', 'アプリの使用を続行', '앱으로 계속', '앱으로 이동', 'lanjutkan ke aplikasi',
+    'teruskan ke aplikasi', 'tiếp tục đến ứng dụng', 'ดำเนินการต่อไปยังแอป', 'المتابعة إلى التطبيق'];
+  const norm = (s) => (s || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+  const state = window.__flutifyConsentState ||= { clicked: new WeakSet(), observer: null };
   const click = () => {
+    if (!trusted()) return '';
     const nodes = document.querySelectorAll('button, [role="button"], input[type="submit"], a[href]');
     for (const n of nodes) {
+      if (state.clicked.has(n) || n.disabled || n.getAttribute('aria-disabled') === 'true' ||
+          n.closest('[hidden], [inert], [aria-hidden="true"]') || !n.getClientRects().length) continue;
+      const style = getComputedStyle(n);
+      if (style.visibility !== 'visible' || style.display === 'none' || style.opacity === '0') continue;
       const t = norm(n.innerText || n.value || n.getAttribute('aria-label'));
       if (!t) continue;
-      if (labels.some((l) => t === l)) { n.click(); return t; }
+      if (proceed.includes(t) || (consentPage() && agree.includes(t))) {
+        state.clicked.add(n);
+        n.click();
+        return t;
+      }
     }
     return '';
   };
+  const stop = () => {
+    state.observer?.disconnect();
+    state.observer = null;
+    clearTimeout(state.timer);
+  };
   const hit = click();
-  if (hit) return hit;
-  if (window.__flutifyConsentObserver) return '';
-  window.__flutifyConsentObserver = true;
-  const mo = new MutationObserver(() => {
-    const h = click();
-    if (h) { mo.disconnect(); window.__flutifyConsentObserver = false; }
+  if (hit) { stop(); return hit; }
+  if (state.observer) return '';
+  state.observer = new MutationObserver(() => {
+    if (!trusted() || click()) stop();
   });
-  mo.observe(document.documentElement, { childList: true, subtree: true });
+  state.observer.observe(document.documentElement, { childList: true, subtree: true,
+    characterData: true, attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'hidden', 'style', 'class'] });
+  state.timer = setTimeout(stop, 12000);
   return '';
 })()
 ''';

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -10,10 +11,18 @@ import 'track_playback_state.dart';
 /// 播放端要驱动的本机播放器（由 [PlaybackReceiverHost] 接到 PlaybackProvider）。
 abstract class ReceiverHost {
   /// 播放 [order]（状态下标，按播放顺序，第一个为当前）对应的曲目，从 [positionMs] 起，[paused] 时停在该处。
-  Future<void> load(TpStateMachine machine, List<int> order, {required int positionMs, required bool paused});
+  Future<void> load(
+    TpStateMachine machine,
+    List<int> order, {
+    required int positionMs,
+    required bool paused,
+  });
 
   /// 当前曲目不变时只同步暂停 / 进度；[positionMs] 为 null（只改了循环 / 随机等）时不动进度。
   Future<void> sync({required int? positionMs, required bool paused});
+
+  /// 服务端扩展了当前曲目的前后窗口；不重新加载当前音频。
+  void updateQueue(TpStateMachine machine, List<int> order);
 
   /// 随机 / 循环方式。
   void applyOptions(TpOptions options);
@@ -50,12 +59,20 @@ class ConnectReceiver {
 
   StreamSubscription<String>? _idSub;
   StreamSubscription<DealerMessage>? _msgSub;
+  StreamSubscription<DealerStatus>? _statusSub;
+  final Duration registerRetryDelay;
+  Timer? _registerRetry;
+  String? _registrationId;
+  Future<void>? _registration;
+  int _registrationEpoch = 0;
+  int _registerAttempts = 0;
   bool _started = false;
   bool _registered = false;
 
   TpStateMachine? _machine;
   int _stateIndex = -1;
   bool _paused = true;
+  int _revision = 0;
 
   /// 本状态是否已汇报过「播满 30 秒」。
   bool _thresholdReported = false;
@@ -66,14 +83,22 @@ class ConnectReceiver {
     required http.Client client,
     required Future<String> Function() webToken,
     required String deviceId,
-  }) : _api = TrackPlaybackApi(client: client, webToken: webToken, deviceId: deviceId),
-       _dealer = DealerClient(
+    DealerClient? dealer,
+    this.registerRetryDelay = const Duration(seconds: 2),
+  }) : _api = TrackPlaybackApi(
          client: client,
-         headers: () async => {
-           'Authorization': 'Bearer ${await webToken()}',
-           'User-Agent': TrackPlaybackApi.userAgent,
-         },
-       );
+         webToken: webToken,
+         deviceId: deviceId,
+       ),
+       _dealer =
+           dealer ??
+           DealerClient(
+             client: client,
+             headers: () async => {
+               'Authorization': 'Bearer ${await webToken()}',
+               'User-Agent': TrackPlaybackApi.userAgent,
+             },
+           );
 
   String get deviceId => _api.deviceId;
 
@@ -88,6 +113,9 @@ class ConnectReceiver {
     _started = true;
     _idSub = _dealer.connectionIds.listen(_register);
     _msgSub = _dealer.messages.listen(_onMessage);
+    _statusSub = _dealer.statusChanges.listen((status) {
+      if (status != DealerStatus.online) _resetRegistration();
+    });
     try {
       await _dealer.connect();
     } catch (e) {
@@ -98,13 +126,15 @@ class ConnectReceiver {
   Future<void> stop() async {
     if (!_started) return;
     _started = false;
+    final wasRegistered = _registered;
+    _resetRegistration();
     await _idSub?.cancel();
     await _msgSub?.cancel();
+    await _statusSub?.cancel();
     _clear();
-    if (_registered) {
-      _registered = false;
+    if (wasRegistered) {
       try {
-        await _api.deregister();
+        await _api.deregister().timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[Receiver] 注销失败：$e');
       }
@@ -112,20 +142,59 @@ class ConnectReceiver {
     await _dealer.close();
   }
 
-  Future<void> _register(String connectionId) async {
+  void _resetRegistration() {
+    ++_registrationEpoch;
+    ++_revision;
+    _registerRetry?.cancel();
+    _registerRetry = null;
+    _registrationId = null;
+    _registration = null;
+    _registered = false;
+    _registerAttempts = 0;
+  }
+
+  Future<void> _register(String connectionId) {
+    if (!_started) return Future.value();
+    if (_registrationId == connectionId && _registration != null)
+      return _registration!;
+    _registerRetry?.cancel();
+    _registrationId = connectionId;
+    final epoch = ++_registrationEpoch;
+    return _registration = _doRegister(connectionId, epoch);
+  }
+
+  Future<void> _doRegister(String connectionId, int epoch) async {
+    bool current() =>
+        _started &&
+        epoch == _registrationEpoch &&
+        _dealer.connectionId == connectionId;
     try {
       final name = deviceName();
-      await _api.register(connectionId: connectionId, name: name, volume: 65535);
+      await _api.register(
+        connectionId: connectionId,
+        name: name,
+        volume: 65535,
+        isCurrent: current,
+      );
+      if (!current()) return;
       _registered = true;
+      _registerAttempts = 0;
       debugPrint('[Receiver] 已注册为 Connect 设备「$name」');
       onRegistered?.call();
     } catch (e) {
+      if (!current()) return;
+      _registration = null;
+      _registered = false;
       debugPrint('[Receiver] 注册失败：$e');
+      final delay = registerRetryDelay * (1 << min(_registerAttempts++, 4));
+      _registerRetry = Timer(delay, () {
+        if (current()) unawaited(_register(connectionId));
+      });
     }
   }
 
   void _onMessage(DealerMessage message) {
-    if (message.uri != 'hm://track-playback/v1/command') return;
+    if (!_started || message.uri != 'hm://track-playback/v1/command') return;
     for (final raw in message.payloads) {
       if (raw is! Map) continue;
       final payload = raw.cast<String, dynamic>();
@@ -148,6 +217,7 @@ class ConnectReceiver {
   }
 
   Future<void> _replaceState(TpReplaceState cmd) async {
+    final revision = ++_revision;
     final prev = _currentTrackUri;
     _machine = cmd.machine;
     _stateIndex = cmd.ref.stateIndex;
@@ -157,11 +227,18 @@ class ConnectReceiver {
     host.applyOptions(cmd.machine.options);
     try {
       if (prev != null && prev == _currentTrackUri) {
+        host.updateQueue(cmd.machine, cmd.machine.advanceChain(_stateIndex));
         await host.sync(positionMs: cmd.seekTo, paused: _paused);
       } else {
         _report('before_track_load', positionMs: position);
-        await host.load(cmd.machine, cmd.machine.advanceChain(_stateIndex), positionMs: position, paused: _paused);
+        await host.load(
+          cmd.machine,
+          cmd.machine.advanceChain(_stateIndex),
+          positionMs: position,
+          paused: _paused,
+        );
       }
+      if (revision != _revision) return;
       _report(
         _paused ? 'pause' : 'started_playing',
         positionMs: cmd.seekTo ?? host.positionMs,
@@ -189,7 +266,11 @@ class ConnectReceiver {
     if (m == null || cur == null) return;
     if (_currentTrackUri == trackUri) return;
     int? target;
-    for (final (ref, _) in [(cur.advance, 'advance'), (cur.skipNext, 'next'), (cur.skipPrev, 'prev')]) {
+    for (final (ref, _) in [
+      (cur.advance, 'advance'),
+      (cur.skipNext, 'next'),
+      (cur.skipPrev, 'prev'),
+    ]) {
       final s = ref == null ? null : m.state(ref.stateIndex);
       if (s != null && m.trackOf(s)?.uri == trackUri) {
         target = ref!.stateIndex;
@@ -198,38 +279,61 @@ class ConnectReceiver {
     }
     if (target == null) {
       debugPrint('[Receiver] 本机改播状态机外的曲目，退出 Connect 播放');
-      _report('state_clear', clear: true);
       _clear();
+      _report('state_clear', clear: true);
       return;
     }
     _stateIndex = target;
+    _revision++;
     _thresholdReported = false;
     _report('started_playing', positionMs: 0, durationMs: durationMs);
   }
 
-  void onLocalPausedChanged(bool paused, {required int positionMs, required int durationMs}) {
+  void onLocalPausedChanged(
+    bool paused, {
+    required int positionMs,
+    required int durationMs,
+  }) {
     if (!isActive || paused == _paused) return;
     _paused = paused;
-    _report(paused ? 'pause' : 'resume', positionMs: positionMs, durationMs: durationMs);
+    _report(
+      paused ? 'pause' : 'resume',
+      positionMs: positionMs,
+      durationMs: durationMs,
+    );
   }
 
   void onLocalSeek(int fromMs, int toMs, {required int durationMs}) {
     if (!isActive) return;
-    _report('seek', positionMs: toMs, durationMs: durationMs, previousPositionMs: fromMs);
+    _report(
+      'seek',
+      positionMs: toMs,
+      durationMs: durationMs,
+      previousPositionMs: fromMs,
+    );
   }
 
   void onLocalProgress(int positionMs, {required int durationMs}) {
     if (!isActive || _thresholdReported || positionMs < 30000) return;
     _thresholdReported = true;
-    _report('played_threshold_reached', positionMs: positionMs, durationMs: durationMs);
+    _report(
+      'played_threshold_reached',
+      positionMs: positionMs,
+      durationMs: durationMs,
+    );
   }
 
   void onLocalVolume(double volume) {
     if (!isActive) return;
-    unawaited(_api.putVolume((volume * 65535).round()).catchError((Object e) => debugPrint('[Receiver] $e')));
+    unawaited(
+      _api
+          .putVolume((volume * 65535).round())
+          .catchError((Object e) => debugPrint('[Receiver] $e')),
+    );
   }
 
   void _clear() {
+    _revision++;
     _machine = null;
     _stateIndex = -1;
     _paused = true;
@@ -243,11 +347,14 @@ class ConnectReceiver {
     bool clear = false,
   }) {
     if (!_registered) return;
+    final revision = _revision;
     // 串行发送：每条都要引用上一条响应换回来的新状态机，并发会引用已失效的 state_id
     _sending = _sending.then((_) async {
+      if (revision != _revision || !_registered) return;
       final m = _machine;
       final s = m?.state(_stateIndex);
-      final duration = durationMs ?? (s == null ? 0 : m!.trackOf(s)?.durationMs ?? 0);
+      final duration =
+          durationMs ?? (s == null ? 0 : m!.trackOf(s)?.durationMs ?? 0);
       try {
         final res = await _api.putState(
           debugSource: debugSource,
@@ -262,7 +369,7 @@ class ConnectReceiver {
           '[Receiver] 汇报 $debugSource（${s?.stateId}, paused=$_paused, ${positionMs}ms）'
           '→ ${res == null ? '空响应' : res.keys.join(',')}',
         );
-        _adoptMachine(res);
+        if (revision == _revision && !clear) _adoptMachine(res);
       } catch (e) {
         debugPrint('[Receiver] $e');
       }
@@ -278,9 +385,12 @@ class ConnectReceiver {
     if (next == null) return;
     final ref = TpStateRef.fromJson(res['updated_state_ref']);
     final curId = _machine?.state(_stateIndex)?.stateId;
-    final index = ref?.stateIndex ?? next.states.indexWhere((s) => s.stateId == curId);
-    if (index < 0) return;
+    final index =
+        ref?.stateIndex ?? next.states.indexWhere((s) => s.stateId == curId);
+    final state = next.state(index);
+    if (state == null || next.trackOf(state)?.uri != _currentTrackUri) return;
     _machine = next;
     _stateIndex = index;
+    host.updateQueue(next, next.advanceChain(index));
   }
 }

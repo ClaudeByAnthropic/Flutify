@@ -29,7 +29,10 @@ class WebLoginScreen extends StatefulWidget {
   /// 打开统一登录页。返回登录结果（用户取消 / 跳过返回 null）。
   static Future<WebLoginResult?> open(BuildContext context) {
     return Navigator.of(context, rootNavigator: true).push<WebLoginResult?>(
-      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WebLoginScreen()),
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const WebLoginScreen(),
+      ),
     );
   }
 
@@ -86,14 +89,25 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
       beginDesktopOAuth: () async => auth?.beginOAuth(),
       cancelDesktopOAuth: () async => auth?.cancelOAuth(),
       onAuthorizeUrl: _loadAuthorizeUrl,
-      onFinished: (_) => _finish(WebLoginResult(spDc: _flow.spDc, desktopAuthorized: _flow.desktopAuthorized)),
+      onFinished: (_) => _finish(
+        WebLoginResult(
+          spDc: _flow.spDc,
+          desktopAuthorized: _flow.desktopAuthorized,
+        ),
+      ),
     );
     _flow.addListener(_onFlowChanged);
     auth?.addListener(_onAuthChanged);
     // 兜底：每 2 秒推一次流程（读 sp_dc 的轮询；跳转路径不固定，不能只靠导航事件）
-    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _flow.poll());
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _flow.poll(),
+    );
     // 同意页自动点击：React 页面的按钮晚于 onLoadStop 渲染，按小周期多试几次
-    _consentTimer = Timer.periodic(const Duration(milliseconds: 900), (_) => _tryAutoApprove());
+    _consentTimer = Timer.periodic(
+      const Duration(milliseconds: 900),
+      (_) => _tryAutoApprove(),
+    );
     // 立即跑一次（WebView 会话里可能已经登录过）
     unawaited(_flow.poll());
   }
@@ -141,8 +155,13 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
 
   /// 读 sp_dc：多来源各试一遍（cookie 域绑定可能落在 accounts 或 open 上）。
   Future<String?> _readSpDc() async {
-    final manager = CookieManager.instance(webViewEnvironment: EmePlayer.cachedEnvironment);
-    for (final url in const ['https://open.spotify.com', 'https://accounts.spotify.com']) {
+    final manager = CookieManager.instance(
+      webViewEnvironment: EmePlayer.cachedEnvironment,
+    );
+    for (final url in const [
+      'https://open.spotify.com',
+      'https://accounts.spotify.com',
+    ]) {
       try {
         final cookie = await manager.getCookie(url: WebUri(url), name: 'sp_dc');
         final value = cookie?.value?.toString() ?? '';
@@ -175,8 +194,11 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
   /// 同意页自动点击（后台无感完成授权的关键一步）。
   Future<void> _tryAutoApprove() async {
     final controller = _controller;
-    if (controller == null || _done || !_flow.waitingForDesktop) return;
-    if (!isConsentPageUrl(_currentUrl)) return;
+    if (controller == null ||
+        _done ||
+        !(_flow.waitingForDesktop || _flow.stage == WebLoginStage.webSignIn))
+      return;
+    if (!isSpotifyAccountsPageUrl(_currentUrl)) return;
     try {
       await controller.evaluateJavascript(source: kConsentAutoApproveScript);
     } catch (_) {
@@ -198,7 +220,10 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final stage = _flow.stage;
-    final showOverlay = !_revealed && (stage == WebLoginStage.preparing || stage == WebLoginStage.desktopAuthorize);
+    final showOverlay =
+        !_revealed &&
+        (stage == WebLoginStage.preparing ||
+            stage == WebLoginStage.desktopAuthorize);
 
     return Scaffold(
       appBar: AppBar(
@@ -211,9 +236,11 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
       ),
       body: Column(
         children: [
-          if (stage != WebLoginStage.done) const LinearProgressIndicator(minHeight: 2),
+          if (stage != WebLoginStage.done)
+            const LinearProgressIndicator(minHeight: 2),
           if (stage == WebLoginStage.webSignIn) const _GoogleAccountHint(),
-          if (_flow.notice != null) _NoticeBar(text: _flow.notice!, icon: Icons.info_outline_rounded),
+          if (_flow.notice != null)
+            _NoticeBar(text: _flow.notice!, icon: Icons.info_outline_rounded),
           if (stage == WebLoginStage.failed)
             _NoticeBar(
               text: _flow.error ?? '登录失败',
@@ -234,7 +261,9 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
                   // 不传会触发插件再建环境（ERROR_INVALID_STATE）导致 WebView 创建失败
                   webViewEnvironment: EmePlayer.cachedEnvironment,
                   initialUrlRequest: URLRequest(
-                    url: WebUri('https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F'),
+                    url: WebUri(
+                      'https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F',
+                    ),
                   ),
                   initialSettings: InAppWebViewSettings(
                     disableContextMenu: true,
@@ -245,7 +274,8 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
                         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
                   ),
                   onWebViewCreated: (controller) => _controller = controller,
-                  onUpdateVisitedHistory: (_, url, _) => _onNav(url?.toString()),
+                  onUpdateVisitedHistory: (_, url, _) =>
+                      _onNav(url?.toString()),
                   onLoadStop: (_, url) => _onNav(url?.toString()),
                 ),
                 if (showOverlay) _ProgressOverlay(stage: stage),
@@ -284,11 +314,18 @@ class _ProgressOverlay extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 4),
             ),
             const SizedBox(height: 24),
-            Text(text, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              text,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               '登录已完成，剩下的步骤在后台自动进行',
-              style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -311,13 +348,19 @@ class _GoogleAccountHint extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Icon(Icons.info_outline_rounded, size: 18, color: colorScheme.onSecondaryContainer),
+          Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: colorScheme.onSecondaryContainer,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               '用 Google 注册的账号：请在此处使用「邮箱 + 密码」登录；'
               '没有密码可先在 Spotify 官网「忘记密码」设置一个。',
-              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
@@ -332,7 +375,12 @@ class _NoticeBar extends StatelessWidget {
   final IconData icon;
   final String? actionLabel;
   final VoidCallback? onAction;
-  const _NoticeBar({required this.text, required this.icon, this.actionLabel, this.onAction});
+  const _NoticeBar({
+    required this.text,
+    required this.icon,
+    this.actionLabel,
+    this.onAction,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -349,7 +397,9 @@ class _NoticeBar extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           if (actionLabel != null)

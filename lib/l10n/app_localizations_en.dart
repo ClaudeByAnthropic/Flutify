@@ -9,6 +9,16 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String playbackRetryWaiting(int attempt, int total, int seconds) {
+    return 'No connection. Retry $attempt/$total in $seconds s';
+  }
+
+  @override
+  String playbackRetryRunning(int attempt, int total) {
+    return 'Reconnecting… Retry $attempt/$total';
+  }
+
+  @override
   String get appTitle => 'Flutify';
 
   @override
@@ -714,6 +724,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareEmbedCopy => 'Copy code';
 
   @override
+  String get shareEmbedUnavailable =>
+      'The system WebView is unavailable. You can still copy the embed code below.';
+
+  @override
+  String get shareEmbedFailed =>
+      'The Spotify embed could not load. Check your connection and retry.';
+
+  @override
   String toastAddedTo(String name) {
     return 'Added to $name';
   }
@@ -1347,4 +1365,80 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get settingsGateway => 'Spotify gateway';
+
+  @override
+  String get settingsGatewayDescription =>
+      'Connect to Spotify APIs, media and Connect through your server. Browser sign-in stays on Spotify. Applies to new connections after saving.';
+
+  @override
+  String get settingsGatewayUrl => 'Gateway URL (including path)';
+
+  @override
+  String get settingsGatewayUser => 'Gateway username';
+
+  @override
+  String get settingsGatewayPassword => 'Gateway password';
+
+  @override
+  String get settingsGatewayInvalid =>
+      'Enter a valid HTTPS URL with one path segment, username and password.';
+
+  @override
+  String get settingsApply => 'Save';
+
+  @override
+  String get settingsCacheLocation => 'Cache location';
+
+  @override
+  String get settingsAudioCacheLocation => 'Audio cache location';
+
+  @override
+  String get settingsArtworkCacheLocation => 'Artwork cache location';
+
+  @override
+  String get settingsLyricsCacheLocation => 'Lyrics cache location';
+
+  @override
+  String get settingsCacheAppData => 'Application data (AppData)';
+
+  @override
+  String get settingsCacheApplication =>
+      'Installation / portable app directory';
+
+  @override
+  String get settingsCacheCustom => 'Custom directory';
+
+  @override
+  String get settingsClearAllCache => 'Clear all caches';
+
+  @override
+  String get settingsClearAllCacheHelp =>
+      'Clear audio, artwork, lyrics and browser temporary caches. Keep your login, settings, library and playback history. Audio in use or downloading is retained.';
+
+  @override
+  String get settingsCacheLocationHelp =>
+      'Existing caches are moved and originals deleted after verification. Audio in use or downloading is moved when released. Custom locations use a FlutifyCache folder inside the selected directory.';
+
+  @override
+  String settingsCacheMigrated(int files, int deferred, int failed) {
+    return 'Moved $files files; $deferred in use; $failed unsuccessful';
+  }
+
+  @override
+  String settingsCacheCleared(String size, int deferred, int failed) {
+    return 'Freed $size; $deferred in use; $failed unsuccessful';
+  }
+
+  @override
+  String get settingsCacheLocationInvalid =>
+      'The directory is not writable or the path is invalid. Choose a local directory the app can access.';
+
+  @override
+  String get settingsCacheLocationSaved => 'Cache location updated';
+
+  @override
+  String get settingsCacheLocationHint => 'Absolute directory path';
 }

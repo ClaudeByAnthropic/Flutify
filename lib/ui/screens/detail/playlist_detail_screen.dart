@@ -62,9 +62,13 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   void initState() {
     super.initState();
     final p = widget.playlist;
-    final isLibraryOwned = p.id == LibraryProvider.likedSongsId || context.read<LibraryProvider>().isOwnPlaylist(p.id);
+    final isLibraryOwned =
+        p.id == LibraryProvider.likedSongsId ||
+        context.read<LibraryProvider>().isOwnPlaylist(p.id);
     // 卡片上的曲目数不可靠（主页 / 搜索卡片常缺，daylist 等动态歌单也可能报 0）：没带曲目就去拉
-    if (!isLibraryOwned && p.tracks.isEmpty) _fetch();
+    if (!isLibraryOwned &&
+        (p.tracks.isEmpty || p.tracks.length < p.totalTracks))
+      _fetch();
   }
 
   /// 拉取完整歌单；失败时记录错误，由占位提供登录 / 重试。
@@ -74,7 +78,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       _error = null;
     });
     try {
-      final full = await context.read<SpotifyApiService>().getPlaylist(widget.playlist.id);
+      final full = await context.read<SpotifyApiService>().getPlaylist(
+        widget.playlist.id,
+      );
       if (mounted) setState(() => _fetched = full);
     } catch (e) {
       if (mounted) setState(() => _error = e);
@@ -87,8 +93,12 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   Widget build(BuildContext context) {
     final library = context.read<LibraryProvider>();
 
-    final libraryVersion = context.select<LibraryProvider, SpotifyPlaylist?>((l) => l.findPlaylist(widget.playlist.id));
-    final isSaved = context.select<LibraryProvider, bool>((l) => l.isPlaylistSaved(widget.playlist.id));
+    final libraryVersion = context.select<LibraryProvider, SpotifyPlaylist?>(
+      (l) => l.findPlaylist(widget.playlist.id),
+    );
+    final isSaved = context.select<LibraryProvider, bool>(
+      (l) => l.isPlaylistSaved(widget.playlist.id),
+    );
 
     final playlist = _fetched ?? libraryVersion ?? widget.playlist;
     final tracks = playlist.tracks;
@@ -97,21 +107,32 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final l10n = context.l10n;
     // 「已点赞的歌曲」由 LibraryProvider 生成，名称与简介按界面语言展示
     final title = isLikedSongs ? l10n.likedSongs : playlist.name;
-    final description = isLikedSongs ? l10n.likedSongsDescription : playlist.description;
+    final description = isLikedSongs
+        ? l10n.likedSongsDescription
+        : playlist.description;
     final playbackContext = isLikedSongs
         ? PlaybackContext.collection(title, uri: LibraryProvider.likedSongsUri)
         : PlaybackContext.playlist(playlist.name, uri: playlist.contextUri);
     final totalMs = tracks.fold<int>(0, (sum, t) => sum + t.durationMs);
     // 「12 首歌曲，45 分 12 秒」；时长未知时只显示歌曲数
     final songs = l10n.songCount(tracks.length);
-    final summary = totalMs > 0 ? l10n.countAndDuration(songs, Formatters.formatLongDuration(l10n, totalMs)) : songs;
+    final summary = totalMs > 0
+        ? l10n.countAndDuration(
+            songs,
+            Formatters.formatLongDuration(l10n, totalMs),
+          )
+        : songs;
 
     // 播放按排序后的顺序（与官方一致）；搜索只影响显示
     final sorted = _sortedTracks(tracks);
     final visible = TrackSort.filter(sorted, _query);
     final hasAddedAt = tracks.any((t) => t.addedAt != null);
-    final desktop = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
-    final compact = context.select<PreferencesProvider?, bool>((p) => p?.prefs.compactTrackList ?? false);
+    final desktop = ShellBreakpoints.isDesktop(
+      MediaQuery.sizeOf(context).width,
+    );
+    final compact = context.select<PreferencesProvider?, bool>(
+      (p) => p?.prefs.compactTrackList ?? false,
+    );
 
     return Scaffold(
       body: LayoutBuilder(
@@ -131,7 +152,13 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           playbackContext: playbackContext,
           hasAddedAt: hasAddedAt,
           compact: desktop && compact,
-          columns: desktop ? TrackTableColumns.forWidth(box.maxWidth, compact: compact, hasAddedAt: hasAddedAt) : null,
+          columns: desktop
+              ? TrackTableColumns.forWidth(
+                  box.maxWidth,
+                  compact: compact,
+                  hasAddedAt: hasAddedAt,
+                )
+              : null,
         ),
       ),
     );
@@ -158,7 +185,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final library = context.read<LibraryProvider>();
     return CollectionTintScope(
       imageUrl: isLikedSongs ? '' : playlist.coverUrl,
-      fallback: isLikedSongs ? const Color(0xFF4A2FB8) : const Color(0xFF3A3A48),
+      fallback: isLikedSongs
+          ? const Color(0xFF4A2FB8)
+          : const Color(0xFF3A3A48),
       child: CustomScrollView(
         slivers: [
           CollectionHero(
@@ -166,7 +195,11 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             title: title,
             imageUrl: playlist.coverUrl,
             coverOverride: isLikedSongs ? const _LikedSongsCover() : null,
-            meta: _PlaylistMeta(description: description, ownerName: playlist.ownerName, summary: summary),
+            meta: _PlaylistMeta(
+              description: description,
+              ownerName: playlist.ownerName,
+              summary: summary,
+            ),
             collapsedAction: ContextPlayButton(
               tracks: sorted,
               playbackContext: playbackContext,
@@ -191,11 +224,16 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                           onSortChanged: (s) => setState(() => _sort = s),
                           hasAddedAt: hasAddedAt,
                           compact: compact,
-                          onCompactChanged: columns == null ? null : _setCompact,
+                          onCompactChanged: columns == null
+                              ? null
+                              : _setCompact,
                         ),
                   leading: [
                     if (!isLikedSongs && !isOwn)
-                      SaveToggleButton(saved: isSaved, onPressed: () => library.togglePlaylistSaved(playlist)),
+                      SaveToggleButton(
+                        saved: isSaved,
+                        onPressed: () => library.togglePlaylistSaved(playlist),
+                      ),
                     ShareButton(target: ShareTarget.playlist(playlist)),
                     if (isOwn)
                       PopupMenuButton<String>(
@@ -207,7 +245,12 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                             Navigator.pop(context);
                           }
                         },
-                        itemBuilder: (_) => [PopupMenuItem(value: 'delete', child: Text(l10n.playlistDelete))],
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(l10n.playlistDelete),
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -218,7 +261,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           if (_loading)
             const CollectionPlaceholder(loading: true)
           else if (_error != null)
-            CollectionErrorPlaceholder(signedOut: identical(_error, SpotifyDataException.notSignedIn), onRetry: _fetch)
+            CollectionErrorPlaceholder(
+              signedOut: identical(_error, SpotifyDataException.notSignedIn),
+              onRetry: _fetch,
+            )
           else if (tracks.isEmpty)
             CollectionPlaceholder(
               message: isLikedSongs
@@ -226,13 +272,22 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   : isOwn
                   ? l10n.playlistOwnEmpty
                   : l10n.playlistEmpty,
-              icon: isLikedSongs ? Icons.favorite_border_rounded : Icons.queue_music_rounded,
+              icon: isLikedSongs
+                  ? Icons.favorite_border_rounded
+                  : Icons.queue_music_rounded,
             )
           else ...[
             if (columns != null)
-              TrackTableHeader(columns: columns, sort: _sort, onSort: (key) => setState(() => _sort = _sort.tap(key))),
+              TrackTableHeader(
+                columns: columns,
+                sort: _sort,
+                onSort: (key) => setState(() => _sort = _sort.tap(key)),
+              ),
             if (visible.isEmpty)
-              CollectionPlaceholder(message: l10n.trackSearchNoResults(_query.trim()), icon: Icons.search_off_rounded)
+              CollectionPlaceholder(
+                message: l10n.trackSearchNoResults(_query.trim()),
+                icon: Icons.search_off_rounded,
+              )
             else
               // 定高列表：行高由原型行量出（随字号缩放自适应）。长歌单滚动时不必逐行测量、
               // 也不用估算总长度，滚动条比例稳定，拖动滚动条跳到中段也只布局可见行。
@@ -299,7 +354,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         color: Colors.redAccent,
         child: const Icon(Icons.delete_rounded, color: Colors.white),
       ),
-      onDismissed: (_) => context.read<LibraryProvider>().removeTrackFromPlaylist(ownPlaylistId, track.id),
+      onDismissed: (_) => context
+          .read<LibraryProvider>()
+          .removeTrackFromPlaylist(ownPlaylistId, track.id),
       child: tile,
     );
   }
@@ -311,7 +368,11 @@ class _PlaylistMeta extends StatelessWidget {
   final String ownerName;
   final String summary;
 
-  const _PlaylistMeta({required this.description, required this.ownerName, required this.summary});
+  const _PlaylistMeta({
+    required this.description,
+    required this.ownerName,
+    required this.summary,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -334,7 +395,11 @@ class _PlaylistMeta extends StatelessWidget {
             CircleAvatar(
               radius: 12,
               backgroundColor: context.tokens.accent,
-              child: Icon(Icons.music_note_rounded, color: context.tokens.onAccent, size: 14),
+              child: Icon(
+                Icons.music_note_rounded,
+                color: context.tokens.onAccent,
+                size: 14,
+              ),
             ),
             const SizedBox(width: 8),
             Flexible(

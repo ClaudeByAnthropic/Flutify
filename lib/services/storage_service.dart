@@ -12,15 +12,18 @@ class StorageService {
   // 会话凭据
   static const String _keyDeviceId = 'sp_device_id';
   static const String _keyUsername = 'sp_username';
-  static const String _keyAccessTokenExpiry = 'sp_access_token_expiry'; // epoch ms
+  static const String _keyAccessTokenExpiry =
+      'sp_access_token_expiry'; // epoch ms
   static const String _keyClientToken = 'sp_client_token';
-  static const String _keyClientTokenExpiry = 'sp_client_token_expiry'; // epoch ms
+  static const String _keyClientTokenExpiry =
+      'sp_client_token_expiry'; // epoch ms
   static const String _keyClientTokenProfile = 'sp_client_token_profile';
 
   // Web 播放器会话（Widevine 真密钥所需的 access_token 来源）
   static const String _keySpDc = 'sp_dc'; // open.spotify.com 的登录 cookie
   static const String _keyWebAccessToken = 'sp_web_access_token';
-  static const String _keyWebAccessTokenExpiry = 'sp_web_access_token_expiry'; // epoch ms
+  static const String _keyWebAccessTokenExpiry =
+      'sp_web_access_token_expiry'; // epoch ms
 
   // 会话类型与账号展示信息
   static const String _keyAuthMethod = 'sp_auth_method';
@@ -29,16 +32,22 @@ class StorageService {
   static const String _desktopSession = 'desktop';
 
   /// 已移除的登录方式（Login5 密码 / 短信 / 凭据导入、开发者应用 OAuth）留下的键，启动时清理。
-  static const List<String> _legacyKeys = ['sp_stored_credential', 'sp_client_id', 'sp_client_secret'];
+  static const List<String> _legacyKeys = [
+    'sp_stored_credential',
+    'sp_client_id',
+    'sp_client_secret',
+  ];
   static const String _keyDisplayName = 'sp_display_name';
   static const String _keyAvatarUrl = 'sp_avatar_url';
 
   static const String _keyRecentSearches = 'sp_recent_searches';
   static const String _keyVolume = 'sp_volume';
   static const String _keyPauseAfterFailures = 'play_pause_after_failures';
-  static const String _keyImmersiveScreen = 'ui_immersive_screen'; // 沉浸式歌词铺满整个屏幕
+  static const String _keyImmersiveScreen =
+      'ui_immersive_screen'; // 沉浸式歌词铺满整个屏幕
   static const String _keyAppearance = 'ui_appearance'; // 外观设置 JSON
-  static const String _keyPreferences = 'app_prefs'; // 其余界面偏好 JSON（AppPreferences）
+  static const String _keyPreferences =
+      'app_prefs'; // 其余界面偏好 JSON（AppPreferences）
   static const String _keyLastTab = 'ui_last_tab'; // 上次所在 Tab（启动页「上次位置」）
   static const String _keyWindowBounds = 'ui_window_bounds'; // 桌面窗口位置 / 大小 JSON
   static const String _keyNormalize = 'play_normalize';
@@ -71,7 +80,9 @@ class StorageService {
   /// 用户重新用浏览器登录即可。
   Future<void> dropLegacySession() async {
     final method = _prefs.getString(_keyAuthMethod);
-    final legacy = (method != null && method != _desktopSession) || _legacyKeys.any(_prefs.containsKey);
+    final legacy =
+        (method != null && method != _desktopSession) ||
+        _legacyKeys.any(_prefs.containsKey);
     if (!legacy) return;
     if (method != _desktopSession) await clearLogin();
     for (final key in _legacyKeys) {
@@ -83,42 +94,55 @@ class StorageService {
   // Tokens & Configuration
   // ---------------------------------------------------------------------------
   String get accessToken => _prefs.getString(_keyAccessToken) ?? '';
-  Future<bool> setAccessToken(String value) => _prefs.setString(_keyAccessToken, value);
+  Future<bool> setAccessToken(String value) =>
+      _prefs.setString(_keyAccessToken, value);
 
   String get refreshToken => _prefs.getString(_keyRefreshToken) ?? '';
-  Future<bool> setRefreshToken(String value) => _prefs.setString(_keyRefreshToken, value);
+  Future<bool> setRefreshToken(String value) =>
+      _prefs.setString(_keyRefreshToken, value);
 
-  String get apiBaseUrl => _prefs.getString(_keyApiBaseUrl) ?? 'https://api.spotify.com/v1';
-  Future<bool> setApiBaseUrl(String value) => _prefs.setString(_keyApiBaseUrl, value);
+  String get apiBaseUrl =>
+      _prefs.getString(_keyApiBaseUrl) ?? 'https://api.spotify.com/v1';
+  Future<bool> setApiBaseUrl(String value) =>
+      _prefs.setString(_keyApiBaseUrl, value);
 
   String get spClientToken => _prefs.getString(_keySpClientToken) ?? '';
-  Future<bool> setSpClientToken(String value) => _prefs.setString(_keySpClientToken, value);
+  Future<bool> setSpClientToken(String value) =>
+      _prefs.setString(_keySpClientToken, value);
 
   // ---------------------------------------------------------------------------
   // 会话
   // ---------------------------------------------------------------------------
   /// 设备 ID：首次访问时生成并持久化（由调用方传入生成器，避免此层依赖）。
   String get deviceId => _prefs.getString(_keyDeviceId) ?? '';
-  Future<bool> setDeviceId(String value) => _prefs.setString(_keyDeviceId, value);
+  Future<bool> setDeviceId(String value) =>
+      _prefs.setString(_keyDeviceId, value);
 
   String get username => _prefs.getString(_keyUsername) ?? '';
-  Future<bool> setUsername(String value) => _prefs.setString(_keyUsername, value);
+  Future<bool> setUsername(String value) =>
+      _prefs.setString(_keyUsername, value);
 
   int get accessTokenExpiry => _prefs.getInt(_keyAccessTokenExpiry) ?? 0;
-  Future<bool> setAccessTokenExpiry(int epochMs) => _prefs.setInt(_keyAccessTokenExpiry, epochMs);
+  Future<bool> setAccessTokenExpiry(int epochMs) =>
+      _prefs.setInt(_keyAccessTokenExpiry, epochMs);
 
   String get clientToken => _prefs.getString(_keyClientToken) ?? '';
-  Future<bool> setClientToken(String value) => _prefs.setString(_keyClientToken, value);
+  Future<bool> setClientToken(String value) =>
+      _prefs.setString(_keyClientToken, value);
 
   int get clientTokenExpiry => _prefs.getInt(_keyClientTokenExpiry) ?? 0;
-  Future<bool> setClientTokenExpiry(int epochMs) => _prefs.setInt(_keyClientTokenExpiry, epochMs);
+  Future<bool> setClientTokenExpiry(int epochMs) =>
+      _prefs.setInt(_keyClientTokenExpiry, epochMs);
 
   /// 当前 client-token 以哪种客户端身份申请（与登录方式不一致时需重新申请）。
-  String get clientTokenProfile => _prefs.getString(_keyClientTokenProfile) ?? '';
-  Future<bool> setClientTokenProfile(String value) => _prefs.setString(_keyClientTokenProfile, value);
+  String get clientTokenProfile =>
+      _prefs.getString(_keyClientTokenProfile) ?? '';
+  Future<bool> setClientTokenProfile(String value) =>
+      _prefs.setString(_keyClientTokenProfile, value);
 
   /// 标记当前凭据属于桌面版浏览器登录会话。
-  Future<bool> markDesktopSession() => _prefs.setString(_keyAuthMethod, _desktopSession);
+  Future<bool> markDesktopSession() =>
+      _prefs.setString(_keyAuthMethod, _desktopSession);
 
   // --- Web 播放器会话（sp_dc + 铸造的 web access_token） ---
 
@@ -142,13 +166,17 @@ class StorageService {
   }
 
   String get displayName => _prefs.getString(_keyDisplayName) ?? '';
-  Future<bool> setDisplayName(String value) => _prefs.setString(_keyDisplayName, value);
+  Future<bool> setDisplayName(String value) =>
+      _prefs.setString(_keyDisplayName, value);
 
   String get avatarUrl => _prefs.getString(_keyAvatarUrl) ?? '';
-  Future<bool> setAvatarUrl(String value) => _prefs.setString(_keyAvatarUrl, value);
+  Future<bool> setAvatarUrl(String value) =>
+      _prefs.setString(_keyAvatarUrl, value);
 
   /// 是否已登录：桌面版会话且持有 refresh_token。
-  bool get isLoggedIn => _prefs.getString(_keyAuthMethod) == _desktopSession && refreshToken.isNotEmpty;
+  bool get isLoggedIn =>
+      _prefs.getString(_keyAuthMethod) == _desktopSession &&
+      refreshToken.isNotEmpty;
 
   /// 清除全部登录态（登出）。device_id 保留（client-token 与之绑定）。
   Future<void> clearLogin() async {
@@ -173,19 +201,24 @@ class StorageService {
 
   /// 连续多首无法播放时自动暂停（默认开启）。
   bool get pauseAfterFailures => _prefs.getBool(_keyPauseAfterFailures) ?? true;
-  Future<bool> setPauseAfterFailures(bool value) => _prefs.setBool(_keyPauseAfterFailures, value);
+  Future<bool> setPauseAfterFailures(bool value) =>
+      _prefs.setBool(_keyPauseAfterFailures, value);
 
   /// 沉浸式歌词是否进入系统全屏（铺满整个屏幕）；默认 false，只铺满窗口。
-  bool get immersiveScreenFullscreen => _prefs.getBool(_keyImmersiveScreen) ?? false;
-  Future<bool> setImmersiveScreenFullscreen(bool value) => _prefs.setBool(_keyImmersiveScreen, value);
+  bool get immersiveScreenFullscreen =>
+      _prefs.getBool(_keyImmersiveScreen) ?? false;
+  Future<bool> setImmersiveScreenFullscreen(bool value) =>
+      _prefs.setBool(_keyImmersiveScreen, value);
 
   /// 外观设置（JSON 字符串，解析见 AppearanceSettings.fromJson）；未保存过为空串。
   String get appearanceJson => _prefs.getString(_keyAppearance) ?? '';
-  Future<bool> setAppearanceJson(String value) => _prefs.setString(_keyAppearance, value);
+  Future<bool> setAppearanceJson(String value) =>
+      _prefs.setString(_keyAppearance, value);
 
   /// 界面偏好（JSON 字符串，解析见 AppPreferences.decode）；未保存过为空串。
   String get preferencesJson => _prefs.getString(_keyPreferences) ?? '';
-  Future<bool> setPreferencesJson(String value) => _prefs.setString(_keyPreferences, value);
+  Future<bool> setPreferencesJson(String value) =>
+      _prefs.setString(_keyPreferences, value);
 
   /// 上次所在的主 Tab 下标（0 主页 / 1 搜索 / 2 音乐库）。
   int get lastTab => _prefs.getInt(_keyLastTab) ?? 0;
@@ -193,19 +226,39 @@ class StorageService {
 
   /// 桌面窗口位置与大小（JSON，见 WindowBoundsMemory）；未保存过为空串。
   String get windowBoundsJson => _prefs.getString(_keyWindowBounds) ?? '';
-  Future<bool> setWindowBoundsJson(String value) => _prefs.setString(_keyWindowBounds, value);
+  Future<bool> setWindowBoundsJson(String value) =>
+      _prefs.setString(_keyWindowBounds, value);
 
   /// 音量均衡（按 Spotify 响度数据衰减偏响的歌），默认关闭。
   bool get normalizeVolume => _prefs.getBool(_keyNormalize) ?? false;
-  Future<bool> setNormalizeVolume(bool value) => _prefs.setBool(_keyNormalize, value);
+  Future<bool> setNormalizeVolume(bool value) =>
+      _prefs.setBool(_keyNormalize, value);
 
   /// 歌曲间淡入淡出时长（秒），0 为关闭。
   int get fadeSeconds => _prefs.getInt(_keyFadeSeconds) ?? 0;
-  Future<bool> setFadeSeconds(int value) => _prefs.setInt(_keyFadeSeconds, value);
+  Future<bool> setFadeSeconds(int value) =>
+      _prefs.setInt(_keyFadeSeconds, value);
 
   /// 音频缓存上限（MB），默认 512。
   int get audioCacheLimitMb => _prefs.getInt(_keyAudioCacheLimitMb) ?? 512;
-  Future<bool> setAudioCacheLimitMb(int value) => _prefs.setInt(_keyAudioCacheLimitMb, value);
+  Future<bool> setAudioCacheLimitMb(int value) =>
+      _prefs.setInt(_keyAudioCacheLimitMb, value);
+
+  String get audioCacheDirectory =>
+      _prefs.getString('cache_audio_directory') ?? '';
+  Future<bool> setAudioCacheDirectory(String value) =>
+      _prefs.setString('cache_audio_directory', value);
+
+  String? get cacheDirectory => _prefs.getString('cache_directory');
+  String get cacheLocationsJson => _prefs.getString('cache_locations_v2') ?? '';
+  Future<bool> setCacheLocationsJson(String value) =>
+      _prefs.setString('cache_locations_v2', value);
+  Future<bool> setCacheDirectory(String value) =>
+      _prefs.setString('cache_directory', value);
+  List<String> get previousCacheRoots =>
+      _prefs.getStringList('cache_previous_roots') ?? const [];
+  Future<bool> setPreviousCacheRoots(List<String> roots) =>
+      _prefs.setStringList('cache_previous_roots', roots);
 
   // ---------------------------------------------------------------------------
   // Generic JSON list persistence (used by LibraryProvider)
@@ -216,11 +269,13 @@ class StorageService {
 
   /// 媒体库缓存所属账号（canonical username）；账号变化时缓存作废。
   String get libraryAccount => _prefs.getString(_keyLibraryAccount) ?? '';
-  Future<bool> setLibraryAccount(String value) => _prefs.setString(_keyLibraryAccount, value);
+  Future<bool> setLibraryAccount(String value) =>
+      _prefs.setString(_keyLibraryAccount, value);
 
   /// 媒体库缓存结构版本：低于当前版本说明缓存来自带示例数据的旧版，需要迁移。
   int get librarySchema => _prefs.getInt(_keyLibrarySchema) ?? 0;
-  Future<bool> setLibrarySchema(int value) => _prefs.setInt(_keyLibrarySchema, value);
+  Future<bool> setLibrarySchema(int value) =>
+      _prefs.setInt(_keyLibrarySchema, value);
 
   /// 读取 JSON 对象列表；单条损坏的数据会被跳过而不是让整个列表失效。
   List<Map<String, dynamic>> readJsonList(String key) {
@@ -243,7 +298,8 @@ class StorageService {
   // ---------------------------------------------------------------------------
   // Search History
   // ---------------------------------------------------------------------------
-  List<String> get recentSearches => _prefs.getStringList(_keyRecentSearches) ?? [];
+  List<String> get recentSearches =>
+      _prefs.getStringList(_keyRecentSearches) ?? [];
   Future<bool> addRecentSearch(String query) {
     final clean = query.trim();
     if (clean.isEmpty) return Future.value(false);

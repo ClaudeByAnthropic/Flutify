@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../services/network/proxy_mode.dart';
+import '../services/network/spotify_gateway.dart';
 
 /// 网络代理：跟随系统 / 不使用（直连）/ 手动指定 HTTP 代理。
 /// ProxyMode 已移至 services/network/proxy_mode.dart（纯 Dart，供命令行探针复用），这里再导出保持兼容。
@@ -60,6 +61,7 @@ class AppPreferences {
   final ProxyMode proxyMode;
   final String proxyHost;
   final int proxyPort;
+  final SpotifyGateway gateway;
 
   /// Spotify 没有逐行同步歌词（只有纯文本或完全没有）时，从 LRCLIB 补全。
   final bool lyricsFallback;
@@ -93,6 +95,7 @@ class AppPreferences {
     this.proxyMode = ProxyMode.system,
     this.proxyHost = '',
     this.proxyPort = 0,
+    this.gateway = const SpotifyGateway(),
     this.lyricsFallback = true,
     this.taskbarLyrics = false,
     this.taskbarLyricsColor = TaskbarLyricsColor.auto,
@@ -127,6 +130,7 @@ class AppPreferences {
     ProxyMode? proxyMode,
     String? proxyHost,
     int? proxyPort,
+    SpotifyGateway? gateway,
     bool? lyricsFallback,
     bool? taskbarLyrics,
     TaskbarLyricsColor? taskbarLyricsColor,
@@ -142,20 +146,23 @@ class AppPreferences {
       startPage: startPage ?? this.startPage,
       rememberWindow: rememberWindow ?? this.rememberWindow,
       connectEnabled: connectEnabled ?? this.connectEnabled,
-      connectReportOnLaunch: connectReportOnLaunch ?? this.connectReportOnLaunch,
+      connectReportOnLaunch:
+          connectReportOnLaunch ?? this.connectReportOnLaunch,
       connectDeviceName: connectDeviceName ?? this.connectDeviceName,
       remoteLyricsLeadMs: remoteLyricsLeadMs ?? this.remoteLyricsLeadMs,
       compactTrackList: compactTrackList ?? this.compactTrackList,
       proxyMode: proxyMode ?? this.proxyMode,
       proxyHost: proxyHost ?? this.proxyHost,
       proxyPort: proxyPort ?? this.proxyPort,
+      gateway: gateway ?? this.gateway,
       lyricsFallback: lyricsFallback ?? this.lyricsFallback,
       taskbarLyrics: taskbarLyrics ?? this.taskbarLyrics,
       taskbarLyricsColor: taskbarLyricsColor ?? this.taskbarLyricsColor,
       taskbarLyricsCustomColor:
           taskbarLyricsCustomColor ?? this.taskbarLyricsCustomColor,
       taskbarLyricsOpacity: taskbarLyricsOpacity ?? this.taskbarLyricsOpacity,
-      taskbarLyricsFontScale: taskbarLyricsFontScale ?? this.taskbarLyricsFontScale,
+      taskbarLyricsFontScale:
+          taskbarLyricsFontScale ?? this.taskbarLyricsFontScale,
     );
   }
 
@@ -174,6 +181,7 @@ class AppPreferences {
     'proxyMode': proxyMode.name,
     'proxyHost': proxyHost,
     'proxyPort': proxyPort,
+    'gateway': gateway.toJson(),
     'lyricsFallback': lyricsFallback,
     'taskbarLyrics': taskbarLyrics,
     'taskbarLyricsColor': taskbarLyricsColor.name,
@@ -208,8 +216,13 @@ class AppPreferences {
       startPage: pick(StartPage.values, json['startPage'], d.startPage),
       rememberWindow: flag(json['rememberWindow'], d.rememberWindow),
       connectEnabled: flag(json['connectEnabled'], d.connectEnabled),
-      connectReportOnLaunch: flag(json['connectReportOnLaunch'], d.connectReportOnLaunch),
-      connectDeviceName: json['connectDeviceName'] is String ? (json['connectDeviceName'] as String).trim() : d.connectDeviceName,
+      connectReportOnLaunch: flag(
+        json['connectReportOnLaunch'],
+        d.connectReportOnLaunch,
+      ),
+      connectDeviceName: json['connectDeviceName'] is String
+          ? (json['connectDeviceName'] as String).trim()
+          : d.connectDeviceName,
       remoteLyricsLeadMs: lead is int
           ? lead.clamp(-maxRemoteLyricsLeadMs, maxRemoteLyricsLeadMs)
           : 0,
@@ -219,6 +232,7 @@ class AppPreferences {
           ? (json['proxyHost'] as String).trim()
           : d.proxyHost,
       proxyPort: port is int && port > 0 && port <= 65535 ? port : d.proxyPort,
+      gateway: SpotifyGateway.fromJson(json['gateway']),
       lyricsFallback: flag(json['lyricsFallback'], d.lyricsFallback),
       taskbarLyrics: flag(json['taskbarLyrics'], d.taskbarLyrics),
       taskbarLyricsColor: pick(
@@ -235,7 +249,10 @@ class AppPreferences {
           ? opacity.clamp(minTaskbarLyricsOpacity, 100)
           : d.taskbarLyricsOpacity,
       taskbarLyricsFontScale: fontScale is int
-          ? fontScale.clamp(minTaskbarLyricsFontScale, maxTaskbarLyricsFontScale)
+          ? fontScale.clamp(
+              minTaskbarLyricsFontScale,
+              maxTaskbarLyricsFontScale,
+            )
           : d.taskbarLyricsFontScale,
     );
   }
@@ -272,6 +289,7 @@ class AppPreferences {
       other.proxyMode == proxyMode &&
       other.proxyHost == proxyHost &&
       other.proxyPort == proxyPort &&
+      other.gateway == gateway &&
       other.lyricsFallback == lyricsFallback &&
       other.taskbarLyrics == taskbarLyrics &&
       other.taskbarLyricsColor == taskbarLyricsColor &&
@@ -280,7 +298,7 @@ class AppPreferences {
       other.taskbarLyricsFontScale == taskbarLyricsFontScale;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     language,
     lyricsScale,
     lyricsAlign,
@@ -295,11 +313,12 @@ class AppPreferences {
     proxyMode,
     proxyHost,
     proxyPort,
+    gateway,
     lyricsFallback,
     taskbarLyrics,
     taskbarLyricsColor,
     taskbarLyricsCustomColor,
     taskbarLyricsOpacity,
     taskbarLyricsFontScale,
-  );
+  ]);
 }
