@@ -8,11 +8,12 @@ import 'oauth_client_config.dart';
 
 /// 标准 OAuth2 授权码 + PKCE（accounts.spotify.com）。
 ///
-/// 用户在系统浏览器里的 Spotify 官方登录页完成登录（人机验证、两步验证、Passkey 均由官方页面处理），
+/// 用户在 Spotify 官方登录页完成登录（账号验证由官方页面处理），
 /// App 不接触密码，只用授权码换取 access_token / refresh_token。
 /// client_id、回调地址与权限范围由 [OAuthClientConfig] 决定。
 class OAuthPkceService {
-  static const String authorizeEndpoint = 'https://accounts.spotify.com/authorize';
+  static const String authorizeEndpoint =
+      'https://accounts.spotify.com/authorize';
   static const String tokenEndpoint = 'https://accounts.spotify.com/api/token';
 
   final http.Client _client;
@@ -24,19 +25,26 @@ class OAuthPkceService {
 
   /// 生成 PKCE 参数：verifier 为 64 位非保留字符，challenge = base64url(SHA256(verifier)) 去掉填充。
   static PkcePair generatePkce([Random? random]) {
-    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    const charset =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
     final rnd = random ?? Random.secure();
-    final verifier = List.generate(64, (_) => charset[rnd.nextInt(charset.length)]).join();
+    final verifier = List.generate(
+      64,
+      (_) => charset[rnd.nextInt(charset.length)],
+    ).join();
     return PkcePair(verifier: verifier, challenge: challengeFor(verifier));
   }
 
-  static String challengeFor(String verifier) =>
-      base64Url.encode(sha256.convert(ascii.encode(verifier)).bytes).replaceAll('=', '');
+  static String challengeFor(String verifier) => base64Url
+      .encode(sha256.convert(ascii.encode(verifier)).bytes)
+      .replaceAll('=', '');
 
   /// 随机 state，用于校验回调确实来自本次授权。
   static String generateState([Random? random]) {
     final rnd = random ?? Random.secure();
-    return base64Url.encode(List.generate(18, (_) => rnd.nextInt(256))).replaceAll('=', '');
+    return base64Url
+        .encode(List.generate(18, (_) => rnd.nextInt(256)))
+        .replaceAll('=', '');
   }
 
   static Uri buildAuthorizeUrl({
@@ -44,15 +52,17 @@ class OAuthPkceService {
     required String codeChallenge,
     required String state,
   }) {
-    return Uri.parse(authorizeEndpoint).replace(queryParameters: {
-      'client_id': config.clientId,
-      'response_type': 'code',
-      'redirect_uri': config.redirectUri,
-      'code_challenge_method': 'S256',
-      'code_challenge': codeChallenge,
-      'state': state,
-      'scope': config.scopes.join(' '),
-    });
+    return Uri.parse(authorizeEndpoint).replace(
+      queryParameters: {
+        'client_id': config.clientId,
+        'response_type': 'code',
+        'redirect_uri': config.redirectUri,
+        'code_challenge_method': 'S256',
+        'code_challenge': codeChallenge,
+        'state': state,
+        'scope': config.scopes.join(' '),
+      },
+    );
   }
 
   /// 用授权码换取令牌。
@@ -71,13 +81,18 @@ class OAuthPkceService {
   }
 
   /// 用 refresh_token 续期；服务端可能轮换 refresh_token，未返回时沿用旧值。
-  Future<OAuthTokens> refresh({required OAuthClientConfig config, required String refreshToken}) async {
+  Future<OAuthTokens> refresh({
+    required OAuthClientConfig config,
+    required String refreshToken,
+  }) async {
     final tokens = await _postToken({
       'grant_type': 'refresh_token',
       'refresh_token': refreshToken,
       'client_id': config.clientId,
     });
-    return tokens.refreshToken.isEmpty ? tokens.withRefreshToken(refreshToken) : tokens;
+    return tokens.refreshToken.isEmpty
+        ? tokens.withRefreshToken(refreshToken)
+        : tokens;
   }
 
   Future<OAuthTokens> _postToken(Map<String, String> form) async {
@@ -129,8 +144,12 @@ class OAuthTokens {
     required this.scope,
   });
 
-  OAuthTokens withRefreshToken(String value) =>
-      OAuthTokens(accessToken: accessToken, refreshToken: value, expiresIn: expiresIn, scope: scope);
+  OAuthTokens withRefreshToken(String value) => OAuthTokens(
+    accessToken: accessToken,
+    refreshToken: value,
+    expiresIn: expiresIn,
+    scope: scope,
+  );
 }
 
 /// OAuth 流程错误（用户拒绝授权、授权失效等）。
@@ -149,7 +168,8 @@ class OAuthException implements Exception {
     final text = switch (error) {
       'access_denied' => '你在授权页取消了授权',
       'invalid_grant' => '授权已失效，请重新登录',
-      _ => description?.isNotEmpty == true ? '授权失败：$description' : '授权失败（$error）',
+      _ =>
+        description?.isNotEmpty == true ? '授权失败：$description' : '授权失败（$error）',
     };
     return OAuthException(text, error);
   }

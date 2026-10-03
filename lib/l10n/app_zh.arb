@@ -307,6 +307,8 @@
   "shareEmbedCompact": "紧凑",
   "shareEmbedDark": "深色",
   "shareEmbedCopy": "复制代码",
+  "shareEmbedUnavailable": "此设备的系统 WebView 暂不可用，仍可复制下方嵌入代码。",
+  "shareEmbedFailed": "Spotify 嵌入播放器加载失败，请检查网络后重试。",
   "toastAddedTo": "已添加到「{name}」",
   "@toastAddedTo": {
     "placeholders": { "name": { "type": "String" } }

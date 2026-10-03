@@ -1,3 +1,4 @@
+import 'package:flutify_app/core/constants/app_info.dart';
 import 'package:flutify_app/core/utils/artwork_palette.dart';
 import 'package:flutify_app/core/utils/byte_size.dart';
 import 'package:flutify_app/main.dart';
@@ -207,7 +208,7 @@ void main() {
     await pumpApp(tester, size: const Size(1440, 2400));
     await openSettings(tester);
 
-    expect(find.text('1.0.0 (1)'), findsOneWidget);
+    expect(find.text(AppInfo.displayVersion), findsOneWidget);
     await tapText(tester, '键盘快捷键');
     expect(find.byType(ShortcutsDialog), findsOneWidget);
     expect(find.text('Space'), findsOneWidget);

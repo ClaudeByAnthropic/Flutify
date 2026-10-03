@@ -25,9 +25,9 @@ class EmeAudioEngine implements AudioEngine {
     required EmePlayer player,
     required Future<Uint8List> Function(Uint8List request) licensePoster,
     required Future<Uint8List> Function() certFetcher,
-  })  : _player = player,
-        _licensePoster = licensePoster,
-        _certFetcher = certFetcher {
+  }) : _player = player,
+       _licensePoster = licensePoster,
+       _certFetcher = certFetcher {
     _player.positionStream.listen((p) {
       _position = p;
       _positionController.add(p);
@@ -58,6 +58,9 @@ class EmeAudioEngine implements AudioEngine {
         _processing = ProcessingState.ready;
       case EmePlayerState.buffering:
         _processing = ProcessingState.buffering;
+      case EmePlayerState.paused:
+        _playing = false;
+        _processing = ProcessingState.ready;
       case EmePlayerState.ended:
         _playing = false;
         _processing = ProcessingState.completed;
@@ -70,7 +73,8 @@ class EmeAudioEngine implements AudioEngine {
           // 并把 _hasSource 复位，让上层知道要重试必须重新整载
           _hasSource = false;
           _errorController.add(
-              _player.lastError ?? const EmePlaybackException('unknown'));
+            _player.lastError ?? const EmePlaybackException('unknown'),
+          );
         }
     }
     _emit();
@@ -99,8 +103,11 @@ class EmeAudioEngine implements AudioEngine {
   bool get hasSource => _hasSource;
 
   @override
-  Future<void> playEme(EmeTrackContent content,
-      {Duration? initialPosition, bool autoplay = true}) async {
+  Future<void> playEme(
+    EmeTrackContent content, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) async {
     _processing = ProcessingState.loading;
     _emit();
     await _player.play(
@@ -117,11 +124,17 @@ class EmeAudioEngine implements AudioEngine {
 
   // just_audio 路径在 EME 引擎上不可用（路由层保证不调用）
   @override
-  Future<void> playFile(String path, {Duration? initialPosition, bool autoplay = true}) =>
-      throw UnimplementedError('EME 引擎不支持本地文件');
+  Future<void> playFile(
+    String path, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) => throw UnimplementedError('EME 引擎不支持本地文件');
   @override
-  Future<void> playStream(ProgressiveAudio audio, {Duration? initialPosition, bool autoplay = true}) =>
-      throw UnimplementedError('EME 引擎不支持流式下载');
+  Future<void> playStream(
+    ProgressiveAudio audio, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) => throw UnimplementedError('EME 引擎不支持流式下载');
 
   @override
   Future<void> play() async {
@@ -142,7 +155,8 @@ class EmeAudioEngine implements AudioEngine {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> setVolume(double volume) => _player.setVolume(volume.clamp(0.0, 1.0));
+  Future<void> setVolume(double volume) =>
+      _player.setVolume(volume.clamp(0.0, 1.0));
 
   @override
   Future<void> stop() async {

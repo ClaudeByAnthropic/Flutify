@@ -693,6 +693,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareEmbedCopy => '复制代码';
 
   @override
+  String get shareEmbedUnavailable => '此设备的系统 WebView 暂不可用，仍可复制下方嵌入代码。';
+
+  @override
+  String get shareEmbedFailed => 'Spotify 嵌入播放器加载失败，请检查网络后重试。';
+
+  @override
   String toastAddedTo(String name) {
     return '已添加到「$name」';
   }

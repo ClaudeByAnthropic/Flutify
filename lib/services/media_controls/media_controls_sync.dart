@@ -46,6 +46,7 @@ class MediaControlsSync {
   StreamSubscription<MediaControlEvent>? _events;
   // 曲目键带来源前缀：本机与远程恰好是同一首时也会重新下发
   String? _trackKey;
+  MediaTrackInfo? _lastTrack;
   MediaPlaybackInfo? _lastPlayback;
   DateTime _lastPlaybackAt = DateTime.now();
 
@@ -71,9 +72,12 @@ class MediaControlsSync {
   void _sync() {
     final remote = _remote;
     final track = remote ? _override!.track : _localTrack();
-    final key = track == null ? null : '${remote ? 'remote' : 'local'}:${track.id}';
-    if (key != _trackKey) {
+    final key = track == null
+        ? null
+        : '${remote ? 'remote' : 'local'}:${track.id}';
+    if (key != _trackKey || !_sameTrack(track, _lastTrack)) {
       _trackKey = key;
+      _lastTrack = track;
       unawaited(controls.setTrack(track));
       _lastPlayback = null;
     }
@@ -94,10 +98,15 @@ class MediaControlsSync {
     if (last == null || _trackKey == null) return;
     final now = DateTime.now();
     final elapsed = now.difference(_lastPlaybackAt);
-    final expected = last.playing ? last.position + elapsed : last.position;
+    final expected = last.playing && !last.buffering
+        ? last.position + elapsed
+        : last.position;
     final position = _remote ? _override!.position.value : playback.position;
     final jumped = (position - expected).abs() > const Duration(seconds: 2);
-    final periodic = controls.needsPeriodicTimeline && last.playing && elapsed >= timelineInterval;
+    final periodic =
+        controls.needsPeriodicTimeline &&
+        last.playing &&
+        elapsed >= timelineInterval;
     if (jumped || periodic) _push(_playbackInfo());
   }
 
@@ -109,8 +118,19 @@ class MediaControlsSync {
 
   MediaTrackInfo? _localTrack() {
     final track = playback.currentTrack;
-    return track == null ? null : trackInfo(track);
+    return track == null ? null : trackInfo(track, duration: playback.duration);
   }
+
+  static bool _sameTrack(MediaTrackInfo? a, MediaTrackInfo? b) =>
+      identical(a, b) ||
+      (a != null &&
+          b != null &&
+          a.id == b.id &&
+          a.title == b.title &&
+          a.artist == b.artist &&
+          a.album == b.album &&
+          a.artUrl == b.artUrl &&
+          a.duration == b.duration);
 
   MediaPlaybackInfo _playbackInfo() {
     if (_remote) return _override!.playbackInfo;
@@ -118,21 +138,22 @@ class MediaControlsSync {
       playing: playback.isPlaying,
       buffering: playback.isBuffering,
       position: playback.position,
-      canNext: playback.userQueue.isNotEmpty || playback.upNext.isNotEmpty,
-      // 「上一首」在开头时回到上一首、否则回到本曲开头，始终可用
+      canNext: playback.canSkipNext,
+      // 有上一首时直接切歌；没有上一首时回到本曲开头。
       canPrevious: true,
     );
   }
 
   /// 曲目 → 系统媒体卡片信息（本机与远程共用）。
-  static MediaTrackInfo trackInfo(SpotifyTrack track) => MediaTrackInfo(
-    id: track.id,
-    title: track.name,
-    artist: track.artistNames,
-    album: track.album?.name ?? '',
-    artUrl: track.coverUrl,
-    duration: Duration(milliseconds: track.durationMs),
-  );
+  static MediaTrackInfo trackInfo(SpotifyTrack track, {Duration? duration}) =>
+      MediaTrackInfo(
+        id: track.id,
+        title: track.name,
+        artist: track.artistNames,
+        album: track.album?.name ?? '',
+        artUrl: track.coverUrl,
+        duration: duration ?? Duration(milliseconds: track.durationMs),
+      );
 
   void _onEvent(MediaControlEvent event) {
     if (_override?.handle(event) ?? false) return;

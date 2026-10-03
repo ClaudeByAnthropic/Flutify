@@ -10,6 +10,7 @@
 #include "snap_layout.h"
 #include "taskbar_lyrics.h"
 #include "win32_window.h"
+#include "windows_trust_store.h"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
@@ -40,6 +41,7 @@ class FlutterWindow : public Win32Window {
 
   // 任务栏歌词（嵌入 Windows 任务栏的歌词窗口）。
   std::unique_ptr<TaskbarLyrics> taskbar_lyrics_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> trust_store_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

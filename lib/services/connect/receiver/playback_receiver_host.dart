@@ -26,7 +26,8 @@ class PlaybackReceiverHost implements ReceiverHost {
   double _lastVolume;
 
   /// 正在执行远程命令：期间本机变化是命令造成的，不回报。
-  bool _applying = false;
+  int _applyingCount = 0;
+  bool get _applying => _applyingCount > 0;
 
   /// 本机在 Connect 之外开始出声（继续上次的歌、本地队列切歌等）时调用：把当前曲目、待播与进度
   /// 交给服务端，服务端再以 replace_state 下发回本机。和官方客户端一样，任何播放都对其他设备可见。
@@ -51,7 +52,12 @@ class PlaybackReceiverHost implements ReceiverHost {
   }
 
   @override
-  Future<void> load(TpStateMachine machine, List<int> order, {required int positionMs, required bool paused}) async {
+  Future<void> load(
+    TpStateMachine machine,
+    List<int> order, {
+    required int positionMs,
+    required bool paused,
+  }) async {
     final tracks = [
       for (final i in order)
         if (machine.trackOf(machine.states[i]) case final t?) _toTrack(t),
@@ -60,6 +66,7 @@ class PlaybackReceiverHost implements ReceiverHost {
     // 交接回来的就是正在放的这首：只对齐进度 / 暂停，不重新加载
     if (playback.currentTrack?.uri == tracks.first.uri) {
       _lastTrackUri = tracks.first.uri;
+      updateQueue(machine, order);
       return sync(positionMs: positionMs, paused: paused);
     }
     await _apply(() async {
@@ -71,7 +78,23 @@ class PlaybackReceiverHost implements ReceiverHost {
         startAt: Duration(milliseconds: positionMs),
         paused: paused,
       );
+      // 服务端已经排过随机顺序，本机不要再随机一次。
+      playback.updateReceiverQueue(tracks);
     });
+  }
+
+  @override
+  void updateQueue(TpStateMachine machine, List<int> order) {
+    _applyingCount++;
+    try {
+      playback.updateReceiverQueue([
+        for (final i in order)
+          if (machine.state(i) case final state?)
+            if (machine.trackOf(state) case final track?) _toTrack(track),
+      ]);
+    } finally {
+      _applyingCount--;
+    }
   }
 
   @override
@@ -80,30 +103,38 @@ class PlaybackReceiverHost implements ReceiverHost {
   @override
   void applyOptions(TpOptions options) {
     _applyingOptions = true;
-    playback.setShuffle(options.shuffle);
-    playback.setRepeatMode(
-      options.repeatTrack
-          ? SpotifyRepeatMode.track
-          : options.repeatContext
-          ? SpotifyRepeatMode.context
-          : SpotifyRepeatMode.off,
-    );
+    if (options.shuffle case final shuffle?) playback.setShuffle(shuffle);
+    if (options.repeatTrack != null || options.repeatContext != null) {
+      final track =
+          options.repeatTrack ?? playback.repeatMode == SpotifyRepeatMode.track;
+      final context =
+          options.repeatContext ?? playback.repeatMode != SpotifyRepeatMode.off;
+      playback.setRepeatMode(
+        track
+            ? SpotifyRepeatMode.track
+            : context
+            ? SpotifyRepeatMode.context
+            : SpotifyRepeatMode.off,
+      );
+    }
     _lastShuffle = playback.shuffle;
     _lastRepeat = playback.repeatMode;
     _applyingOptions = false;
   }
 
   @override
-  Future<void> sync({required int? positionMs, required bool paused}) => _apply(() async {
-    if (positionMs != null && (playback.position.inMilliseconds - positionMs).abs() > 2000) {
-      await playback.seekTo(Duration(milliseconds: positionMs));
-    }
-    if (paused) {
-      await playback.pause();
-    } else if (!playback.isPlaying) {
-      await playback.togglePlayPause();
-    }
-  });
+  Future<void> sync({required int? positionMs, required bool paused}) =>
+      _apply(() async {
+        if (positionMs != null &&
+            (playback.position.inMilliseconds - positionMs).abs() > 2000) {
+          await playback.seekTo(Duration(milliseconds: positionMs));
+        }
+        if (paused) {
+          await playback.pause();
+        } else if (!playback.isPlaying) {
+          await playback.togglePlayPause();
+        }
+      });
 
   @override
   void setVolume(double volume) {
@@ -115,11 +146,11 @@ class PlaybackReceiverHost implements ReceiverHost {
   Future<void> stop() => _apply(playback.pause);
 
   Future<void> _apply(Future<void> Function() action) async {
-    _applying = true;
+    _applyingCount++;
     try {
       await action();
     } finally {
-      _applying = false;
+      _applyingCount--;
       _lastPlaying = playback.isPlaying;
       _lastPositionMs = playback.position.inMilliseconds;
     }
@@ -135,7 +166,11 @@ class PlaybackReceiverHost implements ReceiverHost {
       receiver.onLocalTrackChanged(track.uri, durationMs: durationMs);
     }
     // 出声了但服务端不知道：交接一次（同一首只交接一次，失败不反复重试）
-    if (playback.isPlaying && !receiver.isActive && track != null && !_handingOver && _handedOverUri != track.uri) {
+    if (playback.isPlaying &&
+        !receiver.isActive &&
+        track != null &&
+        !_handingOver &&
+        _handedOverUri != track.uri) {
       final hand = handOver;
       if (hand != null) {
         _handingOver = true;
@@ -146,9 +181,15 @@ class PlaybackReceiverHost implements ReceiverHost {
     // 加载 / 缓冲中的「未播放」不算暂停
     if (!playback.isBuffering && playback.isPlaying != _lastPlaying) {
       _lastPlaying = playback.isPlaying;
-      receiver.onLocalPausedChanged(!_lastPlaying, positionMs: position, durationMs: durationMs);
+      receiver.onLocalPausedChanged(
+        !_lastPlaying,
+        positionMs: position,
+        durationMs: durationMs,
+      );
     }
-    if (!_applyingOptions && (playback.shuffle != _lastShuffle || playback.repeatMode != _lastRepeat)) {
+    if (!_applyingOptions &&
+        (playback.shuffle != _lastShuffle ||
+            playback.repeatMode != _lastRepeat)) {
       _lastShuffle = playback.shuffle;
       _lastRepeat = playback.repeatMode;
       if (receiver.isActive) onLocalOptions?.call(_lastShuffle, _lastRepeat);
@@ -166,7 +207,8 @@ class PlaybackReceiverHost implements ReceiverHost {
     if (_applying) return;
     final durationMs = playback.duration.inMilliseconds;
     // 进度流约每 200ms 一次，跳变超过 3 秒视为拖动
-    if ((pos - prev).abs() > 3000 && playback.currentTrack?.uri == _lastTrackUri) {
+    if ((pos - prev).abs() > 3000 &&
+        playback.currentTrack?.uri == _lastTrackUri) {
       receiver.onLocalSeek(prev, pos, durationMs: durationMs);
     }
     receiver.onLocalProgress(pos, durationMs: durationMs);
@@ -181,8 +223,16 @@ class PlaybackReceiverHost implements ReceiverHost {
       uri: t.uri,
       durationMs: t.durationMs,
       explicit: t.explicit,
-      artists: [for (final a in t.artists) SpotifyArtist(id: idOf(a.uri), name: a.name, uri: a.uri)],
-      album: SpotifyAlbum(id: idOf(t.albumUri), name: t.albumName, uri: t.albumUri, images: images),
+      artists: [
+        for (final a in t.artists)
+          SpotifyArtist(id: idOf(a.uri), name: a.name, uri: a.uri),
+      ],
+      album: SpotifyAlbum(
+        id: idOf(t.albumUri),
+        name: t.albumName,
+        uri: t.albumUri,
+        images: images,
+      ),
     );
   }
 }

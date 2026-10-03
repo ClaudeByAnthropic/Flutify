@@ -9,7 +9,6 @@ import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/shell/desktop/library_sidebar.dart';
 import 'package:flutify_app/ui/shell/desktop/library_sidebar_item.dart';
 import 'package:flutify_app/ui/shell/desktop/now_playing_details.dart';
-import 'package:flutify_app/ui/shell/shell_layout_controller.dart';
 import 'package:flutify_app/ui/widgets/desktop_player_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,22 +31,32 @@ void main() {
     ArtworkPalette.enabled = false;
     SharedPreferences.setMockInitialValues({});
     final storage = await StorageService.init();
-    await tester.pumpWidget(FlutifyApp(
-      storageService: storage,
-      audioEngine: FakeAudioPlayerService(),
-      emePlayer: EmePlayer(),
-      spotifyApiService: FakeSpotifyApiService(
-        storage,
-        homeFeed: SampleHome.feed,
-        librarySource: FakeLibrarySource(
-          playlists: [
-            for (var i = 0; i < 40; i++)
-              SpotifyPlaylist(id: 'p$i', name: 'Playlist $i', uri: 'spotify:playlist:p$i'),
-          ],
+    await storage.markDesktopSession();
+    await storage.setRefreshToken('synthetic-refresh');
+    await storage.setUsername('synthetic-user');
+    await storage.setDisplayName('Synthetic User');
+    await tester.pumpWidget(
+      FlutifyApp(
+        storageService: storage,
+        audioEngine: FakeAudioPlayerService(),
+        emePlayer: EmePlayer(),
+        spotifyApiService: FakeSpotifyApiService(
+          storage,
+          homeFeed: SampleHome.feed,
+          librarySource: FakeLibrarySource(
+            playlists: [
+              for (var i = 0; i < 40; i++)
+                SpotifyPlaylist(
+                  id: 'p$i',
+                  name: 'Playlist $i',
+                  uri: 'spotify:playlist:p$i',
+                ),
+            ],
+          ),
         ),
+        trackAudioLoader: FakeTrackAudioSource(),
       ),
-      trackAudioLoader: FakeTrackAudioSource(),
-    ));
+    );
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
@@ -55,11 +64,11 @@ void main() {
   }
 
   Finder sidebarList() => find.descendant(
-        of: find.byType(LibrarySidebar),
-        matching: find.byWidgetPredicate(
-          (w) => w is ListView && w.scrollDirection == Axis.vertical,
-        ),
-      );
+    of: find.byType(LibrarySidebar),
+    matching: find.byWidgetPredicate(
+      (w) => w is ListView && w.scrollDirection == Axis.vertical,
+    ),
+  );
 
   testWidgets('左栏滚到底：最后一行完整露出在播放胶囊上方', (tester) async {
     await pumpShell(tester);
@@ -88,16 +97,19 @@ void main() {
       listen: false,
     );
     await playback.playTrack(
-      const SpotifyTrack(id: 'synthetic-1', name: 'Synthetic One', durationMs: 180000),
-      contextQueue: const [SpotifyTrack(id: 'synthetic-1', name: 'Synthetic One', durationMs: 180000)],
+      const SpotifyTrack(
+        id: 'synthetic-1',
+        name: 'Synthetic One',
+        durationMs: 180000,
+      ),
+      contextQueue: const [
+        SpotifyTrack(
+          id: 'synthetic-1',
+          name: 'Synthetic One',
+          durationMs: 180000,
+        ),
+      ],
     );
-    for (var i = 0; i < 4; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    Provider.of<ShellLayoutController>(
-      tester.element(find.byType(MainShell)),
-      listen: false,
-    ).togglePanel(RightPanel.nowPlaying);
     for (var i = 0; i < 4; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }

@@ -59,7 +59,8 @@ class NativeDrmPlayer {
 
   Future<void> pause() => _safe('pause');
   Future<void> resume() => _safe('resume');
-  Future<void> seek(Duration pos) => _safe('seek', {'positionMs': pos.inMilliseconds});
+  Future<void> seek(Duration pos) =>
+      _safe('seek', {'positionMs': pos.inMilliseconds});
   Future<void> setVolume(double v) =>
       _safe('setVolume', {'volume': v.clamp(0.0, 1.0)});
   Future<void> stop() => _safe('stop');
@@ -67,10 +68,9 @@ class NativeDrmPlayer {
   Future<void> _safe(String method, [Map<String, dynamic>? args]) async {
     try {
       await _method.invokeMethod<void>(method, args);
-    } on MissingPluginException {
-      debugPrint('[ndrm] 原生插件缺失（非 Android 环境运行？）: $method');
     } catch (e) {
       debugPrint('[ndrm] $method 调用失败: $e');
+      rethrow;
     }
   }
 
@@ -78,8 +78,9 @@ class NativeDrmPlayer {
     if (raw is! Map) return;
     switch (raw['type']) {
       case 'position':
-        _position =
-            Duration(milliseconds: (raw['position'] as num?)?.toInt() ?? 0);
+        _position = Duration(
+          milliseconds: (raw['position'] as num?)?.toInt() ?? 0,
+        );
         final dur = (raw['duration'] as num?)?.toInt() ?? 0;
         if (dur > 0) {
           final d = Duration(milliseconds: dur);
@@ -90,14 +91,15 @@ class NativeDrmPlayer {
         }
         _positionController.add(_position);
       case 'state':
-        // ready+playing 之外的状态（含 ready 暂停、idle）不映射：
-        // 暂停由上层命令驱动，与 EmePlayer 的事件语义一致
+        // 系统音频焦点、拔耳机也能触发暂停，不能只依赖 Dart 的 pause 命令。
         switch (raw['state']) {
           case 'buffering':
             _stateController.add(EmePlayerState.buffering);
           case 'ready':
             if (raw['playing'] == true) {
               _stateController.add(EmePlayerState.playing);
+            } else {
+              _stateController.add(EmePlayerState.paused);
             }
           case 'ended':
             _stateController.add(EmePlayerState.ended);

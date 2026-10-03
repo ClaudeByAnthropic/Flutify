@@ -714,6 +714,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareEmbedCopy => 'Copy code';
 
   @override
+  String get shareEmbedUnavailable =>
+      'The system WebView is unavailable. You can still copy the embed code below.';
+
+  @override
+  String get shareEmbedFailed =>
+      'The Spotify embed could not load. Check your connection and retry.';
+
+  @override
   String toastAddedTo(String name) {
     return 'Added to $name';
   }

@@ -1,24 +1,28 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart' hide MediaButton;
+import 'package:flutter/foundation.dart';
 
 import 'system_media_controls.dart';
 
 /// Android / iOS：通过 audio_service 提供通知栏、锁屏与蓝牙耳机按键控制。
 ///
-/// 实际播放仍由 just_audio 完成；这里的 [AudioHandler] 只做「状态展示 + 按键转发」。
+/// 实际播放由音频引擎完成；这里的 [AudioHandler] 只做状态展示和按键转发。
 class AudioServiceMediaControls implements SystemMediaControls {
-  final _FlutifyAudioHandler _handler;
+  final FlutifyAudioHandler _handler;
 
   AudioServiceMediaControls._(this._handler);
 
+  @visibleForTesting
+  AudioServiceMediaControls.withHandler(this._handler);
+
   static Future<AudioServiceMediaControls> init() async {
     final handler = await AudioService.init(
-      builder: _FlutifyAudioHandler.new,
+      builder: FlutifyAudioHandler.new,
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.flutify.music.playback',
         androidNotificationChannelName: '播放',
-        androidNotificationIcon: 'mipmap/ic_launcher',
+        androidNotificationIcon: 'drawable/ic_stat_music',
         // 暂停时允许划掉通知、让出前台服务
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
@@ -48,7 +52,9 @@ class AudioServiceMediaControls implements SystemMediaControls {
             ),
     );
     if (track == null) {
-      _handler.playbackState.add(PlaybackState(processingState: AudioProcessingState.idle));
+      _handler.playbackState.add(
+        PlaybackState(processingState: AudioProcessingState.idle),
+      );
     }
   }
 
@@ -61,13 +67,31 @@ class AudioServiceMediaControls implements SystemMediaControls {
           info.playing ? MediaControl.pause : MediaControl.play,
           if (info.canNext) MediaControl.skipToNext,
         ],
-        systemActions: const {MediaAction.seek},
+        // 同时声明 MediaSession 能力与通知按钮。Android 13+ 以及部分 OEM
+        // 系统卡片读取 PlaybackState actions，不使用 compact notification 布局。
+        systemActions: {
+          MediaAction.play,
+          MediaAction.pause,
+          MediaAction.playPause,
+          MediaAction.stop,
+          MediaAction.seek,
+          if (info.canPrevious) MediaAction.skipToPrevious,
+          if (info.canNext) MediaAction.skipToNext,
+        },
         androidCompactActionIndices: [
-          for (var i = 0; i < 1 + (info.canPrevious ? 1 : 0) + (info.canNext ? 1 : 0); i++) i,
+          for (
+            var i = 0;
+            i < 1 + (info.canPrevious ? 1 : 0) + (info.canNext ? 1 : 0);
+            i++
+          )
+            i,
         ],
-        processingState: info.buffering ? AudioProcessingState.buffering : AudioProcessingState.ready,
+        processingState: info.buffering
+            ? AudioProcessingState.buffering
+            : AudioProcessingState.ready,
         playing: info.playing,
         updatePosition: info.position,
+        speed: info.playing && !info.buffering ? 1.0 : 0.0,
       ),
     );
   }
@@ -78,8 +102,9 @@ class AudioServiceMediaControls implements SystemMediaControls {
   }
 }
 
-class _FlutifyAudioHandler extends BaseAudioHandler with SeekHandler {
-  final StreamController<MediaControlEvent> events = StreamController.broadcast();
+class FlutifyAudioHandler extends BaseAudioHandler with SeekHandler {
+  final StreamController<MediaControlEvent> events =
+      StreamController.broadcast();
 
   void _button(MediaButton b) => events.add(MediaButtonEvent(b));
 
@@ -99,5 +124,6 @@ class _FlutifyAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> skipToPrevious() async => _button(MediaButton.previous);
 
   @override
-  Future<void> seek(Duration position) async => events.add(MediaSeekEvent(position));
+  Future<void> seek(Duration position) async =>
+      events.add(MediaSeekEvent(position));
 }

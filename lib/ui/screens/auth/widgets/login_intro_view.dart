@@ -29,13 +29,20 @@ class LoginIntroView extends StatelessWidget {
         Text(
           '登录 Spotify',
           textAlign: TextAlign.center,
-          style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -1.2, height: 1.1),
+          style: theme.textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1.2,
+            height: 1.1,
+          ),
         ),
         const SizedBox(height: 12),
         Text(
           '在 Spotify 官方登录页登录一次，\n其余授权全部自动完成',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant, height: 1.5),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            height: 1.5,
+          ),
         ),
         const SizedBox(height: 28),
         const _ReassuranceCard(),
@@ -46,7 +53,9 @@ class LoginIntroView extends StatelessWidget {
             onPressed: onSignIn,
             style: FilledButton.styleFrom(
               shape: const StadiumBorder(),
-              textStyle: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              textStyle: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             icon: const Icon(Icons.login_rounded, size: 22),
             label: const Text('登录'),
@@ -57,7 +66,9 @@ class LoginIntroView extends StatelessWidget {
         Text(
           '以官方客户端身份登录不符合 Spotify 服务条款，建议使用小号。',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant.withAlpha(170)),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant.withAlpha(170),
+          ),
         ),
       ],
     );
@@ -72,13 +83,19 @@ class _ReassuranceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return DecoratedBox(
-      decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(28)),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(28),
+      ),
       child: const Padding(
         padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         child: Column(
           children: [
             _Point(icon: Icons.verified_user_rounded, text: 'Flutify 不接触你的密码'),
-            _Point(icon: Icons.key_rounded, text: '支持 Passkey、两步验证与第三方账号登录'),
+            _Point(
+              icon: Icons.account_circle_outlined,
+              text: '使用 Spotify 官方页面完成账号登录',
+            ),
             _Point(icon: Icons.devices_rounded, text: '登录后可遥控你的其他 Spotify 设备'),
           ],
         ),
@@ -104,12 +121,24 @@ class _Point extends StatelessWidget {
           Container(
             width: 34,
             height: 34,
-            decoration: BoxDecoration(color: colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, size: 18, color: colorScheme.onSecondaryContainer),
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: colorScheme.onSecondaryContainer,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(text, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+            child: Text(
+              text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

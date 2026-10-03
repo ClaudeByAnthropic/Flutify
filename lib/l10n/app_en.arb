@@ -244,6 +244,8 @@
   "shareEmbedCompact": "Compact",
   "shareEmbedDark": "Dark",
   "shareEmbedCopy": "Copy code",
+  "shareEmbedUnavailable": "The system WebView is unavailable. You can still copy the embed code below.",
+  "shareEmbedFailed": "The Spotify embed could not load. Check your connection and retry.",
   "toastAddedTo": "Added to {name}",
   "toastAlreadyIn": "Already in {name}",
 

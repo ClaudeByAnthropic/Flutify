@@ -29,7 +29,12 @@ void main() {
     final storage = await StorageService.init();
     audio = FakeAudioPlayerService();
     loader = FakeTrackAudioSource();
-    playback = PlaybackProvider(audio, storage, random: Random(42), audioLoader: loader);
+    playback = PlaybackProvider(
+      audio,
+      storage,
+      random: Random(42),
+      audioLoader: loader,
+    );
   });
 
   tearDown(() => playback.dispose());
@@ -91,39 +96,77 @@ void main() {
     });
   });
 
-  test('previous restarts the track when more than 3 seconds in', () async {
+  test('previous selects the previous track even after 3 seconds', () async {
     await playback.playTrack(b, contextQueue: [a, b, c], context: ctx);
     audio.positionController.add(const Duration(seconds: 10));
 
     await playback.previousTrack();
-    expect(playback.currentTrack?.id, b.id);
-    expect(audio.seeks.last, Duration.zero);
-
-    audio.positionController.add(const Duration(seconds: 1));
-    await playback.previousTrack();
     expect(playback.currentTrack?.id, a.id);
   });
 
-  test('shuffle keeps the current track and queues every other track once', () async {
-    await playback.playTrack(b, contextQueue: [a, b, c, x], context: ctx);
-    playback.toggleShuffle();
+  test(
+    'receiver queue expands without reloading and retains history and local tail',
+    () async {
+      await playback.playLocal(b, contextQueue: [a, b]);
+      audio.positionController.add(const Duration(seconds: 10));
+      playback.setRepeatMode(SpotifyRepeatMode.context);
+      playback.updateReceiverQueue([b, c, x]);
+      playback.updateReceiverQueue([b, c]);
+      expect(playback.upNext.map((e) => e.track.id), [c.id, x.id]);
+      expect(loader.loaded, [b.id]);
+      expect(playback.position, const Duration(seconds: 10));
+      expect(playback.repeatMode, SpotifyRepeatMode.context);
+      await playback.previousTrack();
+      expect(playback.currentTrack?.id, a.id);
+    },
+  );
 
-    expect(playback.currentTrack?.id, b.id);
-    final upNextIds = playback.upNext.map((e) => e.track.id).toSet();
-    expect(upNextIds, {a.id, c.id, x.id});
+  test(
+    'receiver update ignores stale current tracks and replaces a changed future',
+    () async {
+      await playback.playLocal(a, contextQueue: [a, b, c]);
+      playback.updateReceiverQueue([b, x]);
+      expect(playback.upNext.map((e) => e.track.id), [b.id, c.id]);
+      playback.addToQueue(b);
+      playback.updateReceiverQueue([a, x]);
+      expect(playback.upNext.map((e) => e.track.id), [x.id]);
+      expect(playback.userQueue.single.track.id, b.id);
+    },
+  );
 
-    playback.toggleShuffle();
-    expect(playback.upNext.map((e) => e.track.id), [c.id, x.id]);
-  });
+  test(
+    'shuffle keeps the current track and queues every other track once',
+    () async {
+      await playback.playTrack(b, contextQueue: [a, b, c, x], context: ctx);
+      playback.toggleShuffle();
+
+      expect(playback.currentTrack?.id, b.id);
+      final upNextIds = playback.upNext.map((e) => e.track.id).toSet();
+      expect(upNextIds, {a.id, c.id, x.id});
+
+      playback.toggleShuffle();
+      expect(playback.upNext.map((e) => e.track.id), [c.id, x.id]);
+    },
+  );
 
   test('repeat context wraps around, repeat off stops at the end', () async {
     await playback.playTrack(c, contextQueue: [a, b, c], context: ctx);
+    expect(playback.canSkipNext, isFalse);
 
     await playback.nextTrack();
-    expect(playback.currentTrack?.id, c.id, reason: 'repeat off: stays on last track');
+    expect(
+      playback.currentTrack?.id,
+      c.id,
+      reason: 'repeat off: stays on last track',
+    );
 
     playback.cycleRepeatMode();
     expect(playback.repeatMode, SpotifyRepeatMode.context);
+    expect(
+      playback.canSkipNext,
+      isTrue,
+      reason: 'SMTC must enable next when context repeat can wrap',
+    );
     await playback.nextTrack();
     expect(playback.currentTrack?.id, a.id);
   });
@@ -137,19 +180,22 @@ void main() {
     expect(playback.currentTrack?.id, b.id);
   });
 
-  test('up next can be reordered and trimmed without touching the context', () async {
-    await playback.playTrack(a, contextQueue: [a, b, c, x], context: ctx);
+  test(
+    'up next can be reordered and trimmed without touching the context',
+    () async {
+      await playback.playTrack(a, contextQueue: [a, b, c, x], context: ctx);
 
-    playback.reorderUpNext(2, 0);
-    expect(playback.upNext.map((e) => e.track.id), [x.id, b.id, c.id]);
+      playback.reorderUpNext(2, 0);
+      expect(playback.upNext.map((e) => e.track.id), [x.id, b.id, c.id]);
 
-    playback.removeFromUpNext(1);
-    expect(playback.upNext.map((e) => e.track.id), [x.id, c.id]);
+      playback.removeFromUpNext(1);
+      expect(playback.upNext.map((e) => e.track.id), [x.id, c.id]);
 
-    await playback.playFromUpNext(1);
-    expect(playback.currentTrack?.id, c.id);
-    expect(playback.upNext, isEmpty);
-  });
+      await playback.playFromUpNext(1);
+      expect(playback.currentTrack?.id, c.id);
+      expect(playback.upNext, isEmpty);
+    },
+  );
 
   test('isPlayingContext reflects the active context uri', () async {
     await playback.playTrack(a, contextQueue: [a, b], context: ctx);
@@ -160,7 +206,10 @@ void main() {
   });
 
   group('播放错误', () {
-    const unavailable = TrackPlaybackException(TrackPlaybackFailure.unavailable, '这首歌仅提供 DRM 加密格式');
+    const unavailable = TrackPlaybackException(
+      TrackPlaybackFailure.unavailable,
+      '这首歌仅提供 DRM 加密格式',
+    );
 
     test('成功加载后播放本地文件，无错误', () async {
       await playback.playTrack(a, contextQueue: [a, b], context: ctx);
@@ -229,11 +278,10 @@ void main() {
       expect(playback.pauseAfterFailures, isTrue, reason: '默认开启');
       expect(playback.currentTrack?.id, c.id, reason: '第 3 首失败后不再跳到第 4 首');
       expect(audio.playedFiles, isEmpty);
-      expect(events.map((e) => (e.skipped, e.autoPaused, e.consecutiveFailures)), [
-        (true, false, 1),
-        (true, false, 2),
-        (false, true, 3),
-      ]);
+      expect(
+        events.map((e) => (e.skipped, e.autoPaused, e.consecutiveFailures)),
+        [(true, false, 1), (true, false, 2), (false, true, 3)],
+      );
 
       await playback.nextTrack();
       expect(playback.currentTrack?.id, x.id);
@@ -252,7 +300,11 @@ void main() {
 
       expect(playback.currentTrack?.id, x.id);
       expect(audio.playedFiles, hasLength(1));
-      final reloaded = PlaybackProvider(audio, await StorageService.init(), audioLoader: loader);
+      final reloaded = PlaybackProvider(
+        audio,
+        await StorageService.init(),
+        audioLoader: loader,
+      );
       addTearDown(reloaded.dispose);
       expect(reloaded.pauseAfterFailures, isFalse);
     });
@@ -270,7 +322,10 @@ void main() {
     });
 
     test('网络错误不跳歌；再点播放会重试并清除错误', () async {
-      loader.failures[a.id] = const TrackPlaybackException(TrackPlaybackFailure.network, '网络异常');
+      loader.failures[a.id] = const TrackPlaybackException(
+        TrackPlaybackFailure.network,
+        '网络异常',
+      );
 
       await playback.playTrack(a, contextQueue: [a, b], context: ctx);
       expect(playback.currentTrack?.id, a.id);

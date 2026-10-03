@@ -29,7 +29,9 @@ class _SwipeableArtworkState extends State<SwipeableArtwork> {
   bool _dragging = false;
 
   void _onUpdate(DragUpdateDetails details) {
-    setState(() => _dx = (_dx + details.delta.dx).clamp(-widget.size, widget.size));
+    setState(
+      () => _dx = (_dx + details.delta.dx).clamp(-widget.size, widget.size),
+    );
   }
 
   void _onEnd(DragEndDetails details) {
@@ -63,6 +65,7 @@ class _SwipeableArtworkState extends State<SwipeableArtwork> {
   @override
   Widget build(BuildContext context) {
     final size = widget.size;
+    if (!size.isFinite || size <= 0) return const SizedBox.shrink();
     return Semantics(
       hint: context.l10n.playerSwipeHint,
       child: GestureDetector(
@@ -76,7 +79,9 @@ class _SwipeableArtworkState extends State<SwipeableArtwork> {
         child: TweenAnimationBuilder<double>(
           tween: Tween(end: _dx),
           // 拖动中直接跟手；松手后以回弹曲线归位
-          duration: _dragging ? Duration.zero : const Duration(milliseconds: 320),
+          duration: _dragging
+              ? Duration.zero
+              : const Duration(milliseconds: 320),
           curve: Curves.easeOutBack,
           builder: (context, dx, child) {
             final progress = (dx.abs() / size).clamp(0.0, 1.0);
@@ -94,7 +99,11 @@ class _SwipeableArtworkState extends State<SwipeableArtwork> {
             decoration: BoxDecoration(
               borderRadius: MD3EShapes.roundedExtraLarge,
               boxShadow: [
-                BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 28, offset: const Offset(0, 10)),
+                BoxShadow(
+                  color: Colors.black.withAlpha(120),
+                  blurRadius: 28,
+                  offset: const Offset(0, 10),
+                ),
               ],
             ),
             child: AnimatedSwitcher(

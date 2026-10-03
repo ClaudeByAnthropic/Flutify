@@ -10,7 +10,6 @@ import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/detail/widgets/collection_hero.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/lyrics_backdrop.dart';
-import 'package:flutify_app/ui/screens/player/lyrics_sheet.dart';
 import 'package:flutify_app/ui/screens/player/queue_list.dart';
 import 'package:flutify_app/ui/shell/desktop/now_playing_details.dart';
 import 'package:flutify_app/ui/shell/desktop/now_playing_panel.dart';
@@ -32,8 +31,16 @@ import 'fixtures/sample_catalog.dart';
 
 /// 关键交互流程的冒烟测试：布局溢出、断言失败等都会让测试失败。
 void main() {
-  const mixTracks = [SampleCatalog.track1, SampleCatalog.track2, SampleCatalog.track3, SampleCatalog.track4];
-  const mixContext = PlaybackContext.playlist('Synthetic Mix', uri: 'spotify:playlist:synthetic');
+  const mixTracks = [
+    SampleCatalog.track1,
+    SampleCatalog.track2,
+    SampleCatalog.track3,
+    SampleCatalog.track4,
+  ];
+  const mixContext = PlaybackContext.playlist(
+    'Synthetic Mix',
+    uri: 'spotify:playlist:synthetic',
+  );
 
   /// [library] / [lyrics] / [albumTracks] 注入合成数据；音频加载一律成功（不走网络）。
   Future<void> pumpApp(
@@ -50,13 +57,20 @@ void main() {
 
     SharedPreferences.setMockInitialValues({});
     final storage = await StorageService.init();
-    await tester.pumpWidget(FlutifyApp(
-      storageService: storage,
-      audioEngine: FakeAudioPlayerService(),
-      emePlayer: EmePlayer(),
-      spotifyApiService: FakeSpotifyApiService(storage, librarySource: library, lyricsById: lyrics, albumTracks: albumTracks),
-      trackAudioLoader: FakeTrackAudioSource(),
-    ));
+    await tester.pumpWidget(
+      FlutifyApp(
+        storageService: storage,
+        audioEngine: FakeAudioPlayerService(),
+        emePlayer: EmePlayer(),
+        spotifyApiService: FakeSpotifyApiService(
+          storage,
+          librarySource: library,
+          lyricsById: lyrics,
+          albumTracks: albumTracks,
+        ),
+        trackAudioLoader: FakeTrackAudioSource(),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 300));
   }
 
@@ -67,19 +81,32 @@ void main() {
   }
 
   Future<void> playMix(WidgetTester tester) async {
-    final playback = Provider.of<PlaybackProvider>(tester.element(find.byType(MainShell)), listen: false);
-    await playback.playTrack(mixTracks.first, contextQueue: mixTracks, context: mixContext);
+    final playback = Provider.of<PlaybackProvider>(
+      tester.element(find.byType(MainShell)),
+      listen: false,
+    );
+    await playback.playTrack(
+      mixTracks.first,
+      contextQueue: mixTracks,
+      context: mixContext,
+    );
     await settle(tester);
   }
 
-  testWidgets('mobile: full player, inline lyrics, full-screen lyrics and queue', (tester) async {
-    await pumpApp(tester, const Size(400, 860), lyrics: {
-      SampleCatalog.track1.id: const SpotifyLyrics(lines: [
-        LyricLine(startTimeMs: 0, words: 'First synthetic line'),
-        LyricLine(startTimeMs: 4000, words: 'Second synthetic line'),
-        LyricLine(startTimeMs: 8000, words: 'Third synthetic line'),
-      ]),
-    });
+  testWidgets('mobile: full player, inline lyrics and queue', (tester) async {
+    await pumpApp(
+      tester,
+      const Size(400, 860),
+      lyrics: {
+        SampleCatalog.track1.id: const SpotifyLyrics(
+          lines: [
+            LyricLine(startTimeMs: 0, words: 'First synthetic line'),
+            LyricLine(startTimeMs: 4000, words: 'Second synthetic line'),
+            LyricLine(startTimeMs: 8000, words: 'Third synthetic line'),
+          ],
+        ),
+      },
+    );
     await playMix(tester);
 
     await tester.tap(find.byType(MiniPlayer));
@@ -91,27 +118,17 @@ void main() {
     await tester.tap(find.byTooltip('歌词'));
     await settle(tester);
     expect(find.text('First synthetic line'), findsOneWidget);
-    // 内嵌歌词同样是液态玻璃风格：流动背景 + 玻璃控制区 + 玻璃「全屏」按钮
+    // 手机只保留内嵌歌词：流动背景和玻璃控制区，不再重复打开全屏面板。
     expect(find.byType(LyricsBackdrop), findsOneWidget);
-    expect(find.byType(LiquidGlass), findsNWidgets(2));
-
-    // 全屏歌词：顶部信息胶囊 + 底部控制台两块液态玻璃；非当前行带模糊
-    await tester.tap(find.byTooltip('全屏歌词'));
-    await settle(tester);
-    expect(
-      find.descendant(of: find.byType(LyricsSheet), matching: find.byType(LiquidGlass)),
-      findsNWidgets(2),
-    );
+    expect(find.byType(LiquidGlass), findsOneWidget);
+    expect(find.byTooltip('全屏歌词'), findsNothing);
     expect(find.byType(ImageFiltered), findsWidgets);
-    // 0:00 时第一句清晰，并停在上下玻璃之间的正中
-    final firstLine = find.text('First synthetic line').last;
-    expect(find.ancestor(of: firstLine, matching: find.byType(ImageFiltered)), findsNothing);
-    const sheetHeight = 860 * 0.92;
-    const sheetTop = 860 - sheetHeight;
-    const expectedCenter = sheetTop + (104 + (sheetHeight - 150)) / 2;
-    expect(tester.getCenter(firstLine).dy, closeTo(expectedCenter, 24));
-    await tester.tap(find.byTooltip('关闭').last);
-    await settle(tester);
+    // 0:00 时当前行保持清晰。
+    final firstLine = find.text('First synthetic line');
+    expect(
+      find.ancestor(of: firstLine, matching: find.byType(ImageFiltered)),
+      findsNothing,
+    );
 
     await tester.tap(find.byTooltip('播放队列'));
     await settle(tester);
@@ -142,18 +159,23 @@ void main() {
     expect(find.byType(MiniPlayer), findsOneWidget);
   });
 
-  testWidgets('build errors render a quiet placeholder instead of the red screen', (tester) async {
-    // 测试框架要求在测试体结束前恢复 ErrorWidget.builder（tearDown 太晚）
-    final previous = ErrorWidget.builder;
-    installErrorPlaceholder();
-    try {
-      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: _Throws())));
-      expect(tester.takeException(), isA<StateError>());
-      expect(find.byIcon(Icons.hide_image_outlined), findsOneWidget);
-    } finally {
-      ErrorWidget.builder = previous;
-    }
-  });
+  testWidgets(
+    'build errors render a quiet placeholder instead of the red screen',
+    (tester) async {
+      // 测试框架要求在测试体结束前恢复 ErrorWidget.builder（tearDown 太晚）
+      final previous = ErrorWidget.builder;
+      installErrorPlaceholder();
+      try {
+        await tester.pumpWidget(
+          const MaterialApp(home: Scaffold(body: _Throws())),
+        );
+        expect(tester.takeException(), isA<StateError>());
+        expect(find.byIcon(Icons.hide_image_outlined), findsOneWidget);
+      } finally {
+        ErrorWidget.builder = previous;
+      }
+    },
+  );
 
   testWidgets('desktop: three-column shell panels', (tester) async {
     await pumpApp(tester, const Size(1280, 800));
@@ -174,7 +196,10 @@ void main() {
     expect(find.byType(NowPlayingPanel), findsOneWidget);
     expect(find.widgetWithText(FilterPill, '播放队列'), findsNothing);
     // 无曲目时播放栏只有占位，直接调用队列键对应的操作
-    tester.element(find.byType(NowPlayingPanel)).read<ShellLayoutController>().togglePanel(RightPanel.queue);
+    tester
+        .element(find.byType(NowPlayingPanel))
+        .read<ShellLayoutController>()
+        .togglePanel(RightPanel.queue);
     await settle(tester);
     expect(find.text('播放队列'), findsWidgets, reason: '面板标题随之切换');
     expect(find.byType(QueueList), findsOneWidget);
@@ -183,42 +208,53 @@ void main() {
     expect(find.byType(NowPlayingPanel), findsNothing);
   });
 
-  testWidgets('desktop: now-playing panel embeds lyrics that expand to fill the panel', (tester) async {
-    await pumpApp(tester, const Size(1440, 900), lyrics: {
-      SampleCatalog.track1.id: const SpotifyLyrics(lines: [
-        LyricLine(startTimeMs: 0, words: 'First synthetic line'),
-        LyricLine(startTimeMs: 4000, words: 'Second synthetic line'),
-      ]),
-    });
-    await playMix(tester);
+  testWidgets(
+    'desktop: now-playing panel embeds lyrics that expand to fill the panel',
+    (tester) async {
+      await pumpApp(
+        tester,
+        const Size(1440, 900),
+        lyrics: {
+          SampleCatalog.track1.id: const SpotifyLyrics(
+            lines: [
+              LyricLine(startTimeMs: 0, words: 'First synthetic line'),
+              LyricLine(startTimeMs: 4000, words: 'Second synthetic line'),
+            ],
+          ),
+        },
+      );
+      await playMix(tester);
 
-    // 内嵌：歌词卡与「关于艺人」同在详情列表里
-    expect(find.byType(NowPlayingDetails), findsOneWidget);
-    expect(find.byType(PanelLyricsCard), findsOneWidget);
-    expect(find.text('First synthetic line'), findsOneWidget);
+      // 内嵌：歌词卡与「关于艺人」同在详情列表里
+      expect(find.byType(NowPlayingDetails), findsOneWidget);
+      expect(find.byType(PanelLyricsCard), findsOneWidget);
+      expect(find.text('First synthetic line'), findsOneWidget);
 
-    // 放大：歌词卡撑满面板，详情列表让位；再点收起回到详情
-    await tester.tap(find.byTooltip('放大歌词'));
-    await settle(tester);
-    expect(find.byType(NowPlayingDetails), findsNothing);
-    expect(find.byType(PanelLyricsCard), findsOneWidget);
-    expect(find.text('First synthetic line'), findsOneWidget);
+      // 放大：歌词卡撑满面板，详情列表让位；再点收起回到详情
+      await tester.tap(find.byTooltip('放大歌词'));
+      await settle(tester);
+      expect(find.byType(NowPlayingDetails), findsNothing);
+      expect(find.byType(PanelLyricsCard), findsOneWidget);
+      expect(find.text('First synthetic line'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('收起歌词'));
-    await settle(tester);
-    expect(find.byType(NowPlayingDetails), findsOneWidget);
+      await tester.tap(find.byTooltip('收起歌词'));
+      await settle(tester);
+      expect(find.byType(NowPlayingDetails), findsOneWidget);
 
-    // 播放栏队列键：切到独立的队列面板；再按一次关闭
-    await tester.tap(find.byTooltip('播放队列'));
-    await settle(tester);
-    expect(find.byType(QueueList), findsOneWidget);
-    expect(find.byType(PanelLyricsCard), findsNothing);
-    await tester.tap(find.byTooltip('播放队列'));
-    await settle(tester);
-    expect(find.byType(NowPlayingPanel), findsNothing);
-  });
+      // 播放栏队列键：切到独立的队列面板；再按一次关闭
+      await tester.tap(find.byTooltip('播放队列'));
+      await settle(tester);
+      expect(find.byType(QueueList), findsOneWidget);
+      expect(find.byType(PanelLyricsCard), findsNothing);
+      await tester.tap(find.byTooltip('播放队列'));
+      await settle(tester);
+      expect(find.byType(NowPlayingPanel), findsNothing);
+    },
+  );
 
-  testWidgets('desktop: narrow window keeps the floating panel closed', (tester) async {
+  testWidgets('desktop: narrow window keeps the floating panel closed', (
+    tester,
+  ) async {
     await pumpApp(tester, const Size(1100, 760));
 
     // 1100 – 1280：右栏为浮层，启动时不遮挡内容
@@ -238,7 +274,12 @@ void main() {
       ),
     );
 
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('音乐库')));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('音乐库'),
+      ),
+    );
     await settle(tester);
     expect(find.text('已点赞的歌曲'), findsWidgets);
 

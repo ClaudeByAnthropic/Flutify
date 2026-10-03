@@ -1340,6 +1340,18 @@ abstract class AppLocalizations {
   /// **'复制代码'**
   String get shareEmbedCopy;
 
+  /// No description provided for @shareEmbedUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'此设备的系统 WebView 暂不可用，仍可复制下方嵌入代码。'**
+  String get shareEmbedUnavailable;
+
+  /// No description provided for @shareEmbedFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify 嵌入播放器加载失败，请检查网络后重试。'**
+  String get shareEmbedFailed;
+
   /// No description provided for @toastAddedTo.
   ///
   /// In zh, this message translates to:

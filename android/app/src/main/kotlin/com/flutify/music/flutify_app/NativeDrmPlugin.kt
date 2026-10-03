@@ -44,6 +44,7 @@ class NativeDrmPlugin(
     private val appContext = context.applicationContext
     private val handler = Handler(Looper.getMainLooper())
     private var player: ExoPlayer? = null
+    private var requestedVolume = 1f
     private var eventSink: EventChannel.EventSink? = null
 
     private val methodChannel = MethodChannel(messenger, METHOD_CHANNEL).also {
@@ -86,7 +87,8 @@ class NativeDrmPlugin(
                 }
                 "setVolume" -> {
                     val volume = call.argument<Number>("volume")?.toFloat() ?: 1f
-                    player?.volume = volume.coerceIn(0f, 1f)
+                    requestedVolume = volume.coerceIn(0f, 1f)
+                    player?.volume = requestedVolume
                     result.success(null)
                 }
                 "stop" -> { stopPlayback(); result.success(null) }
@@ -141,6 +143,7 @@ class NativeDrmPlugin(
         // 诊断：打出 loader/DRM 全事件（drmSessionAcquired/drmKeysLoaded/
         // drmSessionManagerError/loadError 等），logcat tag 带 ndrm 前缀
         p.addAnalyticsListener(EventLogger(null, "ndrm"))
+        p.volume = requestedVolume
         p.addListener(playerListener)
         handler.post(positionTicker)
         player = p

@@ -146,8 +146,8 @@ class PlaybackProvider extends ChangeNotifier {
     Random? random,
     this.audioLoader,
     this.sessionStore,
-  })  : _audio = audio,
-        _random = random ?? Random(),
+  }) : _audio = audio,
+       _random = random ?? Random(),
        _pauseAfterFailures = _storage.pauseAfterFailures,
        _volume = _storage.volume,
        _volumeBeforeMute = _storage.volume > 0 ? _storage.volume : 0.8,
@@ -193,6 +193,12 @@ class PlaybackProvider extends ChangeNotifier {
 
   /// 用户手动添加的待播队列（只读）。
   List<QueueEntry> get userQueue => List.unmodifiable(_userQueue);
+
+  /// 系统媒体卡片与实际 nextTrack 使用同一套规则，包括列表末尾回绕。
+  bool get canSkipNext =>
+      _userQueue.isNotEmpty ||
+      _orderPos + 1 < _order.length ||
+      (_repeatMode == SpotifyRepeatMode.context && _order.isNotEmpty);
 
   /// 上下文中接下来要播放的曲目（按实际播放顺序），uid 为其在上下文中的下标。
   List<QueueEntry> get upNext {
@@ -608,6 +614,43 @@ class PlaybackProvider extends ChangeNotifier {
     await _startTrack(track, startAt: startAt, deferLoad: deferLoad);
   }
 
+  /// 更新 Connect 的滑动队列窗口，不重新加载音频或重置进度。
+  /// 保留已播历史；本机已有完整列表且窗口是其前缀时，不截掉尚未下发的尾部。
+  void updateReceiverQueue(List<SpotifyTrack> currentAndNext) {
+    if (currentAndNext.isEmpty ||
+        currentAndNext.first.uri != _currentTrack?.uri)
+      return;
+    final existing = [for (final i in _order) _contextTracks[i]];
+    final matchesCurrent =
+        existing.isNotEmpty && existing[_orderPos].uri == _currentTrack?.uri;
+    final history = matchesCurrent
+        ? existing.take(_orderPos).toList()
+        : <SpotifyTrack>[];
+    final remaining = matchesCurrent
+        ? existing.sublist(_orderPos)
+        : <SpotifyTrack>[];
+    final isPrefix =
+        currentAndNext.length <= remaining.length &&
+        List.generate(
+          currentAndNext.length,
+          (i) => currentAndNext[i].uri == remaining[i].uri,
+        ).every((v) => v);
+    final next = [
+      ...currentAndNext,
+      if (isPrefix) ...remaining.skip(currentAndNext.length),
+    ];
+    if (listEquals(
+      existing.map((t) => t.uri).toList(),
+      [...history, ...next].map((t) => t.uri).toList(),
+    ))
+      return;
+    _contextTracks = [...history, ...next];
+    _order = List.generate(_contextTracks.length, (i) => i);
+    _orderPos = history.length;
+    _scheduleSave();
+    notifyListeners();
+  }
+
   /// 从头播放整个上下文（详情页大播放按钮）。随机模式下从随机曲目开始。
   Future<void> playContext(
     List<SpotifyTrack> tracks,
@@ -663,7 +706,7 @@ class PlaybackProvider extends ChangeNotifier {
   }
 
   Future<void> previousTrack() async {
-    if (position.inSeconds > 3 || _orderPos == 0 || _order.isEmpty) {
+    if (_orderPos == 0 || _order.isEmpty) {
       await seekTo(Duration.zero);
       return;
     }

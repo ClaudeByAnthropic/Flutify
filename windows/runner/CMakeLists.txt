@@ -17,6 +17,7 @@ add_executable(${BINARY_NAME} WIN32
   "taskbar_widget_locator.cpp"
   "utils.cpp"
   "win32_window.cpp"
+  "windows_trust_store.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
@@ -43,6 +44,8 @@ target_compile_options(${BINARY_NAME} PRIVATE "/utf-8")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "crypt32.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "advapi32.lib")
 # 系统媒体控制（SMTC）使用 C++/WinRT
 target_link_libraries(${BINARY_NAME} PRIVATE "windowsapp.lib")
 # 任务栏歌词：GDI+ 绘制、SHCreateMemStream 解码封面、UI Automation 定位小组件

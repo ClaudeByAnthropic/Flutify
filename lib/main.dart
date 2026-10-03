@@ -49,6 +49,7 @@ import 'services/media_controls/media_controls_sync.dart';
 import 'services/media_controls/multi_media_controls.dart';
 import 'services/media_controls/system_media_controls.dart';
 import 'services/network/network_proxy.dart';
+import 'services/network/windows_trust_store.dart';
 import 'services/playback_session_store.dart';
 import 'services/protocol/audio_cache_store.dart';
 import 'services/protocol/eme_track_audio_source.dart';
@@ -68,6 +69,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installFileLog();
   installErrorPlaceholder();
+  await WindowsTrustStore.initialize();
 
   // just_audio 自身没有 Windows / Linux 实现，需在创建任何 AudioPlayer 之前
   // 注册 media_kit 后端；Android / iOS 仍使用 just_audio 原生实现。
@@ -134,7 +136,10 @@ Future<void> main() async {
     );
   }
   // 路由引擎：本地文件/流式 → just_audio；DRM 曲目 → EME / 原生 DRM
-  final audioEngine = RoutedAudioEngine(local: audioPlayerService, eme: drmEngine);
+  final audioEngine = RoutedAudioEngine(
+    local: audioPlayerService,
+    eme: drmEngine,
+  );
 
   // 上次播放会话（曲目 / 队列 / 进度）：单独的 JSON 文件，不放进 SharedPreferences
   final supportDir = await getApplicationSupportDirectory();
@@ -254,7 +259,8 @@ class FlutifyApp extends StatelessWidget {
         Provider<AudioEngine>.value(value: audioEngine),
         Provider<EmePlayer>.value(value: emePlayer),
         Provider<SpotifyApiService>.value(value: spotifyApiService),
-        if (webTokenService != null) Provider<WebTokenService>.value(value: webTokenService!),
+        if (webTokenService != null)
+          Provider<WebTokenService>.value(value: webTokenService!),
         Provider<NetworkProxy?>.value(value: networkProxy),
         // 非惰性：启动即接入 API 层，首屏请求就能自动续期 access_token
         Provider<SpotifyAuthService>(
@@ -369,7 +375,8 @@ class FlutifyApp extends StatelessWidget {
                 start: start,
                 username: ctx.read<SpotifyAuthService>().username,
               );
-              final toRemote = connect.activeDevice != null && !playback.isPlaying;
+              final toRemote =
+                  connect.activeDevice != null && !playback.isPlaying;
               debugPrint(
                 '[Connect] 点歌：request=${request == null ? 'null' : 'ok'} '
                 'active=${connect.activeDevice?.name} localPlaying=${playback.isPlaying} '
@@ -441,7 +448,9 @@ void _startConnectReceiver(
   if (tokens == null) return;
   final preferences = ctx.read<PreferencesProvider>();
   final deviceId =
-      md5.convert(utf8.encode('flutify-receiver:${Platform.localHostname}')).toString() +
+      md5
+          .convert(utf8.encode('flutify-receiver:${Platform.localHostname}'))
+          .toString() +
       sha1.convert(utf8.encode('flutify')).toString().substring(0, 8);
   final host = PlaybackReceiverHost(playback);
   String nameOf() {
@@ -468,9 +477,15 @@ void _startConnectReceiver(
       username: ctx.read<SpotifyAuthService>().username,
     );
     if (request == null) return;
-    debugPrint('[Receiver] 交接给 Connect：${current.name} @${positionMs}ms paused=$paused');
+    debugPrint(
+      '[Receiver] 交接给 Connect：${current.name} @${positionMs}ms paused=$paused',
+    );
     try {
-      await connect.playOnReceiver(request, seekToMs: positionMs, paused: paused);
+      await connect.playOnReceiver(
+        request,
+        seekToMs: positionMs,
+        paused: paused,
+      );
     } catch (e) {
       debugPrint('[Receiver] 交接失败：$e');
     }
@@ -498,7 +513,8 @@ void _startConnectReceiver(
     for (var i = 0; i < 20 && !connect.receiverOnline; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
-    final remoteAudible = connect.activeDevice != null && connect.player.isAudible;
+    final remoteAudible =
+        connect.activeDevice != null && connect.player.isAudible;
     if (playback.isPlaying || receiver.isActive || remoteAudible) return;
     await handOver(playback.position.inMilliseconds, paused: true);
   };
@@ -572,9 +588,7 @@ class _ThemedApp extends StatelessWidget {
           child: AnnotatedRegion<SystemUiOverlayStyle>(
             value: systemBarsStyle(Theme.of(context).brightness),
             // 桌面：窗口按钮 / 窄窗口标题条覆盖在所有路由之上
-            child: TaskbarLyricsBinding(
-              child: WindowFrame(child: child!),
-            ),
+            child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
           ),
         );
       },

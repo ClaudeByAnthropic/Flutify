@@ -83,7 +83,8 @@ class EmePlayer {
         final env = await WebViewEnvironment.create(
           settings: WebViewEnvironmentSettings(
             additionalBrowserArguments:
-                '--autoplay-policy=no-user-gesture-required',
+                '--autoplay-policy=no-user-gesture-required '
+                '--disable-features=HardwareMediaKeyHandling',
           ),
         );
         cachedEnvironment = env;
@@ -118,11 +119,19 @@ class EmePlayer {
       // Android WebView：Widevine 需要 App 显式授予「受保护媒体 ID」，否则 requestMediaKeySystemAccess 直接失败。
       // 只放行这一项，其余（摄像头 / 麦克风等）一律拒绝。WebView2 不走这里。
       onPermissionRequest: (_, request) async {
-        final drm = request.resources.contains(PermissionResourceType.PROTECTED_MEDIA_ID);
-        debugPrint('[eme] 权限请求 ${request.resources.map((r) => r.toNativeValue()).join(',')} → ${drm ? '允许' : '拒绝'}');
+        final drm = request.resources.contains(
+          PermissionResourceType.PROTECTED_MEDIA_ID,
+        );
+        debugPrint(
+          '[eme] 权限请求 ${request.resources.map((r) => r.toNativeValue()).join(',')} → ${drm ? '允许' : '拒绝'}',
+        );
         return PermissionResponse(
-          resources: drm ? [PermissionResourceType.PROTECTED_MEDIA_ID] : const [],
-          action: drm ? PermissionResponseAction.GRANT : PermissionResponseAction.DENY,
+          resources: drm
+              ? [PermissionResourceType.PROTECTED_MEDIA_ID]
+              : const [],
+          action: drm
+              ? PermissionResponseAction.GRANT
+              : PermissionResponseAction.DENY,
         );
       },
       onLoadStop: (_, _) {
@@ -130,7 +139,9 @@ class EmePlayer {
       },
       onReceivedError: (_, request, error) {
         if ((request.isForMainFrame ?? true) && !_pageReady.isCompleted) {
-          _pageReady.completeError(StateError('EME 页加载失败：${error.description}'));
+          _pageReady.completeError(
+            StateError('EME 页加载失败：${error.description}'),
+          );
         }
       },
       onConsoleMessage: (_, msg) {
@@ -155,13 +166,17 @@ class EmePlayer {
           request.response.write(emePageHtml);
           await request.response.close();
         } else if (path == '/hls.js') {
-          request.response.headers.contentType =
-              ContentType('application', 'javascript');
+          request.response.headers.contentType = ContentType(
+            'application',
+            'javascript',
+          );
           request.response.write(hlsJsSource ?? '');
           await request.response.close();
         } else if (path == '/audio.m3u8') {
-          request.response.headers.contentType =
-              ContentType('application', 'vnd.apple.mpegurl');
+          request.response.headers.contentType = ContentType(
+            'application',
+            'vnd.apple.mpegurl',
+          );
           request.response.write(_localM3u8 ?? '#EXTM3U');
           await request.response.close();
         } else if (path == '/audio/current.m4a') {
@@ -217,7 +232,8 @@ class EmePlayer {
 
     // 流式中：等到要的区间下完
     if (dl != null && !dl.done) {
-      final need = endExclusive ?? (dl.expectedTotal > 0 ? dl.expectedTotal : start + 1);
+      final need =
+          endExclusive ?? (dl.expectedTotal > 0 ? dl.expectedTotal : start + 1);
       try {
         await dl.waitFor(need);
       } catch (e) {
@@ -237,7 +253,10 @@ class EmePlayer {
     }
     if (rangeHeader != null) {
       response.statusCode = 206;
-      response.headers.set(HttpHeaders.contentRangeHeader, 'bytes $start-${end - 1}/$total');
+      response.headers.set(
+        HttpHeaders.contentRangeHeader,
+        'bytes $start-${end - 1}/$total',
+      );
     }
     response.headers.set(HttpHeaders.contentLengthHeader, len);
     await file.openRead(start, end).pipe(response);
@@ -256,8 +275,10 @@ class EmePlayer {
     try {
       final resp = await poster(body);
       debugPrint('[eme] license 反代：请求 ${body.length}B → 响应 ${resp.length}B');
-      request.response.headers.contentType =
-          ContentType('application', 'octet-stream');
+      request.response.headers.contentType = ContentType(
+        'application',
+        'octet-stream',
+      );
       request.response.add(resp);
       await request.response.close();
     } catch (e) {
@@ -273,8 +294,10 @@ class EmePlayer {
     }
     try {
       final cert = await fetcher();
-      request.response.headers.contentType =
-          ContentType('application', 'octet-stream');
+      request.response.headers.contentType = ContentType(
+        'application',
+        'octet-stream',
+      );
       request.response.add(cert);
       await request.response.close();
     } catch (e) {
@@ -296,8 +319,11 @@ class EmePlayer {
     final body = await consolidatedBody(request);
     try {
       final resp = await _httpClient
-          .post(Uri.parse(target),
-              headers: {'Content-Type': 'application/octet-stream'}, body: body)
+          .post(
+            Uri.parse(target),
+            headers: {'Content-Type': 'application/octet-stream'},
+            body: body,
+          )
           .timeout(const Duration(seconds: 15));
       var line =
           '[eme] provision 反代：请求 ${body.length}B → HTTP ${resp.statusCode} ${resp.bodyBytes.length}B';
@@ -308,8 +334,10 @@ class EmePlayer {
       }
       debugPrint(line);
       request.response.statusCode = resp.statusCode;
-      request.response.headers.contentType =
-          ContentType('application', 'octet-stream');
+      request.response.headers.contentType = ContentType(
+        'application',
+        'octet-stream',
+      );
       request.response.add(resp.bodyBytes);
       await request.response.close();
     } catch (e) {
@@ -320,7 +348,11 @@ class EmePlayer {
   /// 反代失败：原因写进 500 响应体（页面侧随 HLS 错误带回），并推进错误通道。
   /// 之所以走 [lastError] + stateStream（与 JS 侧 HLS/audio 错误汇合），
   /// 是因为上层只在 error 状态时读错误详情，一条通道即可覆盖两类来源。
-  Future<void> _failRelay(HttpRequest request, String name, Object error) async {
+  Future<void> _failRelay(
+    HttpRequest request,
+    String name,
+    Object error,
+  ) async {
     debugPrint('[eme] $name 反代失败: $error');
     // 只记第一条：随后 hls.js 还会发 fatal 错误事件，别让泛化 details 覆盖真实原因
     lastError ??= EmePlaybackException(
@@ -331,8 +363,11 @@ class EmePlayer {
     _stateController.add(EmePlayerState.error);
     try {
       request.response.statusCode = 500;
-      request.response.headers.contentType =
-          ContentType('text', 'plain', charset: 'utf-8');
+      request.response.headers.contentType = ContentType(
+        'text',
+        'plain',
+        charset: 'utf-8',
+      );
       request.response.write('$error');
       await request.response.close();
     } catch (_) {}
@@ -370,7 +405,8 @@ class EmePlayer {
     if (c == null) throw StateError('EME WebView 未创建（buildHiddenView 未挂载）');
 
     final res = await c.callAsyncJavaScript(
-        functionBody: 'return await emePlayHls();');
+      functionBody: 'return await emePlayHls();',
+    );
     debugPrint('[eme] emePlayHls 结果: ${res?.value}');
     final v = res?.value;
     if (v is String && v.startsWith('ERR:')) {
@@ -409,7 +445,9 @@ class EmePlayer {
     if (line.contains('KEYFORMAT="$_widevineKeyFormatUuid"')) return line;
     if (line.contains('KEYFORMAT="')) {
       return line.replaceAll(
-          RegExp(r'KEYFORMAT="[^"]*"'), 'KEYFORMAT="$_widevineKeyFormatUuid"');
+        RegExp(r'KEYFORMAT="[^"]*"'),
+        'KEYFORMAT="$_widevineKeyFormatUuid"',
+      );
     }
     return '$line,KEYFORMAT="$_widevineKeyFormatUuid"';
   }
@@ -418,7 +456,7 @@ class EmePlayer {
   /// 清单按 ExoPlayer 要求把 KEYFORMAT 改写为 Widevine UUID，返回喂给原生播放器的 URL。
   /// 下载后的加密 m4a、license/证书反代、流式区间等待全部复用本类既有实现。
   Future<({String hlsUrl, String licenseUrl, String provisionUrl})>
-      serveHlsForNative({
+  serveHlsForNative({
     required File m4a,
     required String m3u8,
     required Future<Uint8List> Function(Uint8List request) licensePoster,
@@ -440,8 +478,7 @@ class EmePlayer {
   Future<void> resume() => _js('emeResume()');
   Future<void> seek(Duration pos) =>
       _js('emeSeek(${(pos.inMilliseconds / 1000).toStringAsFixed(3)})');
-  Future<void> setVolume(double v) =>
-      _js('emeSetVolume(${v.clamp(0.0, 1.0)})');
+  Future<void> setVolume(double v) => _js('emeSetVolume(${v.clamp(0.0, 1.0)})');
 
   Future<void> _js(String source) async {
     final c = _controller;
@@ -461,7 +498,9 @@ class EmePlayer {
     final Map<String, dynamic> ev = jsonDecode(raw);
     switch (ev['type']) {
       case 'position':
-        _position = Duration(milliseconds: ((ev['position'] ?? 0) * 1000).round());
+        _position = Duration(
+          milliseconds: ((ev['position'] ?? 0) * 1000).round(),
+        );
         final dur = (ev['duration'] ?? 0) * 1000;
         if (dur > 0) {
           final d = Duration(milliseconds: dur.round());
@@ -510,14 +549,14 @@ class EmePlayer {
   }
 }
 
-enum EmePlayerState { playing, buffering, ended, error }
+enum EmePlayerState { playing, paused, buffering, ended, error }
 
 /// 空白 EME 宿主页（HLS.js 驱动；无任何 UI/Spotify 前端；零外部请求）。
 /// 页面加载 HLS.js → 加载本地 m3u8 → EME 解密 → MSE 播放。
 const String emePageHtml = r'''
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>eme</title></head>
+<head><meta charset="utf-8"><title>Flutify</title></head>
 <body>
 <script src="/hls.js"></script>
 <script>
