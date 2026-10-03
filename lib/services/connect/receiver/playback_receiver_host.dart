@@ -145,7 +145,9 @@ class PlaybackReceiverHost implements ReceiverHost {
       if (generation != _commandGeneration) return;
       if (paused) {
         await playback.pause();
-      } else if (!playback.isPlaying) {
+      } else if (!playback.isPlaying && !playback.isLoadingTrack) {
+        // A remote resume while loading keeps the pending play intent. The UI
+        // toggle cancels loading, so it must not be used for this state sync.
         await playback.togglePlayPause();
       }
     });

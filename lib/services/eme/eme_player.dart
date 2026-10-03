@@ -30,6 +30,18 @@ class EmePlayer {
 
   /// 当前服务的加密音频文件与本地化清单。
   File? _audioFile;
+  String? get currentAudioPath => _audioFile?.path;
+  Future<void> clearBrowserCache() async {
+    if (_controller == null) return;
+    if (Platform.isWindows) {
+      await _controller!.callDevToolsProtocolMethod(
+        methodName: 'Network.clearBrowserCache',
+      );
+    } else {
+      await InAppWebViewController.clearAllCache();
+    }
+  }
+
   String? _localM3u8;
 
   /// 静态资源（hls.js 与证书）内容，由 [play] 注入。

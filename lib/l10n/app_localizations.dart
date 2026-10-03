@@ -98,6 +98,18 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @playbackRetryWaiting.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络连接失败，{seconds} 秒后第 {attempt}/{total} 次重试'**
+  String playbackRetryWaiting(int attempt, int total, int seconds);
+
+  /// No description provided for @playbackRetryRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在重新连接，第 {attempt}/{total} 次重试'**
+  String playbackRetryRunning(int attempt, int total);
+
   /// No description provided for @appTitle.
   ///
   /// In zh, this message translates to:
@@ -2461,6 +2473,138 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'{count} 周前'**
   String addedWeeksAgo(int count);
+
+  /// No description provided for @settingsGateway.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify 反代'**
+  String get settingsGateway;
+
+  /// No description provided for @settingsGatewayDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'通过自建服务器连接 Spotify API、媒体和 Connect。浏览器登录仍使用 Spotify 原站；保存后新连接生效。'**
+  String get settingsGatewayDescription;
+
+  /// No description provided for @settingsGatewayUrl.
+  ///
+  /// In zh, this message translates to:
+  /// **'反代地址（包含路径）'**
+  String get settingsGatewayUrl;
+
+  /// No description provided for @settingsGatewayUser.
+  ///
+  /// In zh, this message translates to:
+  /// **'反代用户名'**
+  String get settingsGatewayUser;
+
+  /// No description provided for @settingsGatewayPassword.
+  ///
+  /// In zh, this message translates to:
+  /// **'反代密码'**
+  String get settingsGatewayPassword;
+
+  /// No description provided for @settingsGatewayInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请填写有效的 HTTPS 地址、单段路径及用户名和密码。'**
+  String get settingsGatewayInvalid;
+
+  /// No description provided for @settingsApply.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存'**
+  String get settingsApply;
+
+  /// No description provided for @settingsCacheLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'缓存位置'**
+  String get settingsCacheLocation;
+
+  /// No description provided for @settingsAudioCacheLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'音频缓存位置'**
+  String get settingsAudioCacheLocation;
+
+  /// No description provided for @settingsArtworkCacheLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'封面缓存位置'**
+  String get settingsArtworkCacheLocation;
+
+  /// No description provided for @settingsLyricsCacheLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词缓存位置'**
+  String get settingsLyricsCacheLocation;
+
+  /// No description provided for @settingsCacheAppData.
+  ///
+  /// In zh, this message translates to:
+  /// **'应用数据目录（AppData）'**
+  String get settingsCacheAppData;
+
+  /// No description provided for @settingsCacheApplication.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装 / 便携程序目录'**
+  String get settingsCacheApplication;
+
+  /// No description provided for @settingsCacheCustom.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义目录'**
+  String get settingsCacheCustom;
+
+  /// No description provided for @settingsClearAllCache.
+  ///
+  /// In zh, this message translates to:
+  /// **'清理所有缓存'**
+  String get settingsClearAllCache;
+
+  /// No description provided for @settingsClearAllCacheHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'清理音频、封面、歌词和浏览器临时缓存，保留登录、设置、收藏和播放记录。正在播放或下载的音频会保留。'**
+  String get settingsClearAllCacheHelp;
+
+  /// No description provided for @settingsCacheLocationHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'已有缓存会迁移到新位置，校验成功后删除旧文件。正在播放或下载的音频将在释放后继续迁移。自定义位置使用所选目录下的 FlutifyCache 文件夹。'**
+  String get settingsCacheLocationHelp;
+
+  /// No description provided for @settingsCacheMigrated.
+  ///
+  /// In zh, this message translates to:
+  /// **'已迁移 {files} 个文件，{deferred} 个使用中，{failed} 个未成功'**
+  String settingsCacheMigrated(int files, int deferred, int failed);
+
+  /// No description provided for @settingsCacheCleared.
+  ///
+  /// In zh, this message translates to:
+  /// **'已释放 {size}，{deferred} 个使用中，{failed} 个未成功'**
+  String settingsCacheCleared(String size, int deferred, int failed);
+
+  /// No description provided for @settingsCacheLocationInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'目录不可写或路径无效，请选择应用有权访问的本地目录。'**
+  String get settingsCacheLocationInvalid;
+
+  /// No description provided for @settingsCacheLocationSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'缓存位置已更新'**
+  String get settingsCacheLocationSaved;
+
+  /// No description provided for @settingsCacheLocationHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'目录绝对路径'**
+  String get settingsCacheLocationHint;
 }
 
 class _AppLocalizationsDelegate

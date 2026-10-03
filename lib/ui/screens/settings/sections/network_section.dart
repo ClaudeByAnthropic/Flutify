@@ -9,6 +9,7 @@ import '../../../../providers/preferences_provider.dart';
 import '../../../../services/network/network_proxy.dart';
 import '../../../../services/network/proxy_probe.dart';
 import '../widgets/proxy_server_fields.dart';
+import '../widgets/gateway_settings.dart';
 import '../widgets/settings_section.dart';
 import '../widgets/settings_segmented.dart';
 
@@ -76,6 +77,7 @@ class _NetworkSectionState extends State<NetworkSection> {
       mode: prefs.proxyMode,
       proxyHost: prefs.proxyHost,
       proxyPort: prefs.proxyPort,
+      gateway: prefs.gateway,
     );
     try {
       final elapsed = await ProxyProbe.run();
@@ -130,6 +132,14 @@ class _NetworkSectionState extends State<NetworkSection> {
       title: l10n.settingsNetworkSection,
       footer: l10n.settingsProxyFootnote,
       children: [
+        GatewaySettings(
+          onChanged: () {
+            setState(() {
+              _probe = _ProbeState.idle;
+              _probeToken++;
+            });
+          },
+        ),
         SettingsTile(
           title: l10n.settingsProxy,
           subtitle: subtitle,

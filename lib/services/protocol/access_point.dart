@@ -137,7 +137,7 @@ class ApKeyException implements Exception {
 /// 其余（metadata / storage-resolve / CDN 下载）都是普通 HTTPS。对照 librespot
 /// `connection/handshake.rs`、`session.rs`、`audio_key.rs` 与官方 `docs/connection.md`。
 class SpotifyAccessPoint {
-  final Socket _socket;
+  final TunnelSocket _socket;
 
   /// 单订阅 socket 的常驻接收：握手期收明文帧，之后喂给 [ApCodec]。
   final BytesBuilder _preCodecBuffer = BytesBuilder();
@@ -285,13 +285,18 @@ class SpotifyAccessPoint {
     Duration timeout = const Duration(seconds: 10),
   }) async {
     final socket = await Socket.connect(host, port, timeout: timeout);
-    return _handshake(SpotifyAccessPoint._(socket, socket), socket, timeout);
+    final transport = TunnelSocket.tcp(socket);
+    return _handshake(
+      SpotifyAccessPoint._(transport, socket),
+      transport,
+      timeout,
+    );
   }
 
   /// ClientHello → APResponse → ClientResponsePlaintext 握手（含 DH 签名验证与密钥安装）。
   static Future<SpotifyAccessPoint> _handshake(
     SpotifyAccessPoint ap,
-    Socket socket,
+    TunnelSocket socket,
     Duration timeout,
   ) async {
     try {

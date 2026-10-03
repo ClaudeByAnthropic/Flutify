@@ -5,6 +5,19 @@ import 'dart:typed_data';
 
 import 'network_proxy.dart';
 
+/// AP only needs byte writes/flush/close; its stream can be TCP or binary WS.
+class TunnelSocket {
+  final void Function(List<int>) add;
+  final Future<void> Function() flush;
+  final void Function() destroy;
+  TunnelSocket({required this.add, required this.flush, required this.destroy});
+  factory TunnelSocket.tcp(Socket socket) => TunnelSocket(
+    add: socket.add,
+    flush: socket.flush,
+    destroy: socket.destroy,
+  );
+}
+
 /// 经 [NetworkProxy] 建立原始 TCP 连接（接入点协议不是 HTTP，不能直接交给 HttpClient）。
 ///
 /// 需要代理时向 HTTP 代理发 `CONNECT host:port`，收到 200 后这条连接就是到目标的透明隧道。
@@ -13,18 +26,54 @@ import 'network_proxy.dart';
 class ProxyTunnel {
   ProxyTunnel._();
 
-  static Future<({Socket socket, Stream<Uint8List> input})> connect(
+  static Future<({TunnelSocket socket, Stream<Uint8List> input})> connect(
     String host,
     int port, {
     required Duration timeout,
     NetworkProxy? proxy,
   }) async {
+    final gateway = (proxy ?? NetworkProxy.instance).gateway;
+    if (gateway.enabled) {
+      // A dedicated client makes a timed-out handshake cancellable and uses
+      // the same forward-proxy policy as all other requests.
+      final client = HttpClient()
+        ..findProxy = (proxy ?? NetworkProxy.instance).findProxy;
+      try {
+        final ws = await WebSocket.connect(
+          gateway.tunnel(host, port).toString(),
+          headers: gateway.headers,
+          customClient: client,
+          compression: CompressionOptions.compressionOff,
+        ).timeout(timeout);
+        ws.pingInterval = const Duration(seconds: 30);
+        return (
+          socket: TunnelSocket(
+            add: (bytes) => ws.add(Uint8List.fromList(bytes)),
+            flush: () async {},
+            destroy: () {
+              unawaited(ws.close());
+              client.close(force: true);
+            },
+          ),
+          input: ws.map((frame) {
+            if (frame is! List<int>)
+              throw const ProxyTunnelException(
+                'AP tunnel received a text frame',
+              );
+            return Uint8List.fromList(frame);
+          }),
+        );
+      } catch (_) {
+        client.close(force: true);
+        rethrow;
+      }
+    }
     final endpoint = (proxy ?? NetworkProxy.instance).endpointFor(
       Uri(scheme: 'https', host: host, port: port),
     );
     if (endpoint == null) {
       final socket = await Socket.connect(host, port, timeout: timeout);
-      return (socket: socket, input: socket);
+      return (socket: TunnelSocket.tcp(socket), input: socket);
     }
 
     final socket = await Socket.connect(
@@ -83,7 +132,7 @@ class ProxyTunnel {
       socket.destroy();
       rethrow;
     }
-    return (socket: socket, input: output.stream);
+    return (socket: TunnelSocket.tcp(socket), input: output.stream);
   }
 
   static void _fail(Completer<void> established, Socket socket, Object error) {

@@ -176,6 +176,54 @@ void main() {
     expect(playback.currentTrack?.id, 'synthetic-2');
   });
 
+  testWidgets('swiping lyrics down removes the sheet and its modal barrier', (
+    tester,
+  ) async {
+    final playback = await pumpPlaying(tester);
+    final originalBarriers = find.byType(ModalBarrier).evaluate().length;
+    await tester.tap(find.byType(MiniPlayer));
+    await settle(tester);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(FullPlayerSheet),
+        matching: find.byTooltip('歌词'),
+      ),
+    );
+    await settle(tester);
+    final close = find.descendant(
+      of: find.byType(FullPlayerSheet),
+      matching: find.byIcon(Icons.keyboard_arrow_down_rounded),
+    );
+    await tester.fling(close, const Offset(0, 650), 1500);
+    await playback.nextTrack();
+    await settle(tester);
+    expect(find.byType(FullPlayerSheet), findsNothing);
+    expect(find.byType(ModalBarrier), findsNWidgets(originalBarriers));
+    expect(find.byType(ErrorWidget), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'rapid repeated opens cannot leave a second player modal underneath',
+    (tester) async {
+      await pumpPlaying(tester);
+      final originalBarriers = find.byType(ModalBarrier).evaluate().length;
+      final context = tester.element(find.byType(MiniPlayer));
+      FullPlayerSheet.show(context);
+      FullPlayerSheet.show(context);
+      await settle(tester);
+      expect(find.byType(FullPlayerSheet, skipOffstage: false), findsOneWidget);
+      await tester.fling(
+        find.byIcon(Icons.keyboard_arrow_down_rounded).last,
+        const Offset(0, 650),
+        1500,
+      );
+      await settle(tester);
+      expect(find.byType(ModalBarrier), findsNWidgets(originalBarriers));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('player opened from the mini player respects display cutouts', (
     tester,
   ) async {

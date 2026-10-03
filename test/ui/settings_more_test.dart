@@ -20,7 +20,8 @@ import '../fakes/fake_spotify_api_service.dart';
 import '../fakes/fake_track_audio_source.dart';
 
 /// 带缓存管理能力的加载器替身（真实 TrackAudioLoader 同时实现两个接口）。
-class _FakeCachingLoader extends FakeTrackAudioSource implements AudioCacheStore {
+class _FakeCachingLoader extends FakeTrackAudioSource
+    implements AudioCacheStore {
   int bytes = 3 * ByteSize.mb;
 
   @override
@@ -93,7 +94,12 @@ void main() {
 
   int currentTab(WidgetTester tester) => tester
       .widget<IndexedStack>(
-        find.ancestor(of: find.byType(TabNavigator).first, matching: find.byType(IndexedStack)).first,
+        find
+            .ancestor(
+              of: find.byType(TabNavigator).first,
+              matching: find.byType(IndexedStack),
+            )
+            .first,
       )
       .index!;
 
@@ -112,7 +118,9 @@ void main() {
     expect(savedPrefs().language, AppLanguage.zh);
   });
 
-  testWidgets('lyrics, playback and Connect options apply and persist', (tester) async {
+  testWidgets('lyrics, playback and Connect options apply and persist', (
+    tester,
+  ) async {
     await pumpApp(tester);
     await openSettings(tester);
 
@@ -146,7 +154,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '清除'));
     await settle(tester);
     expect(loader.bytes, 0);
-    expect(find.text('已释放 3 MB'), findsOneWidget);
+    expect(find.text('已释放 3 MB，0 个使用中，0 个未成功'), findsOneWidget);
     expect(find.text('已用 0 KB，上限 1 GB'), findsOneWidget);
   });
 
@@ -163,7 +171,10 @@ void main() {
     expect(savedPrefs().proxyMode, ProxyMode.manual);
 
     // 地址框直接粘贴 host:port，自动拆分端口
-    await tester.enterText(find.byKey(const ValueKey('proxy-host')), '127.0.0.1:7890');
+    await tester.enterText(
+      find.byKey(const ValueKey('proxy-host')),
+      '127.0.0.1:7890',
+    );
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await settle(tester);
     expect(savedPrefs().proxyHost, '127.0.0.1');
@@ -190,21 +201,27 @@ void main() {
   testWidgets('start page: library and last position', (tester) async {
     await pumpApp(
       tester,
-      seed: (s) => s.setPreferencesJson(const AppPreferences(startPage: StartPage.library).encode()),
+      seed: (s) => s.setPreferencesJson(
+        const AppPreferences(startPage: StartPage.library).encode(),
+      ),
     );
     expect(currentTab(tester), 2);
 
     await pumpApp(
       tester,
       seed: (s) async {
-        await s.setPreferencesJson(const AppPreferences(startPage: StartPage.last).encode());
+        await s.setPreferencesJson(
+          const AppPreferences(startPage: StartPage.last).encode(),
+        );
         await s.setLastTab(1);
       },
     );
     expect(currentTab(tester), 1);
   });
 
-  testWidgets('desktop about: version and keyboard shortcuts dialog', (tester) async {
+  testWidgets('desktop about: version and keyboard shortcuts dialog', (
+    tester,
+  ) async {
     await pumpApp(tester, size: const Size(1440, 2400));
     await openSettings(tester);
 

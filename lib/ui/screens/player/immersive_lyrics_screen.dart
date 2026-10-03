@@ -15,6 +15,7 @@ import '../../widgets/connect/now_playing_source.dart';
 import '../../widgets/connect/playback_shortcuts.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/player_controls.dart';
 import 'lyrics/glass_icon_button.dart';
 import 'lyrics/lyrics_backdrop.dart';
 import 'lyrics/lyrics_glass_controls.dart';
@@ -38,13 +39,21 @@ class ImmersiveLyricsScreen extends StatefulWidget {
       PageRouteBuilder<void>(
         opaque: true,
         transitionDuration: context.motion(const Duration(milliseconds: 380)),
-        reverseTransitionDuration: context.motion(const Duration(milliseconds: 260)),
+        reverseTransitionDuration: context.motion(
+          const Duration(milliseconds: 260),
+        ),
         pageBuilder: (_, _, _) => const ImmersiveLyricsScreen(),
         transitionsBuilder: (_, animation, _, child) {
-          final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
           return FadeTransition(
             opacity: curved,
-            child: ScaleTransition(scale: Tween(begin: 1.03, end: 1.0).animate(curved), child: child),
+            child: ScaleTransition(
+              scale: Tween(begin: 1.03, end: 1.0).animate(curved),
+              child: child,
+            ),
           );
         },
       ),
@@ -132,7 +141,8 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
         },
         child: Focus(
           autofocus: true,
-          onKeyEvent: (_, event) => PlaybackShortcuts.onSpaceKey(context, event),
+          onKeyEvent: (_, event) =>
+              PlaybackShortcuts.onSpaceKey(context, event),
           child: MouseRegion(
             cursor: _idle ? SystemMouseCursors.none : MouseCursor.defer,
             onHover: (_) => _restartIdleTimer(),
@@ -154,8 +164,17 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
                   else
                     LayoutBuilder(
                       builder: (context, box) => box.maxWidth >= _wideBreakpoint
-                          ? _WideLayout(track: track, size: box.biggest, remote: remote)
-                          : _NarrowLayout(track: track, size: box.biggest, remote: remote, topInset: topInset),
+                          ? _WideLayout(
+                              track: track,
+                              size: box.biggest,
+                              remote: remote,
+                            )
+                          : _NarrowLayout(
+                              track: track,
+                              size: box.biggest,
+                              remote: remote,
+                              topInset: topInset,
+                            ),
                     ),
                   // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
                   if (topInset > 0)
@@ -171,14 +190,20 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
                     right: 24,
                     child: AnimatedOpacity(
                       opacity: _idle ? 0 : 1,
-                      duration: context.motion(const Duration(milliseconds: 300)),
+                      duration: context.motion(
+                        const Duration(milliseconds: 300),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (DesktopWindow.enabled) ...[
                             GlassIconButton(
-                              icon: _screen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
-                              tooltip: _screen ? l10n.lyricsFillWindow : l10n.lyricsFillScreen,
+                              icon: _screen
+                                  ? Icons.fullscreen_exit_rounded
+                                  : Icons.fullscreen_rounded,
+                              tooltip: _screen
+                                  ? l10n.lyricsFillWindow
+                                  : l10n.lyricsFillScreen,
                               onPressed: _toggleMode,
                               size: 44,
                             ),
@@ -210,12 +235,18 @@ class _WideLayout extends StatelessWidget {
   final Size size;
   final bool remote;
 
-  const _WideLayout({required this.track, required this.size, required this.remote});
+  const _WideLayout({
+    required this.track,
+    required this.size,
+    required this.remote,
+  });
 
   @override
   Widget build(BuildContext context) {
     // 封面随窗口缩放：既不压过歌词，也不在 4K 全屏下显得局促
-    final artSize = (size.height * 0.46).clamp(220.0, 480.0).clamp(0.0, size.width * 0.32);
+    final artSize = (size.height * 0.46)
+        .clamp(220.0, 480.0)
+        .clamp(0.0, size.width * 0.32);
     final lyricSize = (size.height / 22).clamp(32.0, 48.0);
 
     return Row(
@@ -271,7 +302,12 @@ class _NarrowLayout extends StatelessWidget {
   /// 只铺满窗口时顶部让给窗口按钮的高度。
   final double topInset;
 
-  const _NarrowLayout({required this.track, required this.size, required this.remote, this.topInset = 0});
+  const _NarrowLayout({
+    required this.track,
+    required this.size,
+    required this.remote,
+    this.topInset = 0,
+  });
 
   static const double _headerHeight = 112;
   static const double _controlsHeight = 170;
@@ -303,7 +339,12 @@ class _NarrowLayout extends StatelessWidget {
             ],
           ),
         ),
-        const Positioned(left: 32, right: 32, bottom: 28, child: LyricsGlassControls(full: true, maxWidth: 560)),
+        const Positioned(
+          left: 32,
+          right: 32,
+          bottom: 28,
+          child: LyricsGlassControls(full: true, maxWidth: 560),
+        ),
       ],
     );
   }
@@ -333,7 +374,11 @@ class _Artwork extends StatelessWidget {
             ),
           ],
         ),
-        child: CoverImage(url: track.coverUrl, size: size, borderRadius: radius),
+        child: CoverImage(
+          url: track.coverUrl,
+          size: size,
+          borderRadius: radius,
+        ),
       ),
     );
   }
@@ -348,32 +393,40 @@ class _TrackTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    return Row(
       children: [
-        Text(
-          track.name,
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: large ? 26 : 17,
-            letterSpacing: -0.3,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                track.name,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: large ? 26 : 17,
+                  letterSpacing: -0.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                track.artistNames,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w600,
+                  fontSize: large ? 17 : 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 4),
-        Text(
-          track.artistNames,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontWeight: FontWeight.w600,
-            fontSize: large ? 17 : 14,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        const SizedBox(width: 8),
+        LikeButton(track: track, size: large ? 28 : 24),
       ],
     );
   }

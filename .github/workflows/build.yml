@@ -39,7 +39,7 @@ jobs:
 
       - name: Test playback recovery and authorization
         run: |
-          flutter test test/connect test/playback_provider_test.dart test/ui/connect_ui_test.dart test/ui/responsive_layout_test.dart test/web_login_flow_test.dart test/auth_oauth_test.dart
+          flutter test
           node --test tool/test_consent_auto_approve.cjs
           python3 -m unittest discover -s tool -p test_verify_android_apks.py
 
@@ -142,19 +142,32 @@ jobs:
       - name: Verify native binary architecture
         run: python tool/verify_windows_arch.py build/windows/${{ matrix.arch }}/runner/Release ${{ matrix.arch }}
 
-      - name: Zip
+      - name: Install Inno Setup compiler
         shell: pwsh
         run: |
-          # 附上许可证与第三方声明（libmpv 为 LGPL，须随二进制提供声明）
-          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md build/windows/${{ matrix.arch }}/runner/Release/
-          $name = "Flutify-$($env:GITHUB_REF_NAME -replace '/','-')-windows-${{ matrix.arch }}.zip"
-          Compress-Archive -Path build/windows/${{ matrix.arch }}/runner/Release/* -DestinationPath $name
-          "ZIP_NAME=$name" >> $env:GITHUB_ENV
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          $compilerDir = Join-Path $env:RUNNER_TEMP 'inno-6.7.3'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $installer
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash -ne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') { throw 'Inno Setup checksum mismatch' }
+          # The x86 compiler runs on both Windows x64 and ARM64. Portable mode
+          # avoids depending on Chocolatey or the runner's preinstalled version.
+          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/PORTABLE=1', "/DIR=`"$compilerDir`"") -WindowStyle Hidden -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Inno Setup extraction failed: $($install.ExitCode)" }
+          $compiler = Join-Path $compilerDir 'ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler missing' }
+          "INNO_COMPILER=$compiler" >> $env:GITHUB_ENV
+
+      - name: Package portable ZIP and installer
+        shell: pwsh
+        run: |
+          ./tool/package_windows.ps1 -Arch '${{ matrix.arch }}' -Label $env:GITHUB_REF_NAME -Compiler $env:INNO_COMPILER
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}
-          path: ${{ env.ZIP_NAME }}
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
 
   release:
     name: Publish release

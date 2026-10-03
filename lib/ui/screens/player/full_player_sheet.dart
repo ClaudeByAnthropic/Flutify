@@ -28,6 +28,7 @@ import 'lyrics/glass_icon_button.dart';
 import 'lyrics/lyrics_backdrop.dart';
 import 'lyrics/lyrics_view.dart';
 import 'queue_list.dart';
+import 'player_modal.dart';
 import 'widgets/swipeable_artwork.dart';
 
 /// 全屏播放器中间区域的内容。
@@ -48,7 +49,9 @@ class FullPlayerSheet extends StatefulWidget {
   const FullPlayerSheet({super.key});
 
   /// 根据窗口宽度选择以底部面板或对话框形式打开。
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context) => PlayerModal.show(context, (
+    captureRoute,
+  ) {
     // 调用方可能已在 SafeArea 内，且关闭动画期间可能被重建/移除。
     // 在打开时保存真实窗口安全区，builder 不再读取旧的入口 context。
     final windowMedia = MediaQueryData.fromView(View.of(context));
@@ -56,11 +59,14 @@ class FullPlayerSheet extends StatefulWidget {
     if (isDesktop) {
       return showDialog(
         context: context,
-        builder: (_) => const Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: EdgeInsets.all(24),
-          child: SizedBox(width: 420, height: 720, child: FullPlayerSheet()),
-        ),
+        builder: (dialogContext) {
+          captureRoute(dialogContext);
+          return const Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: EdgeInsets.all(24),
+            child: SizedBox(width: 420, height: 720, child: FullPlayerSheet()),
+          );
+        },
       );
     }
     return showModalBottomSheet(
@@ -72,18 +78,21 @@ class FullPlayerSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       // 底部面板会清掉顶部安全区（useSafeArea: false 时 removeTop），全屏播放器又铺满整屏，
       // 内部的 SafeArea 因此读到 0、内容画进状态栏；这里把外层的安全区原样补回。
-      builder: (sheetContext) => MediaQuery(
-        data: MediaQuery.of(sheetContext).copyWith(
-          padding: windowMedia.padding,
-          viewPadding: windowMedia.viewPadding,
-        ),
-        child: SizedBox(
-          height: windowMedia.size.height,
-          child: const FullPlayerSheet(),
-        ),
-      ),
+      builder: (sheetContext) {
+        captureRoute(sheetContext);
+        return MediaQuery(
+          data: MediaQuery.of(sheetContext).copyWith(
+            padding: windowMedia.padding,
+            viewPadding: windowMedia.viewPadding,
+          ),
+          child: SizedBox(
+            height: windowMedia.size.height,
+            child: const FullPlayerSheet(),
+          ),
+        );
+      },
     );
-  }
+  });
 
   @override
   State<FullPlayerSheet> createState() => _FullPlayerSheetState();

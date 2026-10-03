@@ -272,6 +272,11 @@ void TaskbarLyricsWindow::Tick() {
     last_housekeep_ = now;
     Housekeep();
   }
+  if (vertical_taskbar_ || width_ <= 0) {
+    if (IsWindowVisible(lyric_)) ShowWindow(lyric_, SW_HIDE);
+    SetInterval(250);
+    return;
+  }
   if (!IsWindowVisible(lyric_)) ShowWindow(lyric_, SW_SHOWNA);
   UpdateHover();
   Render();
@@ -421,7 +426,8 @@ bool TaskbarLyricsWindow::IconsCentered() const {
 
 // Win11 的新任务栏由 XAML 绘制，Shell_TrayWnd 下有 DesktopWindowContentBridge 子窗口；Win10 没有。
 bool TaskbarLyricsWindow::IsXamlTaskbar() const {
-  return FindWindowExW(tray_, nullptr, L"Windows.UI.Composition.DesktopWindowContentBridge", nullptr) != nullptr;
+  return FindWindowExW(tray_, nullptr, L"Windows.UI.Composition.DesktopWindowContentBridge", nullptr) != nullptr ||
+         FindWindowExW(tray_, nullptr, L"Windows.UI.Input.InputSite.WindowClass", nullptr) != nullptr;
 }
 
 void TaskbarLyricsWindow::Reflow(bool force) {
@@ -435,6 +441,9 @@ void TaskbarLyricsWindow::Reflow(bool force) {
   scale_ = dpi > 0 ? dpi / 96.0 : 1.0;
   const int height = tray_height - static_cast<int>(6 * scale_);
   const int y = (tray_height - height) / 2;
+  const auto bounds = locator_.bounds();
+  const bool measured = bounds.taskbar == tray_ && bounds.width == tray_width && bounds.height == tray_height;
+  const int gap = static_cast<int>(12 * scale_);
 
   int x, width;
   if (IconsCentered()) {
@@ -448,34 +457,44 @@ void TaskbarLyricsWindow::Reflow(bool force) {
       rebar_left = rr.left - tray.left;
       right = rebar_left - static_cast<int>(14 * scale_);
     }
+    if (measured && bounds.icons_left >= 0) {
+      rebar_left = bounds.icons_left;
+      right = rebar_left - gap;
+    }
     x = MeasureWidgetRight(tray, rebar_left);
-    const int max_right = (std::max)(right, x + static_cast<int>(140 * scale_));
-    width = (std::max)(static_cast<int>(200 * scale_), max_right - x);
+    width = (std::max)(0, right - x);
   } else {
-    // Win10 或 Win11 图标居左：摆在右侧 —— 紧贴系统托盘区（TrayNotifyWnd）的左边。
+    // 图标居左：使用实际按钮与系统托盘之间的空白，并在空白中居中。
     int right = tray_width - static_cast<int>(10 * scale_);
     HWND notify = FindWindowExW(tray_, nullptr, L"TrayNotifyWnd", nullptr);
     RECT nr{};
     if (notify && GetWindowRect(notify, &nr) && nr.left > tray.left) {
       right = nr.left - tray.left - static_cast<int>(10 * scale_);
     }
-    // 左界：Win11 的 ReBarWindow32 宽度随图标数量变化，右缘就是最后一个应用图标；
-    // Win10 的 ReBarWindow32 一直铺到托盘，不能作左界，只留边距。
     int left = static_cast<int>(8 * scale_);
-    HWND rebar = FindWindowExW(tray_, nullptr, L"ReBarWindow32", nullptr);
-    RECT rr{};
-    if (IsXamlTaskbar() && rebar && GetWindowRect(rebar, &rr) && rr.right > tray.left) {
-      left = (std::max)(left, static_cast<int>(rr.right - tray.left + 12 * scale_));
+    if (measured && bounds.icons_right >= 0) {
+      left = bounds.icons_right + gap;
+      if (bounds.tray_left >= 0) right = (std::min)(right, bounds.tray_left - gap);
+      if (bounds.widget_left >= 0) {
+        if (bounds.widget_left > (left + right) / 2) {
+          right = (std::min)(right, bounds.widget_left - gap);
+        } else {
+          left = (std::max)(left, bounds.widget_right + gap);
+        }
+      }
+    } else if (IsXamlTaskbar()) {
+      // UIA 尚未就绪或 Explorer 正在重启：不能用过小的 ReBar 边界覆盖应用按钮。
+      left = right;
     }
-    // 宽度取任务栏的 1/3（至少 200px），贴着托盘向左延伸；图标太多时收缩到图标与托盘之间的空隙，
-    // 空隙为 0 时宽度为 0（等于不显示），宁可不显示也不盖住图标。
     width = (std::max)(static_cast<int>(200 * scale_), tray_width / 3);
     width = (std::min)(width, (std::max)(right - left, 0));
-    x = right - width;
+    x = left + (right - left - width) / 2;
   }
+  // 空间不足时隐藏，避免文字和悬停控制挤到系统按钮上。
+  if (width < static_cast<int>(140 * scale_)) width = 0;
 
   const int tolerance = static_cast<int>(4 * scale_);
-  if (force || std::abs(x - x_) > tolerance || std::abs(width - width_) > tolerance || height != height_ ||
+  if (force || (width == 0) != (width_ == 0) || std::abs(x - x_) > tolerance || std::abs(width - width_) > tolerance || height != height_ ||
       y != y_) {
     x_ = x;
     y_ = y;
@@ -487,7 +506,9 @@ void TaskbarLyricsWindow::Reflow(bool force) {
 }
 
 int TaskbarLyricsWindow::MeasureWidgetRight(const RECT& tray, int rebar_left) {
-  const int uia = locator_.widget_right();
+  const auto bounds = locator_.bounds();
+  const int uia = bounds.taskbar == tray_ && bounds.width == tray.right - tray.left && bounds.height == tray.bottom - tray.top
+                      ? bounds.widget_right : TaskbarWidgetLocator::kUnknown;
   if (uia == TaskbarWidgetLocator::kNone) return static_cast<int>(10 * scale_);  // 没有小组件：贴任务栏最左
   if (uia > 0) return uia + static_cast<int>(12 * scale_);                     // 按钮真实右缘 + 间距
   return ScanWidgetRight(tray, rebar_left);

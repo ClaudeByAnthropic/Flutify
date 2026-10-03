@@ -6,11 +6,13 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/playback_context.dart';
 import '../models/playback_error.dart';
+import '../models/playback_retry.dart';
 import '../models/playback_session.dart';
 import '../models/playback_state.dart';
 import '../models/track.dart';
 import '../services/audio/audio_engine.dart';
 import '../services/playback_session_store.dart';
+import '../services/network/network_failure.dart';
 import '../services/protocol/track_audio_loader.dart';
 import '../services/storage_service.dart';
 
@@ -73,6 +75,37 @@ class PlaybackProvider extends ChangeNotifier {
   /// 协议加载代次号：连续切歌时丢弃过期的加载结果，避免串音。
   int _loadGeneration = 0;
   int _playIntent = 0;
+  int _networkRetries = 0;
+  Timer? _retryTimer;
+  Completer<void>? _retryWait;
+  final ValueNotifier<PlaybackRetry?> retryNotifier = ValueNotifier(null);
+
+  void _cancelRetry() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    final wait = _retryWait;
+    _retryWait = null;
+    if (wait != null && !wait.isCompleted) wait.complete();
+    retryNotifier.value = null;
+  }
+
+  Future<bool> _waitForRetry(Object error, int generation) async {
+    if (!isConnectionFailure(error) || _networkRetries >= PlaybackRetry.limit) {
+      return false;
+    }
+    final attempt = ++_networkRetries;
+    final delay = Duration(seconds: attempt);
+    final wait = Completer<void>();
+    _retryWait = wait;
+    retryNotifier.value = PlaybackRetry(attempt, delay);
+    _retryTimer = Timer(delay, () => wait.complete());
+    await wait.future;
+    if (generation != _loadGeneration) return false;
+    _retryWait = null;
+    _retryTimer = null;
+    retryNotifier.value = PlaybackRetry(attempt, delay, waiting: false);
+    return true;
+  }
 
   /// 已经把音频交给播放器的曲目 id；与当前曲目不一致时，点播放需要（重新）加载。
   String? _loadedTrackId;
@@ -205,6 +238,7 @@ class PlaybackProvider extends ChangeNotifier {
 
   /// 缓冲中：播放器自身缓冲，或正在下载 / 解密整首曲目。
   bool get isBuffering => _isBuffering || _isLoadingTrack;
+  bool get isLoadingTrack => _isLoadingTrack;
   Duration get position => positionNotifier.value;
   Duration get duration => _duration;
   bool get shuffle => _shuffle;
@@ -252,8 +286,9 @@ class PlaybackProvider extends ChangeNotifier {
   /// 暂停，并取消尚未完成的加载，避免设备转走后本机又开始出声。
   Future<void> pause() async {
     ++_playIntent;
+    ++_loadGeneration;
+    _cancelRetry();
     if (_isLoadingTrack) {
-      ++_loadGeneration;
       _loadedTrackId = null;
       _resumeAt = position;
       _setLoading(false);
@@ -339,6 +374,10 @@ class PlaybackProvider extends ChangeNotifier {
           return;
         _loadedTrackId = null;
         _resumeAt = position;
+        if (isConnectionFailure(error)) {
+          await _playAudio(track, connectionError: error);
+          return;
+        }
         await _handleLoadFailure(
           track,
           TrackPlaybackException(
@@ -398,6 +437,7 @@ class PlaybackProvider extends ChangeNotifier {
     if (deferLoad) {
       // 只切到这首歌、暂停在 startAt，点播放时才加载（_loadedTrackId 不匹配 → 重新加载）
       ++_loadGeneration;
+      _cancelRetry();
       _loadedTrackId = null;
       _setLoading(false);
       await _audio.pause();
@@ -415,8 +455,10 @@ class PlaybackProvider extends ChangeNotifier {
   /// - [TrackPlaybackFailure.unavailable]（无权限 / DRM / 地区限制 / 文件损坏）：记录错误并自动跳到下一首；
   /// - [TrackPlaybackFailure.notSignedIn] / [TrackPlaybackFailure.network]：记录错误并停在当前曲目，
   ///   用户再点播放即重试，不跳歌（跳过没有意义）。
-  Future<void> _playAudio(SpotifyTrack track) async {
+  Future<void> _playAudio(SpotifyTrack track, {Object? connectionError}) async {
     final generation = ++_loadGeneration;
+    _cancelRetry();
+    if (connectionError == null) _networkRetries = 0;
     _loadedTrackId = null;
     loadProgressNotifier.value = 0;
     _setLoading(true);
@@ -424,90 +466,112 @@ class PlaybackProvider extends ChangeNotifier {
     await _audio.pause();
     if (generation != _loadGeneration) return;
 
-    try {
-      final loader = audioLoader;
-      if (loader == null) {
-        throw const TrackPlaybackException(
-          TrackPlaybackFailure.notSignedIn,
-          '请先登录 Spotify 账号再播放',
-        );
-      }
-      if (!track.isPlayable) {
-        throw const TrackPlaybackException(
-          TrackPlaybackFailure.unavailable,
-          '这首歌在你所在的地区暂不可播放',
-        );
-      }
-      // 单集必须传完整 URI（加载器按 spotify:episode: 前缀走 mercury 单集链路）；
-      // 曲目优先传 id（缓存键与历史行为一致）。
-      final audio = await loader.open(
-        track.uri.startsWith('spotify:episode:')
-            ? track.uri
-            : (track.id.isNotEmpty ? track.id : track.uri),
-        progress: (p) {
-          if (generation == _loadGeneration) loadProgressNotifier.value = p;
-        },
-      );
-      if (generation != _loadGeneration) return; // 已切歌，丢弃
-      final resumeAt = _resumeAt;
-      _resumeAt = null;
-      // 新文件的均衡倍率；开启淡入时从静音起步，由进度流逐步升起
-      _normalization = audio.normalization;
-      _updateFade(resumeAt ?? Duration.zero);
-      _applyVolume();
-      final eme = audio.emeContent;
-      final stream = audio.stream;
-      if (eme != null) {
-        // DRM 曲目：走 EME 引擎（WebView2 Widevine 解密播放）
-        await _audio.playEme(eme, initialPosition: resumeAt, autoplay: false);
-      } else if (stream != null) {
-        await _audio.playStream(
-          stream,
-          initialPosition: resumeAt,
-          autoplay: false,
-        );
-        _watchStream(stream, track, generation);
-      } else {
-        await _audio.playFile(
-          audio.path,
-          initialPosition: resumeAt,
-          autoplay: false,
-        );
-      }
+    if (connectionError != null) {
+      final retry = await _waitForRetry(connectionError, generation);
       if (generation != _loadGeneration) return;
-      // 加载音源期间也可能收到新的 seek；在开始出声前应用最新进度。
-      var startPosition = resumeAt;
-      while (_resumeAt != null) {
-        startPosition = _resumeAt;
-        _resumeAt = null;
-        await _audio.seek(startPosition!);
+      if (!retry) {
+        await _handleLoadFailure(track, _asPlaybackFailure(connectionError));
+        return;
+      }
+    }
+    while (generation == _loadGeneration) {
+      try {
+        final loader = audioLoader;
+        if (loader == null) {
+          throw const TrackPlaybackException(
+            TrackPlaybackFailure.notSignedIn,
+            '请先登录 Spotify 账号再播放',
+          );
+        }
+        if (!track.isPlayable) {
+          throw const TrackPlaybackException(
+            TrackPlaybackFailure.unavailable,
+            '这首歌在你所在的地区暂不可播放',
+          );
+        }
+        // 单集必须传完整 URI（加载器按 spotify:episode: 前缀走 mercury 单集链路）；
+        // 曲目优先传 id（缓存键与历史行为一致）。
+        final audio = await loader.open(
+          track.uri.startsWith('spotify:episode:')
+              ? track.uri
+              : (track.id.isNotEmpty ? track.id : track.uri),
+          progress: (p) {
+            if (generation == _loadGeneration) loadProgressNotifier.value = p;
+          },
+        );
+        if (generation != _loadGeneration) return; // 已切歌，丢弃
+        final resumeAt = _resumeAt;
+        // 新文件的均衡倍率；开启淡入时从静音起步，由进度流逐步升起
+        _normalization = audio.normalization;
+        _updateFade(resumeAt ?? Duration.zero);
+        _applyVolume();
+        final eme = audio.emeContent;
+        final stream = audio.stream;
+        if (eme != null) {
+          // DRM 曲目：走 EME 引擎（WebView2 Widevine 解密播放）
+          await _audio.playEme(eme, initialPosition: resumeAt, autoplay: false);
+        } else if (stream != null) {
+          await _audio.playStream(
+            stream,
+            initialPosition: resumeAt,
+            autoplay: false,
+          );
+          _watchStream(stream, track, generation);
+        } else {
+          await _audio.playFile(
+            audio.path,
+            initialPosition: resumeAt,
+            autoplay: false,
+          );
+        }
         if (generation != _loadGeneration) return;
+        if (_resumeAt == resumeAt) _resumeAt = null;
+        // 加载音源期间也可能收到新的 seek；在开始出声前应用最新进度。
+        var startPosition = resumeAt;
+        while (_resumeAt != null) {
+          startPosition = _resumeAt;
+          _resumeAt = null;
+          await _audio.seek(startPosition!);
+          if (generation != _loadGeneration) return;
+        }
+        _resumeAudio(track, generation);
+        if (startPosition != null) positionNotifier.value = startPosition;
+        _loadedTrackId = track.id;
+        _consecutiveSkips = 0;
+        _setLoading(false);
+        retryNotifier.value = null;
+        // 边下边播时等当前曲目下载完再预取，避免两路下载抢带宽拖慢起播
+        if (stream == null) {
+          _prefetchNext();
+        } else {
+          stream.done.then((_) {
+            if (generation == _loadGeneration) _prefetchNext();
+          }, onError: (Object _) {});
+        }
+        return;
+      } catch (e) {
+        if (generation != _loadGeneration) return;
+        final retry = await _waitForRetry(e, generation);
+        if (generation != _loadGeneration) return;
+        if (retry) {
+          loadProgressNotifier.value = 0;
+          continue;
+        }
+        retryNotifier.value = null;
+        await _handleLoadFailure(track, _asPlaybackFailure(e));
+        return;
       }
-      _resumeAudio(track, generation);
-      if (startPosition != null) positionNotifier.value = startPosition;
-      _loadedTrackId = track.id;
-      _consecutiveSkips = 0;
-      _setLoading(false);
-      // 边下边播时等当前曲目下载完再预取，避免两路下载抢带宽拖慢起播
-      if (stream == null) {
-        _prefetchNext();
-      } else {
-        stream.done.then((_) {
-          if (generation == _loadGeneration) _prefetchNext();
-        }, onError: (Object _) {});
-      }
-    } catch (e) {
-      if (generation != _loadGeneration) return;
-      final failure = e is TrackPlaybackException
-          ? e
-          : TrackPlaybackException(
-              TrackPlaybackFailure.network,
-              '播放失败，请稍后重试',
-              e,
-            );
-      await _handleLoadFailure(track, failure);
     }
   }
+
+  TrackPlaybackException _asPlaybackFailure(Object error) =>
+      error is TrackPlaybackException
+      ? error
+      : TrackPlaybackException(
+          TrackPlaybackFailure.network,
+          '播放失败，请稍后重试',
+          error,
+        );
 
   /// 处理加载失败：暴露错误状态；「不可播放」类自动跳到下一首（有上限）。
   ///
@@ -566,7 +630,11 @@ class PlaybackProvider extends ChangeNotifier {
             '全曲播放失败，请重试',
             err,
           );
-    unawaited(_handleLoadFailure(track, failure));
+    if (isConnectionFailure(failure)) {
+      unawaited(_playAudio(track, connectionError: failure));
+    } else {
+      unawaited(_handleLoadFailure(track, failure));
+    }
   }
 
   void _setLoading(bool value) {
@@ -586,6 +654,10 @@ class PlaybackProvider extends ChangeNotifier {
       if (generation != _loadGeneration) return;
       _loadedTrackId = null;
       _resumeAt = positionNotifier.value;
+      if (isConnectionFailure(e)) {
+        unawaited(_playAudio(track, connectionError: e));
+        return;
+      }
       _playbackError = PlaybackError(
         serial: ++_errorSerial,
         track: track,
@@ -830,9 +902,12 @@ class PlaybackProvider extends ChangeNotifier {
     final track = _currentTrack;
     if (track == null) return;
 
-    if (_isLoadingTrack) return; // 正在加载，忽略重复点击
+    if (_isLoadingTrack) {
+      await pause();
+      return;
+    }
     if (_isPlaying) {
-      await _audio.pause();
+      await pause();
     } else if (_loadedTrackId != track.id) {
       // 还没加载过 / 上次加载失败（重试）
       _playbackError = null;
@@ -863,7 +938,7 @@ class PlaybackProvider extends ChangeNotifier {
     }
 
     // 上下文播放完毕：停在当前曲目开头
-    await _audio.pause();
+    await pause();
     await seekTo(Duration.zero);
   }
 
@@ -1001,6 +1076,11 @@ class PlaybackProvider extends ChangeNotifier {
 
   /// 登出 / 切换账号：上次播放会话属于旧账号，停止播放并清除（内存 + 磁盘）。
   Future<void> discardSession() async {
+    ++_playIntent;
+    ++_loadGeneration;
+    _cancelRetry();
+    _isLoadingTrack = false;
+    _loadedTrackId = null;
     _currentTrack = null;
     _context = PlaybackContext.none;
     _contextTracks = [];
@@ -1162,6 +1242,8 @@ class PlaybackProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    ++_loadGeneration;
+    _cancelRetry();
     unawaited(flushSession()); // 快照同步生成，写文件在后台完成
     _posSub?.cancel();
     _durSub?.cancel();
@@ -1170,6 +1252,7 @@ class PlaybackProvider extends ChangeNotifier {
     _errorController.close();
     positionNotifier.dispose();
     loadProgressNotifier.dispose();
+    retryNotifier.dispose();
     _audio.dispose();
     super.dispose();
   }

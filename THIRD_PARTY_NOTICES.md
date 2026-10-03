@@ -10,6 +10,7 @@ Flutify 自身的源代码以 [MIT License](LICENSE) 发布。下列随仓库或
 | mpv（`-Dgpl=false`） | `libmpv-2.dll` | LGPL-2.1-or-later | <https://github.com/mpv-player/mpv>；x64 构建脚本 <https://github.com/media-kit/libmpv-win32-audio-build>；ARM64 构建脚本 <https://github.com/media-kit/libmpv-win32-video-cmake> |
 | FFmpeg（`--disable-gpl --disable-nonfree --enable-version3`） | 静态链接于 `libmpv-2.dll` | LGPL-3.0-or-later | <https://ffmpeg.org>；构建脚本同上 |
 | Microsoft Edge WebView2 Loader | `WebView2Loader.dll` | Microsoft WebView2 SDK 许可（允许随应用再分发） | <https://www.nuget.org/packages/Microsoft.Web.WebView2> |
+| Microsoft Visual C++ Runtime | `msvcp140*.dll`、`vcruntime140*.dll`、`concrt140.dll` | Microsoft Visual Studio 可再分发代码许可 | <https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files> |
 
 `libmpv-2.dll` 由仓库内 `packages/media_kit_libs_windows_audio` 在构建时下载；它基于
 [media_kit_libs_windows_audio 1.0.9](https://pub.dev/packages/media_kit_libs_windows_audio)（MIT），添加了架构选择与 SHA-256 校验。

@@ -10,6 +10,7 @@ import '../../widgets/player_controls.dart';
 import 'lyrics/lyrics_backdrop.dart';
 import 'lyrics/lyrics_glass_controls.dart';
 import 'lyrics/lyrics_view.dart';
+import 'player_modal.dart';
 
 /// 同步歌词面板（Apple Music iOS 风格，手机 / 窄窗口使用）。
 /// 遥控远程设备时同样可用（手机上点远程迷你播放器即打开它）。
@@ -25,17 +26,21 @@ class LyricsSheet extends StatelessWidget {
   static const double _headerHeight = 104;
   static const double _controlsHeight = 150;
 
-  static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const LyricsSheet(),
-    );
-  }
+  static Future<void> show(BuildContext context) =>
+      PlayerModal.show(context, (captureRoute) {
+        return showModalBottomSheet(
+          context: context,
+          useRootNavigator: true,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: false,
+          backgroundColor: Colors.transparent,
+          builder: (sheetContext) {
+            captureRoute(sheetContext);
+            return const LyricsSheet();
+          },
+        );
+      });
 
   @override
   Widget build(BuildContext context) {

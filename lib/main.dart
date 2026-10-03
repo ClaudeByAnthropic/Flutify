@@ -5,6 +5,7 @@ import 'dart:io';
 import 'core/utils/file_log.dart';
 
 import 'package:crypto/crypto.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -52,6 +53,8 @@ import 'services/network/network_proxy.dart';
 import 'services/network/windows_trust_store.dart';
 import 'services/playback_session_store.dart';
 import 'services/protocol/audio_cache_store.dart';
+import 'services/cache/cache_location.dart';
+import 'services/cache/artwork_cache.dart';
 import 'services/protocol/eme_track_audio_source.dart';
 import 'services/protocol/track_audio_loader.dart';
 import 'services/spotify_api_service.dart';
@@ -91,6 +94,7 @@ Future<void> main() async {
         mode: initialPrefs.proxyMode,
         proxyHost: initialPrefs.proxyHost,
         proxyPort: initialPrefs.proxyPort,
+        gateway: initialPrefs.gateway,
       )
       .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
 
@@ -143,6 +147,14 @@ Future<void> main() async {
 
   // 上次播放会话（曲目 / 队列 / 进度）：单独的 JSON 文件，不放进 SharedPreferences
   final supportDir = await getApplicationSupportDirectory();
+  final legacyArtworkDirectory =
+      '${(await getTemporaryDirectory()).path}${Platform.pathSeparator}libCachedImageData';
+  final audioCacheLocation = CacheLocation(
+    storageService,
+    supportDir.path,
+    legacyArtworkDirectory: legacyArtworkDirectory,
+  );
+  await audioCacheLocation.initialize();
   final sessionStore = FilePlaybackSessionStore(
     File('${supportDir.path}${Platform.pathSeparator}playback_session.json'),
   );
@@ -164,7 +176,9 @@ Future<void> main() async {
   final lyricsFallback = LrclibLyricsSource(
     LrclibClient(http.Client()),
     cache: LyricsDiskCache(
-      Directory('${supportDir.path}${Platform.pathSeparator}lyrics_lrc'),
+      audioCacheLocation.lyricsDirectory,
+      directoryProvider: () => audioCacheLocation.lyricsDirectory,
+      lock: audioCacheLocation.lock,
     ),
   );
 
@@ -172,6 +186,10 @@ Future<void> main() async {
   // 当前账号 AP RequestKey 全线被拒，EME 是全曲播放的主链路。
   final emeTrackSource = EmeTrackAudioSource(
     cacheDirectory: supportDir.path,
+    cacheDirectoryProvider: () =>
+        audioCacheLocation.rootFor(CacheCategory.audio),
+    playingPath: () => emePlayer.currentAudioPath,
+    cacheLock: audioCacheLocation.lock,
     // 缺 sp_dc（Web 登录态）时在下载前拦截，引导用户完成 Web 登录
     webSessionReady: () => webTokenService.hasSpDc,
     accessToken: () async {
@@ -182,6 +200,16 @@ Future<void> main() async {
     },
     clientToken: () => authService.ensureClientToken(),
   );
+
+  audioCacheLocation.audioInUse = emeTrackSource.isCacheFileInUse;
+  audioCacheLocation.prepareLegacyArtwork = () =>
+      ArtworkCache.prepareLegacy(legacyArtworkDirectory);
+  await audioCacheLocation.resumeMigrations();
+  emeTrackSource.maxCacheBytes = storageService.audioCacheLimitMb * 1024 * 1024;
+  audioCacheLocation.addListener(() => unawaited(emeTrackSource.trimCache()));
+  final artworkCache = ArtworkCache(audioCacheLocation);
+  audioCacheLocation.artworkMaintenance = artworkCache.maintain;
+  CachedNetworkImageProvider.defaultCacheManager = artworkCache;
 
   runApp(
     FlutifyApp(
@@ -195,6 +223,7 @@ Future<void> main() async {
       playbackSessionStore: sessionStore,
       mediaControls: mediaControls,
       networkProxy: NetworkProxy.instance,
+      audioCacheLocation: audioCacheLocation,
       lyricsFallback: lyricsFallback,
       taskbarLyrics: taskbarLyrics,
     ),
@@ -226,6 +255,7 @@ class FlutifyApp extends StatelessWidget {
 
   /// 网络代理策略；为空时设置页只显示模式、不探测系统代理（测试默认）。
   final NetworkProxy? networkProxy;
+  final CacheLocation? audioCacheLocation;
 
   /// LRCLIB 歌词补全；为空时只用 Spotify 官方歌词（测试默认）。
   final LrclibLyricsSource? lyricsFallback;
@@ -245,6 +275,7 @@ class FlutifyApp extends StatelessWidget {
     this.playbackSessionStore,
     this.mediaControls,
     this.networkProxy,
+    this.audioCacheLocation,
     this.lyricsFallback,
     this.taskbarLyrics,
   });
@@ -262,6 +293,7 @@ class FlutifyApp extends StatelessWidget {
         if (webTokenService != null)
           Provider<WebTokenService>.value(value: webTokenService!),
         Provider<NetworkProxy?>.value(value: networkProxy),
+        Provider<CacheLocation?>.value(value: audioCacheLocation),
         // 非惰性：启动即接入 API 层，首屏请求就能自动续期 access_token
         Provider<SpotifyAuthService>(
           lazy: false,
@@ -321,6 +353,7 @@ class FlutifyApp extends StatelessWidget {
                   mode: preferences.prefs.proxyMode,
                   proxyHost: preferences.prefs.proxyHost,
                   proxyPort: preferences.prefs.proxyPort,
+                  gateway: preferences.prefs.gateway,
                 ),
               );
             });
@@ -558,8 +591,8 @@ void _startConnectReceiver(
 }
 
 /// 代理相关偏好的指纹，用于判断是否需要重配 [NetworkProxy]。
-(ProxyMode, String, int) _proxyKey(AppPreferences prefs) =>
-    (prefs.proxyMode, prefs.proxyHost, prefs.proxyPort);
+Object _proxyKey(AppPreferences prefs) =>
+    (prefs.proxyMode, prefs.proxyHost, prefs.proxyPort, prefs.gateway);
 
 /// 按外观设置生成主题；字号缩放与减弱动效通过 MediaQuery 下发给整棵树。
 class _ThemedApp extends StatelessWidget {

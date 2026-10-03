@@ -133,7 +133,10 @@ class _AudioSession {
 class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   final AccessTokenGetter accessToken;
   final AccessTokenGetter? clientToken;
-  final String cacheDirectory;
+  final String _cacheDirectory;
+  final String Function()? cacheDirectoryProvider;
+  String get cacheDirectory =>
+      cacheDirectoryProvider?.call() ?? _cacheDirectory;
   final http.Client _client;
   final List<AudioFileFormat> formatPreference;
   final String? deviceId;
@@ -156,13 +159,15 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   TrackAudioLoader({
     required this.accessToken,
     this.clientToken,
-    required this.cacheDirectory,
+    required String cacheDirectory,
+    this.cacheDirectoryProvider,
     this.formatPreference = kPlayableFormatPreference,
     this.deviceId,
     this.decryptBackend = const InlineDecryptBackend(),
     this._maxCacheBytes = 512 * 1024 * 1024,
     http.Client? client,
-  }) : _client = client ?? http.Client();
+  }) : _cacheDirectory = cacheDirectory,
+       _client = client ?? http.Client();
 
   // ---------------------------------------------------------------------------
   // 缓存管理（AudioCacheStore）

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/utils/byte_size.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../providers/spotify_provider.dart';
 import '../widgets/settings_section.dart';
@@ -13,23 +14,31 @@ class PrivacySection extends StatelessWidget {
   const PrivacySection({super.key});
 
   void _done(BuildContext context) {
-    AppToast.show(context, context.l10n.settingsCleared, icon: Icons.delete_sweep_rounded, tone: ToastTone.success);
+    AppToast.show(
+      context,
+      context.l10n.settingsCleared,
+      icon: Icons.delete_sweep_rounded,
+      tone: ToastTone.success,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final spotify = context.read<SpotifyProvider>();
-    final (searchCount, lyricsCount) = context.select<SpotifyProvider, (int, int)>(
-      (p) => (p.recentSearches.length, p.cachedLyricsCount),
-    );
+    final (searchCount, lyricsCount) = context
+        .select<SpotifyProvider, (int, int)>(
+          (p) => (p.recentSearches.length, p.cachedLyricsCount),
+        );
 
     return SettingsSection(
       title: l10n.settingsPrivacySection,
       children: [
         _ActionTile(
           title: l10n.settingsClearSearchHistory,
-          subtitle: searchCount == 0 ? l10n.settingsSearchHistoryEmpty : l10n.settingsSearchHistoryCount(searchCount),
+          subtitle: searchCount == 0
+              ? l10n.settingsSearchHistoryEmpty
+              : l10n.settingsSearchHistoryCount(searchCount),
           icon: Icons.manage_search_rounded,
           onTap: searchCount == 0
               ? null
@@ -44,9 +53,31 @@ class PrivacySection extends StatelessWidget {
           icon: Icons.lyrics_outlined,
           onTap: lyricsCount == 0
               ? null
-              : () {
-                  spotify.clearLyricsCache();
-                  _done(context);
+              : () async {
+                  try {
+                    final result = await spotify.clearLyricsCache();
+                    if (!context.mounted) return;
+                    if (result.failed > 0) {
+                      AppToast.show(
+                        context,
+                        l10n.settingsCacheCleared(
+                          ByteSize.format(result.bytes),
+                          result.deferred,
+                          result.failed,
+                        ),
+                        tone: ToastTone.error,
+                      );
+                    } else {
+                      _done(context);
+                    }
+                  } catch (_) {
+                    if (context.mounted)
+                      AppToast.show(
+                        context,
+                        l10n.settingsCacheLocationInvalid,
+                        tone: ToastTone.error,
+                      );
+                  }
                 },
         ),
       ],
@@ -61,7 +92,12 @@ class _ActionTile extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
 
-  const _ActionTile({required this.title, required this.subtitle, required this.icon, this.onTap});
+  const _ActionTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +106,10 @@ class _ActionTile extends StatelessWidget {
       child: SettingsTile(
         title: title,
         subtitle: subtitle,
-        trailing: Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        trailing: Icon(
+          icon,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
         onTap: onTap,
       ),
     );

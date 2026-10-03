@@ -4,6 +4,8 @@ import 'dart:io';
 import 'proxy_endpoint.dart';
 import 'proxy_mode.dart';
 import 'system_proxy.dart';
+import 'spotify_gateway.dart';
+import 'gateway_http_client.dart';
 
 /// 全局网络代理策略（设置 →「网络」）：所有 HTTP / WebSocket 请求与接入点的 TCP 连接都按它选路。
 ///
@@ -26,6 +28,7 @@ class NetworkProxy {
 
   ProxyMode _mode = ProxyMode.system;
   ProxyEndpoint? _manual;
+  SpotifyGateway gateway = const SpotifyGateway();
   SystemProxySettings _system = SystemProxySettings.none;
   DateTime? _systemReadAt;
   Future<void>? _refreshing;
@@ -43,7 +46,9 @@ class NetworkProxy {
     required ProxyMode mode,
     String proxyHost = '',
     int proxyPort = 0,
+    SpotifyGateway gateway = const SpotifyGateway(),
   }) {
+    this.gateway = gateway;
     _mode = mode;
     _manual = proxyPort > 0
         ? ProxyEndpoint.tryParse('$proxyHost:$proxyPort')
@@ -105,6 +110,8 @@ class ProxyHttpOverrides extends HttpOverrides {
       HttpOverrides.global = ProxyHttpOverrides(proxy);
 
   @override
-  HttpClient createHttpClient(SecurityContext? context) =>
-      super.createHttpClient(context)..findProxy = proxy.findProxy;
+  HttpClient createHttpClient(SecurityContext? context) => GatewayHttpClient(
+    super.createHttpClient(context)..findProxy = proxy.findProxy,
+    () => proxy.gateway,
+  );
 }

@@ -12,6 +12,7 @@ import '../models/playlist.dart';
 import '../models/track.dart';
 import '../models/user_profile.dart';
 import '../services/lyrics/lyrics_resolver.dart';
+import '../services/cache/cache_location.dart';
 import '../services/spotify_api_service.dart';
 import '../services/storage_service.dart';
 
@@ -120,7 +121,9 @@ class SpotifyProvider extends ChangeNotifier {
     }
     _categories = results[2] as List<SpotifyCategory>;
     _devices = results[3] as List<SpotifyDevice>;
-    _activeDevice = _devices.isEmpty ? null : _devices.firstWhere((d) => d.isActive, orElse: () => _devices.first);
+    _activeDevice = _devices.isEmpty
+        ? null
+        : _devices.firstWhere((d) => d.isActive, orElse: () => _devices.first);
 
     _isLoadingHome = false;
     notifyListeners();
@@ -195,7 +198,10 @@ class SpotifyProvider extends ChangeNotifier {
   void commitRecentSearch(String query) {
     final clean = query.trim();
     if (clean.isEmpty) return;
-    _recentSearches = [clean, ..._recentSearches.where((q) => q != clean)].take(20).toList();
+    _recentSearches = [
+      clean,
+      ..._recentSearches.where((q) => q != clean),
+    ].take(20).toList();
     _storage.addRecentSearch(clean);
     notifyListeners();
   }
@@ -227,20 +233,27 @@ class SpotifyProvider extends ChangeNotifier {
   int get lyricsGeneration => _lyricsGeneration;
 
   /// 清空歌词缓存（含 LRCLIB 补全的本地缓存）：已打开的歌词视图随之重新请求。
-  void clearLyricsCache() {
-    unawaited(_lyrics.fallback?.cache?.clear());
-    if (_lyricsCache.isEmpty) return;
+  Future<CacheResult> clearLyricsCache({
+    Future<CacheResult> Function()? clearDisk,
+  }) async {
     _lyricsCache.clear();
+    _lyricsInFlight.clear();
     _lyricsGeneration++;
-    notifyListeners();
+    final cache = _lyrics.fallback?.cache;
+    final result = cache != null
+        ? await cache.clear(clearFiles: clearDisk)
+        : await clearDisk?.call() ?? CacheResult();
+    if (!_disposed) notifyListeners();
+    return result;
   }
 
   /// 重新获取一首歌的歌词：丢掉内存与本地缓存后重新查（补全歌词选错语言 / 版本时用）。
   Future<SpotifyLyrics> refetchLyrics(LyricsQuery query) async {
     _lyricsCache.remove(query.trackId);
+    _lyricsInFlight.clear();
+    _lyricsGeneration++;
     await _lyrics.fallback?.forget(query);
     final lyrics = fetchLyrics(query);
-    _lyricsGeneration++;
     if (!_disposed) notifyListeners();
     return lyrics;
   }
@@ -248,6 +261,7 @@ class SpotifyProvider extends ChangeNotifier {
   /// 获取歌词（Spotify 官方优先，没有逐行同步歌词时按设置用 LRCLIB 补全，见 [LyricsResolver]）：
   /// 命中缓存直接返回，并发请求合并为同一个 Future。
   Future<SpotifyLyrics> fetchLyrics(LyricsQuery query) {
+    final generation = _lyricsGeneration;
     final trackId = query.trackId;
     final cached = _lyricsCache[trackId];
     if (cached != null) return Future.value(cached);
@@ -260,7 +274,9 @@ class SpotifyProvider extends ChangeNotifier {
     return _lyricsInFlight[trackId] ??= _lyrics
         .resolve(query)
         .then((resolved) {
-          if (resolved.cacheable) {
+          if (resolved.cacheable &&
+              !_disposed &&
+              generation == _lyricsGeneration) {
             _lyricsCache[trackId] = resolved.lyrics;
             if (!_disposed) _lyricsCached.add(trackId);
           }
@@ -268,7 +284,7 @@ class SpotifyProvider extends ChangeNotifier {
         })
         .catchError((Object _) => const SpotifyLyrics(lines: []))
         .whenComplete(() {
-          _lyricsInFlight.remove(trackId);
+          if (generation == _lyricsGeneration) _lyricsInFlight.remove(trackId);
         });
   }
 

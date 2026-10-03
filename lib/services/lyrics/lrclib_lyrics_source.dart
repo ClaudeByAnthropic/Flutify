@@ -41,13 +41,16 @@ class LrclibLyricsSource {
 
   /// 缓存键：优先用 Spotify 曲目 ID（同一首歌的本地化曲名会变，ID 不会）。
   /// 版本号随选词规则升级（v4：纯音乐守卫 + 无歌手信息严格模式），让旧规则可能选错的结果失效。
-  static String cacheKey(LyricsQuery q) =>
-      q.trackId.isNotEmpty ? 'v4|${q.trackId}' : 'v4|${q.title}\u0001${q.artist}\u0001${q.album}';
+  static String cacheKey(LyricsQuery q) => q.trackId.isNotEmpty
+      ? 'v4|${q.trackId}'
+      : 'v4|${q.title}\u0001${q.artist}\u0001${q.album}';
 
   /// 删除这首歌的本地缓存（「重新获取歌词」）。
-  Future<void> forget(LyricsQuery query) async => cache?.remove(cacheKey(query));
+  Future<void> forget(LyricsQuery query) async =>
+      cache?.remove(cacheKey(query));
 
   Future<LrclibLookup> find(LyricsQuery query) async {
+    final cacheGeneration = cache?.generation;
     if (query.title.trim().isEmpty) return const LrclibLookup(null);
 
     final key = cacheKey(query);
@@ -81,7 +84,10 @@ class LrclibLyricsSource {
     if (candidates.length < 4) await add(() => _client.search(track: title));
     if (candidates.length < 3) {
       final altTitle = detectLang('$title ${query.artist}') == LyricLang.zh
-          ? ZhScript.convert(title, toSimplified: LrclibSelector.wantsTraditional(query))
+          ? ZhScript.convert(
+              title,
+              toSimplified: LrclibSelector.wantsTraditional(query),
+            )
           : null;
       final queries = [
         if (query.primaryArtist.isNotEmpty) '$title ${query.primaryArtist}',
@@ -95,21 +101,27 @@ class LrclibLyricsSource {
     }
 
     final selection = LrclibSelector.select(candidates, query);
-    if (selection == null) return LrclibLookup(null, networkError: networkError);
+    if (selection == null)
+      return LrclibLookup(null, networkError: networkError);
     final lines = LrcParser.parse(selection.synced);
     if (lines.isEmpty) return LrclibLookup(null, networkError: networkError);
-    await cache?.write(key, selection.synced);
+    await cache?.write(
+      key,
+      selection.synced,
+      expectedGeneration: cacheGeneration,
+    );
     return LrclibLookup(_lyrics(lines, selection.lang));
   }
 
-  static SpotifyLyrics _lyrics(List<LyricLine> lines, LyricLang lang) => SpotifyLyrics(
-    lines: lines,
-    language: switch (lang) {
-      LyricLang.zh => 'zh',
-      LyricLang.ja => 'ja',
-      LyricLang.ko => 'ko',
-      _ => 'en',
-    },
-    provider: LyricsProvider.lrclib,
-  );
+  static SpotifyLyrics _lyrics(List<LyricLine> lines, LyricLang lang) =>
+      SpotifyLyrics(
+        lines: lines,
+        language: switch (lang) {
+          LyricLang.zh => 'zh',
+          LyricLang.ja => 'ja',
+          LyricLang.ko => 'ko',
+          _ => 'en',
+        },
+        provider: LyricsProvider.lrclib,
+      );
 }
