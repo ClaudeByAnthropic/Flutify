@@ -134,7 +134,12 @@ class _GlassNavigationPill extends StatelessWidget {
                     width: 0.5,
                   ),
                 ),
-                child: nav,
+                // 安全区已经留在药丸外，避免 NavigationBar 再在内部垫高底部。
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeBottom: true,
+                  child: nav,
+                ),
               );
               if (transitioning) return fill;
               return BackdropFilter(

@@ -139,6 +139,27 @@ void main() {
     );
   });
 
+  testWidgets(
+    'navigation pill reserves the bottom inset only outside its contents',
+    (tester) async {
+      tester.view.padding = const FakeViewPadding(top: 48, bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(top: 48, bottom: 34);
+      await pumpPlaying(tester);
+      final nav = find.byType(NavigationBar);
+      final pill = tester.getRect(nav);
+      expect(pill.height, 64);
+      expect(844 - pill.bottom, 34 + 12);
+      for (final element in find.byType(NavigationDestination).evaluate()) {
+        final destination = tester.getRect(find.byWidget(element.widget));
+        expect(destination.center.dy, pill.center.dy);
+      }
+      await tester.tap(find.byIcon(Icons.search_rounded).first);
+      await settle(tester);
+      expect(tester.widget<NavigationBar>(nav).selectedIndex, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('swiping the artwork changes tracks', (tester) async {
     final playback = await pumpPlaying(tester);
 

@@ -7,6 +7,16 @@ import subprocess
 import sys
 
 
+def verify_certificate(output, expected):
+    # apksigner uses SDK-range labels for v3.1, not the older "Signer #1".
+    # Inspect certificate digests only (never public-key or source-stamp hashes).
+    lines = [line.strip() for line in output.splitlines()
+             if line.startswith('Signer ') and ' certificate SHA-256 digest:' in line]
+    certificates = [line.rsplit(':', 1)[-1].strip().lower() for line in lines]
+    if not certificates or any(cert != expected for cert in certificates):
+        raise ValueError(f'signing certificate mismatch: expected {expected}, got {certificates}')
+
+
 def verify(directory, build_number):
     expected = os.environ['ANDROID_SIGNING_CERT_SHA256'].replace(':', '').lower()
     if not re.fullmatch('[0-9a-f]{64}', expected):
@@ -27,9 +37,10 @@ def verify(directory, build_number):
         output = subprocess.check_output(
             [str(build_tools / ('apksigner' + suffix)), 'verify', '--verbose', '--print-certs', str(apk)],
             text=True)
-        certificates = re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)', output)
-        if [cert.lower() for cert in certificates] != [expected]:
-            raise ValueError(f'{name}: signing certificate does not match the fixed beta key')
+        try:
+            verify_certificate(output, expected)
+        except ValueError as error:
+            raise ValueError(f'{name}: {error}; verifier output: {output}') from error
         metadata = subprocess.check_output(
             [str(build_tools / ('aapt.exe' if os.name == 'nt' else 'aapt')), 'dump', 'badging', str(apk)], text=True)
         code = re.search(r"versionCode='(\d+)'", metadata)

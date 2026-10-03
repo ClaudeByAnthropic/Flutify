@@ -23,8 +23,8 @@ class HomeChipBar extends StatelessWidget {
   final ValueChanged<String> onSelected;
   final Widget? leading;
 
-  /// 吸顶时的底色（与页面底色一致，滚动内容从下方穿过时不透出）。
-  final Color background;
+  /// 与页面背景同位置的渐变切片，吸顶时遮住下方滚动内容。
+  final Widget background;
 
   const HomeChipBar({
     super.key,
@@ -140,7 +140,7 @@ class HomeChipBar extends StatelessWidget {
 
 class _ChipBarDelegate extends SliverPersistentHeaderDelegate {
   final double extent;
-  final Color background;
+  final Widget background;
   final Widget child;
 
   _ChipBarDelegate({
@@ -163,10 +163,7 @@ class _ChipBarDelegate extends SliverPersistentHeaderDelegate {
   ) =>
       // 必须撑满 extent：吸顶 sliver 以子组件高度作为绘制高度
       SizedBox.expand(
-        child: ColoredBox(
-          color: overlapsContent ? background : Colors.transparent,
-          child: child,
-        ),
+        child: Stack(fit: StackFit.expand, children: [background, child]),
       );
 
   @override
