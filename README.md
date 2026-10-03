@@ -6,7 +6,7 @@
 
 一个让你呼吸通畅的 Spotify 第三方客户端 · Windows / Android
 
-[下载](../../releases) · 当前版本 **v0.01 Beta**
+[下载](https://github.com/is-hp-is-mad/Flutify/releases) · 当前版本 [![最新版本（含 Beta）](https://img.shields.io/github/v/release/is-hp-is-mad/Flutify?include_prereleases&sort=date&label=release&cacheSeconds=300)](https://github.com/is-hp-is-mad/Flutify/releases)
 
 </div>
 
@@ -23,7 +23,7 @@
 **歌词**
 - 逐行同步歌词，Apple Music 风格的流动背景与液态玻璃
 - 官方没有同步歌词时，自动从 [LRCLIB](https://lrclib.net) 补全
-- 桌面沉浸式歌词（F11）
+- 桌面沉浸式歌词（F11），支持直接收藏歌曲
 - Windows 任务栏歌词：嵌在任务栏里，不需要额外软件
 
 **Spotify Connect**
@@ -37,6 +37,9 @@
 - 系统媒体控制（任务栏 / 锁屏 / 通知栏）、键盘媒体键与快捷键
 - 简体中文 / English，内置 MiSans 字体
 - 支持 HTTP 代理（跟随系统或手动设置）
+- 可配置 Spotify HTTPS 反代，支持 API、媒体和 Connect 连接
+- 音频、封面、歌词缓存分别选择 AppData、程序目录或自定义目录，修改位置时迁移旧缓存
+- 音频缓存按上限自动清理，也可手动清理全部缓存；网络连接失败时最多重试 10 次并显示进度
 
 ## 📦 安装
 
@@ -44,16 +47,22 @@
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
-| Windows 10 / 11 | `windows-x64.zip` | 解压后运行 `Flutify.exe`。需要 WebView2 运行时（Win11 自带） |
-| Android | `android-arm64-v8a.apk` | 绝大多数手机选这个；不确定就选 `universal` |
+| Windows 10 / 11，Intel / AMD | `*-windows-x64-setup.exe` 或 `*-windows-x64.zip` | 安装版或解压即用的便携版 |
+| Windows ARM64 | `*-windows-arm64-setup.exe` 或 `*-windows-arm64.zip` | 原生 ARM64 安装版或便携版 |
+| Android | `*-android-arm64-v8a.apk` | 绝大多数手机选这个；不确定就选 `*-android-universal.apk` |
+
+Windows 便携版解压后运行 `Flutify.exe`。两种发行方式均附带 MSVC 运行库；播放仍需 WebView2 运行时（Windows 11 通常已安装）。安装版默认安装到当前用户目录，也可更改位置。
+
+缓存位置在「设置 → 存储」中分别调整；便携版默认仍使用 AppData，需要时可切换到程序目录。反代入口与凭据在「设置 → 网络 → Spotify 反代」中配置。
 
 首次使用：设置 → 账号 →「登录」，在弹出的 Spotify 官方登录页里登录即可。
 
 ## 🧪 Beta 已知问题
 
-- Android 端还在适配中，部分功能（如全曲播放、Connect 播放端）可能不可用
+- Android 已接入 Media3 / 系统 Widevine 原生播放；设备 DRM 支持和厂商系统媒体卡片仍有兼容性差异
+- vivo 媒体卡片、手机与 PC 间控制权转移、手机歌词退出遮罩及 Windows 左对齐任务栏歌词仍需实机反馈
 - 偶尔遇到播放限流（HTTP 429），稍等片刻再试即可
-- 只支持 OGG / MP3 音源，免费账号功能以 Spotify 实际允许的为准
+- 免费账号功能以 Spotify 实际允许的为准；与旧版签名不同的 Android Beta 安装可能需要首次重装
 
 有问题欢迎提 [Issue](../../issues)。
 
