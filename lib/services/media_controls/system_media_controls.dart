@@ -75,11 +75,15 @@ abstract class SystemMediaControls {
   void dispose();
 
   /// 按当前平台创建；不支持的平台（Linux / macOS / Web）返回 null。
-  static Future<SystemMediaControls?> create() async {
+  static Future<SystemMediaControls?> create({
+    ArtworkFileResolver? artworkFile,
+  }) async {
     if (kIsWeb) return null;
     try {
       if (Platform.isWindows) return WindowsMediaControls();
-      if (Platform.isAndroid || Platform.isIOS) return await AudioServiceMediaControls.init();
+      if (Platform.isAndroid || Platform.isIOS) {
+        return await AudioServiceMediaControls.init(artworkFile: artworkFile);
+      }
     } catch (e) {
       debugPrint('系统媒体控制初始化失败：$e');
     }
