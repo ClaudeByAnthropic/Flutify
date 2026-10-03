@@ -1454,31 +1454,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsGatewayAutomaticHelp =>
-      'Check the network\'s exit country using Cloudflare on startup, network changes, resume and every 2 minutes. Uses your selected system/manual proxy. Failed checks keep the current route.';
+      'Check the network\'s exit country/region using Cloudflare on startup, network changes, resume and every 2 minutes. Uses your selected system/manual proxy. Failed checks keep the current route.';
 
   @override
   String get settingsGatewayDirectCountries =>
-      'Countries allowed to connect directly';
+      'Countries/regions allowed to connect directly';
 
   @override
   String get settingsGatewayDirectCountriesHelp =>
-      'Optional two-letter codes separated by commas or spaces. Empty: CN uses the gateway, all others connect directly. Filled: only listed countries connect directly; all others use the gateway.';
+      'Optional two-letter codes separated by commas or spaces. Empty: CN uses the gateway, all others connect directly. Filled: only listed countries/regions connect directly; all others use the gateway.';
 
   @override
   String get settingsGatewayCountriesInvalid =>
-      'Use two-letter country codes, for example US, JP, HK.';
+      'Use two-letter country/region codes, for example US, JP, HK.';
 
   @override
   String get settingsGatewayLookupFailed =>
-      'Country lookup failed; keeping the current route.';
+      'Country/region lookup failed; keeping the current route.';
 
   @override
   String get settingsGatewayCountryPending =>
-      'Waiting for the network\'s country; keeping the current route.';
+      'Waiting for the network\'s country/region; keeping the current route.';
 
   @override
   String settingsGatewayCountryStatus(String country, String route) {
-    return 'Network country: $country · $route';
+    return 'Network country/region: $country · $route';
   }
 
   @override
@@ -1488,5 +1488,5 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsGatewayRouteDirect => 'Direct connection';
 
   @override
-  String get settingsGatewayRecheck => 'Check country again';
+  String get settingsGatewayRecheck => 'Check country/region again';
 }

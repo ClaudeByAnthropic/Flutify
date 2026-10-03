@@ -2633,19 +2633,19 @@ abstract class AppLocalizations {
   /// No description provided for @settingsGatewayDirectCountries.
   ///
   /// In zh, this message translates to:
-  /// **'允许直连的国家代码'**
+  /// **'允许直连的国家/地区代码'**
   String get settingsGatewayDirectCountries;
 
   /// No description provided for @settingsGatewayDirectCountriesHelp.
   ///
   /// In zh, this message translates to:
-  /// **'可选，填写两位代码，以逗号或空格分隔。留空：CN 开启反代，其余直连；填写后：仅列表内国家直连，其余开启反代。'**
+  /// **'可选，填写两位代码，以逗号或空格分隔。留空：CN 开启反代，其余直连；填写后：仅列表内国家/地区直连，其余开启反代。'**
   String get settingsGatewayDirectCountriesHelp;
 
   /// No description provided for @settingsGatewayCountriesInvalid.
   ///
   /// In zh, this message translates to:
-  /// **'请输入两位国家代码，例如 US、JP、HK。'**
+  /// **'请输入两位国家/地区代码，例如 US、JP、HK。'**
   String get settingsGatewayCountriesInvalid;
 
   /// No description provided for @settingsGatewayLookupFailed.

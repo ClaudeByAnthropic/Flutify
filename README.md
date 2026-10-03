@@ -55,9 +55,15 @@ Windows 便携版解压后运行 `Flutify.exe`。两种发行方式均附带 MSV
 
 桌面端缓存位置在「设置 → 存储」中分别调整；便携版默认仍使用 AppData，需要时可切换到程序目录。移动端保留清除缓存和设置大小上限，不显示目录选择。
 
-反代入口与凭据在「设置 → 网络 → Spotify 反代」中配置。开启自动切换后，通过 `https://cloudflare.com/cdn-cgi/trace` 的 `loc` 查询出口国家/地区：允许直连的国家代码留空时，CN 开启反代，其余直连；填写 `US, JP, HK` 等两位代码时，仅列表内的国家/地区直连，其余全部开启反代。查询使用当前选择的系统/手动 HTTP 代理，失败时保持现有线路。启动、网络变化、回到前台和每两分钟都会检查，也可在设置中手动刷新。
+反代入口与凭据在「设置 → 网络 → Spotify 反代」中配置。开启自动切换后，通过 `https://cloudflare.com/cdn-cgi/trace` 的 `loc` 查询出口国家/地区：允许直连的国家/地区代码留空时，CN 开启反代，其余直连；填写 `US, JP, HK` 等两位代码时，仅列表内的国家/地区直连，其余全部开启反代。查询使用当前选择的系统/手动 HTTP 代理，失败时保持现有线路。启动、网络变化、回到前台和每两分钟都会检查，也可在设置中手动刷新。
 
 首次使用：设置 → 账号 →「登录」，在弹出的 Spotify 官方登录页里登录即可。
+
+## 🌐 可选自建服务
+
+[FlutifyPS](https://github.com/is-hp-is-mad/FlutifyPS) 是 Flutify 的可选反代服务，支持 Spotify API、媒体下载和 Connect 连接。如果当前网络已经可以正常使用 Flutify，无需部署它。
+
+需要自建入口时，按 [FlutifyPS 部署与接入说明](https://github.com/is-hp-is-mad/FlutifyPS#部署) 在服务器上部署，然后在「设置 → 网络 → Spotify 反代」中填写包含路径的 HTTPS 地址、用户名和密码。FlutifyPS 支持 Docker 与 Node.js / systemd，服务器也可配置独立出口代理。
 
 ## 🧪 Beta 已知问题
 

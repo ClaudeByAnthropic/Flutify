@@ -476,15 +476,15 @@
   "settingsCacheChooseDirectory": "Choose folder",
   "settingsCachePickerFailed": "Couldn't open the folder picker. Try again or enter a path.",
   "settingsGatewayAutomatic": "Switch gateway automatically",
-  "settingsGatewayAutomaticHelp": "Check the network's exit country using Cloudflare on startup, network changes, resume and every 2 minutes. Uses your selected system/manual proxy. Failed checks keep the current route.",
-  "settingsGatewayDirectCountries": "Countries allowed to connect directly",
-  "settingsGatewayDirectCountriesHelp": "Optional two-letter codes separated by commas or spaces. Empty: CN uses the gateway, all others connect directly. Filled: only listed countries connect directly; all others use the gateway.",
-  "settingsGatewayCountriesInvalid": "Use two-letter country codes, for example US, JP, HK.",
-  "settingsGatewayLookupFailed": "Country lookup failed; keeping the current route.",
-  "settingsGatewayCountryPending": "Waiting for the network's country; keeping the current route.",
-  "settingsGatewayCountryStatus": "Network country: {country} · {route}",
+  "settingsGatewayAutomaticHelp": "Check the network's exit country/region using Cloudflare on startup, network changes, resume and every 2 minutes. Uses your selected system/manual proxy. Failed checks keep the current route.",
+  "settingsGatewayDirectCountries": "Countries/regions allowed to connect directly",
+  "settingsGatewayDirectCountriesHelp": "Optional two-letter codes separated by commas or spaces. Empty: CN uses the gateway, all others connect directly. Filled: only listed countries/regions connect directly; all others use the gateway.",
+  "settingsGatewayCountriesInvalid": "Use two-letter country/region codes, for example US, JP, HK.",
+  "settingsGatewayLookupFailed": "Country/region lookup failed; keeping the current route.",
+  "settingsGatewayCountryPending": "Waiting for the network's country/region; keeping the current route.",
+  "settingsGatewayCountryStatus": "Network country/region: {country} · {route}",
   "@settingsGatewayCountryStatus": {"placeholders": {"country": {"type": "String"}, "route": {"type": "String"}}},
   "settingsGatewayRouteProxy": "Gateway enabled",
   "settingsGatewayRouteDirect": "Direct connection",
-  "settingsGatewayRecheck": "Check country again"
+  "settingsGatewayRecheck": "Check country/region again"
 }
