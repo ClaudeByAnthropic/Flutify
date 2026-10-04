@@ -1,7 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Widevine license / application-certificate 反代客户端（CDM 请求体 → Spotify）。
+import 'fairplay.dart';
+
+/// 服务的 DRM 体系（同一组入口与身份，按体系换端点与请求形态）。
+/// 未显式指定时按平台默认：macOS → [fairplay]，其余 → [widevine]。
+enum EmeDrmSystem { widevine, fairplay }
+
+/// license / application-certificate 反代客户端（CDM 请求体 → Spotify）。
+///
+/// DRM 体系分两种（同名维护一把客户端，避免装配层分叉）：
+/// - [EmeDrmSystem.widevine]：`widevine-license` 端点（Windows / Android）；
+/// - [EmeDrmSystem.fairplay]：`fairplay-license` 端点（macOS / iOS，WKWebView 无 Widevine，
+///   只能用系统自带 FairPlay CDM；端点语义对齐 Spotify Web 播放器的 FPS 客户端，
+///   见 fairplay.dart）。
 ///
 /// 为什么要多入口：手机网络下部分 Spotify 域名会被掐 TLS 握手
 /// （`HandshakeException: Connection terminated during handshake`），而同一服务的
@@ -21,6 +33,7 @@ class WidevineLicenseClient {
     http.Client? client,
     this.hosts = defaultHosts,
     this.timeout = const Duration(seconds: 12),
+    this.drmSystem,
   }) : _client = client ?? http.Client();
 
   /// Web 播放器 access_token（Widevine 真密钥的身份凭据，sp_dc + TOTP 铸造）。
@@ -41,18 +54,32 @@ class WidevineLicenseClient {
   final List<String> hosts;
   final Duration timeout;
 
+  /// DRM 体系；null 时平台默认（macOS / iOS → fairplay，其余 → widevine，见 [useFairPlay]）。
+  final EmeDrmSystem? drmSystem;
+
+  /// 生效的 DRM 体系。
+  EmeDrmSystem get effectiveDrmSystem =>
+      drmSystem ??
+      (useFairPlay ? EmeDrmSystem.fairplay : EmeDrmSystem.widevine);
+
+  bool get _fairPlay => effectiveDrmSystem == EmeDrmSystem.fairplay;
+
   /// 最近一次成功的入口；下次优先用它。
   String? lastGoodHost;
 
   static const String _ua =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36';
 
-  /// license 反代：POST `/widevine-license/v1/audio/license`，返回 license 响应体。
+  /// license 反代：POST `<service>/v1/audio/license`，返回 license 响应体。
+  /// FairPlay 的请求形态见 [fairPlayLicenseUri]（`?assetId=hex`，体为原样 SPC）。
   Future<Uint8List> postLicense(Uint8List request) async {
     try {
       final token = await webToken();
       final ct = await clientToken();
-      return await _request('audio/license', (uri) {
+      return await _request('audio/license', (host) {
+        final uri = _fairPlay
+            ? fairPlayLicenseUri(host)
+            : Uri.parse('https://$host/widevine-license/v1/audio/license');
         return _client.post(
           uri,
           headers: {
@@ -71,14 +98,23 @@ class WidevineLicenseClient {
     }
   }
 
-  /// Widevine application-certificate 反代（只需 client-token）。
+  /// application-certificate 反代。
+  /// Widevine 只需 client-token；FairPlay 对齐 Web 播放器（播放态证书请求带鉴权，
+  /// Authorization + client-token 都发）。
   Future<Uint8List> fetchCert() async {
     try {
       final ct = await clientToken();
-      return await _request('application-certificate', (uri) {
+      final token = _fairPlay ? await webToken() : null;
+      return await _request('application-certificate', (host) {
+        final uri = _fairPlay
+            ? fairPlayCertUri(host)
+            : Uri.parse(
+                'https://$host/widevine-license/v1/application-certificate',
+              );
         return _client.get(
           uri,
           headers: {
+            if (token != null) 'Authorization': 'Bearer $token',
             'client-token': ct,
             'User-Agent': _ua,
             'Referer': 'https://open.spotify.com/',
@@ -94,7 +130,7 @@ class WidevineLicenseClient {
   /// 按入口顺序发请求；网络错误换入口，业务错误直接抛。
   Future<Uint8List> _request(
     String name,
-    Future<http.Response> Function(Uri uri) send,
+    Future<http.Response> Function(String host) send,
   ) async {
     final order = [
       ?lastGoodHost,
@@ -103,11 +139,11 @@ class WidevineLicenseClient {
     ];
     Object? lastError;
     for (final host in order) {
-      final uri = Uri.parse('https://$host/widevine-license/v1/$name');
       try {
-        final res = await send(uri).timeout(timeout);
+        final res = await send(host).timeout(timeout);
         debugPrint(
-            '[eme] license $name @ $host → HTTP ${res.statusCode} ${res.bodyBytes.length}B');
+          '[eme] license $name @ $host → HTTP ${res.statusCode} ${res.bodyBytes.length}B',
+        );
         if (res.statusCode != 200) {
           throw StateError('license $name 失败：HTTP ${res.statusCode}');
         }

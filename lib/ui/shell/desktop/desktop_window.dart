@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,8 @@ import '../../../services/storage_service.dart';
 import 'window_bounds_memory.dart';
 
 /// 桌面窗口外观：隐藏系统标题栏，由顶栏自绘（拖动区 + 最小化 / 最大化 / 关闭）。
+/// macOS 保留原生交通灯按钮浮在窗口左上角（见 init 中 windowButtonVisibility 分支），
+/// 不渲染 Windows 风格的自绘窗口按钮。
 ///
 /// 只在 Windows / macOS / Linux 的真实运行中启用；Widget 测试和移动端
 /// [enabled] 为 false，顶栏不渲染窗口按钮、不调用任何原生通道。
@@ -19,6 +22,19 @@ class DesktopWindow {
 
   /// 自绘标题栏是否生效。
   static bool get enabled => _enabled;
+
+  /// 是否运行在「macOS 原生窗口按钮」模式：原生交通灯浮在左上角，红色关闭按钮只隐藏
+  /// 窗口（音乐继续播放），真正退出走 Cmd+Q。窗口 chrome / 快捷键 / 原生菜单统一按它分支；
+  /// 依赖 [enabled]，Widget 测试（init 未跑）恒为 false。
+  static bool get macNativeWindow =>
+      debugMacNativeWindowOverride ?? (_enabled && !kIsWeb && Platform.isMacOS);
+
+  /// 测试用：在任意平台模拟 / 关闭「macOS 原生窗口按钮」模式（⌘ 快捷键、原生菜单栏等分支）。
+  @visibleForTesting
+  static bool? debugMacNativeWindowOverride;
+
+  /// macOS 原生交通灯在左上角占用的宽度；顶栏 / 窄窗口标题条的左侧内容需为它留白。
+  static const double macTrafficLightsInset = 80;
 
   /// 窗口最小尺寸：可缩到手机宽度，窄于 `ShellBreakpoints.desktop` 时切换为移动端布局，
   /// 便于在桌面上直接调试手机界面。
@@ -56,7 +72,8 @@ class DesktopWindow {
       center: saved == null,
       title: 'Flutify',
       titleBarStyle: TitleBarStyle.hidden,
-      windowButtonVisibility: false,
+      // macOS 隐藏标题栏时保留原生交通灯（红黄绿）浮在左上角；Windows / Linux 完全自绘窗口按钮
+      windowButtonVisibility: Platform.isMacOS,
     );
     await windowManager.waitUntilReadyToShow(options, () async {
       if (saved != null) await windowManager.setPosition(saved.rect.topLeft);
@@ -81,12 +98,41 @@ class DesktopWindow {
       enabled: remember,
       fullScreen: () => fullScreen.value,
     )..attach();
+    _boundsMemory = memory;
     // 移动 / 缩放后 500ms 内直接关窗会丢掉最后一次位置，关窗前补存一次
     addBeforeCloseHook(memory.saveNow);
-    // 拦截关闭（窗口按钮 / Alt+F4 / 任务栏），先跑完收尾钩子再销毁窗口
+    // 拦截关闭（窗口按钮 / Alt+F4 / 任务栏），先跑完收尾钩子再销毁窗口；
+    // macOS 红色关闭按钮只隐藏窗口（见 _CloseGuard），真正退出由菜单 / Cmd+Q 触发
     await windowManager.setPreventClose(true);
     windowManager.addListener(_CloseGuard());
+    if (Platform.isMacOS) windowManager.addListener(_FullScreenSync());
+    // macOS：Cmd+Q / 菜单退出前跑同一套收尾钩子（红色按钮隐藏窗口时不跑——应用还在运行）。
+    // 监听器注册为 WidgetsBindingObserver，由 binding 持有，随进程存活
+    if (Platform.isMacOS) {
+      AppLifecycleListener(onExitRequested: _onExitRequested);
+    }
     _enabled = true;
+  }
+
+  /// 窗口位置记忆；macOS 隐藏窗口前也要保存一次。
+  static WindowBoundsMemory? _boundsMemory;
+
+  /// 隐藏窗口（macOS 红色关闭按钮）前的收尾：只保存窗口位置，
+  /// 不跑 [addBeforeCloseHook] 的重钩子（注销 Connect、保存播放会话等留给真正退出）。
+  static Future<void> _runBeforeHide() =>
+      _boundsMemory?.saveNow() ?? Future.value();
+
+  static bool _exitRequested = false;
+
+  /// macOS 退出请求（Cmd+Q / 程序坞右键退出 / 菜单「退出 Flutify」）：
+  /// 先并行跑完 [addBeforeCloseHook] 注册的收尾（保存播放会话、注销 Connect 播放端、
+  /// 令牌落盘、保存窗口位置……），再放行系统退出。
+  static Future<AppExitResponse> _onExitRequested() async {
+    // 重入（连按 Cmd+Q）直接放行本次，收尾只跑一次
+    if (_exitRequested) return AppExitResponse.exit;
+    _exitRequested = true;
+    await _runBeforeClose();
+    return AppExitResponse.exit;
   }
 
   static final List<(Future<void> Function(), Duration)> _beforeClose = [];
@@ -160,6 +206,9 @@ class DesktopWindow {
 }
 
 /// 收到关闭请求时先执行 [DesktopWindow.addBeforeCloseHook] 注册的收尾，再真正销毁窗口。
+/// macOS 例外：红色关闭按钮只隐藏窗口（macOS 音乐应用惯例，音乐继续播放），
+/// 窗口位置照常保存；重新打开由 Dock 重开（applicationShouldHandleReopen）原生侧处理，
+/// 真正退出见 [DesktopWindow._exitRequested] 的 AppLifecycleListener。
 class _CloseGuard with WindowListener {
   bool _closing = false;
 
@@ -167,9 +216,44 @@ class _CloseGuard with WindowListener {
   Future<void> onWindowClose() async {
     if (_closing) return;
     _closing = true;
+    if (Platform.isMacOS) {
+      await DesktopWindow._runBeforeHide();
+      await _leaveFullScreen();
+      await windowManager.hide();
+      // 窗口只是藏起来，应用还活着：解除闭锁，下次关窗（或再次隐藏）仍能触发
+      _closing = false;
+      return;
+    }
     await DesktopWindow._runBeforeClose();
     await windowManager.destroy();
   }
+
+  /// 原生全屏时直接隐藏会留下一个黑色的全屏桌面空间，[DesktopWindow.fullScreen] 也停在 true：
+  /// 先退出全屏，等退出动画结束（轮询，最多 2s）再隐藏。
+  static Future<void> _leaveFullScreen() async {
+    if (!await windowManager.isFullScreen()) {
+      DesktopWindow.fullScreen.value = false;
+      return;
+    }
+    await DesktopWindow.setFullScreen(false);
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (await windowManager.isFullScreen() &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    // isFullScreen 翻转时退出动画还在收尾，紧接着 orderOut 偶发留下空白空间
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+  }
+}
+
+/// macOS：绿色按钮、「窗口 → 进入全屏」、⌃⌘F 由系统直接切换全屏，不经过 [DesktopWindow.setFullScreen]。
+/// 把原生全屏状态同步回 [DesktopWindow.fullScreen]（窗口位置记忆、窄窗口标题条、沉浸式歌词都看它）。
+class _FullScreenSync with WindowListener {
+  @override
+  void onWindowEnterFullScreen() => DesktopWindow.fullScreen.value = true;
+
+  @override
+  void onWindowLeaveFullScreen() => DesktopWindow.fullScreen.value = false;
 }
 
 /// 窗口拖动区：按住拖动移动窗口，双击最大化 / 还原（Windows 标题栏行为）。

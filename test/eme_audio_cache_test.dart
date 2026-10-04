@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutify_app/services/auth/proto_codec.dart';
+import 'package:flutify_app/services/eme/fairplay.dart';
 import 'package:flutify_app/services/eme/streaming_download.dart';
 import 'package:flutify_app/services/protocol/eme_track_audio_source.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +19,7 @@ void main() {
   const id = '0000000000000000000001';
   const fileId = '1111111111111111111111111111111111111111';
   setUp(() async {
+    debugUseFairPlayOverride = false;
     root = await Directory.systemTemp.createTemp('flutify-audio-trim-');
     playing = null;
     source = EmeTrackAudioSource(
@@ -57,6 +59,7 @@ void main() {
     );
   });
   tearDown(() async {
+    debugUseFairPlayOverride = null;
     source.dispose();
     await root.delete(recursive: true);
   });

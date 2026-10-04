@@ -12,6 +12,11 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     cacheDirectories = CacheDirectories(messenger: flutterViewController.engine.binaryMessenger)
 
+    let messenger = flutterViewController.engine.binaryMessenger
+    SystemProxyChannel.register(messenger: messenger)
+    MediaControlsChannel.register(messenger: messenger)
+    EditMenuChannel.register(messenger: messenger)
+
     super.awakeFromNib()
   }
 }
@@ -75,5 +80,37 @@ private class CacheDirectories {
 
   deinit {
     for url in accessed.values { url.stopAccessingSecurityScopedResource() }
+  }
+}
+
+/// 「编辑」菜单（Dart 侧 MacMenuBar._EditMenu）的原生半边：焦点在原生视图（登录页
+/// WKWebView 等）时把 `copy:` 这类标准 selector 发给响应链。第一响应者属于 Flutter
+///（FlutterView / 文本输入插件）或没有响应者时回 false，由 Dart 对 Flutter 焦点调用 Intent。
+enum EditMenuChannel {
+  private static let allowed: Set<String> = ["undo:", "redo:", "cut:", "copy:", "paste:", "selectAll:"]
+
+  static func register(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "flutify/edit_menu", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "perform", let name = call.arguments as? String, allowed.contains(name) else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let action = Selector(name)
+      guard let target = NSApp.target(forAction: action, to: nil, from: nil) as AnyObject?,
+            !isFlutterResponder(target)
+      else {
+        result(false)
+        return
+      }
+      result(NSApp.sendAction(action, to: target, from: nil))
+    }
+  }
+
+  /// 响应者是否属于 Flutter 自身（类名以 Flutter 开头，或者是 Flutter 视图里的非平台视图）。
+  private static func isFlutterResponder(_ target: AnyObject) -> Bool {
+    if NSStringFromClass(type(of: target)).hasPrefix("Flutter") { return true }
+    // undo: / redo: 无视图响应时会落到窗口 / 应用本身：交给 Flutter 处理
+    return target is NSWindow || target is NSApplication || target is NSWindowController
   }
 }

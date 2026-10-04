@@ -8,6 +8,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../services/auth/web_login_flow.dart';
 import '../../../services/auth/web_token_service.dart';
 import '../../../services/eme/eme_player.dart';
+import '../../shell/desktop/desktop_window.dart';
 
 export '../../../services/auth/web_login_flow.dart' show WebLoginStage;
 
@@ -225,7 +226,12 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
         (stage == WebLoginStage.preparing ||
             stage == WebLoginStage.desktopAuthorize);
 
-    return Scaffold(
+    // macOS 原生交通灯浮在窗口左上角：标题栏整体下移一条交通灯高度，关闭按钮不再与之重叠；
+    // 下移出的这条与标题栏同色、可拖动窗口
+    final media = MediaQuery.of(context);
+    final macInset = DesktopWindow.macNativeWindow ? _macTitleInset : 0.0;
+
+    final scaffold = Scaffold(
       appBar: AppBar(
         title: const Text('全曲播放：Web 登录'),
         leading: IconButton(
@@ -233,6 +239,9 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
           tooltip: '关闭',
           onPressed: () => _finish(null),
         ),
+        flexibleSpace: macInset > 0
+            ? const WindowDragArea(child: SizedBox.expand())
+            : null,
       ),
       body: Column(
         children: [
@@ -285,7 +294,17 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
         ],
       ),
     );
+    if (macInset == 0) return scaffold;
+    return MediaQuery(
+      data: media.copyWith(
+        padding: media.padding.copyWith(top: media.padding.top + macInset),
+      ),
+      child: scaffold,
+    );
   }
+
+  /// macOS 交通灯所在那一行的高度（隐藏标题栏时的系统标题栏高度）。
+  static const double _macTitleInset = 28;
 }
 
 /// 后台收尾阶段盖住 WebView 的进度浮层：用户只看到「登录完成，正在收尾」。

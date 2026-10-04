@@ -11,10 +11,12 @@ import '../navigation/content_history.dart';
 import '../navigation/tab_navigator.dart';
 import '../shell/desktop/desktop_shell.dart';
 import '../shell/desktop/desktop_top_bar.dart';
+import '../shell/desktop/mac_menu_bar.dart';
 import '../shell/shell_breakpoints.dart';
 import '../shell/mobile/mobile_bottom_bar.dart';
 import '../shell/shell_layout_controller.dart';
 import '../widgets/connect/playback_shortcuts.dart';
+import '../widgets/keyboard_shortcuts.dart';
 import '../widgets/playback_error_listener.dart';
 import '../widgets/track_hotkeys.dart';
 import 'home/home_screen.dart';
@@ -42,8 +44,14 @@ class _MainShellState extends State<MainShell> {
   /// 初始 Tab 按设置页「启动时打开」决定（initState 中读取）。
   late int _currentIndex;
 
-  final List<GlobalKey<NavigatorState>> _navigatorKeys = List.generate(3, (_) => GlobalKey<NavigatorState>());
-  final List<ContentHistory> _histories = List.generate(3, (_) => ContentHistory());
+  final List<GlobalKey<NavigatorState>> _navigatorKeys = List.generate(
+    3,
+    (_) => GlobalKey<NavigatorState>(),
+  );
+  final List<ContentHistory> _histories = List.generate(
+    3,
+    (_) => ContentHistory(),
+  );
 
   /// 搜索词在桌面顶栏与搜索页之间共享。
   final TextEditingController _searchController = TextEditingController();
@@ -62,12 +70,30 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _currentIndex = _startIndex();
-    AppRoutes.contentNavigator = () => _navigatorKeys[_currentIndex].currentState;
+    AppRoutes.contentNavigator = () =>
+        _navigatorKeys[_currentIndex].currentState;
+    // macOS 菜单栏常驻在 App 根部（见 MacMenuBar），这里只登记依赖主界面的动作
+    _menuActions = MacMenuActions(
+      onSearch: _searchFocus.requestFocus,
+      onBack: () => _histories[_currentIndex].back(),
+      onForward: () => _histories[_currentIndex].forward(),
+      onHome: () => _select(_home),
+      onOpenSettings: _openSettings,
+      onImmersive: () => ImmersiveLyricsScreen.open(context),
+      onTogglePlayPause: () => PlaybackShortcuts.togglePlayPause(context),
+      playback: PlaybackShortcuts.actions(context),
+    );
+    MacMenuBar.actions.value = _menuActions;
   }
+
+  late final MacMenuActions _menuActions;
 
   /// 启动页：主页 / 音乐库 / 上次所在 Tab（未注入 Provider 的测试一律主页）。
   int _startIndex() {
-    final prefs = Provider.of<PreferencesProvider?>(context, listen: false)?.prefs;
+    final prefs = Provider.of<PreferencesProvider?>(
+      context,
+      listen: false,
+    )?.prefs;
     final storage = Provider.of<StorageService?>(context, listen: false);
     return switch (prefs?.startPage) {
       StartPage.library => _library,
@@ -85,6 +111,8 @@ class _MainShellState extends State<MainShell> {
   @override
   void dispose() {
     AppRoutes.contentNavigator = null;
+    if (identical(MacMenuBar.actions.value, _menuActions))
+      MacMenuBar.actions.value = null;
     _searchController.dispose();
     _searchFocus.dispose();
     _layout.dispose();
@@ -100,7 +128,10 @@ class _MainShellState extends State<MainShell> {
   /// - 移动端布局：根 Navigator 全屏推入（iOS「设置」式，盖住底部导航）。
   void _openSettings() {
     if (!ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)) {
-      Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
       return;
     }
     final navigator = _navigatorKeys[_currentIndex].currentState;
@@ -139,17 +170,32 @@ class _MainShellState extends State<MainShell> {
     context.read<SpotifyProvider>().performSearch(query);
   }
 
-  void _onSearchSubmitted(String query) => context.read<SpotifyProvider>().commitRecentSearch(query);
+  void _onSearchSubmitted(String query) =>
+      context.read<SpotifyProvider>().commitRecentSearch(query);
 
   /// 桌面快捷键（与 Spotify 桌面端一致）。输入框聚焦时空格会被 TextField 拦截，不会误触。
   /// 播放类按键在远程模式下控制正在播放的其他设备（[PlaybackShortcuts]）。
+  /// 主修饰键按平台取（macOS ⌘，其余 Ctrl），见 [PlatformShortcuts]。
   Map<ShortcutActivator, VoidCallback> _shortcuts() => {
     ...PlaybackShortcuts.bindings(context),
-    const SingleActivator(LogicalKeyboardKey.keyK, control: true): _searchFocus.requestFocus,
-    const SingleActivator(LogicalKeyboardKey.keyL, control: true): _searchFocus.requestFocus,
-    const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () => _histories[_currentIndex].back(),
-    const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () => _histories[_currentIndex].forward(),
-    const SingleActivator(LogicalKeyboardKey.f11): () => ImmersiveLyricsScreen.open(context),
+    PlatformShortcuts.primary(LogicalKeyboardKey.keyK):
+        _searchFocus.requestFocus,
+    PlatformShortcuts.primary(LogicalKeyboardKey.keyL):
+        _searchFocus.requestFocus,
+    const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () =>
+        _histories[_currentIndex].back(),
+    const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () =>
+        _histories[_currentIndex].forward(),
+    const SingleActivator(LogicalKeyboardKey.f11): () =>
+        ImmersiveLyricsScreen.open(context),
+    // Mac 键盘上 F11 默认是「显示桌面」：另给 ⌘⇧F（与 Apple Music 全屏播放器同键，菜单栏「窗口」里有同一项）
+    if (PlatformShortcuts.useMeta)
+      const SingleActivator(
+        LogicalKeyboardKey.keyF,
+        meta: true,
+        shift: true,
+      ): () =>
+          ImmersiveLyricsScreen.open(context),
   };
 
   Widget _pages() => IndexedStack(
@@ -166,7 +212,8 @@ class _MainShellState extends State<MainShell> {
   );
 
   @override
-  Widget build(BuildContext context) => PlaybackErrorListener(child: _buildLayout(context));
+  Widget build(BuildContext context) =>
+      PlaybackErrorListener(child: _buildLayout(context));
 
   Widget _buildLayout(BuildContext context) {
     // sizeOf 只在尺寸变化时触发重建（MediaQuery.of 会随键盘动画每帧重建）
@@ -178,29 +225,30 @@ class _MainShellState extends State<MainShell> {
       _layout.docked = width >= ShellBreakpoints.threeColumn;
       return ChangeNotifierProvider<ShellLayoutController>.value(
         value: _layout,
-        // 曲目快捷键在外层：全局快捷键（Ctrl+S 等）先匹配，字母键再交给悬停的曲目行
+        // 曲目快捷键在更外层：全局快捷键（Ctrl/⌘+S 等）先匹配，字母键再交给悬停的曲目行
         child: TrackHotkeys(
           child: CallbackShortcuts(
-          bindings: _shortcuts(),
-          child: Focus(
-            autofocus: true,
-            onKeyEvent: (_, event) => PlaybackShortcuts.onSpaceKey(context, event),
-            child: DesktopShell(
-              pages: _pages(),
-              topBar: DesktopTopBar(
-                history: _histories[_currentIndex],
-                homeSelected: _currentIndex == _home,
-                onHome: () => _select(_home),
-                searchController: _searchController,
-                searchFocus: _searchFocus,
-                onSearchChanged: _onSearchChanged,
-                onSearchSubmitted: _onSearchSubmitted,
-                onSearchActivated: _activateSearch,
-                onOpenSettings: _openSettings,
+            bindings: _shortcuts(),
+            child: Focus(
+              autofocus: true,
+              onKeyEvent: (_, event) =>
+                  PlaybackShortcuts.onSpaceKey(context, event),
+              child: DesktopShell(
+                pages: _pages(),
+                topBar: DesktopTopBar(
+                  history: _histories[_currentIndex],
+                  homeSelected: _currentIndex == _home,
+                  onHome: () => _select(_home),
+                  searchController: _searchController,
+                  searchFocus: _searchFocus,
+                  onSearchChanged: _onSearchChanged,
+                  onSearchSubmitted: _onSearchSubmitted,
+                  onSearchActivated: _activateSearch,
+                  onOpenSettings: _openSettings,
+                ),
               ),
             ),
           ),
-        ),
         ),
       );
     }
@@ -209,7 +257,10 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       extendBody: true,
       body: _pages(),
-      bottomNavigationBar: MobileBottomBar(selectedIndex: _currentIndex, onSelected: _select),
+      bottomNavigationBar: MobileBottomBar(
+        selectedIndex: _currentIndex,
+        onSelected: _select,
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../l10n/l10n.dart';
 import '../../models/playback_retry.dart';
 import '../../providers/playback_provider.dart';
 import '../../services/audio/audio_engine.dart';
+import '../../services/eme/fairplay.dart';
 import '../../services/protocol/track_playback_exception.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/web_login_screen.dart';
@@ -131,9 +132,11 @@ class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
         null,
         null,
       ),
-      // 设备缺 Widevine / CDM：解密无从谈起，重试无意义，只提示
-      TrackPlaybackFailure.network when _isWidevineMissing(error) => (
-        l10n.playbackErrorWidevine(track),
+      // 设备缺 DRM / CDM（Windows 是 Widevine，macOS / iOS 是 FairPlay）：解密无从谈起，重试无意义，只提示
+      TrackPlaybackFailure.network when _isDrmMissing(error) => (
+        useFairPlay
+            ? l10n.playbackErrorFairPlay(track)
+            : l10n.playbackErrorWidevine(track),
         Icons.shield_outlined,
         ToastTone.error,
         null,
@@ -159,8 +162,9 @@ class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
     );
   }
 
-  /// 本次失败是不是「设备缺 Widevine / CDM」（EME 引擎错误归类标记）。
-  bool _isWidevineMissing(PlaybackError error) {
+  /// 本次失败是不是「设备缺 DRM / CDM」（EME 引擎错误归类标记，
+  /// Windows 缺 Widevine、macOS 缺 FairPlay 都走这个 flag）。
+  bool _isDrmMissing(PlaybackError error) {
     final cause = error.exception.cause;
     return cause is EmePlaybackException && cause.isWidevineMissing;
   }

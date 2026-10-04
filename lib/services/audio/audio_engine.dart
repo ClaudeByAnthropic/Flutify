@@ -14,7 +14,14 @@ class EmeTrackContent {
   /// sneaktables policy=1 原始 HLS 清单（含 EXT-X-KEY/MAP/BYTERANGE）。
   final String m3u8;
 
-  const EmeTrackContent({required this.m4aPath, required this.m3u8});
+  /// 该文件的 file_id（hex）。macOS FairPlay 的 FPS content ID 就是它（见 fairplay.dart）。
+  final String fileIdHex;
+
+  const EmeTrackContent({
+    required this.m4aPath,
+    required this.m3u8,
+    required this.fileIdHex,
+  });
 }
 
 /// EME 播放的运行期错误（license 换取失败 / HLS.js 致命错误 / Widevine 不可用等）。
@@ -66,13 +73,25 @@ abstract class AudioEngine {
   bool get hasSource;
 
   /// 播放本地已解密音频文件（OGG/MP3 等）。
-  Future<void> playFile(String path, {Duration? initialPosition, bool autoplay = true});
+  Future<void> playFile(
+    String path, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  });
 
   /// 边下边播（仍在下载的曲目）。
-  Future<void> playStream(ProgressiveAudio audio, {Duration? initialPosition, bool autoplay = true});
+  Future<void> playStream(
+    ProgressiveAudio audio, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  });
 
   /// 播放 DRM 曲目（EME / Widevine）。默认不支持（仅 EME 引擎实现）。
-  Future<void> playEme(EmeTrackContent content, {Duration? initialPosition, bool autoplay = true}) {
+  Future<void> playEme(
+    EmeTrackContent content, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) {
     throw UnimplementedError('该引擎不支持 EME 播放');
   }
 

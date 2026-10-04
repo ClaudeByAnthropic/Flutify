@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import '../audio/audio_engine.dart';
 import '../protocol/progressive_download.dart';
 import 'eme_player.dart';
+import 'fairplay.dart';
 
 /// EME 音频引擎：用隐藏 WebView2（Widevine + HLS.js）播放 DRM 加密曲目。
 ///
@@ -65,6 +66,14 @@ class EmeAudioEngine implements AudioEngine {
         _playing = false;
         _processing = ProcessingState.completed;
       case EmePlayerState.error:
+        // 状态事件是异步投递的：error 发出后、送达前若已开播下一首（[EmePlayer.play]
+        // 清空了 lastError），这条就是上一首的残留——丢弃，别把正在加载的新曲目标成失败。
+        // （EmePlayer 侧已按代次过滤反代失败与页面事件，这里兜住投递间隙。）
+        final err = _player.lastError;
+        if (err == null) {
+          debugPrint('[eme] 忽略上一首残留 error 状态（lastError 已随换歌清空）');
+          return;
+        }
         _playing = false;
         _processing = ProcessingState.idle;
         if (_hasSource) {
@@ -72,9 +81,7 @@ class EmeAudioEngine implements AudioEngine {
           // 带上 [_player.lastError] 的原因上报给 PlaybackProvider 转成用户可见提示，
           // 并把 _hasSource 复位，让上层知道要重试必须重新整载
           _hasSource = false;
-          _errorController.add(
-            _player.lastError ?? const EmePlaybackException('unknown'),
-          );
+          _errorController.add(err);
         }
     }
     _emit();
@@ -110,11 +117,19 @@ class EmeAudioEngine implements AudioEngine {
   }) async {
     _processing = ProcessingState.loading;
     _emit();
+    // macOS / iOS：WKWebView 无 Widevine，只能走 FairPlay（见 EmePlayer.play / fairplay.dart）。
+    // licensePoster/certFetcher 的 fairplay 端点选择由 license 客户端同步按平台默认，
+    // 两端（本地页 keySystem 切换与反代端点切换）必须保持同一判定，否则端点与 CDM 错配。
+    final fairPlay = useFairPlay;
+    if (fairPlay)
+      debugPrint('[eme] WKWebView：启用 FairPlay 全曲播放链路（com.apple.fps）');
     await _player.play(
       m4a: File(content.m4aPath),
       m3u8: content.m3u8,
       licensePoster: _licensePoster,
       certFetcher: _certFetcher,
+      fairPlay: fairPlay,
+      fairPlayFileId: content.fileIdHex,
     );
     _hasSource = true;
     if (initialPosition != null && initialPosition > Duration.zero) {

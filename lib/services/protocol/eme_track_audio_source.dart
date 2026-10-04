@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -8,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../audio/audio_engine.dart';
 import '../cache/cache_location.dart';
+import '../eme/fairplay.dart';
 import '../eme/segmented_download.dart';
 import '../eme/streaming_download.dart';
 import 'audio_cache_store.dart';
@@ -154,11 +154,19 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
         e,
       );
     }
-    final file = media.selectForFree();
+    // macOS / iOS 走 FairPlay（见 useFairPlay）：只认 cbcs 分组的加密文件（schm=cbcs），cenc 文件 FPS 解不了。
+    final file = useFairPlay
+        ? media.selectCbcsForFairPlay()
+        : media.selectForFree();
     if (file == null) {
-      throw const TrackPlaybackException(
+      debugPrint(
+        '[eme-src] 无可选文件，manifest 分组：${media.mp4Files.map((f) => f.formatKey).toSet().join(',')}',
+      );
+      throw TrackPlaybackException(
         TrackPlaybackFailure.unavailable,
-        '这首歌没有可用的 DRM 音频文件',
+        useFairPlay
+            ? '这首歌没有可用于本机（FairPlay）播放的音频（缺少 FairPlay 所需的 cbcs 文件）'
+            : '这首歌没有可用的 DRM 音频文件',
       );
     }
     debugPrint(
@@ -224,7 +232,11 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
         ),
         durationMs: media.durationMs > 0 ? media.durationMs : null,
         trackId: id.toBase62(),
-        emeContent: EmeTrackContent(m4aPath: dest.path, m3u8: m3u8),
+        emeContent: EmeTrackContent(
+          m4aPath: dest.path,
+          m3u8: m3u8,
+          fileIdHex: file.fileIdHex,
+        ),
       );
     } finally {
       _loadingPaths.remove(dest.path);
