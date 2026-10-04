@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,7 @@ import '../../../providers/appearance_provider.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../providers/connect_provider.dart';
 import '../../navigation/app_routes.dart';
+import '../../shell/shell_breakpoints.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/connect/connect_actions.dart';
 import '../../widgets/connect/remote_progress.dart';
@@ -142,9 +144,13 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
             (p) => p.playbackContext,
           );
     final colorScheme = Theme.of(context).colorScheme;
-    final topRadius = BorderRadius.vertical(
-      top: Radius.circular(context.tokens.corner(32)),
-    );
+    final androidFullscreen =
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        !ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+    final topRadius = androidFullscreen
+        ? BorderRadius.zero
+        : BorderRadius.vertical(top: Radius.circular(context.tokens.corner(32)));
     if (track == null) {
       return _NothingPlaying(
         color: colorScheme.surfaceContainerLowest,

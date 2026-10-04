@@ -13,6 +13,7 @@ import 'package:flutify_app/ui/screens/player/queue_list.dart';
 import 'package:flutify_app/ui/screens/player/widgets/swipeable_artwork.dart';
 import 'package:flutify_app/ui/shell/mobile/mobile_bottom_bar.dart';
 import 'package:flutify_app/ui/widgets/mini_player.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -34,8 +35,11 @@ void main() {
     ),
   ];
 
-  Future<PlaybackProvider> pumpPlaying(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(390, 844);
+  Future<PlaybackProvider> pumpPlaying(
+    WidgetTester tester, {
+    Size size = const Size(390, 844),
+  }) async {
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     ArtworkPalette.enabled = false;
@@ -243,6 +247,45 @@ void main() {
     await settle(tester);
     expect(find.byType(FullPlayerSheet), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('android: full player squares its top corners so they cover the screen', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await pumpPlaying(tester);
+    await tester.tap(find.byType(MiniPlayer));
+    await settle(tester);
+    debugDefaultTargetPlatformOverride = null;
+
+    final clip = tester.widget<ClipRRect>(
+      find
+          .descendant(
+            of: find.byType(FullPlayerSheet),
+            matching: find.byType(ClipRRect),
+          )
+          .first,
+    );
+    expect(clip.borderRadius, BorderRadius.zero);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('other platforms keep the rounded top corners', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    await pumpPlaying(tester);
+    await tester.tap(find.byType(MiniPlayer));
+    await settle(tester);
+    debugDefaultTargetPlatformOverride = null;
+
+    final clip = tester.widget<ClipRRect>(
+      find
+          .descendant(
+            of: find.byType(FullPlayerSheet),
+            matching: find.byType(ClipRRect),
+          )
+          .first,
+    );
+    expect(clip.borderRadius, isNot(BorderRadius.zero));
   });
 }
 
