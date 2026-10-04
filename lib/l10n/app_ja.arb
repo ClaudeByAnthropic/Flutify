@@ -560,5 +560,24 @@
         "type": "String"
       }
     }
-  }
+  },
+  "menuPlayback": "再生",
+  "menuNavigate": "移動",
+  "menuEdit": "編集",
+  "menuUndo": "元に戻す",
+  "menuRedo": "やり直す",
+  "menuCut": "切り取り",
+  "menuCopy": "コピー",
+  "menuPaste": "貼り付け",
+  "menuSelectAll": "すべて選択",
+  "menuWindow": "ウインドウ",
+  "menuSettings": "設定…",
+  "playbackErrorFairPlay": "「{track}」を復号できません：このデバイスで FairPlay セッションを作成できませんでした",
+  "settingsLyricsBilingual": "コミュニティの歌詞翻訳",
+  "settingsLyricsBilingualSubtitle": "曲名とアーティスト名を NetEase Cloud Music に送信して翻訳を検索します。表示する翻訳の言語はアプリの言語に従います",
+  "settingsProxyAuth": "プロキシ認証（任意）",
+  "settingsProxyUsernameHint": "ユーザー名",
+  "settingsProxyPasswordHint": "パスワード",
+  "settingsProxyUsernameInvalid": "ユーザー名にコロン（:）は使用できません。ユーザー名とパスワードの区切り文字として扱われるため、認証に失敗します",
+  "settingsProxyAuthIncomplete": "HTTPS では片方だけでも使用できます。HTTP プロキシ認証には両方の入力が必要です"
 }

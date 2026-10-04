@@ -1,11 +1,15 @@
 class LyricLine {
   final int startTimeMs;
   final String words;
+
+  /// 本行原文对应的译文（双语对照歌词拆分而来，见 `translation_merge.dart`）；无译文为空串。
+  final String translation;
   final List<String> syllables;
 
   const LyricLine({
     required this.startTimeMs,
     required this.words,
+    this.translation = '',
     this.syllables = const [],
   });
 
@@ -15,6 +19,7 @@ class LyricLine {
           ? int.tryParse(json['startTimeMs'] as String) ?? 0
           : (json['startTimeMs'] as int? ?? 0),
       words: json['words'] as String? ?? '',
+      translation: json['translation'] as String? ?? '',
       syllables:
           (json['syllables'] as List<dynamic>?)
               ?.map((e) => e.toString())
@@ -26,12 +31,13 @@ class LyricLine {
   Map<String, dynamic> toJson() => {
     'startTimeMs': startTimeMs,
     'words': words,
+    'translation': translation,
     'syllables': syllables,
   };
 }
 
 /// 歌词来源：Spotify 官方（color-lyrics），或 Spotify 没有逐行同步歌词时由 LRCLIB 补全。
-enum LyricsProvider { spotify, lrclib }
+enum LyricsProvider { spotify, lrclib, netease }
 
 /// 来源提供的其他语言译词，按下标对应原歌词（包括间奏空行）。
 class LyricsAlternative {
@@ -63,6 +69,7 @@ class SpotifyLyrics {
   final List<LyricLine> lines;
   final String language;
   final LyricsProvider provider;
+  final LyricsProvider? translationProvider;
   final List<LyricsAlternative> alternatives;
 
   const SpotifyLyrics({
@@ -70,6 +77,7 @@ class SpotifyLyrics {
     this.lines = const [],
     this.language = 'und',
     this.provider = LyricsProvider.spotify,
+    this.translationProvider,
     this.alternatives = const [],
   });
 

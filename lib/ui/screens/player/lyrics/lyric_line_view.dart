@@ -14,6 +14,8 @@ import '../../../../core/theme/flutify_tokens.dart';
 /// 所有参数通过 TweenAnimationBuilder 平滑过渡，行切换时呈现"对焦"动画。
 class LyricLineView extends StatelessWidget {
   final String text;
+
+  /// 译文（双语歌词）：非空时以小字显示在原文下方。
   final String? translation;
   final int distance;
   final bool focusAll;
@@ -72,27 +74,11 @@ class LyricLineView extends StatelessWidget {
             // 透明度直接写进文字颜色，省去 Opacity 的离屏图层
             Widget result = _LineText(
               text: text,
+              translation: translation,
               opacity: v.opacity,
               fontSize: fontSize,
               centered: centered,
             );
-            if (translation?.isNotEmpty == true) {
-              result = Column(
-                crossAxisAlignment: centered
-                    ? CrossAxisAlignment.center
-                    : CrossAxisAlignment.start,
-                children: [
-                  result,
-                  const SizedBox(height: 8),
-                  _LineText(
-                    text: translation!,
-                    opacity: v.opacity * 0.78,
-                    fontSize: fontSize * 0.62,
-                    centered: centered,
-                  ),
-                ],
-              );
-            }
             // sigma 过小时跳过滤镜，避免无意义的离屏渲染
             if (v.blur > 0.05) {
               result = ImageFiltered(
@@ -112,37 +98,68 @@ class LyricLineView extends StatelessWidget {
   }
 }
 
-/// 歌词文字；空行（间奏）显示三个圆点。
+/// 歌词文字；空行（间奏）显示三个圆点。译文（[translation] 非空且不是间奏时）
+/// 以约六成字号附在原文下方，随原文一起模糊 / 淡出。
 class _LineText extends StatelessWidget {
   final String text;
+  final String? translation;
   final double opacity;
   final double fontSize;
   final bool centered;
 
   const _LineText({
     required this.text,
+    this.translation,
     required this.opacity,
     required this.fontSize,
     required this.centered,
   });
 
+  static const Color _translationGray = Color(0xFFC4CAD4);
+
   @override
   Widget build(BuildContext context) {
     final isInterlude = text.trim().isEmpty || text.trim() == '♪';
+    final trans = isInterlude ? null : translation?.trim();
     return SizedBox(
       width: double.infinity,
-      child: Text(
-        isInterlude ? '•  •  •' : text,
-        textAlign: centered ? TextAlign.center : TextAlign.start,
-        style: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w800,
-          color: Colors.white.withValues(alpha: opacity),
-          // 中文歌词：字距只轻微收紧，行高放宽并上下均分，多行时汉字不挤、不裁切
-          letterSpacing: -0.2,
-          height: 1.3,
-          leadingDistribution: TextLeadingDistribution.even,
-        ),
+      child: Column(
+        crossAxisAlignment: centered
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            isInterlude ? '•  •  •' : text,
+            textAlign: centered ? TextAlign.center : TextAlign.start,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w800,
+              color: Colors.white.withValues(alpha: opacity),
+              // 中文歌词：字距只轻微收紧，行高放宽并上下均分，多行时汉字不挤、不裁切
+              letterSpacing: -0.2,
+              height: 1.3,
+              leadingDistribution: TextLeadingDistribution.even,
+            ),
+          ),
+          if (trans != null && trans.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(top: fontSize * 0.18),
+              child: Text(
+                trans,
+                textAlign: centered ? TextAlign.center : TextAlign.start,
+                style: TextStyle(
+                  fontSize: fontSize * 0.56,
+                  fontWeight: FontWeight.w600,
+                  // 译文偏灰：冷灰色 + 更低透明度，与纯白原文拉开层次
+                  color: _translationGray.withValues(alpha: opacity * 0.62),
+                  letterSpacing: -0.1,
+                  height: 1.25,
+                  leadingDistribution: TextLeadingDistribution.even,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

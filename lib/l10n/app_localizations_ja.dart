@@ -78,6 +78,39 @@ class AppLocalizationsJa extends AppLocalizations {
   String get windowClose => '閉じる';
 
   @override
+  String get menuPlayback => '再生';
+
+  @override
+  String get menuNavigate => '移動';
+
+  @override
+  String get menuEdit => '編集';
+
+  @override
+  String get menuUndo => '元に戻す';
+
+  @override
+  String get menuRedo => 'やり直す';
+
+  @override
+  String get menuCut => '切り取り';
+
+  @override
+  String get menuCopy => 'コピー';
+
+  @override
+  String get menuPaste => '貼り付け';
+
+  @override
+  String get menuSelectAll => 'すべて選択';
+
+  @override
+  String get menuWindow => 'ウインドウ';
+
+  @override
+  String get menuSettings => '設定…';
+
+  @override
   String get commonCancel => 'キャンセル';
 
   @override
@@ -486,6 +519,11 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String playbackErrorWidevine(String track) {
     return '「$track」を復号できません。このデバイスでは Widevine DRM を利用できません';
+  }
+
+  @override
+  String playbackErrorFairPlay(String track) {
+    return '「$track」を復号できません：このデバイスで FairPlay セッションを作成できませんでした';
   }
 
   @override
@@ -909,6 +947,13 @@ class AppLocalizationsJa extends AppLocalizations {
       'Spotify に同期歌詞がない場合、公開ライブラリ LRCLIB から曲の原語の歌詞を取得します';
 
   @override
+  String get settingsLyricsBilingual => 'コミュニティの歌詞翻訳';
+
+  @override
+  String get settingsLyricsBilingualSubtitle =>
+      '曲名とアーティスト名を NetEase Cloud Music に送信して翻訳を検索します。表示する翻訳の言語はアプリの言語に従います';
+
+  @override
   String get settingsTaskbarLyricsSection => 'タスクバー歌詞';
 
   @override
@@ -1094,6 +1139,23 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsProxyInvalid => '有効なアドレスと 1～65535 のポートを入力してください';
+
+  @override
+  String get settingsProxyAuth => 'プロキシ認証（任意）';
+
+  @override
+  String get settingsProxyUsernameHint => 'ユーザー名';
+
+  @override
+  String get settingsProxyPasswordHint => 'パスワード';
+
+  @override
+  String get settingsProxyUsernameInvalid =>
+      'ユーザー名にコロン（:）は使用できません。ユーザー名とパスワードの区切り文字として扱われるため、認証に失敗します';
+
+  @override
+  String get settingsProxyAuthIncomplete =>
+      'HTTPS では片方だけでも使用できます。HTTP プロキシ認証には両方の入力が必要です';
 
   @override
   String get settingsProxyTest => '接続をテスト';

@@ -42,7 +42,8 @@ class LyricsTranslationController extends ChangeNotifier {
   List<String>? get lines => _translation?.lines;
   bool get fromLrclib => _translation?.provider == LyricsProvider.lrclib;
   bool get available => _lyrics != null && _lyrics!.lines.isNotEmpty;
-  bool get unavailable => _attempted && !failed && !busy && _translation == null;
+  bool get unavailable =>
+      _attempted && !failed && !busy && _translation == null;
 
   static LyricsTranslation? official(SpotifyLyrics lyrics, String target) {
     final normalized = LyricsLanguage.normalize(target);
@@ -71,6 +72,15 @@ class LyricsTranslationController extends ChangeNotifier {
         LyricsProvider.spotify,
       );
     }
+    final inline = lyrics.lines.map((line) => line.translation).toList();
+    final code = LyricsLanguage.of('und', inline.join('\n'));
+    if (inline.any((line) => line.trim().isNotEmpty) &&
+        LyricsLanguage.matches(code, normalized)) {
+      return LyricsTranslation(
+        List.unmodifiable(inline),
+        lyrics.translationProvider ?? lyrics.provider,
+      );
+    }
     return null;
   }
 
@@ -88,7 +98,7 @@ class LyricsTranslationController extends ChangeNotifier {
         : '${query.trackId}|${query.title}|${query.artist}';
     final settingsKey =
         '${prefs.lyricsAutoTranslate}|${prefs.lyricsExcludeInterfaceLanguage}|'
-        '${prefs.lyricsExcludedLanguages.join(',')}|${prefs.lyricsFallback}';
+        '${prefs.lyricsExcludedLanguages.join(',')}|${prefs.lyricsFallback}|${prefs.lyricsBilingual}';
     if (identical(lyrics, _lyrics) &&
         target == _target &&
         trackKey == _trackKey &&

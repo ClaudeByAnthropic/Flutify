@@ -45,7 +45,11 @@ class DelayedPlayer extends FakeAudioPlayerService {
 }
 
 void main() {
-  const content = EmeTrackContent(m4aPath: 'encrypted.m4a', m3u8: '#EXTM3U');
+  const content = EmeTrackContent(
+    fileIdHex: '0000000000000000000000000000000000000000',
+    m4aPath: 'encrypted.m4a',
+    m3u8: '#EXTM3U',
+  );
   late Decryptor decryptor;
   late FakeAudioPlayerService native, fallback;
   late WindowsNativeAudioEngine engine;

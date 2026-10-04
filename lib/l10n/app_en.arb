@@ -1,12 +1,31 @@
 {
   "playbackRetryWaiting": "No connection. Retry {attempt}/{total} in {seconds} s",
-  "@playbackRetryWaiting": {"placeholders": {"attempt": {"type": "int"}, "total": {"type": "int"}, "seconds": {"type": "int"}}},
+  "@playbackRetryWaiting": {
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "playbackRetryRunning": "Reconnecting… Retry {attempt}/{total}",
-  "@playbackRetryRunning": {"placeholders": {"attempt": {"type": "int"}, "total": {"type": "int"}}},
+  "@playbackRetryRunning": {
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "@@locale": "en",
-
   "appTitle": "Flutify",
-
   "shellBack": "Go back",
   "shellForward": "Go forward",
   "shellHome": "Home",
@@ -25,7 +44,17 @@
   "windowMaximize": "Maximize",
   "windowRestore": "Restore",
   "windowClose": "Close",
-
+  "menuPlayback": "Playback",
+  "menuNavigate": "Navigate",
+  "menuEdit": "Edit",
+  "menuUndo": "Undo",
+  "menuRedo": "Redo",
+  "menuCut": "Cut",
+  "menuCopy": "Copy",
+  "menuPaste": "Paste",
+  "menuSelectAll": "Select All",
+  "menuWindow": "Window",
+  "menuSettings": "Settings…",
   "commonCancel": "Cancel",
   "commonCreate": "Create",
   "commonDone": "Done",
@@ -40,11 +69,9 @@
   "commonSettings": "Settings",
   "commonShare": "Share",
   "subtitleJoin": "{first} • {second}",
-
   "navHome": "Home",
   "navSearch": "Search",
   "navLibrary": "Your Library",
-
   "typeTrack": "Song",
   "typeArtist": "Artist",
   "typePlaylist": "Playlist",
@@ -78,7 +105,6 @@
   "filterArtists": "Artists",
   "filterPlaylists": "Playlists",
   "filterAlbums": "Albums",
-
   "songCount": "{count, plural, =1{1 song} other{{count} songs}}",
   "followerCount": "{count} followers",
   "durationHoursMinutes": "{hours} hr {minutes} min",
@@ -87,14 +113,12 @@
   "greetingMorning": "Good morning",
   "greetingAfternoon": "Good afternoon",
   "greetingEvening": "Good evening",
-
   "likedSongs": "Liked Songs",
   "likedSongsDescription": "All your favorite songs in one place.",
   "likeAdd": "Save to Liked Songs",
   "likeRemove": "Remove from Liked Songs",
   "libraryAdd": "Save to Your Library",
   "libraryRemove": "Remove from Your Library",
-
   "homeLoadFailedTitle": "Couldn't load recommendations",
   "homeLoadFailedMessage": "Check your connection and try again.",
   "authSessionExpiredTitle": "Your session has expired",
@@ -106,7 +130,6 @@
   "homePodcastUnsupported": "Podcasts aren't supported yet",
   "homeTypePodcast": "Podcast",
   "homeTypeEpisode": "Episode",
-
   "searchHint": "What do you want to listen to?",
   "searchRecent": "Recent searches",
   "searchClearAll": "Clear all",
@@ -119,7 +142,6 @@
   "searchFilterEmptyMessage": "Try another filter to see more results.",
   "searchCategoryMix": "{name} Mix",
   "searchCategoryMixDescription": "Best of {name} curated with fresh vibes.",
-
   "librarySearchHint": "Search in Your Library",
   "libraryCloseSearch": "Close search",
   "libraryCreatePlaylist": "Create playlist",
@@ -131,21 +153,17 @@
   "libraryEmptyTitle": "Nothing here yet",
   "libraryEmptyMessage": "Saved playlists, artists and albums will show up here.",
   "libraryNewPlaylistName": "My Playlist #{number}",
-
   "playlistDelete": "Delete playlist",
   "playlistLikedEmpty": "Songs you like will appear here.\nSave songs by tapping the heart icon.",
   "playlistOwnEmpty": "Let's find something for your playlist.\nUse \"Add to playlist\" from any song's menu.",
   "playlistEmpty": "This playlist is empty.",
-
   "albumNoTracks": "No tracks available for this album.",
   "albumMoreBy": "More by {name}",
-
   "artistPopular": "Popular",
   "artistNoPopular": "No popular tracks yet.",
   "artistDiscography": "Discography",
   "artistFollow": "Follow",
   "artistFollowing": "Following",
-
   "playingFromPlaylist": "PLAYING FROM PLAYLIST",
   "playingFromAlbum": "PLAYING FROM ALBUM",
   "playingFromArtist": "PLAYING FROM ARTIST",
@@ -176,17 +194,16 @@
   "playbackErrorSkipped": "\"{track}\" isn't available right now, skipped",
   "playbackErrorNetwork": "Couldn't load \"{track}\". Check your connection.",
   "playbackErrorWidevine": "Can't decrypt \"{track}\": Widevine DRM is unavailable on this device",
+  "playbackErrorFairPlay": "Can't decrypt \"{track}\": this device couldn't create a FairPlay session",
   "playbackErrorAutoPaused": "{count} songs in a row couldn't play, so playback paused",
   "detailSignInRequired": "Sign in to see what's here",
   "detailLoadFailed": "Couldn't load this. Check your connection and try again.",
-
   "queueTitle": "Queue",
   "queueNextInQueue": "Next in queue",
   "queueClear": "Clear queue",
   "queueNextUp": "Next up",
   "queueNextFrom": "Next from: {name}",
   "queueEmpty": "Nothing queued up next",
-
   "lyricsTitle": "Lyrics",
   "lyricsNotPlaying": "Not playing",
   "lyricsNothingPlayingMessage": "Play a song to see its lyrics here.",
@@ -200,7 +217,6 @@
   "lyricsExitImmersive": "Exit lyrics (Esc)",
   "lyricsFillScreen": "Fill the screen (F11)",
   "lyricsFillWindow": "Fit to window (F11)",
-
   "deviceConnectTitle": "Connect to a device",
   "deviceConnectDescription": "Spotify Connect allows you to seamlessly stream to your PC, phone, or smart speakers.",
   "deviceCurrent": "Current Listening Device",
@@ -219,11 +235,12 @@
   "connectVolumeUnsupported": "{device} doesn't support remote volume control",
   "@connectVolumeUnsupported": {
     "placeholders": {
-      "device": { "type": "String" }
+      "device": {
+        "type": "String"
+      }
     }
   },
   "connectVolume": "Device volume",
-
   "trackAddToPlaylist": "Add to playlist",
   "trackAddToQueue": "Add to queue",
   "trackGoToAlbum": "Go to album",
@@ -252,11 +269,9 @@
   "shareEmbedFailed": "The Spotify embed could not load. Check your connection and retry.",
   "toastAddedTo": "Added to {name}",
   "toastAlreadyIn": "Already in {name}",
-
   "createPlaylistTitle": "Give your playlist a name",
   "createPlaylistHint": "Playlist name",
   "createPlaylistDefaultName": "My Playlist",
-
   "settingsAppearanceSection": "Appearance",
   "settingsThemeMode": "Theme",
   "settingsThemeSystem": "System",
@@ -290,14 +305,12 @@
   "settingsHue": "Hue",
   "settingsSaturation": "Saturation",
   "settingsBrightness": "Brightness",
-
   "settingsLanguageSection": "Language",
   "settingsLanguage": "App language",
   "settingsLanguageSubtitle": "Also changes text provided by Spotify, such as home feed titles",
   "settingsLanguageSystem": "System",
   "settingsLanguageZh": "简体中文",
   "settingsLanguageEn": "English",
-
   "settingsStorageSection": "Storage",
   "settingsAudioCache": "Audio cache",
   "settingsAudioCacheUsage": "{used} of {limit} used",
@@ -308,7 +321,6 @@
   "settingsClearAudioCacheTitle": "Clear audio cache?",
   "settingsClearAudioCacheMessage": "Downloaded songs will be deleted and downloaded again when you play them. The song that's playing is kept.",
   "settingsAudioCacheCleared": "Freed {size}",
-
   "settingsLyricsSection": "Lyrics",
   "settingsLyricsSize": "Lyrics size",
   "settingsLyricsAlign": "Alignment",
@@ -319,6 +331,8 @@
   "settingsLyricsImmersiveScreenSubtitle": "When off, they fill only the window. Press F11 in full-screen lyrics to switch",
   "settingsLyricsFallback": "Fill in missing lyrics",
   "settingsLyricsFallbackSubtitle": "When Spotify has no time-synced lyrics, get them from the open LRCLIB library in the song's original language",
+  "settingsLyricsBilingual": "Community lyric translations",
+  "settingsLyricsBilingualSubtitle": "Send the song title and artist to NetEase Cloud Music to find community translations. The translation language follows the interface language",
   "settingsTaskbarLyricsSection": "Taskbar lyrics",
   "settingsTaskbarLyrics": "Show lyrics on the taskbar",
   "settingsTaskbarLyricsSubtitle": "Shown on the left when taskbar icons are centered, or just left of the system tray when left-aligned; paused on vertical taskbars. Hover for playback controls, click to open Flutify, right-click to reload lyrics",
@@ -343,13 +357,11 @@
   "taskbarLyricsPreviewLine2": "Hover to skip or pause",
   "taskbarLyricsPreviewLine3": "Color and opacity apply instantly",
   "settingsOff": "Off",
-
   "settingsNormalize": "Normalize volume",
   "settingsNormalizeSubtitle": "Uses Spotify's loudness data to turn loud songs down to a consistent level",
   "settingsFade": "Fade between songs",
   "settingsFadeSubtitle": "Fades out at the end of a song and fades the next one in",
   "settingsSeconds": "{count} s",
-
   "settingsStartupSection": "Startup",
   "settingsStartPage": "Open at launch",
   "settingsStartPageHome": "Home",
@@ -357,7 +369,6 @@
   "settingsStartPageLast": "Last page",
   "settingsRememberWindow": "Remember window size and position",
   "settingsRememberWindowSubtitle": "Restored at next launch; centred again if the screen it was on is gone",
-
   "settingsConnectSection": "Spotify Connect",
   "settingsConnectEnabled": "Enable Spotify Connect",
   "settingsConnectEnabledSubtitle": "Show and control playback on your other devices",
@@ -368,7 +379,6 @@
   "settingsConnectReportOnLaunchSubtitle": "Show Flutify's current track on your other devices as soon as it opens, even before playing (takes over an idle session)",
   "settingsRemoteLyricsLead": "Remote lyrics lead",
   "settingsRemoteLyricsLeadSubtitle": "When another device is playing: raise it if lyrics lag behind the singing, lower it if they run ahead",
-
   "settingsNetworkSection": "Network",
   "settingsProxy": "Proxy",
   "settingsProxySystem": "System",
@@ -382,12 +392,16 @@
   "settingsProxyHostHint": "127.0.0.1",
   "settingsProxyPortHint": "Port",
   "settingsProxyInvalid": "Enter a valid address and a port between 1 and 65535",
+  "settingsProxyAuth": "Proxy authentication (optional)",
+  "settingsProxyUsernameHint": "Username",
+  "settingsProxyPasswordHint": "Password",
+  "settingsProxyUsernameInvalid": "The username can't contain a colon (:). It separates the username from the password, so the proxy would reject the credentials",
+  "settingsProxyAuthIncomplete": "HTTPS can use one-sided credentials; HTTP proxy authentication requires both fields",
   "settingsProxyTest": "Test connection",
   "settingsProxyTesting": "Connecting to Spotify…",
   "settingsProxyTestOk": "Connected in {ms} ms",
   "settingsProxyTestFailed": "Connection failed: {error}",
-  "settingsProxyFootnote": "Only HTTP proxies are supported (the mixed port of Clash, v2rayN, etc. works). The sign-in page always follows the system proxy settings.",
-
+  "settingsProxyFootnote": "Only HTTP proxies are supported (the mixed port of Clash, v2rayN, etc. works); a manual proxy may use a username/password, e.g. a self-hosted relay in another region. The sign-in page always follows the system proxy settings.",
   "settingsPrivacySection": "Privacy",
   "settingsClearSearchHistory": "Clear search history",
   "settingsSearchHistoryCount": "{count, plural, =1{1 search} other{{count} searches}}",
@@ -395,12 +409,10 @@
   "settingsClearLyricsCache": "Clear lyrics cache",
   "settingsClearLyricsCacheSubtitle": "Lyrics will be fetched from Spotify again",
   "settingsCleared": "Cleared",
-
   "settingsAboutSection": "About",
   "settingsVersion": "Version",
   "settingsShortcuts": "Keyboard shortcuts",
   "settingsLicenses": "Open-source licences",
-
   "shortcutPlayPause": "Play / pause",
   "shortcutNext": "Next song",
   "shortcutPrevious": "Previous song",
@@ -414,7 +426,6 @@
   "shortcutImmersive": "Full-screen lyrics",
   "shortcutImmersiveMode": "In full-screen lyrics: fill screen / window",
   "shortcutExitImmersive": "Exit full-screen lyrics",
-
   "accountTitle": "Spotify account",
   "accountSignedOutMessage": "Sign in to sync your library",
   "accountSignIn": "Sign in",
@@ -422,7 +433,6 @@
   "accountSignOutTitle": "Sign out?",
   "accountSignOutMessage": "Your saved sign-in and library cache will be removed from this device. You'll need to sign in again to play music and view your library.",
   "accountSignOutConfirm": "Sign out",
-
   "sleepTimer": "Sleep timer",
   "sleepTimerMinutes": "{count} minutes",
   "sleepTimerHour": "1 hour",
@@ -467,9 +477,33 @@
   "settingsClearAllCacheHelp": "Clear audio, artwork, lyrics and browser temporary caches. Keep your login, settings, library and playback history. Audio in use or downloading is retained.",
   "settingsCacheLocationHelp": "Existing caches are moved and originals deleted after verification. Audio in use or downloading is moved when released. Custom locations use a FlutifyCache folder inside the selected directory.",
   "settingsCacheMigrated": "Moved {files} files; {deferred} in use; {failed} unsuccessful",
-  "@settingsCacheMigrated": {"placeholders": {"files": {"type": "int"}, "deferred": {"type": "int"}, "failed": {"type": "int"}}},
+  "@settingsCacheMigrated": {
+    "placeholders": {
+      "files": {
+        "type": "int"
+      },
+      "deferred": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "settingsCacheCleared": "Freed {size}; {deferred} in use; {failed} unsuccessful",
-  "@settingsCacheCleared": {"placeholders": {"size": {"type": "String"}, "deferred": {"type": "int"}, "failed": {"type": "int"}}},
+  "@settingsCacheCleared": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      },
+      "deferred": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "settingsCacheLocationInvalid": "The directory is not writable or the path is invalid. Choose a local directory the app can access.",
   "settingsCacheLocationSaved": "Cache location updated",
   "settingsCacheLocationHint": "Absolute directory path",
@@ -483,7 +517,16 @@
   "settingsGatewayLookupFailed": "Country/region lookup failed; keeping the current route.",
   "settingsGatewayCountryPending": "Waiting for the network's country/region; keeping the current route.",
   "settingsGatewayCountryStatus": "Network country/region: {country} · {route}",
-  "@settingsGatewayCountryStatus": {"placeholders": {"country": {"type": "String"}, "route": {"type": "String"}}},
+  "@settingsGatewayCountryStatus": {
+    "placeholders": {
+      "country": {
+        "type": "String"
+      },
+      "route": {
+        "type": "String"
+      }
+    }
+  },
   "settingsGatewayRouteProxy": "Gateway enabled",
   "settingsGatewayRouteDirect": "Direct connection",
   "settingsGatewayRecheck": "Check country/region again",

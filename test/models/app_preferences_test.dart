@@ -16,11 +16,13 @@ void main() {
       proxyMode: ProxyMode.manual,
       proxyHost: '10.0.0.2',
       proxyPort: 8080,
+      proxyUsername: 'alice',
       lyricsFallback: false,
       lyricsAutoTranslate: false,
       lyricsExcludeInterfaceLanguage: false,
       lyricsExcludedLanguages: ['ja', 'fr'],
       canvasEnabled: false,
+      lyricsBilingual: true,
       taskbarLyrics: true,
       taskbarLyricsColor: TaskbarLyricsColor.custom,
       taskbarLyricsCustomColor: 0xFF336699,
@@ -40,6 +42,29 @@ void main() {
     expect(prefs.taskbarLyricsOpacity, AppPreferences.minTaskbarLyricsOpacity);
   });
 
+  test(
+    'bilingual lyrics: off by default, missing or bad values decode to off',
+    () {
+      // 开启后才会把曲名与歌手发给网易云查译文：默认关闭，没有这个键（旧数据）或类型不对都按关闭处理
+      expect(AppPreferences.defaults.lyricsBilingual, isFalse);
+      expect(AppPreferences.fromJson({}).lyricsBilingual, isFalse);
+      expect(
+        AppPreferences.decode(
+          '{"language": "en", "lyricsFallback": true}',
+        ).lyricsBilingual,
+        isFalse,
+      );
+      expect(
+        AppPreferences.fromJson({'lyricsBilingual': 'yes'}).lyricsBilingual,
+        isFalse,
+      );
+      expect(
+        AppPreferences.fromJson({'lyricsBilingual': true}).lyricsBilingual,
+        isTrue,
+      );
+    },
+  );
+
   test('proxy fields: unknown mode falls back to system, bad port to 0', () {
     final prefs = AppPreferences.fromJson({
       'proxyMode': 'socks',
@@ -49,6 +74,15 @@ void main() {
     expect(prefs.proxyMode, ProxyMode.system);
     expect(prefs.proxyHost, 'h');
     expect(prefs.proxyPort, 0);
+  });
+
+  test('proxy username: trimmed, wrong type falls back to empty', () {
+    expect(
+      AppPreferences.fromJson({'proxyUsername': '  bob  '}).proxyUsername,
+      'bob',
+    );
+    expect(AppPreferences.fromJson({'proxyUsername': 42}).proxyUsername, '');
+    expect(AppPreferences.defaults.proxyUsername, '');
   });
 
   test('empty or corrupt data falls back to defaults', () {

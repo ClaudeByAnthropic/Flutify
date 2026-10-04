@@ -227,6 +227,72 @@ abstract class AppLocalizations {
   /// **'关闭'**
   String get windowClose;
 
+  /// No description provided for @menuPlayback.
+  ///
+  /// In zh, this message translates to:
+  /// **'播放'**
+  String get menuPlayback;
+
+  /// No description provided for @menuNavigate.
+  ///
+  /// In zh, this message translates to:
+  /// **'导航'**
+  String get menuNavigate;
+
+  /// No description provided for @menuEdit.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑'**
+  String get menuEdit;
+
+  /// No description provided for @menuUndo.
+  ///
+  /// In zh, this message translates to:
+  /// **'撤销'**
+  String get menuUndo;
+
+  /// No description provided for @menuRedo.
+  ///
+  /// In zh, this message translates to:
+  /// **'重做'**
+  String get menuRedo;
+
+  /// No description provided for @menuCut.
+  ///
+  /// In zh, this message translates to:
+  /// **'剪切'**
+  String get menuCut;
+
+  /// No description provided for @menuCopy.
+  ///
+  /// In zh, this message translates to:
+  /// **'拷贝'**
+  String get menuCopy;
+
+  /// No description provided for @menuPaste.
+  ///
+  /// In zh, this message translates to:
+  /// **'粘贴'**
+  String get menuPaste;
+
+  /// No description provided for @menuSelectAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全选'**
+  String get menuSelectAll;
+
+  /// No description provided for @menuWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'窗口'**
+  String get menuWindow;
+
+  /// No description provided for @menuSettings.
+  ///
+  /// In zh, this message translates to:
+  /// **'设置…'**
+  String get menuSettings;
+
   /// No description provided for @commonCancel.
   ///
   /// In zh, this message translates to:
@@ -976,6 +1042,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'「{track}」无法解密播放：此设备缺少 Widevine 组件'**
   String playbackErrorWidevine(String track);
+
+  /// No description provided for @playbackErrorFairPlay.
+  ///
+  /// In zh, this message translates to:
+  /// **'「{track}」无法解密播放：此设备无法创建 FairPlay 会话'**
+  String playbackErrorFairPlay(String track);
 
   /// No description provided for @playbackErrorAutoPaused.
   ///
@@ -1751,6 +1823,18 @@ abstract class AppLocalizations {
   /// **'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选'**
   String get settingsLyricsFallbackSubtitle;
 
+  /// No description provided for @settingsLyricsBilingual.
+  ///
+  /// In zh, this message translates to:
+  /// **'社区歌词翻译'**
+  String get settingsLyricsBilingual;
+
+  /// No description provided for @settingsLyricsBilingualSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启后会将歌名与歌手发送至网易云音乐以寻找社区翻译，译词语言跟随界面语言'**
+  String get settingsLyricsBilingualSubtitle;
+
   /// No description provided for @settingsTaskbarLyricsSection.
   ///
   /// In zh, this message translates to:
@@ -2105,6 +2189,36 @@ abstract class AppLocalizations {
   /// **'请填写有效的地址和 1–65535 之间的端口'**
   String get settingsProxyInvalid;
 
+  /// No description provided for @settingsProxyAuth.
+  ///
+  /// In zh, this message translates to:
+  /// **'代理认证（可选）'**
+  String get settingsProxyAuth;
+
+  /// No description provided for @settingsProxyUsernameHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户名'**
+  String get settingsProxyUsernameHint;
+
+  /// No description provided for @settingsProxyPasswordHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码'**
+  String get settingsProxyPasswordHint;
+
+  /// No description provided for @settingsProxyUsernameInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户名不能包含冒号（:），冒号是用户名与密码的分隔符，代理会认证失败'**
+  String get settingsProxyUsernameInvalid;
+
+  /// No description provided for @settingsProxyAuthIncomplete.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户名和密码只填一项时，HTTPS 可用；HTTP 代理认证需要两项都填写'**
+  String get settingsProxyAuthIncomplete;
+
   /// No description provided for @settingsProxyTest.
   ///
   /// In zh, this message translates to:
@@ -2132,7 +2246,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsProxyFootnote.
   ///
   /// In zh, this message translates to:
-  /// **'仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）。登录页面始终跟随系统代理设置。'**
+  /// **'仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）；手动代理可填用户名 / 密码，适合自建带认证的跨区反代。登录页面始终跟随系统代理设置。'**
   String get settingsProxyFootnote;
 
   /// No description provided for @settingsPrivacySection.

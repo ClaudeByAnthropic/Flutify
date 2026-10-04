@@ -12,6 +12,7 @@ import '../navigation/app_routes.dart';
 import '../shell/shell_breakpoints.dart';
 import 'cover_image.dart';
 import 'create_playlist_dialog.dart';
+import 'keyboard_shortcuts.dart';
 import 'menu/desktop_menu.dart';
 import 'share/share_sheet.dart';
 import 'sleep_timer/sleep_timer_menu.dart';
@@ -23,7 +24,10 @@ import 'track_options_sheet.dart';
 /// 曲目操作（菜单项与悬停快捷键共用）。
 enum TrackAction {
   addToPlaylist(SingleActivator(LogicalKeyboardKey.keyP), 'P'),
-  like(SingleActivator(LogicalKeyboardKey.keyB, alt: true, shift: true), 'Alt+Shift+B'),
+  like(
+    SingleActivator(LogicalKeyboardKey.keyB, alt: true, shift: true),
+    'Alt+Shift+B',
+  ),
   queue(SingleActivator(LogicalKeyboardKey.keyQ), 'Q'),
   sleepTimer(null, null),
   artist(SingleActivator(LogicalKeyboardKey.keyA, alt: true), 'Alt+A'),
@@ -51,11 +55,19 @@ class TrackMenu {
   TrackMenu._();
 
   /// [position] 为全局坐标；为空时按 [context] 对应组件的左下角弹出（用于按钮触发）。
-  static Future<void> show(BuildContext context, SpotifyTrack track, {Offset? position}) {
+  static Future<void> show(
+    BuildContext context,
+    SpotifyTrack track, {
+    Offset? position,
+  }) {
     if (!ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)) {
       return TrackOptionsSheet.show(context, track);
     }
-    return _showDesktop(context, track, position ?? DesktopMenu.anchorOf(context));
+    return _showDesktop(
+      context,
+      track,
+      position ?? DesktopMenu.anchorOf(context),
+    );
   }
 
   static void _toast(BuildContext context, String message, IconData icon) {
@@ -64,7 +76,11 @@ class TrackMenu {
   }
 
   /// 当前情境下可用的操作（菜单与快捷键共用同一判断）。
-  static bool isAvailable(BuildContext context, SpotifyTrack track, TrackAction action) => switch (action) {
+  static bool isAvailable(
+    BuildContext context,
+    SpotifyTrack track,
+    TrackAction action,
+  ) => switch (action) {
     TrackAction.artist => track.artists.isNotEmpty,
     TrackAction.album => track.album != null && track.album!.id.isNotEmpty,
     TrackAction.share => ShareTarget.track(track).isShareable,
@@ -72,18 +88,42 @@ class TrackMenu {
     _ => true,
   };
 
-  static Future<void> _showDesktop(BuildContext context, SpotifyTrack track, Offset position) async {
+  static Future<void> _showDesktop(
+    BuildContext context,
+    SpotifyTrack track,
+    Offset position,
+  ) async {
     final l10n = context.l10n;
     final liked = context.read<LibraryProvider>().isLiked(track.id);
     final timerOn = context.read<SleepTimerProvider?>()?.active ?? false;
     final primary = Theme.of(context).colorScheme.primary;
 
-    PopupMenuItem<TrackAction> item(TrackAction action, IconData icon, String label, {Color? color, bool sub = false}) =>
-        DesktopMenu.item(action, icon, label, iconColor: color, shortcut: action.hint, submenu: sub);
+    PopupMenuItem<TrackAction> item(
+      TrackAction action,
+      IconData icon,
+      String label, {
+      Color? color,
+      bool sub = false,
+    }) => DesktopMenu.item(
+      action,
+      icon,
+      label,
+      iconColor: color,
+      // 快捷键提示按平台渲染（macOS ⌥⇧B 式紧凑排，其余 Alt+Shift+B）
+      shortcut: action.hint == null
+          ? null
+          : PlatformShortcuts.hintText(action.hint!),
+      submenu: sub,
+    );
     bool has(TrackAction a) => isAvailable(context, track, a);
 
     final action = await DesktopMenu.show<TrackAction>(context, position, [
-      item(TrackAction.addToPlaylist, Icons.add_rounded, l10n.trackAddToPlaylist, sub: true),
+      item(
+        TrackAction.addToPlaylist,
+        Icons.add_rounded,
+        l10n.trackAddToPlaylist,
+        sub: true,
+      ),
       item(
         TrackAction.like,
         liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -102,8 +142,13 @@ class TrackMenu {
       DesktopMenu.divider,
       item(TrackAction.radio, Icons.sensors_rounded, l10n.trackGoToRadio),
       if (has(TrackAction.artist))
-        item(TrackAction.artist, Icons.person_outline_rounded, l10n.trackGoToArtist(track.artists.length)),
-      if (has(TrackAction.album)) item(TrackAction.album, Icons.album_outlined, l10n.trackGoToAlbum),
+        item(
+          TrackAction.artist,
+          Icons.person_outline_rounded,
+          l10n.trackGoToArtist(track.artists.length),
+        ),
+      if (has(TrackAction.album))
+        item(TrackAction.album, Icons.album_outlined, l10n.trackGoToAlbum),
       item(TrackAction.credits, Icons.groups_outlined, l10n.trackViewCredits),
       if (has(TrackAction.share)) ...[
         DesktopMenu.divider,
@@ -115,7 +160,12 @@ class TrackMenu {
   }
 
   /// 执行操作；[position] 为二级菜单弹出位置（快捷键触发时为鼠标位置）。
-  static Future<void> perform(BuildContext context, SpotifyTrack track, TrackAction action, {Offset? position}) async {
+  static Future<void> perform(
+    BuildContext context,
+    SpotifyTrack track,
+    TrackAction action, {
+    Offset? position,
+  }) async {
     if (!isAvailable(context, track, action)) return;
     final l10n = context.l10n;
     final anchor = position ?? DesktopMenu.anchorOf(context);
@@ -149,7 +199,11 @@ class TrackMenu {
     }
   }
 
-  static Future<void> _goToArtist(BuildContext context, SpotifyTrack track, Offset position) async {
+  static Future<void> _goToArtist(
+    BuildContext context,
+    SpotifyTrack track,
+    Offset position,
+  ) async {
     if (track.artists.length == 1) {
       AppRoutes.openArtist(context, track.artists.first);
       return;
@@ -168,16 +222,27 @@ class TrackMenu {
                 placeholderIcon: Icons.person_rounded,
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text(track.artists[i].name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              Expanded(
+                child: Text(
+                  track.artists[i].name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
     ]);
-    if (picked != null && context.mounted) AppRoutes.openArtist(context, track.artists[picked]);
+    if (picked != null && context.mounted)
+      AppRoutes.openArtist(context, track.artists[picked]);
   }
 
   /// 二级菜单：「新建歌单」+ 自建歌单（已包含该曲目的打勾）。
-  static Future<void> _addToPlaylist(BuildContext context, SpotifyTrack track, Offset position) async {
+  static Future<void> _addToPlaylist(
+    BuildContext context,
+    SpotifyTrack track,
+    Offset position,
+  ) async {
     final l10n = context.l10n;
     final library = context.read<LibraryProvider>();
     final primary = Theme.of(context).colorScheme.primary;
@@ -189,9 +254,13 @@ class TrackMenu {
       for (final playlist in library.ownPlaylists)
         DesktopMenu.item(
           playlist.id,
-          playlist.tracks.any((t) => t.id == track.id) ? Icons.check_circle_rounded : Icons.queue_music_rounded,
+          playlist.tracks.any((t) => t.id == track.id)
+              ? Icons.check_circle_rounded
+              : Icons.queue_music_rounded,
           playlist.name,
-          iconColor: playlist.tracks.any((t) => t.id == track.id) ? primary : null,
+          iconColor: playlist.tracks.any((t) => t.id == track.id)
+              ? primary
+              : null,
         ),
     ]);
     if (id == null || !context.mounted) return;
@@ -201,7 +270,11 @@ class TrackMenu {
       if (name == null || !context.mounted) return;
       final created = library.createPlaylist(name);
       library.addTrackToPlaylist(created.id, track);
-      _toast(context, l10n.toastAddedTo(created.name), Icons.playlist_add_check_rounded);
+      _toast(
+        context,
+        l10n.toastAddedTo(created.name),
+        Icons.playlist_add_check_rounded,
+      );
       return;
     }
     final playlist = library.findPlaylist(id);
@@ -209,7 +282,9 @@ class TrackMenu {
     final added = library.addTrackToPlaylist(id, track);
     _toast(
       context,
-      added ? l10n.toastAddedTo(playlist.name) : l10n.toastAlreadyIn(playlist.name),
+      added
+          ? l10n.toastAddedTo(playlist.name)
+          : l10n.toastAlreadyIn(playlist.name),
       added ? Icons.playlist_add_check_rounded : Icons.playlist_play_rounded,
     );
   }

@@ -8,6 +8,7 @@ import 'package:flutify_app/services/cache/cache_location.dart';
 import 'package:flutify_app/services/lyrics/lyrics_disk_cache.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +18,11 @@ void main() {
   late StorageService storage;
   late CacheLocation location;
   setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.flutify/cache_directories'),
+          (call) async => null,
+        );
     sandbox = await Directory.systemTemp.createTemp('flutify-cache-test-');
     SharedPreferences.setMockInitialValues({});
     storage = await StorageService.init();
@@ -28,6 +34,11 @@ void main() {
     await location.initialize();
   });
   tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.flutify/cache_directories'),
+          null,
+        );
     location.dispose();
     await sandbox.delete(recursive: true);
   });
@@ -103,6 +114,26 @@ void main() {
         await Link(alias).delete();
       }
     },
+  );
+
+  test('macOS system aliases are valid cache ancestors', () async {
+    await CacheLocation.prepare(p.join(sandbox.path, 'alias-cache'));
+  }, skip: !Platform.isMacOS);
+
+  test(
+    'macOS system aliases do not bypass cache containment checks',
+    () async {
+      final alias = location.audioPath.replaceFirst('/private/var/', '/var/');
+      expect(alias, startsWith('/var/'));
+      await expectLater(
+        location.change(
+          CacheCategory.audio,
+          CacheSelection(CachePreset.custom, alias),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    },
+    skip: !Platform.isMacOS,
   );
 
   test('cache child links and custom root links remain rejected', () async {

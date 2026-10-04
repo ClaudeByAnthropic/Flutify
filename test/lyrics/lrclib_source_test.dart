@@ -15,10 +15,18 @@ import 'package:http/testing.dart';
 void main() {
   Future<void> noSleep(Duration _) async {}
   const synced = '[00:01.00]line one\n[00:02.00]line two';
-  const query = LyricsQuery(trackId: 'abc', title: 'Song', artist: 'Singer, Guest', durationMs: 180000);
+  const query = LyricsQuery(
+    trackId: 'abc',
+    title: 'Song',
+    artist: 'Singer, Guest',
+    durationMs: 180000,
+  );
 
-  http.Response json(Object body, [int status = 200]) =>
-      http.Response(jsonEncode(body), status, headers: {'content-type': 'application/json; charset=utf-8'});
+  http.Response json(Object body, [int status = 200]) => http.Response(
+    jsonEncode(body),
+    status,
+    headers: {'content-type': 'application/json; charset=utf-8'},
+  );
 
   group('LrclibClient', () {
     test('404 视为没有，不算网络错误', () async {
@@ -93,7 +101,9 @@ void main() {
       final client = LrclibClient(
         MockClient((req) async {
           paths.add('${req.url.path}?${req.url.query}');
-          return req.url.path.endsWith('/get') ? json({'trackName': 'Song', 'syncedLyrics': synced}) : json([]);
+          return req.url.path.endsWith('/get')
+              ? json({'trackName': 'Song', 'syncedLyrics': synced})
+              : json([]);
         }),
         sleep: noSleep,
       );
@@ -104,7 +114,12 @@ void main() {
       expect(first.lyrics?.provider, LyricsProvider.lrclib);
       expect(first.lyrics?.lines.map((l) => l.words), ['line one', 'line two']);
       expect(
-        paths.any((p) => p.contains('artist_name=Singer') && !p.contains('Guest') && p.contains('/search')),
+        paths.any(
+          (p) =>
+              p.contains('artist_name=Singer') &&
+              !p.contains('Guest') &&
+              p.contains('/search'),
+        ),
         isTrue,
         reason: 'search 只带第一位艺人',
       );
@@ -120,19 +135,66 @@ void main() {
     });
 
     test('全部失败时带出网络错误标记', () async {
-      final client = LrclibClient(MockClient((_) async => http.Response('', 500)), sleep: noSleep);
+      final client = LrclibClient(
+        MockClient((_) async => http.Response('', 500)),
+        sleep: noSleep,
+      );
       final res = await LrclibLyricsSource(client, sleep: noSleep).find(query);
       expect(res.lyrics, isNull);
       expect(res.networkError, isTrue);
+    });
+
+    test('双语对照拆出译文；磁盘缓存命中路径同样带译文', () async {
+      const bilingual =
+          '[00:01.00]line one\n[00:01.00]第一句\n[00:02.00]line two\n[00:02.00]第二句\n'
+          '[00:03.00]line three\n[00:03.00]第三句';
+      final client = LrclibClient(
+        MockClient(
+          (req) async => req.url.path.endsWith('/get')
+              ? json({'trackName': 'Song', 'syncedLyrics': bilingual})
+              : json([]),
+        ),
+        sleep: noSleep,
+      );
+      final source = LrclibLyricsSource(
+        client,
+        cache: LyricsDiskCache(dir),
+        sleep: noSleep,
+      );
+
+      final first = await source.find(query);
+      expect(first.lyrics?.lines.map((l) => l.words), [
+        'line one',
+        'line two',
+        'line three',
+      ]);
+      expect(first.lyrics?.lines.map((l) => l.translation), [
+        '第一句',
+        '第二句',
+        '第三句',
+      ]);
+      expect(first.lyrics?.language, 'und', reason: '拉丁文字不能直接认定为英语');
+
+      final second = await source.find(query);
+      expect(second.lyrics?.lines.map((l) => l.translation), [
+        '第一句',
+        '第二句',
+        '第三句',
+      ]);
     });
   });
 
   group('LyricsResolver', () {
     LrclibLyricsSource source(http.Response Function(http.Request) handler) =>
-        LrclibLyricsSource(LrclibClient(MockClient((req) async => handler(req)), sleep: noSleep), sleep: noSleep);
+        LrclibLyricsSource(
+          LrclibClient(MockClient((req) async => handler(req)), sleep: noSleep),
+          sleep: noSleep,
+        );
 
     final found = source(
-      (req) => req.url.path.endsWith('/get') ? json({'trackName': 'Song', 'syncedLyrics': synced}) : json([]),
+      (req) => req.url.path.endsWith('/get')
+          ? json({'trackName': 'Song', 'syncedLyrics': synced})
+          : json([]),
     );
 
     test('官方只有未同步歌词时用 LRCLIB 升级', () async {
@@ -159,7 +221,10 @@ void main() {
     });
 
     test('官方请求出错且 LRCLIB 找到时用 LRCLIB', () async {
-      final resolver = LyricsResolver((_) async => throw const HttpException('boom'), fallback: found);
+      final resolver = LyricsResolver(
+        (_) async => throw const HttpException('boom'),
+        fallback: found,
+      );
       final res = await resolver.resolve(query);
       expect(res.lyrics.provider, LyricsProvider.lrclib);
     });

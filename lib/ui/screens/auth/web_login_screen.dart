@@ -10,6 +10,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../services/auth/web_login_flow.dart';
 import '../../../services/auth/web_token_service.dart';
 import '../../../services/eme/eme_player.dart';
+import '../../shell/desktop/desktop_window.dart';
 
 export '../../../services/auth/web_login_flow.dart' show WebLoginStage;
 
@@ -227,9 +228,14 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
         (stage == WebLoginStage.preparing ||
             stage == WebLoginStage.desktopAuthorize);
 
-    return Scaffold(
+    final media = MediaQuery.of(context);
+    final macInset = DesktopWindow.macNativeWindow ? 28.0 : 0.0;
+    final scaffold = Scaffold(
       appBar: AppBar(
         title: Text(context.l10n.webLoginTitle),
+        flexibleSpace: macInset > 0
+            ? const WindowDragArea(child: SizedBox.expand())
+            : null,
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           tooltip: context.l10n.commonClose,
@@ -286,6 +292,13 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
           ),
         ],
       ),
+    );
+    if (macInset == 0) return scaffold;
+    return MediaQuery(
+      data: media.copyWith(
+        padding: media.padding.copyWith(top: media.padding.top + macInset),
+      ),
+      child: scaffold,
     );
   }
 }

@@ -24,6 +24,8 @@ import 'package:flutify_app/ui/widgets/connect/remote_player_bar.dart';
 import 'package:flutify_app/ui/widgets/desktop_player_bar.dart';
 import 'package:flutify_app/ui/widgets/mini_player.dart';
 import 'package:flutify_app/ui/widgets/cover_image.dart';
+import 'package:flutify_app/ui/screens/player/lyrics/lyrics_view.dart';
+import 'package:flutify_app/ui/screens/player/queue_list.dart';
 import 'package:flutify_app/ui/widgets/track_tile.dart';
 import 'package:flutify_app/ui/widgets/waveform_visualizer.dart';
 import 'package:flutify_app/models/track.dart';
@@ -853,6 +855,68 @@ void main() {
         expect(find.byType(ImmersiveLyricsScreen), findsNothing);
         expect(DesktopWindow.immersiveWindow.value, isFalse);
         expect(tester.takeException(), isNull);
+        await unmount(tester);
+      },
+    );
+
+    testWidgets(
+      'lyrics / queue buttons switch the right panel; closing both centers the artwork',
+      (tester) async {
+        await pumpHost(
+          tester,
+          const Size(1280, 800),
+          opener(),
+          cluster: syntheticCluster(),
+        );
+        await tester.tap(find.text('immersive'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        final screen = find.byType(ImmersiveLyricsScreen);
+        expect(
+          find.descendant(of: screen, matching: find.byType(LyricsView)),
+          findsOneWidget,
+        );
+
+        // 切到播放队列
+        await tester.tap(
+          find.descendant(
+            of: screen,
+            matching: find.byIcon(Icons.format_list_bulleted_rounded),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 800));
+        expect(
+          find.descendant(of: screen, matching: find.byType(LyricsView)),
+          findsNothing,
+        );
+        expect(
+          find.descendant(of: screen, matching: find.byType(QueueList)),
+          findsOneWidget,
+        );
+
+        // 再点一次关闭面板：封面列移到正中
+        await tester.tap(
+          find.descendant(
+            of: screen,
+            matching: find.byIcon(Icons.format_list_bulleted_rounded),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 800));
+        expect(
+          find.descendant(of: screen, matching: find.byType(QueueList)),
+          findsNothing,
+        );
+        final art = tester.getCenter(
+          find.descendant(of: screen, matching: find.byType(CoverImage)).first,
+        );
+        expect(art.dx, closeTo(640, 2));
+        expect(tester.takeException(), isNull);
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
         await unmount(tester);
       },
     );

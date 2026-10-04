@@ -837,5 +837,24 @@
         "type": "String"
       }
     }
-  }
+  },
+  "menuPlayback": "播放",
+  "menuNavigate": "導覽",
+  "menuEdit": "編輯",
+  "menuUndo": "復原",
+  "menuRedo": "重做",
+  "menuCut": "剪下",
+  "menuCopy": "複製",
+  "menuPaste": "貼上",
+  "menuSelectAll": "全選",
+  "menuWindow": "視窗",
+  "menuSettings": "設定…",
+  "playbackErrorFairPlay": "無法解密「{track}」：此裝置無法建立 FairPlay 工作階段",
+  "settingsLyricsBilingual": "社群歌詞翻譯",
+  "settingsLyricsBilingualSubtitle": "開啟後會將歌名與歌手傳送至網易雲音樂以尋找社群翻譯，譯詞語言跟隨介面語言",
+  "settingsProxyAuth": "代理驗證（選填）",
+  "settingsProxyUsernameHint": "使用者名稱",
+  "settingsProxyPasswordHint": "密碼",
+  "settingsProxyUsernameInvalid": "使用者名稱不能包含冒號（:），否則會被當作使用者名稱與密碼的分隔符，導致驗證失敗",
+  "settingsProxyAuthIncomplete": "HTTPS 可只填寫其中一項；HTTP 代理驗證需要同時填寫兩項"
 }

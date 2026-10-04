@@ -4,7 +4,7 @@
 
 # Flutify
 
-一个让你呼吸通畅的 Spotify 第三方客户端 · Windows / Android
+一个让你呼吸通畅的 Spotify 第三方客户端 · Windows / Android / macOS（源码自测）
 
 [下载](https://github.com/is-hp-is-mad/Flutify/releases) · 当前版本 [![最新版本（含 Beta）](https://img.shields.io/github/v/release/is-hp-is-mad/Flutify?include_prereleases&sort=date&label=release&cacheSeconds=300)](https://github.com/is-hp-is-mad/Flutify/releases)
 
@@ -23,6 +23,7 @@
 **歌词**
 - 逐行同步歌词，Apple Music 风格的流动背景与液态玻璃
 - 官方没有同步歌词时，自动从 [LRCLIB](https://lrclib.net) 补全
+- 可选双语歌词：保留 LRCLIB 对照译文，或查询网易云社区译文并按时间轴对齐
 - 桌面沉浸式歌词（F11），支持直接收藏歌曲
 - Windows 任务栏歌词：嵌在任务栏里，不需要额外软件
 
@@ -50,6 +51,7 @@
 | Windows 10 / 11，Intel / AMD | `*-windows-x64-setup.exe` 或 `*-windows-x64.zip` | 安装版或解压即用的便携版 |
 | Windows ARM64 | `*-windows-arm64-setup.exe` 或 `*-windows-arm64.zip` | 原生 ARM64 安装版或便携版 |
 | Android | `*-android-arm64-v8a.apk` | 绝大多数手机选这个；不确定就选 `*-android-universal.apk` |
+| macOS | 源码构建 / Actions `macos` Artifact | 未签名、未公证，不进入 Releases；见 [macOS 开发说明](docs/MACOS.md) |
 
 Windows 便携版解压后运行 `Flutify.exe`。两种发行方式均附带 MSVC 运行库；播放仍需 WebView2 运行时（Windows 11 通常已安装）。安装版默认安装到当前用户目录，也可更改位置。
 
@@ -73,6 +75,7 @@ Windows 便携版解压后运行 `Flutify.exe`。两种发行方式均附带 MSV
 - vivo 媒体卡片、手机与 PC 间控制权转移、手机歌词退出遮罩及 Windows 左对齐任务栏歌词仍需实机反馈
 - 偶尔遇到播放限流（HTTP 429），稍等片刻再试即可
 - 免费账号功能以 Spotify 实际允许的为准；与旧版签名不同的 Android Beta 安装可能需要首次重装
+- macOS 仍需不同机型、系统版本与账号的实机验证；构建通过不代表全曲播放、系统媒体键等均已验证
 
 有问题欢迎提 [Issue](../../issues)。
 

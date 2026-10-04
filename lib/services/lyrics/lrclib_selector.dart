@@ -19,8 +19,9 @@ class LrclibSelection {
 /// 规则：
 /// - 歌曲语言 = 原唱语言，以同一首歌候选歌词中占多数的语言为准——原词在库里份数最多，译文 / 音译是少数；
 ///   曲名 / 歌手只作平局参考（Spotify 会本地化歌手名，J-pop 也常用英文曲名，单看它们会把英文歌配上日文译词）；
+///   双语对照候选先拆分（见 `translation_merge.dart`），投票 / 打分只看原文部分；
 /// - 歌手对不上（[ArtistMatcher]，同名的另一首歌）直接排除：配错歌比没有歌词更糟；
-/// - 翻译版、罗马音、双语对照（[TranslationFilter]）降到「退而求其次」档，只有别无选择时才用；
+/// - 翻译版、罗马音、整体混排（[TranslationFilter]）降到「退而求其次」档，只有别无选择时才用；
 /// - 打分：语言吻合为主项，歌手对上、曲名一致、时长接近加分；中文再按曲名 / 歌手的字形对齐简繁。
 class LrclibSelector {
   LrclibSelector._();
@@ -128,7 +129,7 @@ class LrclibSelector {
           w *= 0.3; // 时长差太多多半是别的歌 / 别的版本
         }
       }
-      vote(lyricLang(c.synced), w);
+      vote(lyricLang(c.originalText), w);
     }
     vote(detectLang(query.title), 1.5);
     vote(detectLang(query.artist), 0.5);
@@ -151,10 +152,10 @@ class LrclibSelector {
     double durSec,
     bool wantHant,
   ) {
-    var score = langScore(target, c.synced);
+    var score = langScore(target, c.originalText);
     if (target == LyricLang.zh) {
-      final t = ZhScript.countTraditional(c.synced),
-          s = ZhScript.countSimplified(c.synced);
+      final t = ZhScript.countTraditional(c.originalText),
+          s = ZhScript.countSimplified(c.originalText);
       if (t >= 3 || s >= 3) score += (t > s) == wantHant ? 10 : -25;
     }
     if (_sameTitle(c.trackName, title)) score += 12;

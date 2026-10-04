@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'audio_service_media_controls.dart';
+import 'macos_media_controls.dart';
 import 'windows_media_controls.dart';
 
 /// 交给系统显示的曲目信息。
@@ -60,6 +61,7 @@ class MediaSeekEvent extends MediaControlEvent {
 }
 
 /// 系统媒体控制：Windows 为 SMTC（任务栏 / 锁屏媒体卡片、键盘媒体键），
+/// macOS 为 Now Playing + MPRemoteCommandCenter（Control Center / 触控栏 / 键盘媒体键），
 /// Android / iOS 为 audio_service（通知栏、锁屏、蓝牙耳机按键）。
 abstract class SystemMediaControls {
   Stream<MediaControlEvent> get events;
@@ -74,13 +76,14 @@ abstract class SystemMediaControls {
 
   void dispose();
 
-  /// 按当前平台创建；不支持的平台（Linux / macOS / Web）返回 null。
+  /// 按当前平台创建；不支持的平台（Linux / Web）返回 null。
   static Future<SystemMediaControls?> create({
     ArtworkFileResolver? artworkFile,
   }) async {
     if (kIsWeb) return null;
     try {
       if (Platform.isWindows) return WindowsMediaControls();
+      if (Platform.isMacOS) return MacOSMediaControls();
       if (Platform.isAndroid || Platform.isIOS) {
         return await AudioServiceMediaControls.init(artworkFile: artworkFile);
       }

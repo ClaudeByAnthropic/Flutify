@@ -15,7 +15,8 @@ import 'package:http/testing.dart';
 /// 记录所有调用的内存版原生端。
 class _FakePlatform implements TaskbarLyricsPlatform {
   final List<String> calls = [];
-  final StreamController<TaskbarLyricsEvent> controller = StreamController.broadcast();
+  final StreamController<TaskbarLyricsEvent> controller =
+      StreamController.broadcast();
   List<LyricLine>? lyrics;
 
   @override
@@ -25,13 +26,16 @@ class _FakePlatform implements TaskbarLyricsPlatform {
   Future<void> setEnabled(bool enabled) async => calls.add('enabled:$enabled');
 
   @override
-  Future<void> setStyle(TaskbarLyricsStyle style) async => calls.add('style:${style.mode.name}');
+  Future<void> setStyle(TaskbarLyricsStyle style) async =>
+      calls.add('style:${style.mode.name}');
 
   @override
-  Future<void> setTrack(({String title, String artist})? track) async => calls.add('track:${track?.title}');
+  Future<void> setTrack(({String title, String artist})? track) async =>
+      calls.add('track:${track?.title}');
 
   @override
-  Future<void> setArt(Uint8List? bytes) async => calls.add('art:${bytes?.length}');
+  Future<void> setArt(Uint8List? bytes) async =>
+      calls.add('art:${bytes?.length}');
 
   @override
   Future<void> setLyrics(List<LyricLine>? lines) async {
@@ -40,12 +44,16 @@ class _FakePlatform implements TaskbarLyricsPlatform {
   }
 
   @override
-  Future<void> setPlayback({required bool playing, required Duration position}) async => calls.add('playback:$playing');
+  Future<void> setPlayback({
+    required bool playing,
+    required Duration position,
+  }) async => calls.add('playback:$playing');
 }
 
 /// 只记录调用的系统媒体控制端（测 MultiMediaControls）。
 class _RecordingControls implements SystemMediaControls {
-  final StreamController<MediaControlEvent> controller = StreamController.broadcast();
+  final StreamController<MediaControlEvent> controller =
+      StreamController.broadcast();
   final List<String> calls = [];
   bool disposed = false;
   final bool periodic;
@@ -59,10 +67,12 @@ class _RecordingControls implements SystemMediaControls {
   bool get needsPeriodicTimeline => periodic;
 
   @override
-  Future<void> setTrack(MediaTrackInfo? track) async => calls.add('track:${track?.id}');
+  Future<void> setTrack(MediaTrackInfo? track) async =>
+      calls.add('track:${track?.id}');
 
   @override
-  Future<void> setPlayback(MediaPlaybackInfo info) async => calls.add('playback:${info.playing}');
+  Future<void> setPlayback(MediaPlaybackInfo info) async =>
+      calls.add('playback:${info.playing}');
 
   @override
   void dispose() => disposed = true;
@@ -96,15 +106,21 @@ void main() {
     loaded = [];
     reloaded = [];
     result = syncedLyrics;
-    controls = TaskbarLyricsControls(platform, client: MockClient((_) async => http.Response.bytes([1, 2, 3], 200)))
-      ..lyricsLoader = (q) async {
-        loaded.add(q);
-        return result;
-      }
-      ..lyricsReloader = (q) async {
-        reloaded.add(q);
-        return result;
-      };
+    controls =
+        TaskbarLyricsControls(
+            platform,
+            client: MockClient(
+              (_) async => http.Response.bytes([1, 2, 3], 200),
+            ),
+          )
+          ..lyricsLoader = (q) async {
+            loaded.add(q);
+            return result;
+          }
+          ..lyricsReloader = (q) async {
+            reloaded.add(q);
+            return result;
+          };
   });
 
   tearDown(() => controls.dispose());
@@ -142,7 +158,10 @@ void main() {
     await settle();
 
     expect(platform.calls.first, 'enabled:true');
-    expect(platform.calls, containsAllInOrder(['style:accent', 'track:Song', 'lyrics:null']));
+    expect(
+      platform.calls,
+      containsAllInOrder(['style:accent', 'track:Song', 'lyrics:null']),
+    );
     expect(platform.calls, contains('art:3'));
     expect(platform.calls, contains('lyrics:2'));
     expect(platform.calls.last, 'playback:true');
@@ -167,7 +186,10 @@ void main() {
     platform.calls.clear();
     controls.configure(enabled: true, style: style);
     expect(platform.calls, isEmpty);
-    controls.configure(enabled: true, style: const TaskbarLyricsStyle(opacity: 50));
+    controls.configure(
+      enabled: true,
+      style: const TaskbarLyricsStyle(opacity: 50),
+    );
     expect(platform.calls, ['style:auto']);
   });
 
@@ -189,7 +211,10 @@ void main() {
     await settle();
     await settle();
 
-    expect(events.map((e) => (e as MediaButtonEvent).button), [MediaButton.toggle, MediaButton.next]);
+    expect(events.map((e) => (e as MediaButtonEvent).button), [
+      MediaButton.toggle,
+      MediaButton.next,
+    ]);
     expect((opened, disabled), (1, 1));
     expect(reloaded.single.title, 'Song');
     await sub.cancel();
@@ -197,16 +222,26 @@ void main() {
 
   test('切歌后丢弃上一首迟到的歌词', () async {
     final slow = Completer<SpotifyLyrics>();
-    controls.lyricsLoader = (q) => q.trackId == 'id1' ? slow.future : Future.value(syncedLyrics);
+    controls.lyricsLoader = (q) =>
+        q.trackId == 'id1' ? slow.future : Future.value(syncedLyrics);
     controls.configure(enabled: true, style: style);
     await settle();
     unawaited(controls.setTrack(track));
     await settle();
     await controls.setTrack(
-      const MediaTrackInfo(id: 'id2', title: 'Next', artist: '', album: '', artUrl: '', duration: Duration.zero),
+      const MediaTrackInfo(
+        id: 'id2',
+        title: 'Next',
+        artist: '',
+        album: '',
+        artUrl: '',
+        duration: Duration.zero,
+      ),
     );
     platform.calls.clear();
-    slow.complete(const SpotifyLyrics(lines: [LyricLine(startTimeMs: 0, words: 'stale')]));
+    slow.complete(
+      const SpotifyLyrics(lines: [LyricLine(startTimeMs: 0, words: 'stale')]),
+    );
     await settle();
     expect(platform.calls, isNot(contains('lyrics:1')));
   });
@@ -217,11 +252,14 @@ void main() {
 
     setUp(() {
       answers = [const SpotifyLyrics(lines: []), syncedLyrics];
-      retrying = TaskbarLyricsControls(
-        platform,
-        client: MockClient((_) async => http.Response('', 404)),
-        retryDelays: const [Duration(milliseconds: 20)],
-      )..lyricsLoader = (_) async => answers.length > 1 ? answers.removeAt(0) : answers.first;
+      retrying =
+          TaskbarLyricsControls(
+              platform,
+              client: MockClient((_) async => http.Response('', 404)),
+              retryDelays: const [Duration(milliseconds: 20)],
+            )
+            ..lyricsLoader = (_) async =>
+                answers.length > 1 ? answers.removeAt(0) : answers.first;
     });
 
     tearDown(() => retrying.dispose());
@@ -247,6 +285,89 @@ void main() {
       retrying.lyricsCached('id1');
       await settle();
       expect(platform.lyrics, hasLength(2));
+    });
+  });
+
+  group('双语开关', () {
+    test('切换界面语言时不显示其他语言或相反中文字体的译文', () async {
+      result = const SpotifyLyrics(
+        lines: [LyricLine(startTimeMs: 0, words: 'wind', translation: '这里有风')],
+      );
+      await controls.setTrack(track);
+      controls.configure(enabled: true, style: style, locale: 'zh-Hans');
+      await settle();
+      await settle();
+      expect(platform.lyrics?.single.translation, '这里有风');
+      for (final locale in ['zh-Hant', 'ja', 'en']) {
+        controls.configure(enabled: true, style: style, locale: locale);
+        await settle();
+        expect(platform.lyrics?.single.translation, '');
+      }
+      controls.configure(enabled: true, style: style, locale: 'zh-Hans');
+      await settle();
+      expect(platform.lyrics?.single.translation, '这里有风');
+      expect(loaded, hasLength(1));
+    });
+
+    const translated = SpotifyLyrics(
+      lines: [
+        LyricLine(startTimeMs: 0, words: 'a', translation: '甲'),
+        LyricLine(startTimeMs: 1000, words: 'b', translation: '乙'),
+      ],
+    );
+
+    test('打开时重新取当前曲目的歌词（关闭期间取到的没有译文），取到前原文照常显示', () async {
+      await controls.setTrack(track);
+      controls.configure(enabled: true, style: style, bilingual: false);
+      await settle();
+      await settle();
+      expect(loaded, hasLength(1));
+      expect(platform.lyrics?.map((l) => l.translation), ['', '']);
+
+      // 打开双语时 SpotifyProvider 已作废内存里的歌词：重新取到的带网易云译文
+      final reload = Completer<SpotifyLyrics>();
+      controls.lyricsLoader = (q) {
+        loaded.add(q);
+        return reload.future;
+      };
+      platform.calls.clear();
+      controls.configure(enabled: true, style: style, bilingual: true);
+      await settle();
+      expect(loaded, hasLength(2));
+      expect(loaded.last.trackId, 'id1');
+      expect(
+        platform.calls,
+        isNot(contains('lyrics:null')),
+        reason: '新歌词到之前不清掉原文',
+      );
+
+      reload.complete(translated);
+      await settle();
+      expect(platform.lyrics?.map((l) => l.translation), ['甲', '乙']);
+    });
+
+    test('关上时剥掉译文重推已取到的歌词，不重新取', () async {
+      result = translated;
+      await controls.setTrack(track);
+      controls.configure(enabled: true, style: style, bilingual: true);
+      await settle();
+      await settle();
+      expect(platform.lyrics?.map((l) => l.translation), ['甲', '乙']);
+
+      controls.configure(enabled: true, style: style, bilingual: false);
+      await settle();
+      expect(loaded, hasLength(1));
+      expect(platform.lyrics?.map((l) => l.words), ['a', 'b']);
+      expect(platform.lyrics?.map((l) => l.translation), ['', '']);
+    });
+
+    test('任务栏歌词没开时切换双语不取歌词', () async {
+      await controls.setTrack(track);
+      controls.configure(enabled: false, style: style, bilingual: false);
+      controls.configure(enabled: false, style: style, bilingual: true);
+      await settle();
+      expect(loaded, isEmpty);
+      expect(platform.calls, isEmpty);
     });
   });
 

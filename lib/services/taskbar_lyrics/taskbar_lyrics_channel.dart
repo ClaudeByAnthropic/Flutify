@@ -42,7 +42,11 @@ class TaskbarLyricsStyle {
     'accentOnLight': accentOnLight,
     'opacity': opacity,
     'fontScale': fontScale,
-    'labels': {'open': openLabel, 'refetch': refetchLabel, 'disable': disableLabel},
+    'labels': {
+      'open': openLabel,
+      'refetch': refetchLabel,
+      'disable': disableLabel,
+    },
   };
 
   @override
@@ -59,8 +63,17 @@ class TaskbarLyricsStyle {
       other.disableLabel == disableLabel;
 
   @override
-  int get hashCode =>
-      Object.hash(mode, customColor, accentOnDark, accentOnLight, opacity, fontScale, openLabel, refetchLabel, disableLabel);
+  int get hashCode => Object.hash(
+    mode,
+    customColor,
+    accentOnDark,
+    accentOnLight,
+    opacity,
+    fontScale,
+    openLabel,
+    refetchLabel,
+    disableLabel,
+  );
 }
 
 /// 任务栏上的用户操作。
@@ -91,12 +104,15 @@ abstract interface class TaskbarLyricsPlatform {
 class MethodChannelTaskbarLyrics implements TaskbarLyricsPlatform {
   static const MethodChannel _channel = MethodChannel('flutify/taskbar_lyrics');
 
-  final StreamController<TaskbarLyricsEvent> _events = StreamController.broadcast();
+  final StreamController<TaskbarLyricsEvent> _events =
+      StreamController.broadcast();
 
   MethodChannelTaskbarLyrics() {
     _channel.setMethodCallHandler((call) async {
       if (call.method != 'event') return;
-      final event = TaskbarLyricsEvent.values.where((e) => e.name == call.arguments).firstOrNull;
+      final event = TaskbarLyricsEvent.values
+          .where((e) => e.name == call.arguments)
+          .firstOrNull;
       if (event != null) _events.add(event);
     });
   }
@@ -108,11 +124,14 @@ class MethodChannelTaskbarLyrics implements TaskbarLyricsPlatform {
   Future<void> setEnabled(bool enabled) => _invoke('setEnabled', enabled);
 
   @override
-  Future<void> setStyle(TaskbarLyricsStyle style) => _invoke('setStyle', style.toMap());
+  Future<void> setStyle(TaskbarLyricsStyle style) =>
+      _invoke('setStyle', style.toMap());
 
   @override
-  Future<void> setTrack(({String title, String artist})? track) =>
-      _invoke('setTrack', track == null ? null : {'title': track.title, 'artist': track.artist});
+  Future<void> setTrack(({String title, String artist})? track) => _invoke(
+    'setTrack',
+    track == null ? null : {'title': track.title, 'artist': track.artist},
+  );
 
   @override
   Future<void> setArt(Uint8List? bytes) => _invoke('setArt', bytes);
@@ -125,12 +144,19 @@ class MethodChannelTaskbarLyrics implements TaskbarLyricsPlatform {
         : {
             'times': Int32List.fromList([for (final l in lines) l.startTimeMs]),
             'texts': [for (final l in lines) l.words],
+            // 译文（双语歌词），原生端在当前句下方画一行小字；恒为与 texts 等长的数组（可全为空串）
+            'texts2': [for (final l in lines) l.translation],
           },
   );
 
   @override
-  Future<void> setPlayback({required bool playing, required Duration position}) =>
-      _invoke('setPlayback', {'playing': playing, 'positionMs': position.inMilliseconds});
+  Future<void> setPlayback({
+    required bool playing,
+    required Duration position,
+  }) => _invoke('setPlayback', {
+    'playing': playing,
+    'positionMs': position.inMilliseconds,
+  });
 
   Future<void> _invoke(String method, Object? args) async {
     try {

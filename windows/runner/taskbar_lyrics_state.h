@@ -17,6 +17,8 @@ namespace taskbar_lyrics {
 struct LyricLine {
   int64_t start_ms = 0;
   std::wstring text;
+  // 译文（双语歌词）；为空则当前句只画原文一行
+  std::wstring translation;
 };
 
 // 文字颜色：自动（按任务栏背景明暗取黑 / 白）、白、黑、跟随强调色、自定义。

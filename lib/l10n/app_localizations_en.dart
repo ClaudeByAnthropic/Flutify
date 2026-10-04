@@ -79,6 +79,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get windowClose => 'Close';
 
   @override
+  String get menuPlayback => 'Playback';
+
+  @override
+  String get menuNavigate => 'Navigate';
+
+  @override
+  String get menuEdit => 'Edit';
+
+  @override
+  String get menuUndo => 'Undo';
+
+  @override
+  String get menuRedo => 'Redo';
+
+  @override
+  String get menuCut => 'Cut';
+
+  @override
+  String get menuCopy => 'Copy';
+
+  @override
+  String get menuPaste => 'Paste';
+
+  @override
+  String get menuSelectAll => 'Select All';
+
+  @override
+  String get menuWindow => 'Window';
+
+  @override
+  String get menuSettings => 'Settings…';
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override
@@ -508,6 +541,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String playbackErrorWidevine(String track) {
     return 'Can\'t decrypt \"$track\": Widevine DRM is unavailable on this device';
+  }
+
+  @override
+  String playbackErrorFairPlay(String track) {
+    return 'Can\'t decrypt \"$track\": this device couldn\'t create a FairPlay session';
   }
 
   @override
@@ -943,6 +981,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'When Spotify has no time-synced lyrics, get them from the open LRCLIB library in the song\'s original language';
 
   @override
+  String get settingsLyricsBilingual => 'Community lyric translations';
+
+  @override
+  String get settingsLyricsBilingualSubtitle =>
+      'Send the song title and artist to NetEase Cloud Music to find community translations. The translation language follows the interface language';
+
+  @override
   String get settingsTaskbarLyricsSection => 'Taskbar lyrics';
 
   @override
@@ -1138,6 +1183,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter a valid address and a port between 1 and 65535';
 
   @override
+  String get settingsProxyAuth => 'Proxy authentication (optional)';
+
+  @override
+  String get settingsProxyUsernameHint => 'Username';
+
+  @override
+  String get settingsProxyPasswordHint => 'Password';
+
+  @override
+  String get settingsProxyUsernameInvalid =>
+      'The username can\'t contain a colon (:). It separates the username from the password, so the proxy would reject the credentials';
+
+  @override
+  String get settingsProxyAuthIncomplete =>
+      'HTTPS can use one-sided credentials; HTTP proxy authentication requires both fields';
+
+  @override
   String get settingsProxyTest => 'Test connection';
 
   @override
@@ -1155,7 +1217,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsProxyFootnote =>
-      'Only HTTP proxies are supported (the mixed port of Clash, v2rayN, etc. works). The sign-in page always follows the system proxy settings.';
+      'Only HTTP proxies are supported (the mixed port of Clash, v2rayN, etc. works); a manual proxy may use a username/password, e.g. a self-hosted relay in another region. The sign-in page always follows the system proxy settings.';
 
   @override
   String get settingsPrivacySection => 'Privacy';

@@ -180,6 +180,8 @@ void main() {
     // 进度推到靠后的行（切行提前量 300ms，25s → 第 25 行附近）
     playback.positionNotifier.value = const Duration(seconds: 25);
     await tester.pump();
+    // 滚动动画的 Ticker 在下一帧才开始计时
+    await tester.pump(const Duration(milliseconds: 16));
     await tester.pump(const Duration(milliseconds: 700));
 
     expect(inner.offset, greaterThan(0), reason: '歌词区应滚到当前行');

@@ -78,6 +78,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get windowClose => '关闭';
 
   @override
+  String get menuPlayback => '播放';
+
+  @override
+  String get menuNavigate => '导航';
+
+  @override
+  String get menuEdit => '编辑';
+
+  @override
+  String get menuUndo => '撤销';
+
+  @override
+  String get menuRedo => '重做';
+
+  @override
+  String get menuCut => '剪切';
+
+  @override
+  String get menuCopy => '拷贝';
+
+  @override
+  String get menuPaste => '粘贴';
+
+  @override
+  String get menuSelectAll => '全选';
+
+  @override
+  String get menuWindow => '窗口';
+
+  @override
+  String get menuSettings => '设置…';
+
+  @override
   String get commonCancel => '取消';
 
   @override
@@ -498,6 +531,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String playbackErrorFairPlay(String track) {
+    return '「$track」无法解密播放：此设备无法创建 FairPlay 会话';
+  }
+
+  @override
   String playbackErrorAutoPaused(int count) {
     return '连续 $count 首无法播放，已暂停';
   }
@@ -914,6 +952,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选';
 
   @override
+  String get settingsLyricsBilingual => '社区歌词翻译';
+
+  @override
+  String get settingsLyricsBilingualSubtitle =>
+      '开启后会将歌名与歌手发送至网易云音乐以寻找社区翻译，译词语言跟随界面语言';
+
+  @override
   String get settingsTaskbarLyricsSection => '任务栏歌词';
 
   @override
@@ -1097,6 +1142,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsProxyInvalid => '请填写有效的地址和 1–65535 之间的端口';
 
   @override
+  String get settingsProxyAuth => '代理认证（可选）';
+
+  @override
+  String get settingsProxyUsernameHint => '用户名';
+
+  @override
+  String get settingsProxyPasswordHint => '密码';
+
+  @override
+  String get settingsProxyUsernameInvalid =>
+      '用户名不能包含冒号（:），冒号是用户名与密码的分隔符，代理会认证失败';
+
+  @override
+  String get settingsProxyAuthIncomplete =>
+      '用户名和密码只填一项时，HTTPS 可用；HTTP 代理认证需要两项都填写';
+
+  @override
   String get settingsProxyTest => '测试连接';
 
   @override
@@ -1114,7 +1176,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsProxyFootnote =>
-      '仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）。登录页面始终跟随系统代理设置。';
+      '仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）；手动代理可填用户名 / 密码，适合自建带认证的跨区反代。登录页面始终跟随系统代理设置。';
 
   @override
   String get settingsPrivacySection => '隐私';
@@ -1629,6 +1691,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get windowClose => '關閉';
 
   @override
+  String get menuPlayback => '播放';
+
+  @override
+  String get menuNavigate => '導覽';
+
+  @override
+  String get menuEdit => '編輯';
+
+  @override
+  String get menuUndo => '復原';
+
+  @override
+  String get menuRedo => '重做';
+
+  @override
+  String get menuCut => '剪下';
+
+  @override
+  String get menuCopy => '複製';
+
+  @override
+  String get menuPaste => '貼上';
+
+  @override
+  String get menuSelectAll => '全選';
+
+  @override
+  String get menuWindow => '視窗';
+
+  @override
+  String get menuSettings => '設定…';
+
+  @override
   String get commonCancel => '取消';
 
   @override
@@ -2049,6 +2144,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String playbackErrorFairPlay(String track) {
+    return '無法解密「$track」：此裝置無法建立 FairPlay 工作階段';
+  }
+
+  @override
   String playbackErrorAutoPaused(int count) {
     return '連續 $count 首無法播放，已暫停';
   }
@@ -2465,6 +2565,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Spotify 沒有逐行同步歌詞時，從 LRCLIB 開放歌詞庫補全，并按原唱語言挑選';
 
   @override
+  String get settingsLyricsBilingual => '社群歌詞翻譯';
+
+  @override
+  String get settingsLyricsBilingualSubtitle =>
+      '開啟後會將歌名與歌手傳送至網易雲音樂以尋找社群翻譯，譯詞語言跟隨介面語言';
+
+  @override
   String get settingsTaskbarLyricsSection => '任務欄歌詞';
 
   @override
@@ -2646,6 +2753,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsProxyInvalid => '請填寫有效的地址和 1–65535 之間的端口';
+
+  @override
+  String get settingsProxyAuth => '代理驗證（選填）';
+
+  @override
+  String get settingsProxyUsernameHint => '使用者名稱';
+
+  @override
+  String get settingsProxyPasswordHint => '密碼';
+
+  @override
+  String get settingsProxyUsernameInvalid =>
+      '使用者名稱不能包含冒號（:），否則會被當作使用者名稱與密碼的分隔符，導致驗證失敗';
+
+  @override
+  String get settingsProxyAuthIncomplete => 'HTTPS 可只填寫其中一項；HTTP 代理驗證需要同時填寫兩項';
 
   @override
   String get settingsProxyTest => '測試連接';

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../l10n/l10n.dart';
 import '../../../providers/auth_provider.dart';
 import '../../navigation/content_history.dart';
+import '../../widgets/keyboard_shortcuts.dart';
 import '../../widgets/user_avatar.dart';
 import 'desktop_window.dart';
 import 'window_caption_buttons.dart';
@@ -12,8 +13,11 @@ import 'window_caption_buttons.dart';
 ///
 /// 布局：`‹ ›` 后退 / 前进 ─── [⌂] [ 🔍 你想听什么？  Ctrl K ] ─── 头像 · （窗口按钮位）
 /// - 空白处可拖动窗口、双击最大化（[WindowDragArea]）；
-/// - 搜索框居中，输入即切到搜索页；`Ctrl K` 聚焦；
+/// - 搜索框居中，输入即切到搜索页；`Ctrl K`（macOS 为 `⌘K`）聚焦；
 /// - 头像打开设置（账号卡片在设置页顶部）。
+///
+/// macOS：原生交通灯浮在窗口左上角，顶栏左侧为它留白 [DesktopWindow.macTrafficLightsInset]，
+/// 右上角不再为自绘窗口按钮占位（macOS 不渲染自绘按钮）。
 class DesktopTopBar extends StatelessWidget {
   final ContentHistory history;
   final bool homeSelected;
@@ -43,12 +47,16 @@ class DesktopTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final macButtons = DesktopWindow.macNativeWindow;
     return WindowDragArea(
       child: SizedBox(
         height: height,
         child: Row(
           children: [
-            const SizedBox(width: 16),
+            // macOS 原生交通灯浮在左上角，顶栏内容为它留白
+            SizedBox(
+              width: macButtons ? DesktopWindow.macTrafficLightsInset : 16,
+            ),
             ListenableBuilder(
               listenable: history,
               builder: (context, _) => Row(
@@ -94,8 +102,13 @@ class DesktopTopBar extends StatelessWidget {
               ),
             ),
             _AccountButton(onPressed: onOpenSettings),
-            // 窗口按钮由 WindowFrame 浮在右上角（所有页面都可见），这里只留出位置
-            SizedBox(width: DesktopWindow.enabled ? 8 + WindowCaptionButtons.width : 16),
+            // 窗口按钮由 WindowFrame 浮在右上角（所有页面都可见），这里只留出位置；
+            // macOS 用原生交通灯，无自绘按钮不占位
+            SizedBox(
+              width: DesktopWindow.enabled && !macButtons
+                  ? 8 + WindowCaptionButtons.width
+                  : 16,
+            ),
           ],
         ),
       ),
@@ -109,7 +122,11 @@ class _RoundIconButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback? onPressed;
 
-  const _RoundIconButton({required this.icon, required this.tooltip, this.onPressed});
+  const _RoundIconButton({
+    required this.icon,
+    required this.tooltip,
+    this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +165,9 @@ class _HomeButton extends StatelessWidget {
       style: IconButton.styleFrom(
         fixedSize: const Size(48, 48),
         backgroundColor: colorScheme.surfaceContainerHigh,
-        foregroundColor: selected ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+        foregroundColor: selected
+            ? colorScheme.onSurface
+            : colorScheme.onSurfaceVariant,
       ),
     );
   }
@@ -213,10 +232,14 @@ class _SearchFieldState extends State<_SearchField> {
         duration: const Duration(milliseconds: 160),
         height: 48,
         decoration: ShapeDecoration(
-          color: _hover || focused ? colorScheme.surfaceContainerHighest : colorScheme.surfaceContainerHigh,
+          color: _hover || focused
+              ? colorScheme.surfaceContainerHighest
+              : colorScheme.surfaceContainerHigh,
           shape: StadiumBorder(
             side: BorderSide(
-              color: focused ? colorScheme.onSurface : (_hover ? colorScheme.outlineVariant : Colors.transparent),
+              color: focused
+                  ? colorScheme.onSurface
+                  : (_hover ? colorScheme.outlineVariant : Colors.transparent),
               width: focused ? 2 : 1,
             ),
           ),
@@ -224,7 +247,13 @@ class _SearchFieldState extends State<_SearchField> {
         child: Row(
           children: [
             const SizedBox(width: 14),
-            Icon(Icons.search_rounded, size: 24, color: focused ? colorScheme.onSurface : colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.search_rounded,
+              size: 24,
+              color: focused
+                  ? colorScheme.onSurface
+                  : colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: TextField(
@@ -233,7 +262,9 @@ class _SearchFieldState extends State<_SearchField> {
                 textInputAction: TextInputAction.search,
                 onChanged: widget.onChanged,
                 onSubmitted: widget.onSubmitted,
-                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
                 decoration: InputDecoration(
                   hintText: l10n.searchHint,
                   filled: false,
@@ -265,8 +296,12 @@ class _SearchFieldState extends State<_SearchField> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  l10n.shellSearchShortcut,
-                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, letterSpacing: 0.4),
+                  // macOS 显示 ⌘K（见 PlatformShortcuts），其余平台 Ctrl K
+                  PlatformShortcuts.hintText(l10n.shellSearchShortcut),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    letterSpacing: 0.4,
+                  ),
                 ),
               ),
             if (hasText) const SizedBox(width: 4),
@@ -286,10 +321,14 @@ class _AccountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final (signedIn, name) = context.select<AuthProvider, (bool, String)>((a) => (a.isSignedIn, a.displayName));
+    final (signedIn, name) = context.select<AuthProvider, (bool, String)>(
+      (a) => (a.isSignedIn, a.displayName),
+    );
 
     return Tooltip(
-      message: signedIn && name.isNotEmpty ? name : context.l10n.shellAccountMenu,
+      message: signedIn && name.isNotEmpty
+          ? name
+          : context.l10n.shellAccountMenu,
       child: IconButton(
         onPressed: onPressed,
         icon: const UserAvatar(size: 32),

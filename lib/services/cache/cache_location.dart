@@ -90,14 +90,15 @@ class CacheLocation extends ChangeNotifier {
   Directory get lyricsDirectory => Directory(directory(CacheCategory.lyrics));
   Directory get imageDirectory => Directory(directory(CacheCategory.artwork));
 
-  String _root(CacheSelection choice) => switch (choice.preset) {
-    CachePreset.appData => defaultRoot,
-    CachePreset.application => p.join(applicationRoot, 'FlutifyCache'),
-    CachePreset.custom => p.join(
-      p.normalize(choice.customPath.trim()),
-      'FlutifyCache',
-    ),
-  };
+  String _root(CacheSelection choice) =>
+      _canonicalPlatformPath(switch (choice.preset) {
+        CachePreset.appData => defaultRoot,
+        CachePreset.application => p.join(applicationRoot, 'FlutifyCache'),
+        CachePreset.custom => p.join(
+          p.normalize(choice.customPath.trim()),
+          'FlutifyCache',
+        ),
+      });
 
   Future<void> initialize() async {
     // path_provider can return OS aliases (e.g. Android /data/user/0 or
@@ -191,7 +192,19 @@ class CacheLocation extends ChangeNotifier {
         return p.join(alias.value, p.relative(path, from: alias.key));
       }
     }
-    return path;
+    return _normalizeMacOSSystemPath(path);
+  }
+
+  static String _normalizeMacOSSystemPath(String path) {
+    final normalized = p.normalize(path);
+    if (Platform.isMacOS) {
+      for (final alias in const ['/var', '/tmp']) {
+        if (p.equals(alias, normalized) || p.isWithin(alias, normalized)) {
+          return '/private$normalized';
+        }
+      }
+    }
+    return normalized;
   }
 
   static bool _valid(String path) =>
@@ -215,7 +228,7 @@ class CacheLocation extends ChangeNotifier {
   }
 
   static Future<void> _checkAncestors(String path) async {
-    var ancestor = p.normalize(p.absolute(path));
+    var ancestor = _normalizeMacOSSystemPath(p.absolute(path));
     while (true) {
       if (await FileSystemEntity.type(ancestor, followLinks: false) ==
           FileSystemEntityType.link) {

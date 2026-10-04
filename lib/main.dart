@@ -46,11 +46,14 @@ import 'services/lyrics/lrclib_client.dart';
 import 'services/lyrics/lrclib_lyrics_source.dart';
 import 'services/lyrics/lyrics_disk_cache.dart';
 import 'services/lyrics/lyrics_resolver.dart';
+import 'services/lyrics/netease_client.dart';
+import 'services/lyrics/netease_translation_source.dart';
 import 'services/media_controls/connect_media_source.dart';
 import 'services/media_controls/media_controls_sync.dart';
 import 'services/media_controls/multi_media_controls.dart';
 import 'services/media_controls/system_media_controls.dart';
 import 'services/network/network_proxy.dart';
+import 'services/network/system_proxy_channel.dart';
 import 'services/network/windows_trust_store.dart';
 import 'services/playback_session_store.dart';
 import 'services/protocol/audio_cache_store.dart';
@@ -65,6 +68,7 @@ import 'services/taskbar_lyrics/taskbar_lyrics_channel.dart';
 import 'services/taskbar_lyrics/taskbar_lyrics_controls.dart';
 import 'ui/screens/main_shell.dart';
 import 'ui/shell/desktop/desktop_window.dart';
+import 'ui/shell/desktop/mac_menu_bar.dart';
 import 'ui/shell/desktop/window_frame.dart';
 import 'ui/widgets/dynamic_accent_sync.dart';
 import 'ui/widgets/automatic_gateway_binding.dart';
@@ -97,6 +101,8 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   await CacheDirectoryAccess.restore();
 
   // 网络代理须在任何网络客户端创建前就位；系统代理最多等 1.5 秒，读不到就先直连、后台补读
+  // macOS GUI 应用读不到 shell 的代理环境变量，须先挂上原生通道读「系统设置 → 网络 → 代理」
+  installMacOSSystemProxyReader();
   ProxyHttpOverrides.install(NetworkProxy.instance);
   reportStage('配置网络');
   final initialPrefs = AppPreferences.decode(storageService.preferencesJson);
@@ -106,6 +112,8 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
         proxyHost: initialPrefs.proxyHost,
         proxyPort: initialPrefs.proxyPort,
         gateway: initialPrefs.gateway,
+        proxyUsername: initialPrefs.proxyUsername,
+        proxyPassword: storageService.proxyPassword,
       )
       .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
 
@@ -223,6 +231,16 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
       lock: audioCacheLocation.lock,
     ),
   );
+  // 歌词译文：网易云音乐的社区翻译（只取译文对齐到现有歌词，原文仍以 Spotify / LRCLIB 为准）；
+  // 只在设置开启「双语歌词」时查询（会把曲名与歌手发给网易云），关闭时不发任何请求
+  final lyricsTranslation = NeteaseTranslationSource(
+    NeteaseClient(http.Client()),
+    cache: LyricsDiskCache(
+      audioCacheLocation.lyricsDirectory,
+      directoryProvider: () => audioCacheLocation.lyricsDirectory,
+      lock: audioCacheLocation.lock,
+    ),
+  );
 
   // EME 曲目源（Widevine 全曲播放）：AP 密钥被拒的 DRM 曲目走这里。
   // 当前账号 AP RequestKey 全线被拒，EME 是全曲播放的主链路。
@@ -266,6 +284,7 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
     networkProxy: NetworkProxy.instance,
     audioCacheLocation: audioCacheLocation,
     lyricsFallback: lyricsFallback,
+    lyricsTranslation: lyricsTranslation,
     taskbarLyrics: taskbarLyrics,
   );
 }
@@ -300,6 +319,9 @@ class FlutifyApp extends StatelessWidget {
   /// LRCLIB 歌词补全；为空时只用 Spotify 官方歌词（测试默认）。
   final LrclibLyricsSource? lyricsFallback;
 
+  /// 网易云歌词译文；为空时不查译文（测试默认）。
+  final NeteaseTranslationSource? lyricsTranslation;
+
   /// 任务栏歌词（Windows）；已包含在 [mediaControls] 里，这里供界面层绑定设置与歌词来源。
   final TaskbarLyricsControls? taskbarLyrics;
 
@@ -317,6 +339,7 @@ class FlutifyApp extends StatelessWidget {
     this.networkProxy,
     this.audioCacheLocation,
     this.lyricsFallback,
+    this.lyricsTranslation,
     this.taskbarLyrics,
   });
 
@@ -394,24 +417,42 @@ class FlutifyApp extends StatelessWidget {
                   proxyHost: preferences.prefs.proxyHost,
                   proxyPort: preferences.prefs.proxyPort,
                   gateway: preferences.prefs.gateway,
+                  proxyUsername: preferences.prefs.proxyUsername,
+                  // 密码存在 StorageService（不进偏好 JSON），改密码由设置页即时重配
+                  proxyPassword: storageService.proxyPassword,
                 ),
               );
             });
             return preferences;
           },
         ),
-        // 在 PreferencesProvider 之后创建：歌词补全开关在每次取歌词时读取
+        // 在 PreferencesProvider 之后创建：歌词补全 / 双语歌词开关在每次取歌词时读取
         ChangeNotifierProvider(
-          create: (ctx) => SpotifyProvider(
-            spotifyApiService,
-            storageService,
-            lyrics: LyricsResolver(
-              spotifyApiService.getLyrics,
-              fallback: lyricsFallback,
-              fallbackEnabled: () =>
-                  ctx.read<PreferencesProvider>().prefs.lyricsFallback,
-            ),
-          ),
+          create: (ctx) {
+            final preferences = ctx.read<PreferencesProvider>();
+            final spotify = SpotifyProvider(
+              spotifyApiService,
+              storageService,
+              lyrics: LyricsResolver(
+                spotifyApiService.getLyrics,
+                fallback: lyricsFallback,
+                fallbackEnabled: () => preferences.prefs.lyricsFallback,
+                translation: lyricsTranslation,
+                // 双语歌词关闭时不查译文，不向网易云发任何请求
+                translationEnabled: () => preferences.prefs.lyricsBilingual,
+              ),
+            );
+            // 打开双语歌词：关闭期间解析的歌词没查过译文，作废内存里的结果重新解析（本地缓存保留）。
+            // 关上不用处理：界面与任务栏不再显示译文，之后也不会再查
+            var bilingual = preferences.prefs.lyricsBilingual;
+            preferences.addListener(() {
+              final enabled = preferences.prefs.lyricsBilingual;
+              if (enabled == bilingual) return;
+              bilingual = enabled;
+              if (enabled) spotify.invalidateResolvedLyrics();
+            });
+            return spotify;
+          },
         ),
         Provider<TaskbarLyricsControls?>.value(value: taskbarLyrics),
         // 设置页「存储」分组：音频缓存占用 / 上限 / 清除
@@ -629,8 +670,13 @@ void _startConnectReceiver(
 }
 
 /// 代理相关偏好的指纹，用于判断是否需要重配 [NetworkProxy]。
-Object _proxyKey(AppPreferences prefs) =>
-    (prefs.proxyMode, prefs.proxyHost, prefs.proxyPort, prefs.gateway);
+Object _proxyKey(AppPreferences prefs) => (
+  prefs.proxyMode,
+  prefs.proxyHost,
+  prefs.proxyPort,
+  prefs.proxyUsername,
+  prefs.gateway,
+);
 
 /// 按外观设置生成主题；字号缩放与减弱动效通过 MediaQuery 下发给整棵树。
 class _ThemedApp extends StatelessWidget {
@@ -673,7 +719,10 @@ class _ThemedApp extends StatelessWidget {
           child: AnnotatedRegion<SystemUiOverlayStyle>(
             value: systemBarsStyle(Theme.of(context).brightness),
             // 桌面：窗口按钮 / 窄窗口标题条覆盖在所有路由之上
-            child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
+            // macOS 原生菜单栏常驻于此（卸载会清空系统菜单），主界面动作由 MainShell 注册
+            child: MacMenuBar(
+              child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
+            ),
           ),
         );
       },

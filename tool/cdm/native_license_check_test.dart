@@ -118,7 +118,11 @@ void main() {
         );
         stage = 'native_start';
         memory = await decryptor.decrypt(
-          EmeTrackContent(m4aPath: env['FLUTIFY_CDM_CHECK_MEDIA']!, m3u8: ''),
+          EmeTrackContent(
+            fileIdHex: '0000000000000000000000000000000000000000',
+            m4aPath: env['FLUTIFY_CDM_CHECK_MEDIA']!,
+            m3u8: '',
+          ),
         );
         expect(memory.length, greaterThan(0));
         print('native_full_decrypt_pass bytes=${memory.length}');

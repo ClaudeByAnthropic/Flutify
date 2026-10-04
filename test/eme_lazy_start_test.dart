@@ -15,13 +15,106 @@ class RecordingPlayer extends EmePlayer {
     required String m3u8,
     required Future<Uint8List> Function(Uint8List) licensePoster,
     required Future<Uint8List> Function() certFetcher,
-  }) async => events.add('play');
+    bool fairPlay = false,
+    String? fairPlayFileId,
+    bool autoplay = true,
+    Duration? initialPosition,
+  }) async {
+    events.add('play');
+    lastAutoplay = autoplay;
+    lastPosition = initialPosition;
+  }
+
+  bool? lastAutoplay;
+  Duration? lastPosition;
+  Completer<void>? resumeDone;
+  @override
+  Future<void> pause() async => events.add('pause');
+  @override
+  Future<void> stop() async => events.add('stop');
+  @override
+  Future<void> resume() async {
+    events.add('resume');
+    await resumeDone?.future;
+  }
+
   @override
   Future<void> setVolume(double volume) async => events.add('volume:$volume');
 }
 
 void main() {
-  const content = EmeTrackContent(m4aPath: 'unused.m4a', m3u8: '#EXTM3U');
+  const content = EmeTrackContent(
+    fileIdHex: '0000000000000000000000000000000000000000',
+    m4aPath: 'unused.m4a',
+    m3u8: '#EXTM3U',
+  );
+
+  for (final cancel in ['pause', 'stop', 'dispose']) {
+    test(
+      '$cancel during initialization prevents delayed audible playback',
+      () async {
+        final ready = Completer<void>();
+        final player = RecordingPlayer();
+        final engine = EmeAudioEngine(
+          player: player,
+          licensePoster: (bytes) async => bytes,
+          certFetcher: () async => Uint8List(0),
+          initialize: () => ready.future,
+        );
+        if (cancel != 'dispose') addTearDown(engine.dispose);
+        final loading = engine.playEme(content);
+        if (cancel == 'pause') await engine.pause();
+        if (cancel == 'stop') await engine.stop();
+        if (cancel == 'dispose') engine.dispose();
+        ready.complete();
+        await loading;
+        expect(engine.isPlaying, isFalse);
+        if (cancel == 'pause') {
+          expect(player.lastAutoplay, isFalse);
+        } else {
+          expect(player.events, isNot(contains('play')));
+          expect(engine.hasSource, isFalse);
+        }
+      },
+    );
+  }
+
+  test('paused handoff forwards its position without autoplay', () async {
+    final player = RecordingPlayer();
+    final engine = EmeAudioEngine(
+      player: player,
+      licensePoster: (bytes) async => bytes,
+      certFetcher: () async => Uint8List(0),
+    );
+    addTearDown(engine.dispose);
+    await engine.playEme(
+      content,
+      autoplay: false,
+      initialPosition: const Duration(seconds: 42),
+    );
+    expect(player.lastAutoplay, isFalse);
+    expect(player.lastPosition, const Duration(seconds: 42));
+    expect(engine.isPlaying, isFalse);
+    expect(engine.hasSource, isTrue);
+    await engine.play();
+    expect(engine.isPlaying, isTrue);
+  });
+
+  test('late resume acknowledgement cannot override a newer pause', () async {
+    final player = RecordingPlayer()..resumeDone = Completer<void>();
+    final engine = EmeAudioEngine(
+      player: player,
+      licensePoster: (bytes) async => bytes,
+      certFetcher: () async => Uint8List(0),
+    );
+    addTearDown(engine.dispose);
+    await engine.playEme(content, autoplay: false);
+    final resuming = engine.play();
+    await engine.pause();
+    player.resumeDone!.complete();
+    await resuming;
+    expect(engine.isPlaying, isFalse);
+  });
 
   test(
     'desktop DRM initializes on demand and restores volume before playback',

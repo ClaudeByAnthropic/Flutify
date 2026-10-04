@@ -8,10 +8,19 @@ class PlaybackFile {
   final int format;
   final int bitrate;
 
+  /// 该条目出自的 manifest 分组（`file_ids_mp4` / `file_ids_mp4_cbcs`）。
+  /// macOS FairPlay 只认 cbcs 分组的加密形态（schm=cbcs）。
+  final String formatKey;
+
+  /// cbcs 分组的 audio 记录可能携带 `encoding_id`（FairPlay 的 assetId）。
+  final String? encodingId;
+
   const PlaybackFile({
     required this.fileIdHex,
     required this.format,
     required this.bitrate,
+    this.formatKey = '',
+    this.encodingId,
   });
 }
 
@@ -38,6 +47,19 @@ class TrackPlaybackMedia {
     final sorted = [...mp4Files]
       ..sort((a, b) => a.bitrate.compareTo(b.bitrate));
     return sorted.first;
+  }
+
+  /// 选 FairPlay 用的 cbcs 文件：只从 `file_ids_mp4_cbcs` 分组取、取最低码率；
+  /// 无 cbcs 条目返回 null（该曲目对 macOS 解密不可用，调用方报「不可用」）。
+  /// 对齐 Spotify Web 播放器的行为：keySystem 为 FairPlay 时只向 manifest 请求
+  /// file_ids_mp4_cbcs（见 vendor 播放器 FILE_IDS_CBCS 分支）。
+  PlaybackFile? selectCbcsForFairPlay() {
+    final cbcs = mp4Files
+        .where((f) => f.formatKey == 'file_ids_mp4_cbcs')
+        .toList();
+    if (cbcs.isEmpty) return null;
+    cbcs.sort((a, b) => a.bitrate.compareTo(b.bitrate));
+    return cbcs.first;
   }
 }
 
@@ -93,13 +115,16 @@ Future<TrackPlaybackMedia> fetchTrackPlaybackMedia(
       if (!entry.key.startsWith('file_ids_mp4')) continue;
       for (final f in (entry.value as List? ?? [])) {
         final m = f as Map<String, dynamic>;
-        final fid = m['file_id'] as String?;
-        if (fid == null) continue;
+        // 非字符串的 file_id 无法当十六进制 id 用：跳过这一项，不让整首歌解析失败
+        final fid = m['file_id'];
+        if (fid is! String) continue;
         files.add(
           PlaybackFile(
             fileIdHex: fid,
             format: _toInt(m['format']),
             bitrate: _toInt(m['bitrate']),
+            formatKey: entry.key,
+            encodingId: m['encoding_id']?.toString(),
           ),
         );
       }

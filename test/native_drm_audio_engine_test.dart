@@ -81,8 +81,11 @@ void main() {
     messenger.setMockMethodCallHandler(events, null);
   });
 
-  EmeTrackContent content([String id = 'a']) =>
-      EmeTrackContent(m4aPath: '$id.m4a', m3u8: id);
+  EmeTrackContent content([String id = 'a']) => EmeTrackContent(
+    fileIdHex: '0000000000000000000000000000000000000000',
+    m4aPath: '$id.m4a',
+    m3u8: id,
+  );
 
   test(
     'paused preparation passes intent and seek to native before starting',

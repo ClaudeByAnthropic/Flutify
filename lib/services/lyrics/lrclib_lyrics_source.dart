@@ -9,6 +9,7 @@ import 'lyric_script.dart';
 import 'lyrics_disk_cache.dart';
 import 'lyrics_title.dart';
 import 'lyrics_translation.dart';
+import 'translation_merge.dart';
 import 'zh_script.dart';
 
 /// 一次补全查询的结果：[lyrics] 为 null 表示没找到；[networkError] 表示没找到可能只是网络问题。
@@ -50,10 +51,10 @@ class LrclibLyricsSource {
   }) : _sleep = sleep ?? Future.delayed;
 
   /// 缓存键：优先用 Spotify 曲目 ID（同一首歌的本地化曲名会变，ID 不会）。
-  /// 版本号随选词规则升级（v4：纯音乐守卫 + 无歌手信息严格模式），让旧规则可能选错的结果失效。
+  /// 版本号随选词规则升级（v5：双语对照拆分保留译文），让旧规则可能选错的结果失效。
   static String cacheKey(LyricsQuery q) => q.trackId.isNotEmpty
-      ? 'v4|${q.trackId}'
-      : 'v4|${q.title}\u0001${q.artist}\u0001${q.album}';
+      ? 'v5|${q.trackId}'
+      : 'v5|${q.title}\u0001${q.artist}\u0001${q.album}';
 
   /// 删除这首歌的本地缓存（「重新获取歌词」）。
   Future<void> forget(LyricsQuery query) async {
@@ -113,8 +114,11 @@ class LrclibLyricsSource {
     final key = cacheKey(query);
     final hit = await cache?.read(key);
     if (hit != null) {
-      final lines = LrcParser.parse(hit);
-      if (lines.isNotEmpty) return LrclibLookup(_lyrics(lines, lyricLang(hit)));
+      final lines = _withTranslation(LrcParser.parse(hit));
+      if (lines.isNotEmpty)
+        return LrclibLookup(
+          _lyrics(lines, lyricLang(TranslationMerge.originalText(lines))),
+        );
     }
 
     final response = await _candidates(query);
@@ -129,7 +133,7 @@ class LrclibLyricsSource {
       selection.synced,
       expectedGeneration: cacheGeneration,
     );
-    return LrclibLookup(_lyrics(lines, selection.lang));
+    return LrclibLookup(_lyrics(_withTranslation(lines), selection.lang));
   }
 
   Future<LrclibResponse> _collect(LyricsQuery query) async {
@@ -193,4 +197,7 @@ class LrclibLyricsSource {
         },
         provider: LyricsProvider.lrclib,
       );
+
+  static List<LyricLine> _withTranslation(List<LyricLine> lines) =>
+      TranslationMerge.tryMerge(lines) ?? lines;
 }

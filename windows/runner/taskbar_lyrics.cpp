@@ -160,14 +160,20 @@ void TaskbarLyrics::OnMethodCall(const flutter::MethodCall<EncodableValue>& call
       if (args) {
         const EncodableValue* times = Find(*args, "times");
         const EncodableValue* texts = Find(*args, "texts");
+        const EncodableValue* translations = Find(*args, "texts2");
         const auto* t = times ? std::get_if<std::vector<int32_t>>(times) : nullptr;
         const auto* s = texts ? std::get_if<EncodableList>(texts) : nullptr;
+        const auto* s2 = translations ? std::get_if<EncodableList>(translations) : nullptr;
         if (t && s) {
           const size_t n = (std::min)(t->size(), s->size());
           shared_.lines.reserve(n);
           for (size_t i = 0; i < n; i++) {
             const auto* text = std::get_if<std::string>(&(*s)[i]);
-            shared_.lines.push_back({(*t)[i], text ? Wide(*text) : L""});
+            std::wstring translation;
+            if (s2 && i < s2->size()) {
+              if (const auto* tr = std::get_if<std::string>(&(*s2)[i])) translation = Wide(*tr);
+            }
+            shared_.lines.push_back({(*t)[i], text ? Wide(*text) : L"", std::move(translation)});
           }
         }
       }

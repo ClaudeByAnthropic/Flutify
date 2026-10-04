@@ -42,6 +42,30 @@ final withAlternatives = SpotifyLyrics(
 
 void main() {
   test(
+    'community inline translations retain provenance and follow Chinese script',
+    () {
+      final lyrics = SpotifyLyrics(
+        language: 'en',
+        provider: LyricsProvider.lrclib,
+        translationProvider: LyricsProvider.netease,
+        lines: [
+          for (final (i, line) in original.lines.indexed)
+            LyricLine(
+              startTimeMs: line.startTimeMs,
+              words: line.words,
+              translation: hans[i],
+            ),
+        ],
+      );
+      final selected = LyricsTranslationController.official(lyrics, 'zh-Hans');
+      expect(selected?.lines, hans);
+      expect(selected?.provider, LyricsProvider.netease);
+      expect(LyricsTranslationController.official(lyrics, 'zh-Hant'), isNull);
+      expect(LyricsTranslationController.official(lyrics, 'ja'), isNull);
+    },
+  );
+
+  test(
     'Japanese interface selects Japanese source translation and excludes Japanese originals',
     () {
       const japanese = ['ここには風がある', '', '君の声が聞こえる', 'これが最後の行'];

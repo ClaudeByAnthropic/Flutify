@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +8,7 @@ import '../../models/audio_playback_info.dart';
 
 import '../audio/audio_engine.dart';
 import '../cache/cache_location.dart';
+import '../eme/fairplay.dart';
 import '../eme/segmented_download.dart';
 import '../eme/streaming_download.dart';
 import 'audio_cache_store.dart';
@@ -237,7 +237,9 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
         '此播客需要先完成 Web 登录',
       );
     }
-    final file = media.selectForFree();
+    final file = useFairPlay
+        ? media.selectCbcsForFairPlay()
+        : media.selectForFree();
     if (file == null) {
       throw TrackPlaybackException(
         TrackPlaybackFailure.unavailable,
@@ -311,7 +313,11 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
         ),
         durationMs: media.durationMs > 0 ? media.durationMs : null,
         trackId: id.toBase62(),
-        emeContent: EmeTrackContent(m4aPath: dest.path, m3u8: m3u8),
+        emeContent: EmeTrackContent(
+          m4aPath: dest.path,
+          m3u8: m3u8,
+          fileIdHex: file.fileIdHex,
+        ),
       );
     } finally {
       _loadingPaths.remove(dest.path);

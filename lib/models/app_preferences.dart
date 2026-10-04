@@ -63,12 +63,20 @@ class AppPreferences {
   final int proxyPort;
   final SpotifyGateway gateway;
 
+  /// 手动代理的认证用户名（空表示代理不需要认证）；密码是敏感信息，单独存在
+  /// StorageService 的 `sp_proxy_password` 键下，不进这份 JSON。
+  final String proxyUsername;
+
   /// Spotify 没有逐行同步歌词（只有纯文本或完全没有）时，从 LRCLIB 补全。
   final bool lyricsFallback;
   final bool canvasEnabled;
   final List<String> lyricsExcludedLanguages;
   final bool lyricsExcludeInterfaceLanguage;
   final bool lyricsAutoTranslate;
+
+  /// 双语歌词：在原文下方显示翻译（LRCLIB 对照版拆出的译文，或网易云社区翻译）。
+  /// 默认关闭：开启后才查网易云译文（会把曲名与歌手发给网易云音乐），关闭时不向网易云发任何请求。
+  final bool lyricsBilingual;
 
   /// Windows：把当前歌词嵌入任务栏（天气小组件右侧）。
   final bool taskbarLyrics;
@@ -100,11 +108,13 @@ class AppPreferences {
     this.proxyHost = '',
     this.proxyPort = 0,
     this.gateway = const SpotifyGateway(),
+    this.proxyUsername = '',
     this.lyricsFallback = true,
     this.canvasEnabled = true,
     this.lyricsExcludedLanguages = const [],
     this.lyricsExcludeInterfaceLanguage = true,
     this.lyricsAutoTranslate = true,
+    this.lyricsBilingual = false,
     this.taskbarLyrics = false,
     this.taskbarLyricsColor = TaskbarLyricsColor.auto,
     this.taskbarLyricsCustomColor = defaultTaskbarLyricsCustomColor,
@@ -139,11 +149,13 @@ class AppPreferences {
     String? proxyHost,
     int? proxyPort,
     SpotifyGateway? gateway,
+    String? proxyUsername,
     bool? lyricsFallback,
     bool? canvasEnabled,
     List<String>? lyricsExcludedLanguages,
     bool? lyricsExcludeInterfaceLanguage,
     bool? lyricsAutoTranslate,
+    bool? lyricsBilingual,
     bool? taskbarLyrics,
     TaskbarLyricsColor? taskbarLyricsColor,
     int? taskbarLyricsCustomColor,
@@ -167,6 +179,7 @@ class AppPreferences {
       proxyHost: proxyHost ?? this.proxyHost,
       proxyPort: proxyPort ?? this.proxyPort,
       gateway: gateway ?? this.gateway,
+      proxyUsername: proxyUsername ?? this.proxyUsername,
       lyricsFallback: lyricsFallback ?? this.lyricsFallback,
       canvasEnabled: canvasEnabled ?? this.canvasEnabled,
       lyricsExcludedLanguages:
@@ -174,6 +187,7 @@ class AppPreferences {
       lyricsExcludeInterfaceLanguage:
           lyricsExcludeInterfaceLanguage ?? this.lyricsExcludeInterfaceLanguage,
       lyricsAutoTranslate: lyricsAutoTranslate ?? this.lyricsAutoTranslate,
+      lyricsBilingual: lyricsBilingual ?? this.lyricsBilingual,
       taskbarLyrics: taskbarLyrics ?? this.taskbarLyrics,
       taskbarLyricsColor: taskbarLyricsColor ?? this.taskbarLyricsColor,
       taskbarLyricsCustomColor:
@@ -200,11 +214,13 @@ class AppPreferences {
     'proxyHost': proxyHost,
     'proxyPort': proxyPort,
     'gateway': gateway.toJson(),
+    'proxyUsername': proxyUsername,
     'lyricsFallback': lyricsFallback,
     'canvasEnabled': canvasEnabled,
     'lyricsExcludedLanguages': lyricsExcludedLanguages,
     'lyricsExcludeInterfaceLanguage': lyricsExcludeInterfaceLanguage,
     'lyricsAutoTranslate': lyricsAutoTranslate,
+    'lyricsBilingual': lyricsBilingual,
     'taskbarLyrics': taskbarLyrics,
     'taskbarLyricsColor': taskbarLyricsColor.name,
     'taskbarLyricsCustomColor': taskbarLyricsCustomColor,
@@ -255,6 +271,9 @@ class AppPreferences {
           : d.proxyHost,
       proxyPort: port is int && port > 0 && port <= 65535 ? port : d.proxyPort,
       gateway: SpotifyGateway.fromJson(json['gateway']),
+      proxyUsername: json['proxyUsername'] is String
+          ? (json['proxyUsername'] as String).trim()
+          : d.proxyUsername,
       lyricsFallback: flag(json['lyricsFallback'], d.lyricsFallback),
       canvasEnabled: flag(json['canvasEnabled'], d.canvasEnabled),
       lyricsExcludedLanguages: json['lyricsExcludedLanguages'] is List
@@ -278,6 +297,7 @@ class AppPreferences {
         json['lyricsAutoTranslate'],
         d.lyricsAutoTranslate,
       ),
+      lyricsBilingual: flag(json['lyricsBilingual'], d.lyricsBilingual),
       taskbarLyrics: flag(json['taskbarLyrics'], d.taskbarLyrics),
       taskbarLyricsColor: pick(
         TaskbarLyricsColor.values,
@@ -334,11 +354,13 @@ class AppPreferences {
       other.proxyHost == proxyHost &&
       other.proxyPort == proxyPort &&
       other.gateway == gateway &&
+      other.proxyUsername == proxyUsername &&
       other.lyricsFallback == lyricsFallback &&
       other.canvasEnabled == canvasEnabled &&
       listEquals(other.lyricsExcludedLanguages, lyricsExcludedLanguages) &&
       other.lyricsExcludeInterfaceLanguage == lyricsExcludeInterfaceLanguage &&
       other.lyricsAutoTranslate == lyricsAutoTranslate &&
+      other.lyricsBilingual == lyricsBilingual &&
       other.taskbarLyrics == taskbarLyrics &&
       other.taskbarLyricsColor == taskbarLyricsColor &&
       other.taskbarLyricsCustomColor == taskbarLyricsCustomColor &&
@@ -362,11 +384,13 @@ class AppPreferences {
     proxyHost,
     proxyPort,
     gateway,
+    proxyUsername,
     lyricsFallback,
     canvasEnabled,
     Object.hashAll(lyricsExcludedLanguages),
     lyricsExcludeInterfaceLanguage,
     lyricsAutoTranslate,
+    lyricsBilingual,
     taskbarLyrics,
     taskbarLyricsColor,
     taskbarLyricsCustomColor,
