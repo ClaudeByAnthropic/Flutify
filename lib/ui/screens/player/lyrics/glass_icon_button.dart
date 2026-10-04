@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/flutify_tokens.dart';
 import '../../../widgets/liquid_glass.dart';
 
 /// 圆形液态玻璃图标按钮：歌词界面上的「全屏 / 关闭 / 退出」等浮动操作。
@@ -9,7 +10,7 @@ class GlassIconButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final double size;
   final bool glass;
-  final bool selected;
+  final bool? selected;
 
   const GlassIconButton({
     super.key,
@@ -18,25 +19,30 @@ class GlassIconButton extends StatelessWidget {
     required this.onPressed,
     this.size = 40,
     this.glass = true,
-    this.selected = false,
+    this.selected,
   });
 
   @override
   Widget build(BuildContext context) {
-    final button = SizedBox.square(
-      dimension: size,
-      child: IconButton(
-        icon: Icon(icon, size: size * 0.45),
-        color: Colors.white,
-        tooltip: tooltip,
-        padding: EdgeInsets.zero,
-        style: IconButton.styleFrom(
-          backgroundColor: selected
-              ? Colors.white.withValues(alpha: 0.16)
-              : null,
+    final button = Semantics(
+      toggled: selected,
+      child: AnimatedContainer(
+        duration: context.motion(const Duration(milliseconds: 220)),
+        curve: const Cubic(0.22, 1.0, 0.36, 1.0),
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: selected == true ? Colors.white : Colors.transparent,
+          shape: BoxShape.circle,
         ),
-        isSelected: selected,
-        onPressed: onPressed,
+        child: IconButton(
+          icon: Icon(icon, size: size * 0.45),
+          color: selected == true ? Colors.black87 : Colors.white,
+          tooltip: tooltip,
+          padding: EdgeInsets.zero,
+          isSelected: selected,
+          onPressed: onPressed,
+        ),
       ),
     );
     return glass

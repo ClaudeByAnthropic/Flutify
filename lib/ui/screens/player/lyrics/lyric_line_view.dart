@@ -17,6 +17,7 @@ class LyricLineView extends StatelessWidget {
 
   /// 译文（双语歌词）：非空时以小字显示在原文下方。
   final String? translation;
+  final double translationProgress;
   final int distance;
   final bool focusAll;
   final VoidCallback? onTap;
@@ -34,6 +35,7 @@ class LyricLineView extends StatelessWidget {
     super.key,
     required this.text,
     this.translation,
+    this.translationProgress = 1,
     required this.distance,
     this.focusAll = false,
     this.onTap,
@@ -69,12 +71,13 @@ class LyricLineView extends StatelessWidget {
         child: TweenAnimationBuilder<_LineVisual>(
           tween: _LineVisualTween(end: _LineVisual(blur, opacity, scale)),
           duration: context.motion(_duration),
-          curve: Curves.easeOutCubic,
+          curve: const Cubic(0.22, 1.0, 0.36, 1.0),
           builder: (context, v, _) {
             // 透明度直接写进文字颜色，省去 Opacity 的离屏图层
             Widget result = _LineText(
               text: text,
               translation: translation,
+              translationProgress: translationProgress,
               opacity: v.opacity,
               fontSize: fontSize,
               centered: centered,
@@ -103,6 +106,7 @@ class LyricLineView extends StatelessWidget {
 class _LineText extends StatelessWidget {
   final String text;
   final String? translation;
+  final double translationProgress;
   final double opacity;
   final double fontSize;
   final bool centered;
@@ -110,6 +114,7 @@ class _LineText extends StatelessWidget {
   const _LineText({
     required this.text,
     this.translation,
+    required this.translationProgress,
     required this.opacity,
     required this.fontSize,
     required this.centered,
@@ -121,45 +126,60 @@ class _LineText extends StatelessWidget {
   Widget build(BuildContext context) {
     final isInterlude = text.trim().isEmpty || text.trim() == '♪';
     final trans = isInterlude ? null : translation?.trim();
-    return SizedBox(
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: centered
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            isInterlude ? '•  •  •' : text,
-            textAlign: centered ? TextAlign.center : TextAlign.start,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: opacity),
-              // 中文歌词：字距只轻微收紧，行高放宽并上下均分，多行时汉字不挤、不裁切
-              letterSpacing: -0.2,
-              height: 1.3,
-              leadingDistribution: TextLeadingDistribution.even,
-            ),
-          ),
-          if (trans != null && trans.isNotEmpty)
-            Padding(
-              padding: EdgeInsets.only(top: fontSize * 0.18),
-              child: Text(
-                trans,
-                textAlign: centered ? TextAlign.center : TextAlign.start,
-                style: TextStyle(
-                  fontSize: fontSize * 0.56,
-                  fontWeight: FontWeight.w600,
-                  // 译文偏灰：冷灰色 + 更低透明度，与纯白原文拉开层次
-                  color: _translationGray.withValues(alpha: opacity * 0.62),
-                  letterSpacing: -0.1,
-                  height: 1.25,
-                  leadingDistribution: TextLeadingDistribution.even,
-                ),
+    final progress = trans == null || trans.isEmpty
+        ? 0.0
+        : translationProgress.clamp(0.0, 1.0);
+    return Transform.translate(
+      offset: Offset(0, -fontSize * 0.3 * progress),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: centered
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isInterlude ? '•  •  •' : text,
+              textAlign: centered ? TextAlign.center : TextAlign.start,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w800,
+                color: Colors.white.withValues(alpha: opacity),
+                // 中文歌词：字距只轻微收紧，行高放宽并上下均分，多行时汉字不挤、不裁切
+                letterSpacing: -0.2,
+                height: 1.3,
+                leadingDistribution: TextLeadingDistribution.even,
               ),
             ),
-        ],
+            if (progress > 0)
+              Align(
+                alignment: centered ? Alignment.topCenter : Alignment.topLeft,
+                heightFactor: progress,
+                child: Padding(
+                  padding: EdgeInsets.only(top: fontSize * 0.18),
+                  child: Transform.translate(
+                    offset: Offset(0, fontSize * 0.18 * (1 - progress)),
+                    child: Text(
+                      trans!,
+                      textAlign: centered ? TextAlign.center : TextAlign.start,
+                      style: TextStyle(
+                        fontSize: fontSize * 0.56,
+                        fontWeight: FontWeight.w600,
+                        // 译文偏灰：冷灰色 + 更低透明度，与纯白原文拉开层次
+                        color: _translationGray.withValues(
+                          alpha: opacity * 0.62 * progress,
+                        ),
+                        letterSpacing: -0.1,
+                        height: 1.25,
+                        leadingDistribution: TextLeadingDistribution.even,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

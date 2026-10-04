@@ -18,6 +18,7 @@ import '../../../../core/theme/flutify_tokens.dart';
 class BreathingDots extends StatefulWidget {
   /// 播放进度。
   final ValueListenable<Duration> position;
+  final bool isPlaying;
 
   /// 叠加到进度上的提前量（与歌词切行一致），呼吸点与下一句的出现严丝合缝。
   final int leadMs;
@@ -35,6 +36,7 @@ class BreathingDots extends StatefulWidget {
   const BreathingDots({
     super.key,
     required this.position,
+    required this.isPlaying,
     required this.startMs,
     required this.endMs,
     required this.dotSize,
@@ -54,16 +56,11 @@ class _BreathingDotsState extends State<BreathingDots>
   /// 收尾「放大 → 缩小消失」的最长时长。
   static const int _finaleMs = 900;
 
-  /// 超过这么久没有新进度，视为暂停：不再外推、不再呼吸。
-  static const Duration _staleAfter = Duration(milliseconds: 700);
-
   late final Ticker _ticker = createTicker(_onTick);
-  final Stopwatch _clock = Stopwatch()..start();
-
-  /// 最近一次进度推送的位置与到达时刻。
   int _anchorMs = 0;
-  Duration _anchorAt = Duration.zero;
-  bool _advancing = false;
+  Duration _sincePosition = Duration.zero;
+  bool _reduceMotion = false;
+  bool _tickerEnabled = false;
 
   /// 呼吸相位（秒），只在播放时累加，暂停后恢复不跳变。
   double _breath = 0;
@@ -74,39 +71,61 @@ class _BreathingDotsState extends State<BreathingDots>
     super.initState();
     _anchorMs = _positionMs;
     widget.position.addListener(_onPosition);
-    _ticker.start();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion = context.reduceMotion;
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _syncTicker();
+  }
+
+  @override
+  void didUpdateWidget(covariant BreathingDots oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.position != widget.position) {
+      oldWidget.position.removeListener(_onPosition);
+      widget.position.addListener(_onPosition);
+    }
+    if (oldWidget.position != widget.position ||
+        oldWidget.leadMs != widget.leadMs ||
+        oldWidget.isPlaying != widget.isPlaying) {
+      _anchorMs = _positionMs;
+      _sincePosition = Duration.zero;
+    }
+    _syncTicker();
   }
 
   int get _positionMs => widget.position.value.inMilliseconds + widget.leadMs;
 
   void _onPosition() {
-    final ms = _positionMs;
-    // 进度前进且步长合理才算在播放；跳转 / 回退只重置锚点
-    _advancing = ms > _anchorMs && ms - _anchorMs < 2000;
-    _anchorMs = ms;
-    _anchorAt = _clock.elapsed;
-    if (!_ticker.isActive) {
+    setState(() {
+      _anchorMs = _positionMs;
+      _sincePosition = Duration.zero;
+    });
+  }
+
+  void _syncTicker() {
+    if (widget.isPlaying && !_reduceMotion && _tickerEnabled) {
+      if (_ticker.isActive) return;
       _lastTick = Duration.zero;
       _ticker.start();
+    } else {
+      _ticker.stop();
     }
   }
 
   void _onTick(Duration elapsed) {
-    final dt = (elapsed - _lastTick).inMicroseconds / 1e6;
+    final delta = elapsed - _lastTick;
     _lastTick = elapsed;
-    final stale = _clock.elapsed - _anchorAt > _staleAfter;
-    if (_advancing && !stale) _breath += dt;
-    setState(() {});
-    // 暂停：画完这一帧就停表，下次进度推送再启动
-    if (stale) _ticker.stop();
+    setState(() {
+      _sincePosition += delta;
+      _breath += delta.inMicroseconds / 1e6;
+    });
   }
 
-  /// 外推后的当前时间。
-  int get _nowMs {
-    final since = _clock.elapsed - _anchorAt;
-    if (!_advancing || since > _staleAfter) return _anchorMs;
-    return _anchorMs + since.inMilliseconds;
-  }
+  int get _nowMs => _anchorMs + _sincePosition.inMilliseconds;
 
   @override
   void dispose() {
@@ -138,7 +157,7 @@ class _BreathingDotsState extends State<BreathingDots>
 
     var scale = breathe;
     var fade = 1.0;
-    if (now > fillEnd) {
+    if (!reduceMotion && now > fillEnd) {
       // 收尾：前 40% 放大到 1.3，后 60% 缩小到 0 并淡出
       final k = (now - fillEnd) / finale;
       if (k < 0.4) {

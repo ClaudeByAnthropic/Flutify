@@ -391,7 +391,8 @@ class _InlineLyrics extends StatelessWidget {
           ),
           Positioned(
             top: 0,
-            right: 12,
+            left: isDesktop ? null : 12,
+            right: isDesktop ? 12 : null,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
