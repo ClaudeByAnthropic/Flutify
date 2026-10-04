@@ -8,6 +8,7 @@ class StorageService {
   static const String _keyRefreshToken = 'sp_refresh_token';
   static const String _keyApiBaseUrl = 'sp_api_base_url';
   static const String _keySpClientToken = 'sp_spclient_token';
+  static const String _keyProxyPassword = 'sp_proxy_password';
 
   // 会话凭据
   static const String _keyDeviceId = 'sp_device_id';
@@ -109,6 +110,12 @@ class StorageService {
   String get spClientToken => _prefs.getString(_keySpClientToken) ?? '';
   Future<bool> setSpClientToken(String value) =>
       _prefs.setString(_keySpClientToken, value);
+
+  /// 手动代理的认证密码（敏感信息单独按键存放；用户名不敏感，在 AppPreferences JSON 里）。
+  /// 空串表示代理不需要认证。
+  String get proxyPassword => _prefs.getString(_keyProxyPassword) ?? '';
+  Future<bool> setProxyPassword(String value) =>
+      _prefs.setString(_keyProxyPassword, value);
 
   // ---------------------------------------------------------------------------
   // 会话
