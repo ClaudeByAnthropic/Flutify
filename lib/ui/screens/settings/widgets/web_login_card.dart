@@ -23,6 +23,8 @@ class WebLoginCard extends StatefulWidget {
 }
 
 class _WebLoginCardState extends State<WebLoginCard> {
+  static const double _stackActionsBelow = 420;
+
   bool _busy = false;
 
   Future<void> _login() async {
@@ -62,10 +64,11 @@ class _WebLoginCardState extends State<WebLoginCard> {
         color: colorScheme.surfaceContainerHigh,
         borderRadius: context.tokens.radius(20),
       ),
-      child: Row(
-        children: [
-          // 钥匙图标块：与账号卡片的品牌标位置对应，表意「解密密钥」
-          Container(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackActions = constraints.maxWidth < _stackActionsBelow;
+          final icon = Container(
+            // 钥匙图标块：与账号卡片的品牌标位置对应，表意「解密密钥」
             width: 48,
             height: 48,
             decoration: BoxDecoration(
@@ -80,46 +83,77 @@ class _WebLoginCardState extends State<WebLoginCard> {
                   ? colorScheme.onPrimaryContainer
                   : colorScheme.onSurfaceVariant,
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.webLoginCardTitle,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+          );
+          final texts = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.webLoginCardTitle,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  signedIn
-                      ? context.l10n.webLoginReady
-                      : context.l10n.webLoginRequired,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                signedIn
+                    ? context.l10n.webLoginReady
+                    : context.l10n.webLoginRequired,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          if (signedIn)
-            TextButton(
-              onPressed: _busy ? null : _clear,
-              child: Text(context.l10n.commonClear),
-            ),
-          const SizedBox(width: 4),
-          FilledButton.tonal(
+              ),
+            ],
+          );
+          final clearButton = TextButton(
+            onPressed: _busy ? null : _clear,
+            child: Text(context.l10n.commonClear),
+          );
+          final loginButton = FilledButton.tonal(
             onPressed: _busy ? null : _login,
             child: Text(
               signedIn
                   ? context.l10n.authSignInAgain
                   : context.l10n.webLoginAction,
             ),
-          ),
-        ],
+          );
+
+          if (!stackActions) {
+            return Row(
+              children: [
+                icon,
+                const SizedBox(width: 14),
+                Expanded(child: texts),
+                const SizedBox(width: 12),
+                if (signedIn) clearButton,
+                const SizedBox(width: 4),
+                loginButton,
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  icon,
+                  const SizedBox(width: 14),
+                  Expanded(child: texts),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (signedIn) ...[
+                    clearButton,
+                    const SizedBox(width: 8),
+                  ],
+                  loginButton,
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
