@@ -6,6 +6,7 @@ import 'package:flutify_app/models/track.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
 import 'package:flutify_app/services/media_controls/audio_service_media_controls.dart';
 import 'package:flutify_app/services/media_controls/media_controls_sync.dart';
+import 'package:flutify_app/services/media_controls/system_media_controls.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -123,5 +124,82 @@ void main() {
     expect(handler.playbackState.value.speed, 0);
     audio.stateController.add(PlayerState(true, ProcessingState.ready));
     expect(handler.playbackState.value.speed, 1);
+  });
+
+  MediaTrackInfo info({String id = 't1', String artUrl = ''}) => MediaTrackInfo(
+    id: id,
+    title: 'Title',
+    artist: 'Artist',
+    album: 'Album',
+    artUrl: artUrl,
+    duration: const Duration(seconds: 100),
+  );
+
+  test('封面本地化：解析到本地文件时首次即下发 file:// 封面', () async {
+    final controls = AudioServiceMediaControls.withHandler(
+      handler,
+      (url) async {
+        expect(url, 'https://i.scdn.co/image/abc');
+        return '/tmp/flutify-cover.jpg';
+      },
+    );
+    await controls.setTrack(
+      info(artUrl: 'https://i.scdn.co/image/abc'),
+    );
+    expect(handler.mediaItem.value!.artUri, Uri.file('/tmp/flutify-cover.jpg'));
+    controls.dispose();
+  });
+
+  test('封面本地化失败或没有解析器时回退远程 URL', () async {
+    final fallback = AudioServiceMediaControls.withHandler(handler, (url) async {
+      throw StateError('下载失败');
+    });
+    await fallback.setTrack(info(artUrl: 'https://example.test/cover.jpg'));
+    expect(
+      handler.mediaItem.value!.artUri,
+      Uri.parse('https://example.test/cover.jpg'),
+    );
+
+    final plain = AudioServiceMediaControls.withHandler(handler);
+    await plain.setTrack(info(artUrl: 'https://example.test/cover.jpg'));
+    expect(
+      handler.mediaItem.value!.artUri,
+      Uri.parse('https://example.test/cover.jpg'),
+    );
+    fallback.dispose();
+    plain.dispose();
+  });
+
+  test('无封面时不设置 artUri', () async {
+    final controls = AudioServiceMediaControls.withHandler(
+      handler,
+      (url) async => '/tmp/never.jpg',
+    );
+    await controls.setTrack(info());
+    expect(handler.mediaItem.value!.artUri, isNull);
+    controls.dispose();
+  });
+
+  test('换曲期间旧封面解析完成不会覆盖新曲目', () async {
+    final first = Completer<String?>();
+    final second = Completer<String?>();
+    var calls = 0;
+    final controls = AudioServiceMediaControls.withHandler(handler, (url) {
+      calls++;
+      return calls == 1 ? first.future : second.future;
+    });
+    final old = controls.setTrack(
+      info(id: 'old', artUrl: 'https://example.test/old.jpg'),
+    );
+    final fresh = controls.setTrack(
+      info(id: 'new', artUrl: 'https://example.test/new.jpg'),
+    );
+    second.complete('/tmp/new.jpg');
+    await fresh;
+    first.complete('/tmp/old.jpg');
+    await old;
+    expect(handler.mediaItem.value!.id, 'new');
+    expect(handler.mediaItem.value!.artUri, Uri.file('/tmp/new.jpg'));
+    controls.dispose();
   });
 }

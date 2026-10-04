@@ -192,6 +192,7 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   );
   reportStage('准备缓存目录');
   await audioCacheLocation.initialize();
+  final artworkCache = ArtworkCache(audioCacheLocation);
   final sessionStore = FilePlaybackSessionStore(
     File('${supportDir.path}${Platform.pathSeparator}playback_session.json'),
   );
@@ -203,7 +204,9 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   // 系统媒体控制：Windows SMTC（任务栏 / 锁屏媒体卡片、媒体键），Android / iOS 通知栏与锁屏。
   // Windows 上再挂一个任务栏歌词，二者共用同一套本机 / 远程切换与按键路由
   reportStage('连接系统媒体控制');
-  final systemControls = await SystemMediaControls.create();
+  final systemControls = await SystemMediaControls.create(
+    artworkFile: (url) async => (await artworkCache.getSingleFile(url)).path,
+  );
   final taskbarLyrics = Platform.isWindows
       ? TaskbarLyricsControls(MethodChannelTaskbarLyrics())
       : null;
@@ -247,7 +250,6 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   await audioCacheLocation.resumeMigrations();
   emeTrackSource.maxCacheBytes = storageService.audioCacheLimitMb * 1024 * 1024;
   audioCacheLocation.addListener(() => unawaited(emeTrackSource.trimCache()));
-  final artworkCache = ArtworkCache(audioCacheLocation);
   audioCacheLocation.artworkMaintenance = artworkCache.maintain;
   CachedNetworkImageProvider.defaultCacheManager = artworkCache;
 

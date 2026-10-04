@@ -17,3 +17,17 @@
 收到新版后，在反馈 vivo 设备上验证：播放有后续曲目的歌单，展开通知并查看锁屏控制；暂停／恢复，切换前后曲目，拖动进度；熄屏后重复操作。若仍缺失，用 `adb shell dumpsys media_session` 检查 Flutify 会话的 active、actions、state、position、speed 与 metadata duration。回传前去掉其他应用会话和个人曲目信息。
 
 按钮缺失与发布资源裁剪吻合；仍需实机确认是否还有 OEM 展示策略差异。
+
+## 小米澎湃 OS：系统媒体卡片不显示封面
+
+反馈：澎湃 OS 下通知栏与控制中心的媒体通知都不显示封面（文字、按钮、进度正常）。
+
+根因：`AudioServiceMediaControls.setTrack` 把 Spotify 的远程封面 URL（`https://i.scdn.co/...`）直接作为 `MediaItem.artUri`。audio_service 对非 `file://` 的封面是两段式下发——先发一次不带封面的 metadata，下载完成后再发第二次补上封面。MIUI / 澎湃 的系统媒体框架只渲染首次 metadata，不再为后续补发的 bitmap 重绘封面，于是封面一直为空。此外 audio_service 下载封面用的是 flutter_cache_manager 的全局 `DefaultCacheManager`，与 App 自己的 `ArtworkCache`（`CachedNetworkImageProvider.defaultCacheManager`）是两套缓存，已缓存的封面无法复用。
+
+修复：
+
+- 系统媒体控制创建时注入封面本地化解析器（`main.dart` 用 `ArtworkCache.getSingleFile`），`setTrack` 先把封面落到本地文件，再以 `file://` 单次下发；audio_service 对 `file://` 不走两段式。解析失败或超时（5 秒）时回退远程 URL。
+- `AudioService.init` 补 `androidArtDownscaleSize`（512×512），限制 metadata 内联 bitmap 尺寸。
+- 封面解析是异步的，用下发序号丢弃换曲期间完成的过期结果，避免旧封面盖住新曲目。
+
+验证：`test/audio_service_media_controls_test.dart` 覆盖本地化下发、失败回退、无封面、换曲乱序四种路径；沿用 remote 的旧测试保持通过。真机确认仍需在澎湃设备上播放并查看通知栏 / 控制中心封面。
