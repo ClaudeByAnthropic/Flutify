@@ -8,6 +8,7 @@ import 'package:flutify_app/services/protocol/audio_cache_store.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/settings/sections/storage_section.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
@@ -36,6 +37,11 @@ void main() {
   late FileSelectorPlatform original;
 
   setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.flutify/cache_directories'),
+          (call) async => null,
+        );
     SharedPreferences.setMockInitialValues({});
     storage = await StorageService.init();
     temp = await Directory.systemTemp.createTemp('flutify-cache-ui-');
@@ -49,6 +55,11 @@ void main() {
     FileSelectorPlatform.instance = picker = _Picker();
   });
   tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.flutify/cache_directories'),
+          null,
+        );
     FileSelectorPlatform.instance = original;
     location.dispose();
     await temp.delete(recursive: true);
