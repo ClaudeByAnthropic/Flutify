@@ -213,18 +213,19 @@ void TaskbarLyricsPainter::PaintLyrics(const Canvas& canvas, const std::wstring&
     // 双语：原文在上（大 / 亮）、译文在下（小 / 暗）铺满整高，无上滚；
     // 两行同时逐级缩小，仍放不下由省略号裁切（DrawText 的 TrimmingEllipsis）
     const float top_h = canvas.height * 0.62f;
-    double big = big_pt * 0.95, small = small_pt;
+    double original_pt = big_pt * 0.95;
+    double translation_pt = small_pt;
     const double floor_pt = small_pt * 0.78;
     Font* ofont = nullptr;
     Font* tfont = nullptr;
     for (;;) {
-      ofont = FontFor(current, big, true);
-      tfont = FontFor(current_translation, small, false);
+      ofont = FontFor(current, original_pt, true);
+      tfont = FontFor(current_translation, translation_pt, false);
       const bool fits = MeasureWidth(canvas.graphics, current, ofont) <= avail &&
                         MeasureWidth(canvas.graphics, current_translation, tfont) <= avail;
-      if (fits || big <= floor_pt) break;
-      big -= 0.5;
-      small = (std::max)(floor_pt, small - 0.25);
+      if (fits || original_pt <= floor_pt) break;
+      original_pt -= 0.5;
+      translation_pt = (std::max)(floor_pt, translation_pt - 0.25);
     }
     DrawText(canvas, current, ofont, RectF(pad, 0, avail, top_h), 255);
     DrawText(canvas, current_translation, tfont, RectF(pad, top_h, avail, canvas.height - top_h), 185);
