@@ -1,6 +1,6 @@
 # Flutify 🎵 - Spotify-Style Music Player (Google Material 3 Expressive)
 
-> **当前版本：[最新发布（含 Beta）](https://github.com/is-hp-is-mad/Flutify/releases)** · 支持 Windows x64、Windows ARM64 与 Android
+> **当前版本：[最新发布（含 Beta）](https://github.com/is-hp-is-mad/Flutify/releases)** · 支持 Windows x64、Windows ARM64 与 Android；macOS 源码自测见 [MACOS.md](MACOS.md)
 >
 > 下载：[Releases](../../releases) 页面。Windows 解压后运行 `Flutify.exe`（需要 WebView2 运行时，Win11 自带）；
 > Android 一般选 `arm64-v8a`，不确定时选 `universal`。
@@ -406,6 +406,7 @@ $env:FLUTIFY_AUDIT='1'; & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" test -
 发布两个 Windows 便携包、两个安装包、四个 Android APK 和 `SHA256SUMS.txt`。不勾选发布时跳过发布 Job 是预期行为。
 
 桌面原生 Widevine 播放的跨平台评估见 [WIDEVINE.md](WIDEVINE.md)。
+macOS 使用单独的 FairPlay / WebKit 播放链路；CI 只上传未签名自测产物，不参与 Windows / Android 的 Release 发布，详见 [MACOS.md](MACOS.md)。
 
 ---
 

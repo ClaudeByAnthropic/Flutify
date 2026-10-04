@@ -1,7 +1,8 @@
-# 构建 Windows 与 Android 安装包。
+# 构建 Android / Windows 安装包与未签名的 macOS 自测产物。
 # - 推送 v* 标签：两端构建完成后发布到 GitHub Releases（标签含 beta / alpha / rc 时标为预发布）；
 # - 手动运行默认只构建；勾选 publish_release 并填写 release_tag 后，全部构建成功才发布。
 # - 推送到 main：只构建，产物在本次运行的 Artifacts 里。
+# - macOS 只上传未做 Developer ID 签名、公证的自测 Artifact，不参与 Releases。
 name: Build
 
 on:
@@ -44,6 +45,7 @@ jobs:
         with:
           fetch-depth: 0
       - run: node --test tool/test_release_config.cjs
+      - run: node --test tool/test_macos_workflow.cjs
       - id: config
         env:
           PUBLISH_RELEASE: ${{ inputs.publish_release }}
@@ -211,6 +213,39 @@ jobs:
             dist/*.zip
             dist/*-setup.exe
 
+  macos:
+    name: macOS
+    needs: prepare
+    env:
+      BUILD_LABEL: ${{ needs.prepare.outputs.label }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter test
+
+      - run: flutter build macos --release
+
+      # 未签名、未公证：不上 Releases，仅供开发者自测
+      - name: Zip
+        run: |
+          name="Flutify-${BUILD_LABEL}-macos.zip"
+          ditto -c -k --keepParent build/macos/Build/Products/Release/Flutify.app "$name"
+          echo "ZIP_NAME=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: ${{ env.ZIP_NAME }}
+
   release:
     name: Publish release
     if: needs.prepare.outputs.publish == 'true'
@@ -219,6 +254,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          pattern: '{android,windows-*}'
           path: dist
           merge-multiple: true
 
@@ -240,7 +276,8 @@ jobs:
           name: Flutify ${{ needs.prepare.outputs.tag }}
           prerelease: ${{ contains(needs.prepare.outputs.tag, 'beta') || contains(needs.prepare.outputs.tag, 'alpha') || contains(needs.prepare.outputs.tag, 'rc') }}
           body: |
-            Windows x64 / ARM64 提供安装版和便携版；Android 提供三种 ABI 与通用 APK。全部平台构建及产物校验通过后发布，校验和见 SHA256SUMS.txt。
+            Windows x64 / ARM64 提供安装版和便携版；Android 提供三种 ABI 与通用 APK。Windows / Android 构建及产物校验通过后发布，校验和见 SHA256SUMS.txt。
+            macOS 仅提供本次 Actions 的自测 Artifact，未做 Developer ID 签名、公证，不包含在本 Release 中。
             构建通过不代表所有设备兼容性问题已完成实机验证，已知问题见 README。
           generate_release_notes: true
           fail_on_unmatched_files: true
