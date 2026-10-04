@@ -20,7 +20,11 @@ import '../fakes/fake_track_audio_source.dart';
 /// 曾经用静态的 Scrollable.ensureVisible 对中当前行，它会沿嵌套滚动容器一路向外滚——
 /// 右栏「正在播放」列表会跟着歌词切行整体滑动。
 void main() {
-  const track = SpotifyTrack(id: 'synthetic-1', name: 'Synthetic One', durationMs: 60000);
+  const track = SpotifyTrack(
+    id: 'synthetic-1',
+    name: 'Synthetic One',
+    durationMs: 60000,
+  );
 
   testWidgets('歌词切行：内层歌词滚动，外层列表纹丝不动', (tester) async {
     tester.view.physicalSize = const Size(900, 700);
@@ -31,7 +35,10 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final storage = await StorageService.init();
     final lyrics = SpotifyLyrics(
-      lines: [for (var i = 0; i < 40; i++) LyricLine(startTimeMs: i * 1000, words: 'Line $i')],
+      lines: [
+        for (var i = 0; i < 40; i++)
+          LyricLine(startTimeMs: i * 1000, words: 'Line $i'),
+      ],
     );
     final playback = PlaybackProvider(
       FakeAudioPlayerService(),
@@ -48,7 +55,10 @@ void main() {
           ChangeNotifierProvider.value(value: playback),
           ChangeNotifierProvider(
             create: (_) => SpotifyProvider(
-              FakeSpotifyApiService(storage, lyricsById: {'synthetic-1': lyrics}),
+              FakeSpotifyApiService(
+                storage,
+                lyricsById: {'synthetic-1': lyrics},
+              ),
               storage,
             ),
           ),
@@ -87,6 +97,8 @@ void main() {
     // 进度推到靠后的行（切行提前量 300ms，25s → 第 25 行附近）
     playback.positionNotifier.value = const Duration(seconds: 25);
     await tester.pump();
+    // 滚动动画的 Ticker 在下一帧才开始计时
+    await tester.pump(const Duration(milliseconds: 16));
     await tester.pump(const Duration(milliseconds: 700));
 
     expect(inner.offset, greaterThan(0), reason: '歌词区应滚到当前行');

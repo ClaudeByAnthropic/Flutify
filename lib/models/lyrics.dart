@@ -1,11 +1,15 @@
 class LyricLine {
   final int startTimeMs;
   final String words;
+
+  /// 本行原文对应的译文（双语对照歌词拆分而来，见 `translation_merge.dart`）；无译文为空串。
+  final String translation;
   final List<String> syllables;
 
   const LyricLine({
     required this.startTimeMs,
     required this.words,
+    this.translation = '',
     this.syllables = const [],
   });
 
@@ -15,7 +19,9 @@ class LyricLine {
           ? int.tryParse(json['startTimeMs'] as String) ?? 0
           : (json['startTimeMs'] as int? ?? 0),
       words: json['words'] as String? ?? '',
-      syllables: (json['syllables'] as List<dynamic>?)
+      translation: json['translation'] as String? ?? '',
+      syllables:
+          (json['syllables'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
@@ -25,6 +31,7 @@ class LyricLine {
   Map<String, dynamic> toJson() => {
     'startTimeMs': startTimeMs,
     'words': words,
+    'translation': translation,
     'syllables': syllables,
   };
 }
@@ -56,7 +63,8 @@ class SpotifyLyrics {
     return SpotifyLyrics(
       syncType: lyricsData['syncType'] as String? ?? 'LINE_SYNCED',
       language: lyricsData['language'] as String? ?? 'en',
-      lines: (lyricsData['lines'] as List<dynamic>?)
+      lines:
+          (lyricsData['lines'] as List<dynamic>?)
               ?.map((e) => LyricLine.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],

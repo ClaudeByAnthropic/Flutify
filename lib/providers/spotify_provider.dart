@@ -51,6 +51,9 @@ class SpotifyProvider extends ChangeNotifier {
   final Map<String, SpotifyLyrics> _lyricsCache = {};
   final Map<String, Future<SpotifyLyrics>> _lyricsInFlight = {};
   int _lyricsGeneration = 0;
+
+  /// [invalidateResolvedLyrics] 时递增：在那之前发出、还没返回的请求结果作废，不再写入缓存。
+  int _lyricsEpoch = 0;
   final StreamController<String> _lyricsCached = StreamController.broadcast();
 
   /// dispose 之后异步回调不得再 notifyListeners。
@@ -229,7 +232,7 @@ class SpotifyProvider extends ChangeNotifier {
   /// 已缓存歌词的曲目数（设置页「隐私」分组展示）。
   int get cachedLyricsCount => _lyricsCache.length;
 
-  /// 歌词缓存被清空 / 某首歌被要求重新获取时递增；歌词视图据此重新加载。
+  /// 歌词缓存被清空 / 作废，或某首歌被要求重新获取时递增；歌词视图据此重新加载。
   int get lyricsGeneration => _lyricsGeneration;
 
   /// 清空歌词缓存（含 LRCLIB 补全的本地缓存）：已打开的歌词视图随之重新请求。
@@ -243,8 +246,22 @@ class SpotifyProvider extends ChangeNotifier {
     final result = cache != null
         ? await cache.clear(clearFiles: clearDisk)
         : await clearDisk?.call() ?? CacheResult();
+    final translationCache = _lyrics.translation?.cache;
+    if (translationCache != null && !identical(translationCache, cache)) {
+      result.add(await translationCache.clear());
+    }
     if (!_disposed) notifyListeners();
     return result;
+  }
+
+  /// 作废内存里已解析的歌词（含进行中的请求），LRCLIB 选词与网易云译文的本地缓存保留：
+  /// 开启「双语歌词」时调用——关闭期间解析的歌词没查过译文，已打开的歌词视图随之重新解析。
+  void invalidateResolvedLyrics() {
+    _lyricsEpoch++;
+    _lyricsCache.clear();
+    _lyricsInFlight.clear();
+    _lyricsGeneration++;
+    if (!_disposed) notifyListeners();
   }
 
   /// 重新获取一首歌的歌词：丢掉内存与本地缓存后重新查（补全歌词选错语言 / 版本时用）。
@@ -252,7 +269,7 @@ class SpotifyProvider extends ChangeNotifier {
     _lyricsCache.remove(query.trackId);
     _lyricsInFlight.clear();
     _lyricsGeneration++;
-    await _lyrics.fallback?.forget(query);
+    await _lyrics.forget(query);
     final lyrics = fetchLyrics(query);
     if (!_disposed) notifyListeners();
     return lyrics;
@@ -271,12 +288,17 @@ class SpotifyProvider extends ChangeNotifier {
     //
     // 只缓存确定的结果（含「这首歌没有歌词」）；网络 / 鉴权错误不缓存，下次打开歌词页会重试，
     // 本次对 UI 返回空歌词（显示「暂无歌词」）。
+    //
+    // 请求期间内存歌词被作废（[invalidateResolvedLyrics]）：结果照常返回给这次的调用方，但可能缺译文，
+    // 不写缓存，也不能把作废之后同一首歌新发出的请求从 _lyricsInFlight 里移除。
+    final epoch = _lyricsEpoch;
     return _lyricsInFlight[trackId] ??= _lyrics
         .resolve(query)
         .then((resolved) {
           if (resolved.cacheable &&
               !_disposed &&
-              generation == _lyricsGeneration) {
+              generation == _lyricsGeneration &&
+              epoch == _lyricsEpoch) {
             _lyricsCache[trackId] = resolved.lyrics;
             if (!_disposed) _lyricsCached.add(trackId);
           }
@@ -284,7 +306,8 @@ class SpotifyProvider extends ChangeNotifier {
         })
         .catchError((Object _) => const SpotifyLyrics(lines: []))
         .whenComplete(() {
-          if (generation == _lyricsGeneration) _lyricsInFlight.remove(trackId);
+          if (generation == _lyricsGeneration && epoch == _lyricsEpoch)
+            _lyricsInFlight.remove(trackId);
         });
   }
 

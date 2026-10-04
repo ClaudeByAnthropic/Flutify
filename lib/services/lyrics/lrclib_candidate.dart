@@ -1,5 +1,6 @@
 import '../../models/lyrics.dart';
 import 'lrc_parser.dart';
+import 'translation_merge.dart';
 
 /// LRCLIB 返回的一条歌词记录（`/api/get` 返回单个对象，`/api/search` 返回数组）。
 ///
@@ -15,9 +16,22 @@ class LrclibCandidate {
   final bool instrumental;
 
   /// 解析后的歌词行（纯音乐为空）。
-  late final List<LyricLine> lines = instrumental ? const [] : LrcParser.parse(synced);
+  late final List<LyricLine> lines = instrumental
+      ? const []
+      : LrcParser.parse(synced);
 
-  /// 被判为翻译版 / 音译 / 双语对照（由选词器写入）。
+  /// 双语对照拆分后的歌词行（译文存进 [LyricLine.translation]）；不是对照结构为 null。
+  /// 选词器的语言投票 / 打分与最终展示都以拆分结果为准。
+  late final List<LyricLine>? mergedLines = lines.isEmpty
+      ? null
+      : TranslationMerge.tryMerge(lines);
+
+  /// 拆分后所有原文行（没有对照结构时即原始歌词）。语言投票、打分只看原文、不掺译文。
+  late final String originalText = TranslationMerge.originalText(
+    mergedLines ?? lines,
+  );
+
+  /// 被判为翻译版 / 音译 / 整体混排（由选词器写入；双语对照不算，见 [mergedLines]）。
   bool rejected = false;
 
   LrclibCandidate({

@@ -78,6 +78,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get windowClose => '关闭';
 
   @override
+  String get menuPlayback => '播放';
+
+  @override
+  String get menuNavigate => '导航';
+
+  @override
+  String get menuEdit => '编辑';
+
+  @override
+  String get menuUndo => '撤销';
+
+  @override
+  String get menuRedo => '重做';
+
+  @override
+  String get menuCut => '剪切';
+
+  @override
+  String get menuCopy => '拷贝';
+
+  @override
+  String get menuPaste => '粘贴';
+
+  @override
+  String get menuSelectAll => '全选';
+
+  @override
+  String get menuWindow => '窗口';
+
+  @override
+  String get menuSettings => '设置…';
+
+  @override
   String get commonCancel => '取消';
 
   @override
@@ -498,6 +531,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String playbackErrorFairPlay(String track) {
+    return '「$track」无法解密播放：此设备无法创建 FairPlay 会话';
+  }
+
+  @override
   String playbackErrorAutoPaused(int count) {
     return '连续 $count 首无法播放，已暂停';
   }
@@ -914,6 +952,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选';
 
   @override
+  String get settingsLyricsBilingual => '双语歌词';
+
+  @override
+  String get settingsLyricsBilingualSubtitle =>
+      '开启后会把曲名和歌手发送给网易云音乐，查询社区翻译并显示在原文下方（LRCLIB 自带的双语对照也会显示）';
+
+  @override
   String get settingsTaskbarLyricsSection => '任务栏歌词';
 
   @override
@@ -1097,6 +1142,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsProxyInvalid => '请填写有效的地址和 1–65535 之间的端口';
 
   @override
+  String get settingsProxyAuth => '代理认证（可选）';
+
+  @override
+  String get settingsProxyUsernameHint => '用户名';
+
+  @override
+  String get settingsProxyPasswordHint => '密码';
+
+  @override
+  String get settingsProxyUsernameInvalid =>
+      '用户名不能包含冒号（:），冒号是用户名与密码的分隔符，代理会认证失败';
+
+  @override
+  String get settingsProxyAuthIncomplete =>
+      '用户名和密码只填一项时，HTTPS 可用；HTTP 代理认证需要两项都填写';
+
+  @override
   String get settingsProxyTest => '测试连接';
 
   @override
@@ -1114,7 +1176,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsProxyFootnote =>
-      '仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）。登录页面始终跟随系统代理设置。';
+      '仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）；手动代理可填用户名 / 密码，适合自建带认证的跨区反代。登录页面始终跟随系统代理设置。';
 
   @override
   String get settingsPrivacySection => '隐私';

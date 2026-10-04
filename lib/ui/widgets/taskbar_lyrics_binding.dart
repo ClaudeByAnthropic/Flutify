@@ -82,15 +82,21 @@ class _TaskbarLyricsBindingState extends State<TaskbarLyricsBinding> {
   Widget build(BuildContext context) {
     final controls = _controls;
     if (controls == null) return widget.child;
-    final prefs = context.select<PreferencesProvider, AppPreferences>((p) => p.prefs);
+    final prefs = context.select<PreferencesProvider, AppPreferences>(
+      (p) => p.prefs,
+    );
     final appearance = context.read<AppearanceProvider>();
     final accent = context.select<AppearanceProvider, Color>((a) => a.accent);
-    final (onDark, onLight) = prefs.taskbarLyricsColor == TaskbarLyricsColor.accent
+    final (
+      onDark,
+      onLight,
+    ) = prefs.taskbarLyricsColor == TaskbarLyricsColor.accent
         ? _tones(appearance, accent)
         : _accentTones;
     final l10n = context.l10n;
     controls.configure(
       enabled: prefs.taskbarLyrics,
+      bilingual: prefs.lyricsBilingual,
       style: TaskbarLyricsStyle(
         mode: prefs.taskbarLyricsColor,
         customColor: prefs.taskbarLyricsCustomColor,

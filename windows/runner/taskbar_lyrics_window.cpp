@@ -625,7 +625,7 @@ void TaskbarLyricsWindow::Render() {
                                  std::to_wstring(style_.font_scale) + L"|" +
                                  std::to_wstring(w) + L"x" + std::to_wstring(h);
 
-  std::wstring previous, current, next;
+  std::wstring previous, current, next, current_trans;
   float eased = 1;
   std::wstring signature;
   if (control) {
@@ -656,11 +656,12 @@ void TaskbarLyricsWindow::Render() {
       current = L"\u266A " + title_ + (artist_.empty() ? L"" : L" \u2014 " + artist_);
     } else {
       current = lines_[index].text.empty() ? L"\u266A \u266A \u266A" : lines_[index].text;
+      current_trans = lines_[index].translation;
       if (index > 0) previous = lines_[index - 1].text;
     }
     if (index + 1 < static_cast<int>(lines_.size())) next = lines_[index + 1].text;
     // 动画期间逐帧推，静止时内容不变就跳过
-    if (p >= 1) signature = L"L|" + current + L"|" + next + L"|" + style_sig;
+    if (p >= 1) signature = L"L|" + current + L"|" + current_trans + L"|" + next + L"|" + style_sig;
   }
   if (!signature.empty() && signature == frame_signature_) return;
   frame_signature_ = signature;
@@ -679,7 +680,7 @@ void TaskbarLyricsWindow::Render() {
     layout_ = painter_->PaintControl(canvas, title_.empty() ? L"Flutify" : title_, artist_, art_.get(), playing_,
                                      hovered_button_);
   } else {
-    painter_->PaintLyrics(canvas, previous, current, next, eased);
+    painter_->PaintLyrics(canvas, previous, current, next, current_trans, eased);
   }
   g.Flush(Gdiplus::FlushIntentionSync);
   Push();

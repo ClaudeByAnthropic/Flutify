@@ -104,6 +104,8 @@ TaskbarLyricsPainter::TaskbarLyricsPainter() {
 
 // 字体对象须先于字体族、字体族须先于字体集合释放
 TaskbarLyricsPainter::~TaskbarLyricsPainter() {
+  // 测宽缓存以 Font* 地址为键，与字体缓存同进同退
+  widths_.clear();
   fonts_.clear();
   system_families_.clear();
   bold_family_.reset();
@@ -151,7 +153,8 @@ Font* TaskbarLyricsPainter::FontFor(const std::wstring& text, double points, boo
   auto font = std::make_unique<Font>(family, static_cast<Gdiplus::REAL>(quarter / 4.0 * kPointToPixel), style,
                                      Gdiplus::UnitPixel);
   Font* result = font.get();
-  if (fonts_.size() > 96) fonts_.clear();
+  // 这里不做淘汰：调用方可能还持有本轮先取到的 Font*（如双语分支的 ofont），清空会悬空。
+  // 淘汰统一放在每轮绘制入口的 TrimCaches()
   fonts_[key] = std::move(font);
   return result;
 }
@@ -163,7 +166,6 @@ float TaskbarLyricsPainter::MeasureWidth(Graphics* g, const std::wstring& text, 
   if (it != widths_.end()) return it->second;
   RectF box;
   g->MeasureString(text.c_str(), static_cast<INT>(text.size()), font, PointF(0, 0), &box);
-  if (widths_.size() > 512) widths_.clear();
   widths_[key] = box.Width;
   return box.Width;
 }
@@ -177,7 +179,21 @@ void TaskbarLyricsPainter::DrawText(const Canvas& canvas, const std::wstring& te
   canvas.graphics->DrawString(text.c_str(), static_cast<INT>(text.size()), font, rect, text_format_.get(), &brush);
 }
 
+// 每轮绘制开始、尚未取得任何 Font* 时调用：字体与测宽缓存一起淘汰。
+// 测宽缓存以 Font* 地址为键，字体释放后地址可能被新字体复用，必须同时清空，否则会命中过期宽度。
+void TaskbarLyricsPainter::TrimCaches() {
+  if (fonts_.size() > 96 || widths_.size() > 512) {
+    widths_.clear();
+    fonts_.clear();
+  }
+}
+
 bool TaskbarLyricsPainter::NeedsWrap(const Canvas& canvas, const std::wstring& current) {
+  TrimCaches();
+  return WrapNeeded(canvas, current);
+}
+
+bool TaskbarLyricsPainter::WrapNeeded(const Canvas& canvas, const std::wstring& current) {
   const float pad = static_cast<float>(8 * canvas.scale);
   const float avail = canvas.width - pad * 2;
   Font* big = FontFor(current, kBigPt * canvas.scale * canvas.font_scale, true);
@@ -185,13 +201,37 @@ bool TaskbarLyricsPainter::NeedsWrap(const Canvas& canvas, const std::wstring& c
 }
 
 void TaskbarLyricsPainter::PaintLyrics(const Canvas& canvas, const std::wstring& previous,
-                                       const std::wstring& current, const std::wstring& next, float progress) {
+                                       const std::wstring& current, const std::wstring& next,
+                                       const std::wstring& current_translation, float progress) {
+  TrimCaches();
   const double big_pt = kBigPt * canvas.scale * canvas.font_scale;
   const double small_pt = kSmallPt * canvas.scale * canvas.font_scale;
   const float pad = static_cast<float>(8 * canvas.scale);
   const float avail = canvas.width - pad * 2;
 
-  if (NeedsWrap(canvas, current)) {
+  if (!current_translation.empty()) {
+    // 双语：原文在上（大 / 亮）、译文在下（小 / 暗）铺满整高，无上滚；
+    // 两行同时逐级缩小，仍放不下由省略号裁切（DrawText 的 TrimmingEllipsis）
+    const float top_h = canvas.height * 0.62f;
+    double big = big_pt * 0.95, small = small_pt;
+    const double floor_pt = small_pt * 0.78;
+    Font* ofont = nullptr;
+    Font* tfont = nullptr;
+    for (;;) {
+      ofont = FontFor(current, big, true);
+      tfont = FontFor(current_translation, small, false);
+      const bool fits = MeasureWidth(canvas.graphics, current, ofont) <= avail &&
+                        MeasureWidth(canvas.graphics, current_translation, tfont) <= avail;
+      if (fits || big <= floor_pt) break;
+      big -= 0.5;
+      small = (std::max)(floor_pt, small - 0.25);
+    }
+    DrawText(canvas, current, ofont, RectF(pad, 0, avail, top_h), 255);
+    DrawText(canvas, current_translation, tfont, RectF(pad, top_h, avail, canvas.height - top_h), 185);
+    return;
+  }
+
+  if (WrapNeeded(canvas, current)) {
     // 折两行：均分成两半铺满整高，无上滚；字号逐级缩小到两半都放得下
     std::wstring a, b;
     SplitTwo(current, &a, &b);
@@ -251,6 +291,7 @@ TaskbarLyricsPainter::ControlLayout TaskbarLyricsPainter::PaintControl(const Can
                                                                        const std::wstring& artist,
                                                                        Gdiplus::Bitmap* art, bool playing,
                                                                        Button hovered) {
+  TrimCaches();
   const double sc = canvas.scale;
   const int h = canvas.height;
   const int pad = static_cast<int>(8 * sc);

@@ -17,6 +17,7 @@ import 'taskbar_lyrics_channel.dart';
 /// - 收到曲目后按 [lyricsLoader] 取歌词（与 App 内歌词同一来源，含 LRCLIB 补全），只把逐行同步歌词推给原生；
 ///   纯文本或没有歌词时原生显示控制条（封面 + 歌名 + 按钮）；没取到时按 [retryDelays] 重试，
 ///   App 内先取到时由 [lyricsCached] 立即补上；
+/// - 打开双语歌词时重新取当前曲目的歌词（关闭期间取到的没有网易云译文），关上时剥掉译文重推；
 /// - 下载封面字节交给原生解码（只保留最近一张）；
 /// - 关闭时不向原生推任何曲目数据，开启时补推当前状态。
 /// 「打开 Flutify」「关闭任务栏歌词」由界面层（TaskbarLyricsBinding）通过回调处理。
@@ -24,7 +25,8 @@ class TaskbarLyricsControls implements SystemMediaControls {
   final TaskbarLyricsPlatform _platform;
   final http.Client _http;
 
-  final StreamController<MediaControlEvent> _events = StreamController.broadcast();
+  final StreamController<MediaControlEvent> _events =
+      StreamController.broadcast();
   StreamSubscription<TaskbarLyricsEvent>? _platformEvents;
 
   /// 取歌词 / 强制重新取歌词（由界面层接到 SpotifyProvider）。
@@ -39,6 +41,12 @@ class TaskbarLyricsControls implements SystemMediaControls {
   MediaTrackInfo? _track;
   MediaPlaybackInfo? _playback;
   DateTime _playbackAt = DateTime.now();
+
+  /// 双语歌词开关（设置页「歌词 → 双语歌词」）：关闭时剥掉译文，只推原文给原生。
+  bool _bilingual = true;
+
+  /// 最近一次推给原生的歌词行（带译文），关上双语开关时剥掉译文重推，不用重新联网。
+  List<LyricLine>? _lastLines;
 
   // 每换一次曲目递增，丢弃过期的异步结果（歌词 / 封面）
   int _generation = 0;
@@ -56,7 +64,11 @@ class TaskbarLyricsControls implements SystemMediaControls {
   TaskbarLyricsControls(
     this._platform, {
     http.Client? client,
-    this.retryDelays = const [Duration(seconds: 10), Duration(seconds: 30), Duration(seconds: 90)],
+    this.retryDelays = const [
+      Duration(seconds: 10),
+      Duration(seconds: 30),
+      Duration(seconds: 90),
+    ],
   }) : _http = client ?? http.Client() {
     _platformEvents = _platform.events.listen(_onPlatformEvent);
   }
@@ -64,7 +76,28 @@ class TaskbarLyricsControls implements SystemMediaControls {
   bool get enabled => _enabled;
 
   /// 界面层每次构建时调用；只在开关 / 样式真正变化时通知原生。
-  void configure({required bool enabled, required TaskbarLyricsStyle style}) {
+  void configure({
+    required bool enabled,
+    required TaskbarLyricsStyle style,
+    bool bilingual = true,
+  }) {
+    if (bilingual != _bilingual) {
+      _bilingual = bilingual;
+      final track = _track;
+      if (_enabled && track != null) {
+        if (bilingual) {
+          // 打开：关闭期间取到的歌词没查过网易云译文。SpotifyProvider 在偏好变化时已同步作废内存里的歌词
+          //（见 main.dart），这里重新取到的是带译文的结果；取到之前原生照常显示原文
+          _resetLyricsState();
+          unawaited(_pushLyrics(track, _generation));
+        } else if (_hasLyrics) {
+          // 关上：剥掉译文重推已取到的歌词即可
+          final lines = _lastLines;
+          if (lines != null)
+            unawaited(_platform.setLyrics(_linesForPlatform(lines)));
+        }
+      }
+    }
     if (style != _style) {
       _style = style;
       if (_enabled) unawaited(_platform.setStyle(style));
@@ -102,7 +135,11 @@ class TaskbarLyricsControls implements SystemMediaControls {
   Future<void> setPlayback(MediaPlaybackInfo info) async {
     _playback = info;
     _playbackAt = DateTime.now();
-    if (_enabled) await _platform.setPlayback(playing: info.playing, position: info.position);
+    if (_enabled)
+      await _platform.setPlayback(
+        playing: info.playing,
+        position: info.position,
+      );
   }
 
   @override
@@ -124,8 +161,13 @@ class TaskbarLyricsControls implements SystemMediaControls {
     final playback = _playback;
     if (playback != null) {
       // 开启时距上次推送已过去一段时间：按经过的时间补上进度
-      final elapsed = playback.playing ? DateTime.now().difference(_playbackAt) : Duration.zero;
-      await _platform.setPlayback(playing: playback.playing, position: playback.position + elapsed);
+      final elapsed = playback.playing
+          ? DateTime.now().difference(_playbackAt)
+          : Duration.zero;
+      await _platform.setPlayback(
+        playing: playback.playing,
+        position: playback.position + elapsed,
+      );
     }
   }
 
@@ -140,7 +182,10 @@ class TaskbarLyricsControls implements SystemMediaControls {
     await _platform.setTrack((title: track.title, artist: track.artist));
     // 先清掉上一首的歌词，新歌词到之前显示控制条，不会错配
     await _platform.setLyrics(null);
-    await Future.wait([_pushArt(track, generation), _pushLyrics(track, generation)]);
+    await Future.wait([
+      _pushArt(track, generation),
+      _pushLyrics(track, generation),
+    ]);
   }
 
   Future<void> _pushArt(MediaTrackInfo track, int generation) async {
@@ -154,14 +199,20 @@ class TaskbarLyricsControls implements SystemMediaControls {
 
   Future<Uint8List?> _download(String url) async {
     try {
-      final res = await _http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final res = await _http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
       return res.statusCode == 200 ? res.bodyBytes : null;
     } catch (_) {
       return null;
     }
   }
 
-  Future<void> _pushLyrics(MediaTrackInfo track, int generation, {bool reload = false}) async {
+  Future<void> _pushLyrics(
+    MediaTrackInfo track,
+    int generation, {
+    bool reload = false,
+  }) async {
     final loader = reload ? lyricsReloader : lyricsLoader;
     if (loader == null) return;
     SpotifyLyrics lyrics;
@@ -174,17 +225,28 @@ class TaskbarLyricsControls implements SystemMediaControls {
     if (lyrics.isSynced) {
       _hasLyrics = true;
       _retryTimer?.cancel();
-      await _platform.setLyrics(lyrics.lines);
+      _lastLines = lyrics.lines;
+      await _platform.setLyrics(_linesForPlatform(lyrics.lines));
     } else {
       await _platform.setLyrics(null);
       _scheduleRetry(track, generation);
     }
   }
 
+  /// 双语开关关闭时剥掉译文，只推原文。
+  List<LyricLine> _linesForPlatform(List<LyricLine> lines) => _bilingual
+      ? lines
+      : [
+          for (final l in lines)
+            LyricLine(startTimeMs: l.startTimeMs, words: l.words),
+        ];
+
   void _scheduleRetry(MediaTrackInfo track, int generation) {
-    if (_retries >= retryDelays.length || (_retryTimer?.isActive ?? false)) return;
+    if (_retries >= retryDelays.length || (_retryTimer?.isActive ?? false))
+      return;
     _retryTimer = Timer(retryDelays[_retries++], () {
-      if (generation == _generation && _enabled && !_hasLyrics) unawaited(_pushLyrics(track, generation));
+      if (generation == _generation && _enabled && !_hasLyrics)
+        unawaited(_pushLyrics(track, generation));
     });
   }
 
@@ -192,6 +254,7 @@ class TaskbarLyricsControls implements SystemMediaControls {
     _retryTimer?.cancel();
     _hasLyrics = false;
     _retries = 0;
+    _lastLines = null;
   }
 
   /// App 内（歌词页、右栏）取到了某首歌的歌词：若正是任务栏上这首、且任务栏还没有歌词，立即补上。
@@ -231,7 +294,11 @@ class TaskbarLyricsControls implements SystemMediaControls {
         final track = _track;
         if (track != null) {
           _resetLyricsState();
-          unawaited(_platform.setLyrics(null).then((_) => _pushLyrics(track, _generation, reload: true)));
+          unawaited(
+            _platform
+                .setLyrics(null)
+                .then((_) => _pushLyrics(track, _generation, reload: true)),
+          );
         }
     }
   }
