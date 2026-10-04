@@ -15,7 +15,6 @@ import '../../../providers/appearance_provider.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../providers/connect_provider.dart';
 import '../../navigation/app_routes.dart';
-import '../../shell/shell_breakpoints.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/connect/connect_actions.dart';
 import '../../widgets/connect/remote_progress.dart';
@@ -50,7 +49,10 @@ enum _PlayerView { artwork, lyrics, queue }
 /// 本组件只在切歌或播放上下文变化时重建；进度条、播放按钮、随机/循环、
 /// 点赞按钮均为独立订阅的子组件。
 class FullPlayerSheet extends StatefulWidget {
-  const FullPlayerSheet({super.key});
+  const FullPlayerSheet({super.key, this.fullscreen = false});
+
+  /// Presentation is selected when opening the route; resizing does not change it.
+  final bool fullscreen;
 
   /// 根据窗口宽度选择以底部面板或对话框形式打开。
   static Future<void> show(BuildContext context) => PlayerModal.show(context, (
@@ -91,7 +93,7 @@ class FullPlayerSheet extends StatefulWidget {
           ),
           child: SizedBox(
             height: windowMedia.size.height,
-            child: const FullPlayerSheet(),
+            child: const FullPlayerSheet(fullscreen: true),
           ),
         );
       },
@@ -147,10 +149,12 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
     final androidFullscreen =
         !kIsWeb &&
         defaultTargetPlatform == TargetPlatform.android &&
-        !ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+        widget.fullscreen;
     final topRadius = androidFullscreen
         ? BorderRadius.zero
-        : BorderRadius.vertical(top: Radius.circular(context.tokens.corner(32)));
+        : BorderRadius.vertical(
+            top: Radius.circular(context.tokens.corner(32)),
+          );
     if (track == null) {
       return _NothingPlaying(
         color: colorScheme.surfaceContainerLowest,
