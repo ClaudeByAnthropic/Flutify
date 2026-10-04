@@ -38,15 +38,17 @@ class TrackPlaybackMedia {
     this.externalUrls = const [],
   });
 
-  /// 是否有可用的 CENC MP4 文件。
+  /// 是否有 MP4 文件（不表示所有 DRM 后端都支持其加密格式）。
   bool get hasMp4 => mp4Files.isNotEmpty;
 
-  /// 选免费档可播的 MP4：优先 128k（MP4_128），无则取最低码率。
+  /// Widevine 路径只选 CENC 分组中的最低码率。
+  /// CBCS 即使码率更低或排列在前，也不能交给仅支持 CENC 的原生后端。
   PlaybackFile? selectForFree() {
-    if (mp4Files.isEmpty) return null;
-    final sorted = [...mp4Files]
+    final sorted = mp4Files
+        .where((f) => f.formatKey == 'file_ids_mp4')
+        .toList()
       ..sort((a, b) => a.bitrate.compareTo(b.bitrate));
-    return sorted.first;
+    return sorted.isEmpty ? null : sorted.first;
   }
 
   /// 选 FairPlay 用的 cbcs 文件：只从 `file_ids_mp4_cbcs` 分组取、取最低码率；

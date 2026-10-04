@@ -8,6 +8,8 @@ import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/screens/player/immersive_lyrics_screen.dart';
+import 'package:flutify_app/ui/screens/player/lyrics/lyrics_glass_controls.dart';
+import 'package:flutify_app/ui/screens/player/lyrics/lyrics_translation_controls.dart';
 import 'package:flutify_app/ui/screens/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -168,6 +170,32 @@ void main() {
       expect(find.byType(ImmersiveLyricsScreen), findsOneWidget);
       expect(find.text('Immersive first line'), findsOneWidget);
       expect(find.byTooltip('退出全屏歌词（Esc）'), findsOneWidget);
+
+      // Controls must remain reachable in the minimum window and a short wide window.
+      for (final size in [const Size(360, 600), const Size(1000, 600)]) {
+        tester.view.physicalSize = size;
+        await settle(tester);
+        final close = find.byTooltip('退出全屏歌词（Esc）');
+        final translate = find.byType(LyricsTranslationButton);
+        expect(tester.getSize(close).height, greaterThanOrEqualTo(48));
+        expect(
+          tester.getCenter(close).dx,
+          lessThan(tester.getCenter(translate).dx),
+        );
+        final sliders = find.descendant(
+          of: find.byType(ImmersiveLyricsScreen),
+          matching: find.byType(Slider),
+        );
+        final volume = sliders.last;
+        expect(
+          tester.getCenter(volume).dy,
+          greaterThan(
+            tester.getBottomLeft(find.byType(LyricsGlassControls)).dy,
+          ),
+        );
+        expect(tester.getBottomLeft(volume).dy, lessThanOrEqualTo(size.height));
+        expect(tester.takeException(), isNull);
+      }
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);

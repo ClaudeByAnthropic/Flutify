@@ -4,6 +4,7 @@ import 'artist_match.dart';
 import 'lrc_parser.dart';
 import 'lyric_script.dart';
 import 'lyrics_disk_cache.dart';
+import 'lyrics_title.dart';
 import 'netease_client.dart';
 import 'translation_merge.dart';
 
@@ -50,10 +51,10 @@ class NeteaseTranslationSource {
       lyricLang(TranslationMerge.originalText(originals)) != LyricLang.zh;
 
   /// 缓存键：优先用 Spotify 曲目 ID（同一首歌多次搜歌结果不变，对齐在读取时重算）。
-  /// v2：挑歌改为去版本后缀比曲名，「没找到这首歌」也落盘。
+  /// v3：兼容无括号 feat.十明 等署名，淘汰旧匹配规则留下的空缓存。
   static String cacheKey(LyricsQuery q) => q.trackId.isNotEmpty
-      ? 'netease|v2|${q.trackId}'
-      : 'netease|v2|${q.title} ${q.artist}';
+      ? 'netease|v3|${q.trackId}'
+      : 'netease|v3|${q.title} ${q.artist}';
 
   /// 删除这首歌的本地译文缓存（「重新获取歌词」）。
   Future<void> forget(LyricsQuery cacheKeyHint) async =>
@@ -121,7 +122,7 @@ class NeteaseTranslationSource {
         (await search('$title ${query.primaryArtist}')).value ??
         const <NeteaseSong>[];
     // 只按曲名重搜是给「没搜到」用的：第一次就网络错误（断网 / 风控冷却中）时重搜也是白等，结果反正不缓存
-    if (songs.isEmpty && !networkError)
+    if (pickSong(songs, query) == null && !networkError)
       songs = (await search(title)).value ?? const <NeteaseSong>[];
     final pick = pickSong(songs, query);
     return NeteaseResponse(pick, networkError: pick == null && networkError);
@@ -139,7 +140,7 @@ class NeteaseTranslationSource {
   /// 去掉版本后缀的曲名（保留大小写，搜索用）：「 - xxx」后缀与括号段只在含版本标记时去掉，
   /// 「Lemon（Cover 米津玄师）」「（伴奏）」这类不是同一份歌词的不动，挑歌时自然对不上。
   static String baseTitle(String title) {
-    var t = title.trim();
+    var t = LyricsTitle.search(title);
     final dash = _dashSuffix.firstMatch(t);
     if (dash != null && _versionWord.hasMatch(dash.group(1)!))
       t = t.substring(0, dash.start);

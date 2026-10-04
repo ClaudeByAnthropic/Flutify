@@ -1,5 +1,14 @@
 import 'dart:typed_data';
 
+/// Fixed diagnostic codes, safe to log without media bytes or arbitrary input.
+enum CencFormatFailure { unsupportedCodec, unsupportedEncryptionScheme }
+
+class CencFormatException extends FormatException {
+  const CencFormatException(this.failure) : super('Unsupported CENC format');
+
+  final CencFormatFailure failure;
+}
+
 /// A bounded parser for the single-track, fragmented AAC/CENC files delivered
 /// by the current audio source. Unsupported layouts fail before any rewriting.
 /// In particular, an absent senc is clear only for an explicitly clear sample
@@ -95,8 +104,13 @@ class CencAudio {
       final schm = _path(sinf, ['schm']);
       _min(frma, 4);
       _min(schm, 8);
-      if (_type(frma.body) != 'mp4a' || _type(schm.body + 4) != 'cenc') {
-        _bad('only AAC with cenc is supported');
+      if (_type(frma.body) != 'mp4a') {
+        throw const CencFormatException(CencFormatFailure.unsupportedCodec);
+      }
+      if (_type(schm.body + 4) != 'cenc') {
+        throw const CencFormatException(
+          CencFormatFailure.unsupportedEncryptionScheme,
+        );
       }
       final tenc = _path(sinf, ['schi', 'tenc']);
       _min(tenc, 24);

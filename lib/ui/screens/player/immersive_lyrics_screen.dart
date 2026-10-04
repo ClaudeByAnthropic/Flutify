@@ -21,6 +21,7 @@ import '../../widgets/connect/playback_shortcuts.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/liquid_glass.dart';
+import '../../widgets/menu/desktop_menu.dart';
 import '../../widgets/toast/app_toast.dart';
 import '../../widgets/track_menu.dart';
 import 'lyrics/lyrics_backdrop.dart';
@@ -42,7 +43,7 @@ const Duration _layoutDuration = Duration(milliseconds: 640);
 ///
 /// - 两种铺满方式（左上角按钮或 F11 切换，记住上次选择）：默认只铺满窗口（保留窗口按钮，顶部可拖动窗口），
 ///   或进入系统全屏铺满整个屏幕；关闭时恢复；Esc / 左上角关闭按钮退出；
-/// - 左上角玻璃胶囊：译文 + 关闭 + 切换铺满方式（macOS 只铺满窗口时排在原生交通灯右侧）；右上角音量；
+/// - 左上角玻璃胶囊：关闭 + 切换铺满方式 + 译文（macOS 窗口模式避开交通灯）；控制台下方音量；
 /// - 歌名右侧：喜欢、更多操作；右下角：歌词 / 播放队列切换；
 ///   两个面板都关闭时封面、歌名与控制台移到正中，所有切换都用 Apple 风格的非线性动画；
 /// - 遥控远程设备时展示远程曲目，歌词按远程进度滚动，控制台、音量与快捷键作用于远程设备；
@@ -106,8 +107,8 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
   /// 只铺满窗口时，顶部留给窗口按钮与拖动区的高度（与 WindowCaptionButtons 默认高度一致）。
   static const double _captionInset = 40;
 
-  /// 顶部玻璃胶囊（关闭 / 音量）的高度。
-  static const double _barHeight = 30;
+  /// 顶部按钮保持足够大的触控区域。
+  static const double _barHeight = 48;
 
   /// macOS 只铺满窗口：胶囊距窗口顶端的距离（比交通灯略低，不贴顶）。
   static const double _macBarTop = 8;
@@ -189,14 +190,14 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
     final topInset = _screen || !DesktopWindow.enabled ? 0.0 : _captionInset;
     // macOS 只铺满窗口：原生交通灯浮在左上角，胶囊排在其右侧、略低于交通灯
     final macWindow = DesktopWindow.macNativeWindow && !_screen;
-    // Windows / Linux 只铺满窗口：自绘窗口按钮在右上角，音量让到它左侧
+    // Windows / Linux 只铺满窗口：拖动区避开右上角自绘窗口按钮。
     final captionRight = topInset > 0 && !DesktopWindow.macNativeWindow
         ? WindowCaptionButtons.width
         : 0.0;
     final barTop = macWindow
         ? _macBarTop
         : topInset > 0
-        ? (topInset - _barHeight) / 2
+        ? 8.0
         : 20.0;
     final l10n = context.l10n;
     final fade = context.motion(const Duration(milliseconds: 300));
@@ -208,114 +209,115 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
     );
 
     return LyricsTranslationScope(
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: systemBarsStyle(Brightness.dark),
-        child: CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.escape): _close,
-            const SingleActivator(LogicalKeyboardKey.f11): _toggleMode,
-            // 播放类按键与主窗口相同，远程模式下控制其他设备
-            ...PlaybackShortcuts.bindings(context),
-          },
-          child: Focus(
-            autofocus: true,
-            onKeyEvent: (_, event) =>
-                PlaybackShortcuts.onSpaceKey(context, event),
-            child: MouseRegion(
-              cursor: _idle ? SystemMouseCursors.none : MouseCursor.defer,
-              onHover: (_) => _restartIdleTimer(),
-              child: Material(
-                color: Colors.black,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
-                    if (track == null)
-                      Center(
-                        child: EmptyState(
-                          icon: Icons.music_off_rounded,
-                          title: context.l10n.playerNothingPlayingTitle,
-                          message: context.l10n.lyricsNothingPlayingMessage,
-                          onDark: true,
+      child: GlassMenuScope(
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: systemBarsStyle(Brightness.dark),
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape): _close,
+              const SingleActivator(LogicalKeyboardKey.f11): _toggleMode,
+              // 播放类按键与主窗口相同，远程模式下控制其他设备
+              ...PlaybackShortcuts.bindings(context),
+            },
+            child: Focus(
+              autofocus: true,
+              onKeyEvent: (_, event) =>
+                  PlaybackShortcuts.onSpaceKey(context, event),
+              child: MouseRegion(
+                cursor: _idle ? SystemMouseCursors.none : MouseCursor.defer,
+                onHover: (_) => _restartIdleTimer(),
+                child: Material(
+                  color: Colors.black,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
+                      if (track == null)
+                        Center(
+                          child: EmptyState(
+                            icon: Icons.music_off_rounded,
+                            title: context.l10n.playerNothingPlayingTitle,
+                            message: context.l10n.lyricsNothingPlayingMessage,
+                            onDark: true,
+                          ),
+                        )
+                      else
+                        LayoutBuilder(
+                          builder: (context, box) =>
+                              box.maxWidth >= _wideBreakpoint
+                              ? _WideLayout(
+                                  track: track,
+                                  size: box.biggest,
+                                  remote: remote,
+                                  panel: _panel,
+                                )
+                              : _NarrowLayout(
+                                  track: track,
+                                  size: box.biggest,
+                                  remote: remote,
+                                  panel: _panel,
+                                  topInset:
+                                      (barTop + _barHeight).clamp(
+                                        topInset,
+                                        double.infinity,
+                                      ) +
+                                      8,
+                                ),
                         ),
-                      )
-                    else
-                      LayoutBuilder(
-                        builder: (context, box) =>
-                            box.maxWidth >= _wideBreakpoint
-                            ? _WideLayout(
-                                track: track,
-                                size: box.biggest,
-                                remote: remote,
-                                panel: _panel,
-                              )
-                            : _NarrowLayout(
-                                track: track,
-                                size: box.biggest,
-                                remote: remote,
-                                panel: _panel,
-                                topInset:
-                                    (barTop + _barHeight).clamp(
-                                      topInset,
-                                      double.infinity,
-                                    ) +
-                                    8,
-                              ),
-                      ),
-                    // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
-                    if (topInset > 0)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: captionRight,
-                        height: topInset,
-                        child: const WindowDragArea(child: SizedBox.expand()),
-                      ),
-                    Positioned(
-                      top: barTop,
-                      left: macWindow ? _macBarLeft : 18,
-                      child: idleFade(
-                        _GlassCapsule(
-                          height: _barHeight,
-                          children: [
-                            if (track != null && _panel == _Panel.lyrics)
-                              const LyricsTranslationButton(size: _barHeight),
-                            _CapsuleIcon(
-                              icon: Icons.close_rounded,
-                              tooltip: l10n.lyricsExitImmersive,
-                              onPressed: _close,
-                            ),
-                            if (DesktopWindow.enabled)
-                              _CapsuleIcon(
-                                icon: _screen
-                                    ? Icons.fullscreen_exit_rounded
-                                    : Icons.fullscreen_rounded,
-                                tooltip: _screen
-                                    ? l10n.lyricsFillWindow
-                                    : l10n.lyricsFillScreen,
-                                onPressed: _toggleMode,
-                              ),
-                          ],
+                      // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
+                      if (topInset > 0)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: captionRight,
+                          height: topInset,
+                          child: const WindowDragArea(child: SizedBox.expand()),
                         ),
-                      ),
-                    ),
-                    if (track != null) ...[
                       Positioned(
                         top: barTop,
-                        right: captionRight + 18,
+                        left: macWindow ? _macBarLeft : 18,
                         child: idleFade(
-                          _VolumeCapsule(height: _barHeight, remote: remote),
+                          _GlassCapsule(
+                            height: _barHeight,
+                            children: [
+                              _CapsuleIcon(
+                                icon: Icons.close_rounded,
+                                tooltip: l10n.lyricsExitImmersive,
+                                onPressed: _close,
+                              ),
+                              if (DesktopWindow.enabled)
+                                _CapsuleIcon(
+                                  icon: _screen
+                                      ? Icons.fullscreen_exit_rounded
+                                      : Icons.fullscreen_rounded,
+                                  tooltip: _screen
+                                      ? l10n.lyricsFillWindow
+                                      : l10n.lyricsFillScreen,
+                                  onPressed: _toggleMode,
+                                ),
+                              if (track != null && _panel == _Panel.lyrics)
+                                const LyricsTranslationButton(
+                                  size: _barHeight,
+                                  glass: false,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                      Positioned(
-                        right: 20,
-                        bottom: 20,
-                        child: idleFade(
-                          _PanelButtons(panel: _panel, onToggle: _togglePanel),
+                      if (track != null) ...[
+                        Positioned(
+                          right: 20,
+                          bottom: 20,
+                          child: idleFade(
+                            _PanelButtons(
+                              panel: _panel,
+                              onToggle: _togglePanel,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -344,11 +346,14 @@ class _WideLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     // 左栏占 5/11，右侧面板占其余
     final leftWidth = size.width * 5 / 11;
+    // 为上下留白、标题、播放控制与音量保留高度；大字体仍可滚动。
+    final maxArtHeight = (size.height - 380).clamp(0.0, 480.0);
     // 封面随窗口缩放：既不压过歌词，也不在 4K 全屏下显得局促；居中时放大一些
     final artBase = (size.height * 0.46)
         .clamp(220.0, 480.0)
-        .clamp(0.0, size.width * 0.32);
-    final artCentered = (artBase * 1.12).clamp(0.0, size.height * 0.52);
+        .clamp(0.0, size.width * 0.32)
+        .clamp(0.0, maxArtHeight);
+    final artCentered = (artBase * 1.12).clamp(0.0, maxArtHeight);
     final lyricSize = (size.height / 22).clamp(32.0, 48.0);
     final open = panel != _Panel.none;
 
@@ -385,7 +390,9 @@ class _WideLayout extends StatelessWidget {
           builder: (context, t, _) {
             final artSize = lerpDouble(artCentered, artBase, t)!;
             final centerX = lerpDouble(size.width / 2, leftWidth / 2 + 16, t)!;
-            final columnWidth = artSize + 96;
+            // 五个播放按钮与内边距至少需要 280px，不随封面继续缩窄。
+            final contentWidth = artSize.clamp(280.0, double.infinity);
+            final columnWidth = contentWidth + 96;
             return Positioned(
               left: centerX - columnWidth / 2,
               width: columnWidth,
@@ -398,16 +405,22 @@ class _WideLayout extends StatelessWidget {
                     vertical: 56,
                   ),
                   child: SizedBox(
-                    width: artSize,
+                    width: contentWidth,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _Artwork(track: track, size: artSize),
+                        Center(
+                          child: _Artwork(track: track, size: artSize),
+                        ),
                         const SizedBox(height: 26),
                         _TitleRow(track: track),
                         const SizedBox(height: 18),
-                        LyricsGlassControls(full: true, maxWidth: artSize),
+                        LyricsGlassControls(full: true, maxWidth: contentWidth),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: _VolumeCapsule(height: 48, remote: remote),
+                        ),
                       ],
                     ),
                   ),
@@ -440,7 +453,7 @@ class _NarrowLayout extends StatelessWidget {
   });
 
   static const double _headerHeight = 88;
-  static const double _controlsHeight = 170;
+  static const double _controlsHeight = 230;
 
   @override
   Widget build(BuildContext context) {
@@ -498,11 +511,18 @@ class _NarrowLayout extends StatelessWidget {
           ),
         ),
         // 底部右侧留给歌词 / 队列切换按钮
-        const Positioned(
+        Positioned(
           left: 32,
           right: 32,
           bottom: 72,
-          child: LyricsGlassControls(full: true, maxWidth: 560),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const LyricsGlassControls(full: true, maxWidth: 560),
+              const SizedBox(height: 12),
+              _VolumeCapsule(height: 48, remote: remote),
+            ],
+          ),
         ),
       ],
     );
@@ -819,17 +839,17 @@ class _CapsuleIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: Icon(icon, size: 18),
+      icon: Icon(icon, size: 24),
       color: Colors.white,
       tooltip: tooltip,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 34, height: 30),
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
       onPressed: onPressed,
     );
   }
 }
 
-/// 右上角音量：玻璃胶囊里一条白色滑杆 + 喇叭（点击静音 / 恢复）。
+/// 控制台下方音量：玻璃胶囊里一条白色滑杆 + 喇叭（点击静音 / 恢复）。
 /// 遥控远程设备时调节远程设备音量。
 class _VolumeCapsule extends StatelessWidget {
   final double height;

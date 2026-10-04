@@ -26,7 +26,7 @@ import 'lyric_line_view.dart';
 /// 歌词滚动区。
 ///
 /// 行为（对齐 Apple Music）：
-/// - 当前行顶端固定在可视区偏上的位置（上方恰好露出上一句），上下句按距离逐级模糊；
+/// - 当前行顶端停在用户设置的可视区位置，上下句按距离逐级模糊；
 /// - 前奏与间奏（无人声片段）显示三个呼吸点，只在该片段内出现，结束时收起；歌曲末尾的无人声不显示；
 /// - 用户手动拖动时全部行变清晰（[_browsing]）并显示滚动条，停手 3 秒后恢复对焦并滚回当前行；
 ///   自动滚动时不显示滚动条；
@@ -80,14 +80,11 @@ class _LyricsViewState extends State<LyricsView> {
   /// 间奏短于这个时长不显示呼吸点（一闪而过反而打扰），对焦停在上一句。
   static const int _minGapMs = 1500;
 
-  /// 当前行顶端在「未被玻璃遮挡区域」中的纵向位置比例：偏上，正好露出上一句。
-  static const double _focusFraction = 0.16;
-
   /// 切行滚动与间奏收起 / 展开共用的时长与曲线（两者同步，位置才不会跳）。
   static const Duration _scrollDuration = Duration(milliseconds: 560);
   static const Curve _scrollCurve = Cubic(0.22, 1.0, 0.36, 1.0);
 
-  /// 歌词区可视高度（由 LayoutBuilder 写入），用于把当前行对准"未被玻璃遮挡区域"的正中。
+  /// 歌词区可视高度（由 LayoutBuilder 写入），用于定位当前行。
   double _viewportHeight = 0;
 
   late final ValueListenable<Duration> _position;
@@ -263,14 +260,14 @@ class _LyricsViewState extends State<LyricsView> {
     return _activeIndex;
   }
 
-  /// 对焦行顶端的纵坐标：顶部信息区之下、偏上的位置。
+  /// 对焦行顶端的纵坐标：按用户偏好定位在未被控件遮挡的区域内。
   double get _focusTopY =>
       widget.topInset +
       (_viewportHeight - widget.topInset - widget.bottomInset).clamp(
             0.0,
             double.infinity,
           ) *
-          _focusFraction;
+          _style.lyricsFocusPosition;
 
   /// 最后一个 startTimeMs <= ms 的行；在第一行之前返回 -1。
   int _indexFor(int ms) {
@@ -380,9 +377,10 @@ class _LyricsViewState extends State<LyricsView> {
     final style = context.select<PreferencesProvider?, AppPreferences>(
       (p) => p?.prefs ?? AppPreferences.defaults,
     );
-    // 字号 / 对齐 / 双语开关变化后行高改变（双语开关决定译文行显不显示），重新把对焦行对准中心
+    // 样式或停靠位置改变后，重新定位当前行。
     if (style.lyricsScale != _style.lyricsScale ||
         style.lyricsAlign != _style.lyricsAlign ||
+        style.lyricsFocusPosition != _style.lyricsFocusPosition ||
         style.lyricsBilingual != _style.lyricsBilingual) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _scrollToActive(animate: false),
@@ -434,7 +432,7 @@ class _LyricsViewState extends State<LyricsView> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 窗口尺寸变化后重新把对焦行对准中心
+        // 窗口尺寸变化后按相同比例重新定位当前行。
         if (constraints.maxHeight != _viewportHeight) {
           _viewportHeight = constraints.maxHeight;
           WidgetsBinding.instance.addPostFrameCallback(
@@ -562,6 +560,18 @@ class _LyricsViewState extends State<LyricsView> {
                       padding: const EdgeInsets.only(top: 28),
                       child: Text(
                         context.l10n.lyricsFromLrclib,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  if (_translationIsCurrent && _translation.fromNetease)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 28),
+                      child: Text(
+                        context.l10n.lyricsTranslationFromNetease,
                         style: const TextStyle(
                           color: Colors.white54,
                           fontSize: 12,

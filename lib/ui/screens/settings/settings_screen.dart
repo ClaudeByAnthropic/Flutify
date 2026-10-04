@@ -79,15 +79,18 @@ class _MobileSettings extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.commonSettings)),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: ListView(
-            physics: const BouncingScrollPhysics(),
-            // 末尾留白 = 底部播放栏 / 导航占位（MediaQuery 底部 padding）+ 基础间距
-            padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.paddingOf(context).bottom + 40),
-            children: [..._accountCards(context), const SizedBox(height: 28), ..._singleColumn],
+      body: SafeArea(
+        top: false, // AppBar already consumes the status bar inset.
+        bottom: false, // Included in the scroll padding below.
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              // 末尾留白 = 底部播放栏 / 导航占位（MediaQuery 底部 padding）+ 基础间距
+              padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.paddingOf(context).bottom + 40),
+              children: [..._accountCards(context), const SizedBox(height: 28), ..._singleColumn],
+            ),
           ),
         ),
       ),

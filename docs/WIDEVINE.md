@@ -65,7 +65,7 @@ flutter build windows --release --no-pub --dart-define=FLUTIFY_NATIVE_WIDEVINE=t
 
 普通构建也可以在启动进程前设置 `FLUTIFY_NATIVE_WIDEVINE=1`。未启用时仍走 WebView2。ARM64 没有打包此 x64 宿主，不能按 x64 实测结果宣称可用。
 
-1. `windows_native_decryptor.dart` 等待加密媒体下载完成（最多 30 秒、64 MiB），由 `cenc_audio.dart` 解析 AAC fMP4 CENC 的 PSSH、KID、IV 与 subsamples。
+1. `track_playback_media.dart` 只从 `file_ids_mp4` 选择最低码率的 CENC 文件；`file_ids_mp4_cbcs` 留给 FairPlay。`windows_native_decryptor.dart` 等待加密媒体下载完成（最多 30 秒、64 MiB），由 `cenc_audio.dart` 解析 AAC fMP4 CENC 的 PSSH、KID、IV 与 subsamples。创建会话优先使用 HLS 清单中的 Widevine PSSH 原始字节，与现有 HLS 播放路径保持一致；清单没有该数据时使用 MP4 内的 PSSH。
 2. `windows_cdm_process.dart` 启动可执行文件旁的 `flutify_cdm_bridge.exe`，加载本机浏览器安装的 CDM，优先匹配接口 11，其次 10。账号凭据和网络请求仍留在现有 Dart 许可证客户端。
 3. 每个临时会话重新获取 application certificate，交换 CDM 原样生成的许可证请求；不提取内容密钥，不修改许可证响应。
 4. 通过匿名管道分批解密样本。全部成功后才将 MP4 的加密描述改为普通 AAC，在内存中交给 media_kit；不保存解密文件。失败、取消、切歌及释放时清理缓冲区并关闭子进程；宿主自身持有的解密缓冲区使用 `SecureZeroMemory` 清理。这不代表已审计第三方解码器的所有内存副本。
@@ -81,6 +81,20 @@ flutter build windows --release --no-pub --dart-define=FLUTIFY_NATIVE_WIDEVINE=t
 - CENC 解析、原生引擎生命周期及组件发现由自动化测试覆盖；相关测试替身输出不能当成真实 CDM 播放证据。
 
 证据：工作区 `native-bridge-check.log`、`native-license-check.log`；后续构建日志为 `windows-native-build.log`。实验版目录为 `app/build/native-widevine/windows/x64/runner/Release/`，其中包含 `Flutify.exe` 与独立宿主，不包含 CDM DLL。
+
+### `unsupported_cenc` 修复与复测（2026-10-04）
+
+用户 20:37 日志中的文件 `15a8f0998bcf63c01cbd3fbc7cd3a49a43afcb36` 实际为 AAC / **CBCS**。原选择器将 CENC、CBCS 混在一起仅按码率排序，可能把原生后端不支持的 CBCS 交给 CENC 解析器。现已限定 Widevine 路径选择明确的 `file_ids_mp4` 分组，缺少该分组时不猜测未知格式；FairPlay 继续选择 CBCS。解析器区分 `unsupportedEncryptionScheme` 和 `unsupportedCodec`，没有把 CBCS 冒充 CENC 解密。
+
+另一个差异是初始化数据来源：复测文件的 MP4 内 PSSH 为 83 字节，HLS 提供的 PSSH 为 87 字节，后者包含 `cenc` 保护格式字段。原生会话现在使用清单提供的完整原始数据，不自行拼装或修改服务元数据。新增解析器验证 PSSH 长度、版本、Widevine UUID 与数据边界；不抓取远程 key URI，不接受当前管线尚未实现的多组 PSSH 轮换。
+
+修复后的本地真实 CENC 文件解析得到 **10,194** 个加密样本。使用内嵌 PSSH、改用 HLS PSSH、改用 Edge CDM 三次有界诊断中，应用证书均成功获取（HTTP 200 / 702 B），许可证均返回 **HTTP 403**。因此格式选择和初始化数据差异已修正，但原生完整解密及出声仍未验证成功，也不能断言 403 是某一种宿主认证或令牌问题。日志现在可明确显示 `license_http_403`，失败仍回退 WebView，不连续重复请求被拒绝的许可证。
+
+证据日志：`D:/Flutify/native-format-license-check.log`、`native-hls-license-check.log`、`native-edge-hls-license-check.log`。诊断工具可显式设置 `FLUTIFY_CDM_CHECK_FETCH_MANIFEST=1` 获取本地缓存文件对应的 HLS 清单，并使用同一偏好中的代理配置；凭据与许可证正文不写入诊断日志。
+
+本轮全套 Flutter 测试 740 项通过、8 项跳过；随后新增错误分类日志测试，原生引擎、初始化数据与 FairPlay 定向回归 16 项通过（与全套有重叠，不相加）。这些自动化结果不改变上述真实许可证失败结论。
+
+本轮 Windows x64 Release 已启用原生实验并构建成功（退出 0，670.1 秒），产物为 `app/build/native-format-fix/windows/x64/runner/Release/Flutify.exe`；保留完整目录使用，其中包含 `flutify_cdm_bridge.exe`，不包含 CDM DLL。21 个随包原生程序 / 库的 VC 运行库依赖检查通过；使用新宿主加载本机 Chrome 和 Edge 组件，接口 11 初始化、无许可证时返回 `kNoKey` 及进程关闭均通过，仍不是有许可证的播放验证。构建含第三方 WebView 插件警告，没有编译错误。证据：`windows-native-format-build.log`、`native-format-runtime-check.log`、`native-format-packaged-bridge-check.log`。
 
 ### 证书与组件更新
 

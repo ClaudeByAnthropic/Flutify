@@ -58,8 +58,9 @@ void main() {
       expect(calls, 3);
     });
 
-    test('429 后重试成功', () async {
+    test('429 不立即重试，冷却结束后恢复查询', () async {
       var calls = 0;
+      var now = DateTime.utc(2026, 10, 4);
       final client = LrclibClient(
         MockClient((_) async {
           calls++;
@@ -71,7 +72,12 @@ void main() {
                 ]);
         }),
         sleep: noSleep,
+        now: () => now,
       );
+      expect((await client.search(track: 'Song')).networkError, isTrue);
+      expect((await client.get(track: 'Other', artist: 'Singer')).networkError, isTrue);
+      expect(calls, 1);
+      now = now.add(const Duration(minutes: 1));
       final res = await client.search(track: 'Song');
       expect(res.candidates, hasLength(1), reason: '没有同步歌词的记录被丢弃');
       expect(res.networkError, isFalse);

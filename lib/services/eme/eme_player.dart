@@ -803,10 +803,14 @@ class EmePlayer {
         _stateController.add(EmePlayerState.error);
       case 'widevineUnavailable':
         _widevineUnavailable = true;
-        debugPrint('[eme] Widevine 不可用（后续播放错误按缺 Widevine 归类）: ${ev['msg']}');
+        if (!useFairPlay) {
+          debugPrint('[eme] Widevine 不可用（后续播放错误按缺 Widevine 归类）: ${ev['msg']}');
+        }
       case 'fairplayUnavailable':
         _fairPlayUnavailable = true;
-        debugPrint('[eme] FairPlay 不可用（后续播放错误按缺 FairPlay 归类）: ${ev['msg']}');
+        if (useFairPlay) {
+          debugPrint('[eme] FairPlay 不可用（后续播放错误按缺 FairPlay 归类）: ${ev['msg']}');
+        }
       case 'log':
         debugPrint('[eme-js] ${ev['msg']}');
     }

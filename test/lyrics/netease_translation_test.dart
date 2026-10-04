@@ -6,6 +6,8 @@ import 'package:flutify_app/models/lyrics.dart';
 import 'package:flutify_app/models/lyrics_query.dart';
 import 'package:flutify_app/services/lyrics/lyrics_disk_cache.dart';
 import 'package:flutify_app/services/lyrics/lyrics_resolver.dart';
+import 'package:flutify_app/services/lyrics/lyrics_translation.dart';
+import 'package:flutify_app/models/app_preferences.dart';
 import 'package:flutify_app/services/lyrics/netease_client.dart';
 import 'package:flutify_app/services/lyrics/netease_translation_source.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -109,6 +111,84 @@ void main() {
     late Directory dir;
     setUp(() => dir = Directory.systemTemp.createTempSync('flutify_ne_test'));
     tearDown(() => dir.deleteSync(recursive: true));
+
+    test('Suzume source title with an unbracketed featured artist matches', () {
+      const q = LyricsQuery(
+        trackId: 'suzume',
+        title: 'すずめ',
+        artist: 'RADWIMPS, Toaka',
+        durationMs: 236000,
+      );
+      expect(
+        NeteaseTranslationSource.pickSong(const [
+          NeteaseSong(
+            id: 1,
+            name: '東京上空',
+            artists: 'RADWIMPS',
+            durationMs: 254933,
+          ),
+          NeteaseSong(
+            id: 1984758339,
+            name: 'すずめ feat.十明',
+            artists: 'RADWIMPS, 十明',
+            durationMs: 236390,
+          ),
+          NeteaseSong(
+            id: 3,
+            name: 'すずめ feat.十明',
+            artists: 'Cover Artist',
+            durationMs: 236390,
+          ),
+        ], q)?.id,
+        1984758339,
+      );
+      expect(
+        NeteaseTranslationSource.baseTitle('Song featuring Artist'),
+        'Song',
+      );
+      expect(
+        NeteaseTranslationSource.baseTitle('Song features'),
+        'Song features',
+      );
+    });
+
+    test(
+      'irrelevant search hits still allow one title-only fallback',
+      () async {
+        final keywords = <String>[];
+        final src = source((request) {
+          if (!request.url.path.contains('search')) return lyricJson();
+          final keyword = Uri.splitQueryString(request.body)['s']!;
+          keywords.add(keyword);
+          return searchJson(
+            keyword == query.title ? [song()] : [song(name: 'Other')],
+          );
+        });
+        expect((await src.find(query, originals)).lines, isNotNull);
+        expect(keywords, ['Mystery of Love Sufjan Stevens', 'Mystery of Love']);
+      },
+    );
+
+    test(
+      'old negative cache does not prevent corrected song matching',
+      () async {
+        final cache = LyricsDiskCache(dir);
+        await cache.write(
+          'netease|v2|mol',
+          const NeteaseLyricBundle().encode(),
+        );
+        final log = <String>[];
+        expect(
+          (await source(
+            mysteryOfLove,
+            cache: cache,
+            log: log,
+          ).find(query, originals)).lines,
+          isNotNull,
+        );
+        expect(log, hasLength(2));
+      },
+    );
 
     test('搜歌取译文并按文本锚定对齐到我们的时间轴', () async {
       final src = source(mysteryOfLove, cache: LyricsDiskCache(dir));
@@ -410,6 +490,85 @@ void main() {
 
   group('LyricsResolver 集成', () {
     SpotifyLyrics official() => SpotifyLyrics(lines: originals);
+
+    test(
+      'translation button searches source without preloading bilingual lyrics',
+      () async {
+        final log = <String>[];
+        final resolver = LyricsResolver(
+          (_) async => official(),
+          translation: source(mysteryOfLove, log: log),
+          translationEnabled: () => false,
+          fallbackEnabled: () => false,
+        );
+        final lyrics = (await resolver.resolve(query)).lyrics;
+        expect(log, isEmpty);
+        final controller = LyricsTranslationController(
+          lookup: resolver.translate,
+        );
+        addTearDown(controller.dispose);
+        controller.configure(
+          lyrics,
+          const AppPreferences(lyricsAutoTranslate: false),
+          'zh-Hans',
+          query: query,
+        );
+        await controller.translate();
+        expect(controller.lines?.first, '闭上双眼 仍能清晰回忆起彼时');
+        expect(controller.failed, isFalse);
+        expect(log, hasLength(2));
+      },
+    );
+
+    test(
+      'Chinese source translations follow Traditional Chinese interface',
+      () async {
+        final resolver = LyricsResolver(
+          (_) async => official(),
+          translation: source(mysteryOfLove),
+        );
+        final result = await resolver.translate(query, official(), 'zh-TW');
+        expect(result?.provider, LyricsProvider.netease);
+        expect(result?.lines.first, '閉上雙眼 仍能清晰回憶起彼時');
+        expect(official().lines.first.words, originals.first.words);
+      },
+    );
+
+    test(
+      'English target does not query a Chinese-only translation source',
+      () async {
+        final log = <String>[];
+        final resolver = LyricsResolver(
+          (_) async => official(),
+          translation: source(mysteryOfLove, log: log),
+        );
+        expect(await resolver.translate(query, official(), 'en'), isNull);
+        expect(log, isEmpty);
+      },
+    );
+
+    test(
+      'source failure is retryable, not reported as missing translation',
+      () async {
+        final resolver = LyricsResolver(
+          (_) async => official(),
+          translation: source((_) => http.Response('', 403)),
+        );
+        final controller = LyricsTranslationController(
+          lookup: resolver.translate,
+        );
+        addTearDown(controller.dispose);
+        controller.configure(
+          official(),
+          const AppPreferences(lyricsAutoTranslate: false),
+          'zh-Hans',
+          query: query,
+        );
+        await controller.translate();
+        expect(controller.failed, isTrue);
+        expect(controller.unavailable, isFalse);
+      },
+    );
 
     test('官方歌词挂上网易云译文', () async {
       final resolver = LyricsResolver(

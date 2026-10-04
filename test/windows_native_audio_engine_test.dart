@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutify_app/services/audio/audio_engine.dart';
+import 'package:flutify_app/services/eme/cenc_audio.dart';
+import 'package:flutify_app/services/eme/license_client.dart';
 import 'package:flutify_app/services/eme/windows_native_audio_engine.dart';
 import 'package:flutify_app/services/eme/windows_native_decryptor.dart';
 import 'package:flutify_app/services/protocol/progressive_download.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'fakes/fake_audio_player_service.dart';
 
@@ -64,6 +67,32 @@ void main() {
     );
   });
   tearDown(() => engine.dispose());
+
+  test('fallback logs specific safe codes for scheme and HTTP failures', () async {
+    final logs = <String>[];
+    final originalPrint = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) logs.add(message);
+    };
+    addTearDown(() => debugPrint = originalPrint);
+    for (final error in [
+      const CencFormatException(CencFormatFailure.unsupportedEncryptionScheme),
+      LicenseHttpException(403, isCertificate: false),
+    ]) {
+      engine.dispose();
+      engine = WindowsNativeAudioEngine(
+        native: native,
+        fallback: fallback,
+        decryptor: decryptor,
+      );
+      final playing = engine.playEme(content, autoplay: false);
+      decryptor.pending.last.completeError(error);
+      await playing;
+    }
+    expect(logs.join('\n'), contains('unsupportedEncryptionScheme'));
+    expect(logs.join('\n'), contains('license_http_403'));
+    expect(fallback.playedEme, [content, content]);
+  });
 
   test(
     'native success honors pause, seek and volume during license wait',

@@ -35,6 +35,13 @@ void main() {
                   'item': {
                     'metadata': {'duration': 1000},
                     'manifest': {
+                      'file_ids_mp4_cbcs': [
+                        {
+                          'file_id': '2222222222222222222222222222222222222222',
+                          'format': 10,
+                          'bitrate': 96000,
+                        },
+                      ],
                       'file_ids_mp4': [
                         {'file_id': fileId, 'format': 10, 'bitrate': 128000},
                       ],
@@ -46,9 +53,13 @@ void main() {
             200,
           );
         }
-        if (request.url.path.contains('sneaktables'))
+        if (request.url.path.contains('sneaktables')) {
+          // The HLS manifest must match the CENC file even with CBCS first.
+          expect(request.url.path, contains(fileId));
           return http.Response('#EXTM3U', 200);
+        }
         if (request.url.path.contains('storage-resolve')) {
+          expect(request.url.path, contains(fileId));
           return http.Response.bytes(
             (ProtoWriter()..string(2, 'https://cdn.test/audio')).toBytes(),
             200,

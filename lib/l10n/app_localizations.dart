@@ -1769,6 +1769,24 @@ abstract class AppLocalizations {
   /// **'歌词'**
   String get settingsLyricsSection;
 
+  /// No description provided for @settingsLyricsFocusPosition.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前行位置'**
+  String get settingsLyricsFocusPosition;
+
+  /// No description provided for @settingsLyricsFocusPositionSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'调整当前歌词在可见歌词区域中的高度，数值越大越靠下。'**
+  String get settingsLyricsFocusPositionSubtitle;
+
+  /// No description provided for @lyricsTranslationFromNetease.
+  ///
+  /// In zh, this message translates to:
+  /// **'译词来自网易云音乐社区'**
+  String get lyricsTranslationFromNetease;
+
   /// No description provided for @settingsLyricsSize.
   ///
   /// In zh, this message translates to:
@@ -1832,7 +1850,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsBilingualSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'开启后会将歌名与歌手发送至网易云音乐以寻找社区翻译，译词语言跟随界面语言'**
+  /// **'加载歌词时预取中文译词，也供任务栏歌词使用。关闭后仍可通过翻译按钮或自动翻译查找译词；查询会发送曲名与歌手到网易云音乐。'**
   String get settingsLyricsBilingualSubtitle;
 
   /// No description provided for @settingsTaskbarLyricsSection.
@@ -2834,7 +2852,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsAutoTranslateSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'优先使用 Spotify 已有译词，开启 LRCLIB 补全后也会查找其译词；中文简繁跟随界面，保留原文。'**
+  /// **'自动查找歌词源已有的译文。中文译词会按曲名、歌手查询网易云；启用 LRCLIB 补全时也会查找对照版。简繁体跟随界面。'**
   String get settingsLyricsAutoTranslateSubtitle;
 
   /// No description provided for @settingsLyricsExcludeInterface.

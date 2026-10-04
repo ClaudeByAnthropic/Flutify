@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme/system_bars.dart';
+import 'core/theme/app_text_scaler.dart';
 import 'core/utils/error_placeholder.dart';
 import 'core/utils/orientation_policy.dart';
 import 'l10n/app_locale.dart';
@@ -710,9 +711,7 @@ class _ThemedApp extends StatelessWidget {
         return MediaQuery(
           data: media.copyWith(
             // 用户字号与系统字号相乘
-            textScaler: TextScaler.linear(
-              media.textScaler.scale(1) * settings.fontScale,
-            ),
+            textScaler: AppTextScaler(media.textScaler, settings.fontScale),
             disableAnimations: media.disableAnimations || settings.reduceMotion,
           ),
           // 状态栏 / 导航栏图标随深浅色切换；全屏播放器等深色沉浸页面自行覆盖为浅色图标

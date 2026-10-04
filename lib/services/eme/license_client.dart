@@ -7,6 +7,18 @@ import 'fairplay.dart';
 /// 未显式指定时按平台默认：macOS → [fairplay]，其余 → [widevine]。
 enum EmeDrmSystem { widevine, fairplay }
 
+/// Status only: callers can report a server rejection without logging payloads.
+class LicenseHttpException extends StateError {
+  LicenseHttpException(this.statusCode, {required this.isCertificate})
+    : super('DRM ${isCertificate ? 'certificate' : 'license'} HTTP $statusCode');
+
+  final int statusCode;
+  final bool isCertificate;
+
+  String get code =>
+      '${isCertificate ? 'certificate' : 'license'}_http_$statusCode';
+}
+
 /// license / application-certificate 反代客户端（CDM 请求体 → Spotify）。
 ///
 /// DRM 体系分两种（同名维护一把客户端，避免装配层分叉）：
@@ -145,7 +157,10 @@ class WidevineLicenseClient {
           '[eme] license $name @ $host → HTTP ${res.statusCode} ${res.bodyBytes.length}B',
         );
         if (res.statusCode != 200) {
-          throw StateError('license $name 失败：HTTP ${res.statusCode}');
+          throw LicenseHttpException(
+            res.statusCode,
+            isCertificate: name == 'application-certificate',
+          );
         }
         lastGoodHost = host;
         return res.bodyBytes;

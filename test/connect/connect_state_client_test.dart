@@ -45,6 +45,35 @@ const _clusterJson = {
 }
 
 void main() {
+  test('429 blocks repeated controls and registration until Retry-After, without minting tokens', () async {
+    var now = DateTime.utc(2026, 10, 4);
+    var requests = 0;
+    var headers = 0;
+    final client = ConnectStateClient(
+      client: MockClient((_) async {
+        requests++;
+        return requests == 1
+            ? http.Response('', 429, headers: {'retry-after': '120'})
+            : http.Response('', 204);
+      }),
+      headers: () async { headers++; return {}; },
+      spclientHost: () => 'spclient.test',
+      connectionId: () => 'connection',
+      now: () => now,
+    );
+    final limited = throwsA(isA<ConnectException>().having((e) => e.statusCode, 'status', 429));
+    await expectLater(client.command('from', 'to', 'resume'), limited);
+    now = now.add(const Duration(seconds: 119));
+    await expectLater(client.registerObserver('observer', 'connection'), limited);
+    await expectLater(client.setVolume('from', 'to', 42), limited);
+    expect(requests, 1);
+    expect(headers, 1);
+    now = now.add(const Duration(seconds: 1));
+    await client.command('from', 'to', 'pause');
+    expect(requests, 2);
+    expect(headers, 2);
+  });
+
   group('registerObserver', () {
     test('PUT 路径 / 请求头 / body 正确，无 content-type 的 JSON 响应能解析', () async {
       final h = _build((_) => http.Response.bytes(utf8.encode(jsonEncode(_clusterJson)), 200));

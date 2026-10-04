@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../network/retry_after_cooldown.dart';
+
 /// 网易云音乐「搜索结果」里的一首曲目（只取歌词匹配需要的字段）。
 class NeteaseSong {
   final int id;
@@ -84,8 +86,9 @@ class NeteaseResponse<T> {
 /// - `POST /api/search/get`：按关键词搜曲目（`type=1` 单曲）；
 /// - `GET /api/song/lyric`：`lrc` 原文 LRC、`tlyric` 社区翻译 LRC（带时间轴，很多外语歌有中译）。
 ///
-/// 「没有」与「请求失败」分开：404 / 空结果记为没有；断网 / 超时 / 5xx / 429 最多再试两次，
+/// 「没有」与「请求失败」分开：404 / 空结果记为没有；断网 / 超时 / 普通 5xx 最多再试两次，
 /// 仍失败记为 [NeteaseResponse.networkError]。
+/// 429 / 带 Retry-After 的 503 遵循服务端冷却时间，不立即重试。
 ///
 /// 风控（业务码非 200，如 `-460` / `-462`；或 HTTP 403）也记为网络错误，但不重试：网易云按出口 IP
 /// 判定，马上重试照样被拒。随后 [cooldown] 内不再发请求，直接返回网络错误。
@@ -106,6 +109,7 @@ class NeteaseClient {
   final http.Client _client;
   final Future<void> Function(Duration) _sleep;
   final DateTime Function() _now;
+  final RetryAfterCooldown _rateLimit;
 
   /// 风控冷却的截止时间；null 表示没有被风控过。
   DateTime? _cooldownUntil;
@@ -115,7 +119,8 @@ class NeteaseClient {
     Future<void> Function(Duration)? sleep,
     DateTime Function()? now,
   }) : _sleep = sleep ?? Future.delayed,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _rateLimit = RetryAfterCooldown(now: now);
 
   /// 搜曲目；没有命中返回空列表。
   Future<NeteaseResponse<List<NeteaseSong>>> search(
@@ -133,7 +138,7 @@ class NeteaseClient {
             body: {'s': keyword, 'type': '1', 'limit': '$limit'},
           )
           .timeout(timeout);
-      if (res.statusCode != 200) return _http(res.statusCode);
+      if (res.statusCode != 200) return _http(res);
       try {
         final json = jsonDecode(utf8.decode(res.bodyBytes));
         if (_rejected(json)) return _blocked();
@@ -159,7 +164,7 @@ class NeteaseClient {
             headers: _headers,
           )
           .timeout(timeout);
-      if (res.statusCode != 200) return _http(res.statusCode);
+      if (res.statusCode != 200) return _http(res);
       try {
         final json = jsonDecode(utf8.decode(res.bodyBytes));
         if (json is! Map) return const NeteaseResponse(NeteaseLyricBundle());
@@ -185,9 +190,11 @@ class NeteaseClient {
   static bool _rejected(Object? json) =>
       json is Map && json['code'] is num && json['code'] != 200;
 
-  NeteaseResponse<T> _http<T>(int code) {
+  NeteaseResponse<T> _http<T>(http.Response response) {
+    if (_rateLimit.observe(response)) return const NeteaseResponse(null, networkError: true);
+    final code = response.statusCode;
     if (code == 403) return _blocked();
-    if (code >= 500 || code == 429 || code == 0)
+    if (code >= 500 || code == 0)
       return const NeteaseResponse(null, networkError: true);
     // 404 = 没有这条；其余 4xx 不当成可重试的故障，按「没有」处理
     return NeteaseResponse(null);
@@ -201,7 +208,7 @@ class NeteaseClient {
 
   bool get _coolingDown {
     final until = _cooldownUntil;
-    return until != null && _now().isBefore(until);
+    return _rateLimit.active || (until != null && _now().isBefore(until));
   }
 
   Future<NeteaseResponse<T>> _retry<T>(

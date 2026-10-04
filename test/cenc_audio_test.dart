@@ -17,12 +17,14 @@ Uint8List fixture({
   bool subsamples = false,
   bool omitSenc = false,
   int sencCount = 2,
+  String scheme = 'cenc',
+  String codec = 'mp4a',
 }) {
   final kid = List<int>.generate(16, (i) => i);
   final tenc = box('tenc', [0, 0, 0, 0, 0, 0, 1, 8, ...kid]);
   final sinf = box('sinf', [
-    ...box('frma', 'mp4a'.codeUnits),
-    ...box('schm', [...u32(0), ...'cenc'.codeUnits, ...u32(0x10000)]),
+    ...box('frma', codec.codeUnits),
+    ...box('schm', [...u32(0), ...scheme.codeUnits, ...u32(0x10000)]),
     ...box('schi', tenc),
   ]);
   final stsd = box('stsd', [
@@ -116,6 +118,33 @@ Uint8List fixture({
 }
 
 void main() {
+  test('CBCS is rejected before sample rewriting with a fixed diagnostic', () {
+    final bytes = fixture(scheme: 'cbcs');
+    final before = Uint8List.fromList(bytes);
+    expect(
+      () => CencAudio.parse(bytes),
+      throwsA(
+        isA<CencFormatException>().having(
+          (e) => e.failure,
+          'failure',
+          CencFormatFailure.unsupportedEncryptionScheme,
+        ),
+      ),
+    );
+    expect(bytes, before);
+  });
+  test('unsupported codec is distinguishable from encryption scheme', () {
+    expect(
+      () => CencAudio.parse(fixture(codec: 'Opus')),
+      throwsA(
+        isA<CencFormatException>().having(
+          (e) => e.failure,
+          'failure',
+          CencFormatFailure.unsupportedCodec,
+        ),
+      ),
+    );
+  });
   test(
     'description switch preserves clear lead-in and parses default sample sizes',
     () {

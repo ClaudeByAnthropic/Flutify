@@ -3,11 +3,11 @@ class LyricsTitle {
   LyricsTitle._();
 
   static final _credit = RegExp(
-    r'\s*[\[(（]\s*(?:feat\.?|ft\.?|featuring)\s+[^\])）]+[\])）]',
+    r'\s*[\[(（]\s*(?:feat\.\s*|ft\.\s*|(?:feat|ft|featuring)\s+)[^\])）]+[\])）]',
     caseSensitive: false,
   );
   static final _trailingCredit = RegExp(
-    r'\s+(?:[-–—]\s*)?(?:feat\.?|ft\.?|featuring)\s+[^\[\]()（）]+$',
+    r'\s+(?:[-–—]\s*)?(?:feat\.\s*|ft\.\s*|(?:feat|ft|featuring)\s+)[^\[\]()（）]+$',
     caseSensitive: false,
   );
 

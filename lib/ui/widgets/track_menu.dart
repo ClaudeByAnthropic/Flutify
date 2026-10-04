@@ -60,7 +60,8 @@ class TrackMenu {
     SpotifyTrack track, {
     Offset? position,
   }) {
-    if (!ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)) {
+    if (!GlassMenuScope.of(context) &&
+        !ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)) {
       return TrackOptionsSheet.show(context, track);
     }
     return _showDesktop(

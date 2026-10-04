@@ -9,7 +9,7 @@ import '../widgets/settings_section.dart';
 import '../widgets/settings_segmented.dart';
 import '../widgets/settings_slider_tile.dart';
 
-/// 歌词：字号、对齐、其他行模糊强度、LRCLIB 补全、双语歌词（开启才查网易云译文）、全屏歌词默认铺满屏幕还是窗口。
+/// 歌词：字号、对齐、当前行位置、模糊强度、来源补全、译词预取与全屏偏好。
 ///
 /// 对所有歌词视图生效（右栏、手机歌词面板、全屏播放器、沉浸式歌词，含远程模式）。
 class LyricsSection extends StatelessWidget {
@@ -74,6 +74,19 @@ class LyricsSection extends StatelessWidget {
             onChanged: (v) =>
                 provider.update(provider.prefs.copyWith(lyricsAlign: v)),
           ),
+        ),
+        SettingsSliderTile(
+          title: l10n.settingsLyricsFocusPosition,
+          subtitle: l10n.settingsLyricsFocusPositionSubtitle,
+          value: prefs.lyricsFocusPosition,
+          min: AppPreferences.minLyricsFocusPosition,
+          max: AppPreferences.maxLyricsFocusPosition,
+          divisions: 30,
+          minIcon: Icons.vertical_align_top_rounded,
+          maxIcon: Icons.vertical_align_bottom_rounded,
+          labelOf: (v) => '${(v * 100).round()}%',
+          onChanged: (v) =>
+              provider.update(provider.prefs.copyWith(lyricsFocusPosition: v)),
         ),
         SettingsSliderTile(
           title: l10n.settingsLyricsBlur,

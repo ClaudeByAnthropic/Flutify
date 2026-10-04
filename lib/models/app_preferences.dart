@@ -34,6 +34,9 @@ class AppPreferences {
   final double lyricsScale;
   final LyricsAlign lyricsAlign;
 
+  /// 当前歌词行顶端在可见歌词区域中的纵向比例，避开顶部 / 底部控件。
+  final double lyricsFocusPosition;
+
   /// 非当前行的模糊强度倍率：0 = 不模糊，1 = 默认（Apple Music 观感），2 = 加倍。
   final double lyricsBlur;
 
@@ -75,7 +78,7 @@ class AppPreferences {
   final bool lyricsAutoTranslate;
 
   /// 双语歌词：在原文下方显示翻译（LRCLIB 对照版拆出的译文，或网易云社区翻译）。
-  /// 默认关闭：开启后才查网易云译文（会把曲名与歌手发给网易云音乐），关闭时不向网易云发任何请求。
+  /// 默认关闭；开启后预取网易云译文。主动翻译 / 自动翻译仍可独立查询，会发送曲名与歌手。
   final bool lyricsBilingual;
 
   /// Windows：把当前歌词嵌入任务栏（天气小组件右侧）。
@@ -96,6 +99,7 @@ class AppPreferences {
     this.language = AppLanguage.zh,
     this.lyricsScale = 1.0,
     this.lyricsAlign = LyricsAlign.left,
+    this.lyricsFocusPosition = 0.16,
     this.lyricsBlur = 1.0,
     this.startPage = StartPage.home,
     this.rememberWindow = true,
@@ -126,6 +130,8 @@ class AppPreferences {
 
   static const double minLyricsScale = 0.8;
   static const double maxLyricsScale = 1.4;
+  static const double minLyricsFocusPosition = 0.10;
+  static const double maxLyricsFocusPosition = 0.70;
   static const double maxLyricsBlur = 2.0;
   static const int maxRemoteLyricsLeadMs = 2000;
   static const int minTaskbarLyricsOpacity = 15;
@@ -137,6 +143,7 @@ class AppPreferences {
     AppLanguage? language,
     double? lyricsScale,
     LyricsAlign? lyricsAlign,
+    double? lyricsFocusPosition,
     double? lyricsBlur,
     StartPage? startPage,
     bool? rememberWindow,
@@ -166,6 +173,7 @@ class AppPreferences {
       language: language ?? this.language,
       lyricsScale: lyricsScale ?? this.lyricsScale,
       lyricsAlign: lyricsAlign ?? this.lyricsAlign,
+      lyricsFocusPosition: lyricsFocusPosition ?? this.lyricsFocusPosition,
       lyricsBlur: lyricsBlur ?? this.lyricsBlur,
       startPage: startPage ?? this.startPage,
       rememberWindow: rememberWindow ?? this.rememberWindow,
@@ -202,6 +210,7 @@ class AppPreferences {
     'language': language.name,
     'lyricsScale': lyricsScale,
     'lyricsAlign': lyricsAlign.name,
+    'lyricsFocusPosition': lyricsFocusPosition,
     'lyricsBlur': lyricsBlur,
     'startPage': startPage.name,
     'rememberWindow': rememberWindow,
@@ -250,6 +259,12 @@ class AppPreferences {
         maxLyricsScale,
       ),
       lyricsAlign: pick(LyricsAlign.values, json['lyricsAlign'], d.lyricsAlign),
+      lyricsFocusPosition: number(
+        json['lyricsFocusPosition'],
+        d.lyricsFocusPosition,
+        minLyricsFocusPosition,
+        maxLyricsFocusPosition,
+      ),
       lyricsBlur: number(json['lyricsBlur'], d.lyricsBlur, 0, maxLyricsBlur),
       startPage: pick(StartPage.values, json['startPage'], d.startPage),
       rememberWindow: flag(json['rememberWindow'], d.rememberWindow),
@@ -342,6 +357,7 @@ class AppPreferences {
       other.language == language &&
       other.lyricsScale == lyricsScale &&
       other.lyricsAlign == lyricsAlign &&
+      other.lyricsFocusPosition == lyricsFocusPosition &&
       other.lyricsBlur == lyricsBlur &&
       other.startPage == startPage &&
       other.rememberWindow == rememberWindow &&
@@ -372,6 +388,7 @@ class AppPreferences {
     language,
     lyricsScale,
     lyricsAlign,
+    lyricsFocusPosition,
     lyricsBlur,
     startPage,
     rememberWindow,

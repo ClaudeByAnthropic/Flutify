@@ -233,18 +233,24 @@ class _MainShellState extends State<MainShell> {
               autofocus: true,
               onKeyEvent: (_, event) =>
                   PlaybackShortcuts.onSpaceKey(context, event),
-              child: DesktopShell(
-                pages: _pages(),
-                topBar: DesktopTopBar(
-                  history: _histories[_currentIndex],
-                  homeSelected: _currentIndex == _home,
-                  onHome: () => _select(_home),
-                  searchController: _searchController,
-                  searchFocus: _searchFocus,
-                  onSearchChanged: _onSearchChanged,
-                  onSearchSubmitted: _onSearchSubmitted,
-                  onSearchActivated: _activateSearch,
-                  onOpenSettings: _openSettings,
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                // Wide layouts also run on Android tablets and foldables.
+                child: SafeArea(
+                  child: DesktopShell(
+                    pages: _pages(),
+                    topBar: DesktopTopBar(
+                      history: _histories[_currentIndex],
+                      homeSelected: _currentIndex == _home,
+                      onHome: () => _select(_home),
+                      searchController: _searchController,
+                      searchFocus: _searchFocus,
+                      onSearchChanged: _onSearchChanged,
+                      onSearchSubmitted: _onSearchSubmitted,
+                      onSearchActivated: _activateSearch,
+                      onOpenSettings: _openSettings,
+                    ),
+                  ),
                 ),
               ),
             ),

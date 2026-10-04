@@ -1,8 +1,10 @@
 import '../../models/lyrics.dart';
 import '../../models/lyrics_query.dart';
 import 'lrclib_lyrics_source.dart';
+import 'lyrics_language.dart';
 import 'lyrics_translation.dart';
 import 'netease_translation_source.dart';
+import 'zh_script.dart';
 
 /// 合并后的歌词与是否可以缓存（网络问题导致的结果不缓存，下次打开会重试）。
 class ResolvedLyrics {
@@ -22,10 +24,9 @@ class ResolvedLyrics {
 /// | 没有歌词（404） | LRCLIB 找到就用，否则为空 |
 /// | 请求失败 | LRCLIB 找到就用，否则抛出原错误（调用方显示「暂无歌词」且不缓存） |
 ///
-/// 译文（歌词行还没有译文时）：只在「双语歌词」开启时查——查询会把曲名与歌手发给网易云音乐，
-/// 关闭时一个网易云请求都不发（LRCLIB 对照版自带的译文不受影响，显不显示由界面按开关决定）。
-/// 关闭期间解析的歌词不带网易云译文，开启时由调用方丢掉内存里的结果重新解析
-///（见 SpotifyProvider.invalidateResolvedLyrics）。查一次网易云，查不到就保持单语；
+/// 「双语歌词」决定加载原文时是否预取网易云译文；翻译按钮 / 自动翻译通过 translate 独立查询。
+/// 查询会把曲名与歌手发给网易云音乐。预取开关变化时由调用方重新解析
+///（见 SpotifyProvider.invalidateResolvedLyrics）。查不到译文时保持单语；
 /// 查询遇网络错误时把结果标记为不可缓存，下次打开歌词会重新尝试（原文本身已有缓存，重试很便宜）。
 class LyricsResolver {
   final Future<SpotifyLyrics> Function(String trackId) _official;
@@ -39,7 +40,7 @@ class LyricsResolver {
   /// 设置里是否开启了补全；为 false 时行为与只用官方歌词相同。
   final bool Function() _fallbackEnabled;
 
-  /// 设置里是否开启了双语歌词；为 false 时不查译文（不向网易云发任何请求）。
+  /// 是否在加载原文时预取双语歌词；主动翻译由 translate 单独处理。
   final bool Function() _translationEnabled;
 
   LyricsResolver(
@@ -51,13 +52,56 @@ class LyricsResolver {
   }) : _fallbackEnabled = fallbackEnabled ?? (() => true),
        _translationEnabled = translationEnabled ?? (() => true);
 
+  /// 翻译按钮或自动翻译明确发起的查询，不依赖「预加载双语歌词」开关。
+  /// 网易云提供中文社区译词；只转换译词字形，不把原文转字形冒充翻译。
   Future<LyricsTranslation?> translate(
     LyricsQuery query,
     SpotifyLyrics lyrics,
     String target,
-  ) async => _fallbackEnabled()
-      ? await fallback?.findTranslation(query, lyrics, target)
-      : null;
+  ) async {
+    final embedded = LyricsTranslationController.official(lyrics, target);
+    if (embedded != null) return embedded;
+    if (!lyrics.isSynced || lyrics.lines.isEmpty) return null;
+    final language = LyricsLanguage.normalize(target);
+    var networkError = false;
+    final source = translation;
+    if (source != null && language.startsWith('zh')) {
+      try {
+        final found = await source.find(query, lyrics.lines);
+        networkError = found.networkError;
+        final lines = found.lines;
+        if (lines != null &&
+            lines.length == lyrics.lines.length &&
+            lines.any((line) => line.words.trim().isNotEmpty)) {
+          final code = LyricsLanguage.of(
+            'und',
+            lines.map((l) => l.words).join('\n'),
+          );
+          if (code.startsWith('zh')) {
+            return LyricsTranslation(
+              List.unmodifiable(
+                lines.map(
+                  (line) => ZhScript.convert(
+                    line.words,
+                    toSimplified: language != 'zh-Hant',
+                  ),
+                ),
+              ),
+              LyricsProvider.netease,
+            );
+          }
+        }
+      } catch (_) {
+        networkError = true;
+      }
+    }
+    if (_fallbackEnabled()) {
+      final found = await fallback?.findTranslation(query, lyrics, target);
+      if (found != null) return found;
+    }
+    if (networkError) throw StateError('Lyrics translation source unavailable');
+    return null;
+  }
 
   Future<ResolvedLyrics> resolve(LyricsQuery query) async {
     var resolved = await _resolveOriginal(query);

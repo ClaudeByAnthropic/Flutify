@@ -5,6 +5,7 @@ import 'flutify_tokens.dart';
 import 'md3e_colors.dart';
 import 'md3e_shapes.dart';
 import 'md3e_typography.dart';
+import 'system_bars.dart';
 
 /// Complete Material 3 Expressive (MD3E) Theme Provider
 class MD3ETheme {
@@ -63,7 +64,9 @@ class MD3ETheme {
 
       // App Bar Theme
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: colorScheme.surface,
+        // AppBar creates its own overlay region, overriding the app-wide one.
+        systemOverlayStyle: systemBarsStyle(colorScheme.brightness),
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,

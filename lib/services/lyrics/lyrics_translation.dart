@@ -41,6 +41,7 @@ class LyricsTranslationController extends ChangeNotifier {
 
   List<String>? get lines => _translation?.lines;
   bool get fromLrclib => _translation?.provider == LyricsProvider.lrclib;
+  bool get fromNetease => _translation?.provider == LyricsProvider.netease;
   bool get available => _lyrics != null && _lyrics!.lines.isNotEmpty;
   bool get unavailable =>
       _attempted && !failed && !busy && _translation == null;

@@ -112,22 +112,54 @@
 
 依据：`providers/spotify_provider.dart`、`services/pathfinder/desktop_data_source.dart`、`ui/screens/home/`、`l10n/app_ja.arb`、`ui/screens/settings/sections/language_section.dart`；`test/home_refresh_test.dart`、`desktop_home_refresh_test.dart`、`ui/home_refresh_test.dart`、`ui/settings_more_test.dart`。
 
+### 4.5 Android 系统栏、交互与请求节制
+
+- AppBar 显式按背景明暗设置系统栏图标，修复设置页浅色背景上的白色状态栏图标；设置内容保留侧边安全区，宽屏主界面也避开系统区域。设置页恢复平台滚动物理效果。
+- 设置行采用至少 56 逻辑像素高度，修复水波纹承载层，并合并开关标题、状态与操作语义；应用字号与系统文字缩放组合，保留系统非线性缩放。
+- LRCLIB、网易歌词和 Connect 状态查询收到 429 或带 `Retry-After` 的 503 后，共享各自客户端的冷却时间，后续候选查询也遵守冷却；支持秒数及 HTTP 日期。此保护未覆盖所有 Spotify API、接收端或许可证请求，不能称为全应用限流。
+- Windows EME 只报告当前使用的 DRM 系统缺失，去掉无关的 FairPlay 不可用提示。原生媒体误选 CBCS、初始化数据来源和失败分类的修复见 [WIDEVINE.md](WIDEVINE.md)。
+- **自动点击同意按用户确认保留，作为减少操作步骤的预期功能，不列为待删除问题。** 登录页跨平台固定 Windows Chrome User-Agent 是另一项兼容性问题，与是否自动同意分别评估。
+
+仍需处理的审查项：
+
+| 项目 | 现状与影响 |
+| --- | --- |
+| 凭据存储与备份 | `storage_service.dart` 将令牌、刷新令牌、`sp_dc` 和代理密码写入普通 SharedPreferences；受操作系统应用目录权限保护，但未使用系统凭据库，Android 清单也未配置相应备份排除 |
+| 平板触控 | 宽屏布局仍复用桌面播放器中的 32 / 36 逻辑像素按钮，需要覆盖平板上至少 48 的触摸目标 |
+| MD3E 组件 | 一些滑块仍使用旧式细轨道、圆形滑块；启用 `useMaterial3` 不等于所有组件已符合 MD3E |
+| 错误恢复 | 部分 403 被解释为令牌失效，可能产生不准确的重新登录提示；需按端点和明确错误语义区分 |
+| 服务协议 | 内部接口、跨平台复用官方客户端身份与广告跳过仍有服务兼容性 / 策略风险；保留用户要求的跳过功能，不伪造广告收听，也不据此推断具体封号概率 |
+
+系统栏与交互有 widget 测试覆盖，尚无 Android 实机截图或本轮 APK：本机未安装 Android SDK，构建停在 SDK 检查。
+
 ## 5. 验证与未验证范围
 
 | 验证 | 结果 | 边界 |
 | --- | --- | --- |
-| `flutter test --no-pub` | 586 项通过，6 项显式跳过 | 包含 Connect 撤销播放状态、切走后立即恢复、Android 原生异步加载取消，以及广告跳过、首页刷新、四种界面语言、源译词和原生播放回退等；使用 HTTP / 播放测试替身，跳过项不计为通过；双设备实机切换仍待验证 |
-| `flutter build windows --release --no-pub --dart-define=FLUTIFY_NATIVE_WIDEVINE=true` | 本地 Windows x64 Release 构建成功，退出 0，118.1 秒 | 包含 CDM 子进程；保留第三方 WebView CMake 开发警告，构建通过不等于真实播放通过；此记录早于发布版本号更新 |
+| `flutter test --no-pub` | 740 项通过，8 项显式跳过 | 包含 Connect、歌词、系统栏与交互、CENC 选择、HLS 初始化数据和原生回退等；使用 HTTP / 播放测试替身，跳过项不计为通过；双设备实机切换仍待验证 |
+| 最后一次定向 Flutter 回归 | 16 项通过 | 全套之后新增错误分类日志测试；覆盖原生引擎、HLS 初始化数据和 FairPlay，与全套有重叠，不相加 |
+| EME JavaScript 与自动同意测试 | 19 项通过 | 保留自动同意行为；不是实机浏览器兼容性验证 |
+| Android 本地构建 | 未生成 APK：No Android SDK found | 系统栏效果仍需 Android 实机验证 |
+| `flutter build windows --release --no-pub --dart-define=FLUTIFY_NATIVE_WIDEVINE=true` | 本轮 Windows x64 Release 构建成功，退出 0，670.1 秒 | 包含 CDM 子进程；保留第三方 WebView 插件警告，构建通过不等于真实播放通过 |
 | ProxyServer `npm test` | 23 项通过 | 包含头清理、出口连接及 WebSocket 等边界；本轮未更改代理代码 |
-| Windows x64 随包 CDM 子进程检查 | Chrome / Edge 组件均退出 0，接口 11 初始化通过；8185 个加密样本被解析，无许可证时返回预期 `kNoKey`，容器重写保持长度 | 无网络、无账号、无许可证交换；不是完整播放实测 |
-| Windows 原生真实许可证实验 | 应用证书 HTTP 200 / 702 B；许可证 HTTP 403 | 403 原因尚未确定，未验证原生出声；WebView 播放日志不能作为原生验证证据 |
-| `dart analyze lib test tool/cdm/native_license_check_test.dart` | 退出 0，无错误或警告；189 条 info / 样式提示 | 分析当前源码与测试，不包含历史构建目录；不代表运行期接口验证通过 |
+| Windows x64 随包 CDM 子进程检查 | Chrome / Edge 组件均退出 0，接口 11 初始化通过；10,194 个加密样本被解析，无许可证时返回预期 `kNoKey`，容器重写保持长度 | 使用本轮新构建的宿主；无网络、无账号、无许可证交换，不是完整播放实测 |
+| Windows VC 运行库依赖 | 21 个随包原生程序 / 库检查通过 | 使用构建工具链的 `dumpbin /DEPENDENTS`，核对所需 VC 运行库随包存在 |
+| Windows 原生真实许可证实验 | 修复后 Chrome / Edge CDM 均为应用证书 HTTP 200 / 702 B、许可证 HTTP 403 | CENC 文件解析到 10,194 个加密样本，使用 HLS 的 87 B 初始化数据仍被拒绝；403 原因尚未确定，未验证原生出声 |
+| `dart analyze lib test tool/cdm/native_license_check_test.dart` | 退出 0，无错误或警告，仍有 info / 样式提示 | 分析当前源码与测试，不包含历史构建目录；不代表运行期接口验证通过 |
 
 工作区证据日志在 `D:/Flutify/`：`connect-final-tests.log`、`connect-final-analysis.log`、`final-app-tests.log`、`final-app-analysis.log`、`ad-skip-tests.log`、`final-fix-tests.log`、`proxy-test.log`、`native-bridge-check.log`、`native-license-check.log`、`windows-native-build.log`。日志保留本地，不随版本发布。隔离的 Windows 本地构建产物在 `app/build/native-widevine/windows/x64/runner/Release/`。
+
+本轮增量证据：`native-format-full-tests.log`、`native-format-final-targeted.log`、`native-format-final-analyze.log`、`native-format-cleanup-analyze.log`、`native-hls-license-check.log`、`native-edge-hls-license-check.log`、`android-review-node.log`、`android-review-build.log`、`windows-native-format-build.log`、`native-format-runtime-check.log`、`native-format-packaged-bridge-check.log`。旧构建记录仅代表当时源码；本轮产物另存 `app/build/native-format-fix/windows/x64/runner/Release/`，不覆盖正在运行的 `build/pr-merge/`。
 
 0.05beta 按用户要求提交 GitHub 构建，并明确提示 **Windows 可能不可用（未验证）**。发布版 x64 开启原生 DRM 实验并保留 WebView 加载失败回退；ARM64 保留 WebView。真实账号播放、完整设备兼容性和账号封禁概率未获得验证结论。
 
 后续验证应集中在真实 Canvas 显示、外部播客长时播放与跳转、歌词源实际可用性，以及 Widevine 后端的设备兼容性。真实许可证成功、能出声、暂停 / 跳转 / 退出清理都需要分别验证；单纯初始化 CDM 成功不等于完整播放成功。
+
+### 0.06beta 发布前回归
+
+在合入 PR #9 / #10、歌词当前行位置设置、翻译匹配与沉浸式播放器修正后，版本更新为 `0.0.6+6`。全套 Flutter 测试 762 项通过、8 项跳过；发布流程、EME 播放与自动同意脚本测试 25 项通过。`dart analyze lib test tool/cdm/native_license_check_test.dart` 无错误或警告，有 202 项 info 提示。日志为工作区 `v006-tests.log`、`v006-node-tests.log`、`v006-analyze.log`。
+
+版本号更新前的同批功能已完成本地 Windows x64 Release 编译（466.0 秒），21 个原生文件的架构及 VC 运行库依赖检查通过；产物在 `app/build/lyrics-position/windows/x64/runner/Release/`。该验证不代表新版完整播放或原生 Widevine 获得许可证；0.06beta 的各平台发行产物由标签触发的 GitHub Actions 重新构建。
 
 ## 6. 修正旧报告
 

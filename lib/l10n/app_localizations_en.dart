@@ -951,6 +951,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLyricsSection => 'Lyrics';
 
   @override
+  String get settingsLyricsFocusPosition => 'Current line position';
+
+  @override
+  String get settingsLyricsFocusPositionSubtitle =>
+      'Adjust the current line within the visible lyrics area. Higher values move it down.';
+
+  @override
+  String get lyricsTranslationFromNetease =>
+      'Translations from the NetEase Music community';
+
+  @override
   String get settingsLyricsSize => 'Lyrics size';
 
   @override
@@ -985,7 +996,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLyricsBilingualSubtitle =>
-      'Send the song title and artist to NetEase Cloud Music to find community translations. The translation language follows the interface language';
+      'Preload Chinese translations when loading lyrics, including for taskbar lyrics. Turning this off still allows the translation button and automatic translation to search. Searches send the song title and artist to NetEase Music.';
 
   @override
   String get settingsTaskbarLyricsSection => 'Taskbar lyrics';
@@ -1570,7 +1581,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLyricsAutoTranslateSubtitle =>
-      'Use existing Spotify translations, then LRCLIB when fallback is enabled. Chinese script follows the interface; original lyrics stay visible.';
+      'Find existing translations from lyrics sources. Chinese translations use the song title and artist to search NetEase; LRCLIB is also searched when fallback is enabled. Chinese script follows the interface.';
 
   @override
   String get settingsLyricsExcludeInterface => 'Skip the interface language';

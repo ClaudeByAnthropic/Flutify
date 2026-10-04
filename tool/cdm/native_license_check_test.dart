@@ -2,6 +2,7 @@
 // FLUTIFY_CDM_CHECK_PREFS, FLUTIFY_CDM_CHECK_MEDIA, FLUTIFY_CDM_CHECK_HELPER.
 // Preferences are read once and cloned into a memory-only store: token refreshes
 // cannot overwrite the running app's session. No plaintext media is saved.
+// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'dart:io';
 
@@ -13,6 +14,7 @@ import 'package:flutify_app/services/eme/license_client.dart';
 import 'package:flutify_app/services/eme/windows_cdm_process.dart';
 import 'package:flutify_app/services/eme/windows_native_decryptor.dart';
 import 'package:flutify_app/services/network/network_proxy.dart';
+import 'package:flutify_app/services/protocol/track_playback_media.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,8 +71,9 @@ void main() {
               entry.key.substring(8): entry.value,
         });
         final storage = StorageService(await SharedPreferences.getInstance());
-        if (storage.spDc.isEmpty)
+        if (storage.spDc.isEmpty) {
           throw const CdmException('web_session_missing');
+        }
         final prefs = AppPreferences.decode(storage.preferencesJson);
         stage = 'network';
         ProxyHttpOverrides.install(NetworkProxy.instance);
@@ -79,10 +82,37 @@ void main() {
           proxyHost: prefs.proxyHost,
           proxyPort: prefs.proxyPort,
           gateway: prefs.gateway,
+          proxyUsername: prefs.proxyUsername,
+          proxyPassword: storage.proxyPassword,
         );
         client = StatusClient();
         final web = WebTokenService(storage, client);
         final auth = SpotifyAuthService(storage);
+        var manifest = '';
+        if (env['FLUTIFY_CDM_CHECK_FETCH_MANIFEST'] == '1') {
+          stage = 'manifest';
+          final fileId = File(
+            env['FLUTIFY_CDM_CHECK_MEDIA']!,
+          ).uri.pathSegments.last.split('.').first;
+          if (!RegExp(r'^[a-f0-9]{40}$').hasMatch(fileId)) {
+            throw const CdmException('invalid_media_file_id');
+          }
+          manifest = await fetchHlsManifest(
+            fileId,
+            headers: () async {
+              await auth.ensureAccessToken();
+              return {
+                'Authorization': 'Bearer ${storage.accessToken}',
+                'client-token': await auth.ensureClientToken(),
+                'User-Agent': 'Spotify/130100234 Win32_x86_64/0 (PC desktop)',
+                'app-platform': 'Win32_x86_64',
+                'spotify-app-version': '1.3.1.234.g59d6bf59',
+              };
+            },
+            client: client,
+          );
+          print('fresh_manifest_loaded=true');
+        }
         stage = 'web_token';
         final token =
             storage.webAccessToken.isNotEmpty &&
@@ -121,7 +151,7 @@ void main() {
           EmeTrackContent(
             fileIdHex: '0000000000000000000000000000000000000000',
             m4aPath: env['FLUTIFY_CDM_CHECK_MEDIA']!,
-            m3u8: '',
+            m3u8: manifest,
           ),
         );
         expect(memory.length, greaterThan(0));

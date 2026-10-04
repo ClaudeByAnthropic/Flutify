@@ -24,8 +24,9 @@ class LyricsTranslationScope extends StatelessWidget {
 
 class LyricsTranslationButton extends StatelessWidget {
   final double size;
+  final bool glass;
 
-  const LyricsTranslationButton({super.key, this.size = 36});
+  const LyricsTranslationButton({super.key, this.size = 36, this.glass = true});
 
   @override
   Widget build(BuildContext context) {
@@ -42,9 +43,11 @@ class LyricsTranslationButton extends StatelessWidget {
         ? l10n.lyricsTranslationUnavailable
         : l10n.lyricsTranslate;
     return GlassIconButton(
-      icon: active ? Icons.close_rounded : Icons.translate_rounded,
+      icon: Icons.translate_rounded,
       tooltip: label,
       size: size,
+      glass: glass,
+      selected: active,
       onPressed: !controller.available
           ? null
           : active

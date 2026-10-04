@@ -36,7 +36,7 @@ class SleepTimerMenu {
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.maybeOf(context);
 
-    final Object? picked = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)
+    final Object? picked = GlassMenuScope.of(context) || ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)
         ? await DesktopMenu.show<Object>(context, position ?? DesktopMenu.anchorOf(context), [
             for (final preset in SleepTimerPreset.values)
               DesktopMenu.check<Object>(preset, presetLabel(l10n, preset), checked: timer.preset == preset),

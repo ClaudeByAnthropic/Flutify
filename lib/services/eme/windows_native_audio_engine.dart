@@ -5,6 +5,8 @@ import 'package:just_audio/just_audio.dart';
 
 import '../audio/audio_engine.dart';
 import '../protocol/progressive_download.dart';
+import 'cenc_audio.dart';
+import 'license_client.dart';
 import 'windows_native_decryptor.dart';
 import 'windows_cdm_process.dart';
 
@@ -185,6 +187,10 @@ class WindowsNativeAudioEngine implements AudioEngine {
         debugPrint(
           '[native-wv] Experiment failed (${error is CdmException
               ? error.code
+              : error is LicenseHttpException
+              ? error.code
+              : error is CencFormatException
+              ? error.failure.name
               : error is FormatException
               ? 'unsupported_cenc'
               : error.runtimeType}); falling back to WebView for this app run',

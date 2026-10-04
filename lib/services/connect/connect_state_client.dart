@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../models/connect_cluster.dart';
+import '../network/retry_after_cooldown.dart';
 
 /// Connect 请求失败。[statusCode] 为 null 表示没有拿到 HTTP 响应（网络错误 / 解析失败 / 未连接）。
 class ConnectException implements Exception {
@@ -42,13 +43,16 @@ class ConnectStateClient {
   final Future<Map<String, String>> Function() _headers;
   final String Function() _spclientHost;
   final String? Function() _connectionId;
+  final RetryAfterCooldown _cooldown;
+  int _cooldownStatus = 429;
 
   ConnectStateClient({
     required this._client,
     required this._headers,
     required this._spclientHost,
     required this._connectionId,
-  });
+    DateTime Function()? now,
+  }) : _cooldown = RetryAfterCooldown(now: now);
 
   /// 注册隐藏观察者（只收状态，不出现在别的设备的列表里）并返回全量 cluster。
   Future<ConnectCluster> registerObserver(
@@ -131,6 +135,7 @@ class ConnectStateClient {
     String? connectionId,
     Map<String, Object?>? body,
   }) async {
+    _checkCooldown();
     final request = http.Request(
       method,
       Uri.parse('https://${_spclientHost()}$path'),
@@ -142,6 +147,7 @@ class ConnectStateClient {
         'Content-Type': 'application/json',
         'X-Spotify-Connection-Id': connectionId ?? _requireConnectionId(),
       });
+      _checkCooldown(); // Another request may have been limited while awaiting credentials.
       if (body != null) request.body = jsonEncode(body);
       res = await _client
           .send(request)
@@ -152,8 +158,13 @@ class ConnectStateClient {
     } catch (_) {
       throw const ConnectException(null, '网络错误，无法连接 Spotify');
     }
+    if (_cooldown.observe(res)) _cooldownStatus = res.statusCode;
     if (res.statusCode < 200 || res.statusCode >= 300)
       throw ConnectException.fromStatus(res.statusCode);
     return res;
+  }
+
+  void _checkCooldown() {
+    if (_cooldown.active) throw ConnectException.fromStatus(_cooldownStatus);
   }
 }

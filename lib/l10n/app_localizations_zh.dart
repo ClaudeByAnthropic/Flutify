@@ -923,6 +923,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLyricsSection => '歌词';
 
   @override
+  String get settingsLyricsFocusPosition => '当前行位置';
+
+  @override
+  String get settingsLyricsFocusPositionSubtitle =>
+      '调整当前歌词在可见歌词区域中的高度，数值越大越靠下。';
+
+  @override
+  String get lyricsTranslationFromNetease => '译词来自网易云音乐社区';
+
+  @override
   String get settingsLyricsSize => '歌词字号';
 
   @override
@@ -956,7 +966,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLyricsBilingualSubtitle =>
-      '开启后会将歌名与歌手发送至网易云音乐以寻找社区翻译，译词语言跟随界面语言';
+      '加载歌词时预取中文译词，也供任务栏歌词使用。关闭后仍可通过翻译按钮或自动翻译查找译词；查询会发送曲名与歌手到网易云音乐。';
 
   @override
   String get settingsTaskbarLyricsSection => '任务栏歌词';
@@ -1498,7 +1508,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLyricsAutoTranslateSubtitle =>
-      '优先使用 Spotify 已有译词，开启 LRCLIB 补全后也会查找其译词；中文简繁跟随界面，保留原文。';
+      '自动查找歌词源已有的译文。中文译词会按曲名、歌手查询网易云；启用 LRCLIB 补全时也会查找对照版。简繁体跟随界面。';
 
   @override
   String get settingsLyricsExcludeInterface => '不自动翻译界面语言';
@@ -2536,6 +2546,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsLyricsSection => '歌詞';
 
   @override
+  String get settingsLyricsFocusPosition => '目前歌詞行位置';
+
+  @override
+  String get settingsLyricsFocusPositionSubtitle =>
+      '調整目前歌詞在可見歌詞區域中的高度，數值越大越靠下。';
+
+  @override
+  String get lyricsTranslationFromNetease => '譯詞來自網易雲音樂社群';
+
+  @override
   String get settingsLyricsSize => '歌詞字號';
 
   @override
@@ -2569,7 +2589,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsLyricsBilingualSubtitle =>
-      '開啟後會將歌名與歌手傳送至網易雲音樂以尋找社群翻譯，譯詞語言跟隨介面語言';
+      '載入歌詞時預先取得中文譯詞，也供工作列歌詞使用。關閉後仍可透過翻譯按鈕或自動翻譯尋找譯詞；查詢會傳送曲名與歌手至網易雲音樂。';
 
   @override
   String get settingsTaskbarLyricsSection => '任務欄歌詞';
@@ -3110,7 +3130,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsLyricsAutoTranslateSubtitle =>
-      '優先使用 Spotify 已有譯詞，開啟 LRCLIB 補全后也會查找其譯詞；中文簡繁跟隨界面，保留原文。';
+      '自動尋找歌詞來源已有的譯文。中文譯詞會依曲名、歌手查詢網易雲；啟用 LRCLIB 補全時也會尋找對照版。簡繁體跟隨介面。';
 
   @override
   String get settingsLyricsExcludeInterface => '不自動翻譯界面語言';

@@ -40,13 +40,55 @@ void main() {
       expect(media.selectCbcsForFairPlay(), isNull);
     });
 
-    test('selectForFree 行为不变：全分组最低码率', () {
+  });
+  group('TrackPlaybackMedia.selectForFree', () {
+    for (final reversed in [false, true]) {
+      test('同码率 CBCS 不参与 Widevine 选择，倒序=$reversed', () {
+        final files = [
+          f('file_ids_mp4_cbcs', 128000),
+          f('file_ids_mp4', 128000),
+          f('file_ids_mp4', 256000),
+          f('file_ids_mp4_cbcs', 256000),
+        ];
+        final media = TrackPlaybackMedia(
+          name: 't',
+          durationMs: 1000,
+          mp4Files: reversed ? files.reversed.toList() : files,
+        );
+        final selected = media.selectForFree()!;
+        expect(selected.formatKey, 'file_ids_mp4');
+        expect(selected.bitrate, 128000);
+      });
+    }
+    test('CBCS 码率更低时仍选 CENC 中的最低码率', () {
       final media = TrackPlaybackMedia(
         name: 't',
         durationMs: 1000,
-        mp4Files: [f('file_ids_mp4_cbcs', 256000), f('file_ids_mp4', 128000)],
+        mp4Files: [
+          f('file_ids_mp4_cbcs', 96000),
+          f('file_ids_mp4', 256000),
+          f('file_ids_mp4', 128000),
+        ],
       );
       expect(media.selectForFree()!.bitrate, 128000);
+      expect(media.selectForFree()!.formatKey, 'file_ids_mp4');
+    });
+    test('缺少已知 CENC 分组时返回不可用', () {
+      for (final files in <List<PlaybackFile>>[
+        [],
+        [f('file_ids_mp4_cbcs', 128000)],
+        [f('file_ids_mp4_unknown', 128000)],
+        [f('', 128000)],
+      ]) {
+        expect(
+          TrackPlaybackMedia(
+            name: 't',
+            durationMs: 1000,
+            mp4Files: files,
+          ).selectForFree(),
+          isNull,
+        );
+      }
     });
   });
   group('fetchTrackPlaybackMedia 解析', () {

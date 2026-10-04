@@ -9,6 +9,7 @@ import '../protocol/progressive_download.dart';
 import 'cenc_audio.dart';
 import 'streaming_download.dart';
 import 'windows_cdm_process.dart';
+import 'widevine_init_data.dart';
 
 abstract class NativeAudioDecryptor {
   Future<NativeMemoryAudio> decrypt(EmeTrackContent content);
@@ -72,8 +73,13 @@ class WindowsNativeDecryptor implements NativeAudioDecryptor {
       final encrypted = await file.readAsBytes();
       check();
       final audio = CencAudio.parse(encrypted);
+      final manifestPssh = widevinePsshFromHls(content.m3u8);
+      final pssh = manifestPssh ?? audio.pssh;
       debugPrint(
         '[native-wv] CENC parsed encrypted_samples=${audio.samples.length} bytes=${encrypted.length}',
+      );
+      debugPrint(
+        '[native-wv] Init data source=${manifestPssh == null ? 'mp4' : 'hls'} bytes=${pssh.length}',
       );
       host = await startHost();
       check();
@@ -87,7 +93,7 @@ class WindowsNativeDecryptor implements NativeAudioDecryptor {
       check();
       await host.open(
         certificate: certificate,
-        pssh: audio.pssh,
+        pssh: pssh,
         postLicense: postLicense,
       );
       check();

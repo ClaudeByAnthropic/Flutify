@@ -247,7 +247,7 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
       );
     }
     debugPrint(
-      '[eme-src] 选定 file_id=${file.fileIdHex.substring(0, 16)}… br=${file.bitrate}',
+      '[eme-src] 选定 file_id=${file.fileIdHex.substring(0, 16)}… br=${file.bitrate} group=${file.formatKey}',
     );
 
     // 2) sneaktables 取 HLS 清单，同时 storage-resolve 取 CDN 地址（两者互不依赖，并行省一个往返）

@@ -918,6 +918,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLyricsSection => '歌詞';
 
   @override
+  String get settingsLyricsFocusPosition => '現在の歌詞行の位置';
+
+  @override
+  String get settingsLyricsFocusPositionSubtitle =>
+      '表示領域内で現在の歌詞行の位置を調整します。値を大きくすると下に移動します。';
+
+  @override
+  String get lyricsTranslationFromNetease => '訳詞提供：NetEase Music コミュニティ';
+
+  @override
   String get settingsLyricsSize => '歌詞の文字サイズ';
 
   @override
@@ -951,7 +961,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLyricsBilingualSubtitle =>
-      '曲名とアーティスト名を NetEase Cloud Music に送信して翻訳を検索します。表示する翻訳の言語はアプリの言語に従います';
+      '歌詞の読み込み時に中国語の訳詞を取得し、タスクバー歌詞にも使用します。オフでも翻訳ボタンや自動翻訳で検索できます。検索時は曲名とアーティスト名を NetEase Music に送信します。';
 
   @override
   String get settingsTaskbarLyricsSection => 'タスクバー歌詞';
@@ -1502,7 +1512,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLyricsAutoTranslateSubtitle =>
-      'Spotify の既存の訳詞を優先し、歌詞補完が有効な場合は LRCLIB も検索します。中国語の字体はアプリの言語に従います。原文の歌詞も表示します。';
+      '歌詞ソースにある訳詞を検索します。中国語の訳詞は曲名とアーティスト名で NetEase を検索し、LRCLIB 補完が有効な場合は対訳版も検索します。簡体字・繁体字は表示言語に従います。';
 
   @override
   String get settingsLyricsExcludeInterface => 'アプリと同じ言語の曲は除外';
