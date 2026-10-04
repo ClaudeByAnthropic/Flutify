@@ -7,6 +7,7 @@ import '../../screens/player/immersive_lyrics_screen.dart';
 import '../../screens/player/lyrics/glass_icon_button.dart';
 import '../../screens/player/lyrics/lyrics_backdrop.dart';
 import '../../screens/player/lyrics/lyrics_view.dart';
+import '../../screens/player/lyrics/lyrics_translation_controls.dart';
 import '../../widgets/cover_image.dart';
 import '../shell_layout_controller.dart';
 
@@ -21,7 +22,12 @@ class PanelLyricsCard extends StatelessWidget {
   final bool remote;
   final bool expanded;
 
-  const PanelLyricsCard({super.key, required this.track, required this.remote, required this.expanded});
+  const PanelLyricsCard({
+    super.key,
+    required this.track,
+    required this.remote,
+    required this.expanded,
+  });
 
   /// 顶部按钮条的高度：歌词从它下方开始滚动，避免第一行被按钮压住。
   static const double _barHeight = 56;
@@ -31,66 +37,75 @@ class PanelLyricsCard extends StatelessWidget {
     final l10n = context.l10n;
     final layout = context.read<ShellLayoutController>();
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          LyricsBackdrop(imageUrl: track.coverUrl),
-          LyricsView(
-            key: ValueKey((track.id, remote)),
-            track: track,
-            remote: remote,
-            topInset: _barHeight + (expanded ? 8 : 0),
-            bottomInset: 16,
-            fontSize: expanded ? 26 : 20,
-            horizontalPadding: 20,
-          ),
-          // 顶部渐暗：保证按钮与标题在任何封面色上都清晰
-          const Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            height: _barHeight + 16,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x66000000), Color(0x00000000)],
+    return LyricsTranslationScope(
+      key: ValueKey((track.id, remote)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            LyricsBackdrop(imageUrl: track.coverUrl),
+            LyricsView(
+              key: ValueKey((track.id, remote)),
+              track: track,
+              remote: remote,
+              topInset: _barHeight + (expanded ? 8 : 0),
+              bottomInset: 16,
+              fontSize: expanded ? 26 : 20,
+              horizontalPadding: 20,
+            ),
+            // 顶部渐暗：保证按钮与标题在任何封面色上都清晰
+            const Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: _barHeight + 16,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x66000000), Color(0x00000000)],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            left: 14,
-            right: 10,
-            top: 10,
-            height: 36,
-            child: Row(
-              children: [
-                Expanded(
-                  child: expanded ? _TrackLabel(track: track) : _CardLabel(text: l10n.lyricsTitle),
-                ),
-                GlassIconButton(
-                  icon: expanded ? Icons.close_fullscreen_rounded : Icons.open_in_full_rounded,
-                  tooltip: expanded ? l10n.lyricsCollapse : l10n.lyricsExpand,
-                  size: 36,
-                  onPressed: layout.toggleLyricsExpanded,
-                ),
-                const SizedBox(width: 8),
-                GlassIconButton(
-                  icon: Icons.fullscreen_rounded,
-                  tooltip: l10n.lyricsImmersive,
-                  size: 36,
-                  onPressed: () => ImmersiveLyricsScreen.open(context),
-                ),
-              ],
+            Positioned(
+              left: 14,
+              right: 10,
+              top: 10,
+              height: 36,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: expanded
+                        ? _TrackLabel(track: track)
+                        : _CardLabel(text: l10n.lyricsTitle),
+                  ),
+                  const LyricsTranslationButton(),
+                  const SizedBox(width: 8),
+                  GlassIconButton(
+                    icon: expanded
+                        ? Icons.close_fullscreen_rounded
+                        : Icons.open_in_full_rounded,
+                    tooltip: expanded ? l10n.lyricsCollapse : l10n.lyricsExpand,
+                    size: 36,
+                    onPressed: layout.toggleLyricsExpanded,
+                  ),
+                  const SizedBox(width: 8),
+                  GlassIconButton(
+                    icon: Icons.fullscreen_rounded,
+                    tooltip: l10n.lyricsImmersive,
+                    size: 36,
+                    onPressed: () => ImmersiveLyricsScreen.open(context),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -108,7 +123,10 @@ class _CardLabel extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Text(
         text,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -125,7 +143,11 @@ class _TrackLabel extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Row(
       children: [
-        CoverImage(url: track.coverUrl, size: 34, borderRadius: BorderRadius.circular(8)),
+        CoverImage(
+          url: track.coverUrl,
+          size: 34,
+          borderRadius: BorderRadius.circular(8),
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -136,13 +158,20 @@ class _TrackLabel extends StatelessWidget {
                 track.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: textTheme.labelLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w800, height: 1.2),
+                style: textTheme.labelLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                ),
               ),
               Text(
                 track.artistNames,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: textTheme.labelSmall?.copyWith(color: Colors.white.withAlpha(190), height: 1.2),
+                style: textTheme.labelSmall?.copyWith(
+                  color: Colors.white.withAlpha(190),
+                  height: 1.2,
+                ),
               ),
             ],
           ),

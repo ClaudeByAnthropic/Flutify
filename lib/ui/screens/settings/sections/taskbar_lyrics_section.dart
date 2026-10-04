@@ -34,8 +34,8 @@ class TaskbarLyricsSection extends StatelessWidget {
     final prefs = context.select<PreferencesProvider, AppPreferences>((p) => p.prefs);
     void update(AppPreferences Function(AppPreferences p) change) => provider.update(change(provider.prefs));
 
-    // 预览：模拟系统明暗对应的任务栏，颜色按与原生相同的规则解析
-    final lightTaskbar = MediaQuery.platformBrightnessOf(context) == Brightness.light;
+    // 设置页预览跟随应用当前主题；实际任务栏仍由原生端跟随系统。
+    final lightTaskbar = Theme.of(context).brightness == Brightness.light;
     final accent = context.select<AppearanceProvider, Color>((a) => a.accent);
     final color = switch (prefs.taskbarLyricsColor) {
       TaskbarLyricsColor.auto => lightTaskbar ? const Color(0xFF141414) : Colors.white,

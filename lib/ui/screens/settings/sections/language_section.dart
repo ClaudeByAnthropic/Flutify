@@ -6,9 +6,8 @@ import '../../../../models/app_preferences.dart';
 import '../../../../providers/preferences_provider.dart';
 import '../../../../providers/spotify_provider.dart';
 import '../widgets/settings_section.dart';
-import '../widgets/settings_segmented.dart';
 
-/// 语言：跟随系统 / 中文 / English。
+/// 语言：跟随系统 / 简繁中文 / English / 日本語。
 ///
 /// 切换后界面立即换语言；主页等由 Spotify 本地化的内容在下一帧（Accept-Language 已更新后）重新拉取。
 class LanguageSection extends StatelessWidget {
@@ -19,13 +18,17 @@ class LanguageSection extends StatelessWidget {
     if (provider.prefs.language == language) return;
     final spotify = context.read<SpotifyProvider>();
     provider.update(provider.prefs.copyWith(language: language));
-    WidgetsBinding.instance.addPostFrameCallback((_) => spotify.loadInitialData());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => spotify.loadInitialData(),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final language = context.select<PreferencesProvider, AppLanguage>((p) => p.prefs.language);
+    final language = context.select<PreferencesProvider, AppLanguage>(
+      (p) => p.prefs.language,
+    );
 
     return SettingsSection(
       title: l10n.settingsLanguageSection,
@@ -33,15 +36,23 @@ class LanguageSection extends StatelessWidget {
         SettingsTile(
           title: l10n.settingsLanguage,
           subtitle: l10n.settingsLanguageSubtitle,
-          below: SettingsSegmented<AppLanguage>(
-            values: AppLanguage.values,
-            labelOf: (v) => switch (v) {
-              AppLanguage.system => l10n.settingsLanguageSystem,
-              AppLanguage.zh => l10n.settingsLanguageZh,
-              AppLanguage.en => l10n.settingsLanguageEn,
-            },
-            selected: language,
-            onChanged: (v) => _change(context, v),
+          below: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final value in AppLanguage.values)
+                ChoiceChip(
+                  label: Text(switch (value) {
+                    AppLanguage.system => l10n.settingsLanguageSystem,
+                    AppLanguage.zh => l10n.settingsLanguageZh,
+                    AppLanguage.zhHant => l10n.settingsLanguageZhHant,
+                    AppLanguage.en => l10n.settingsLanguageEn,
+                    AppLanguage.ja => l10n.settingsLanguageJa,
+                  }),
+                  selected: language == value,
+                  onSelected: (_) => _change(context, value),
+                ),
+            ],
           ),
         ),
       ],

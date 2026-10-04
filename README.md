@@ -35,7 +35,7 @@
 - Material 3 Expressive 设计，深 / 浅色，纯黑背景，强调色可跟随封面
 - 桌面三栏布局，窗口变窄自动切换为手机布局
 - 系统媒体控制（任务栏 / 锁屏 / 通知栏）、键盘媒体键与快捷键
-- 简体中文 / English，内置 MiSans 字体
+- 简体中文 / 繁體中文 / English / 日本語，内置 MiSans 字体
 - 支持 HTTP 代理（跟随系统或手动设置）
 - 可配置 Spotify HTTPS 反代，支持 API、媒体和 Connect 连接，并按网络出口国家/地区自动开关
 - 桌面端的音频、封面、歌词缓存分别选择 AppData、程序目录或自定义目录，支持系统文件夹选择器，修改位置时迁移旧缓存
@@ -66,6 +66,8 @@ Windows 便携版解压后运行 `Flutify.exe`。两种发行方式均附带 MSV
 需要自建入口时，按 [FlutifyPS 部署与接入说明](https://github.com/is-hp-is-mad/FlutifyPS#部署) 在服务器上部署，然后在「设置 → 网络 → Spotify 反代」中填写包含路径的 HTTPS 地址、用户名和密码。FlutifyPS 支持 Docker 与 Node.js / systemd，服务器也可配置独立出口代理。
 
 ## 🧪 Beta 已知问题
+
+- **0.05beta：Windows 可能不可用（未验证）。** 本地编译通过不代表真实播放验证通过；x64 开启实验性原生 Widevine，加载失败回退 WebView2，ARM64 继续使用 WebView2。原生实验的许可证请求仍返回 HTTP 403，尚未验证原生出声，详见 [Widevine 实验记录](docs/WIDEVINE.md)。
 
 - Android 已接入 Media3 / 系统 Widevine 原生播放；设备 DRM 支持和厂商系统媒体卡片仍有兼容性差异
 - vivo 媒体卡片、手机与 PC 间控制权转移、手机歌词退出遮罩及 Windows 左对齐任务栏歌词仍需实机反馈

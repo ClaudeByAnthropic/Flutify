@@ -163,7 +163,16 @@ class EmePlayer {
       },
     );
     _headless = headless;
-    await headless.run();
+    try {
+      await headless.run();
+    } catch (_) {
+      _headless = null;
+      _controller = null;
+      try {
+        await headless.dispose();
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   Future<void> _ensureServer() async {

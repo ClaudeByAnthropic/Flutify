@@ -13,7 +13,8 @@ class LyricsException implements Exception {
   const LyricsException(this.message, [this.statusCode]);
 
   @override
-  String toString() => statusCode == null ? message : '$message（HTTP $statusCode）';
+  String toString() =>
+      statusCode == null ? message : '$message（HTTP $statusCode）';
 }
 
 /// 歌词服务：spclient `GET /color-lyrics/v2/track/{trackId}`（Spotify 官方客户端的同步歌词接口）。
@@ -35,12 +36,18 @@ class LyricsService {
   Future<SpotifyLyrics> fetch(String trackId) async {
     if (trackId.isEmpty) return const SpotifyLyrics(lines: []);
 
-    final path = SpotifyEndpoints.spclientColorLyrics.replaceAll('{track_id}', trackId);
+    final path = SpotifyEndpoints.spclientColorLyrics.replaceAll(
+      '{track_id}',
+      trackId,
+    );
     final headers = await _headers();
     final http.Response res;
     try {
       res = await _client.get(
-        Uri.parse('${SpotifyEndpoints.defaultSpClientBase}$path?format=json&vocalRemoval=false&market=from_token'),
+        // 官方播放器的 ALL_LANGUAGES 模式：一次取回来源已有的译词。
+        Uri.parse(
+          '${SpotifyEndpoints.defaultSpClientBase}$path?format=json&vocalRemoval=false&market=from_token&clientLanguage=all',
+        ),
         headers: {
           // 没有官方客户端身份（头里没有 app-platform）时按 Web 播放器声明
           if (!headers.containsKey('app-platform')) 'app-platform': 'WebPlayer',
@@ -65,7 +72,8 @@ class LyricsService {
       if (json is! Map<String, dynamic>) return const SpotifyLyrics(lines: []);
       final lyrics = SpotifyLyrics.fromJson(json);
       // 同步歌词里的空行表示间奏 / 停顿（用于切换当前行），需要保留；但全是空行等同于没有歌词
-      if (lyrics.lines.every((l) => l.words.trim().isEmpty)) return const SpotifyLyrics(lines: []);
+      if (lyrics.lines.every((l) => l.words.trim().isEmpty))
+        return const SpotifyLyrics(lines: []);
       return lyrics;
     } catch (_) {
       return const SpotifyLyrics(lines: []);

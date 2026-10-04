@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../l10n/l10n.dart';
+
 import '../../../../providers/auth_provider.dart';
 import 'auth_error_banner.dart';
 import 'login_hero.dart';
@@ -27,7 +29,7 @@ class LoginIntroView extends StatelessWidget {
         const Center(child: LoginHero()),
         const SizedBox(height: 36),
         Text(
-          '登录 Spotify',
+          context.l10n.loginTitle,
           textAlign: TextAlign.center,
           style: theme.textTheme.displaySmall?.copyWith(
             fontWeight: FontWeight.w800,
@@ -37,7 +39,7 @@ class LoginIntroView extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          '在 Spotify 官方登录页登录一次，\n其余授权全部自动完成',
+          context.l10n.loginSubtitle,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge?.copyWith(
             color: colorScheme.onSurfaceVariant,
@@ -58,13 +60,13 @@ class LoginIntroView extends StatelessWidget {
               ),
             ),
             icon: const Icon(Icons.login_rounded, size: 22),
-            label: const Text('登录'),
+            label: Text(context.l10n.accountSignIn),
           ),
         ),
         AuthErrorBanner(message: error),
         const SizedBox(height: 20),
         Text(
-          '以官方客户端身份登录不符合 Spotify 服务条款，建议使用小号。',
+          context.l10n.loginTermsNotice,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant.withAlpha(170),
@@ -87,16 +89,22 @@ class _ReassuranceCard extends StatelessWidget {
         color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(28),
       ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         child: Column(
           children: [
-            _Point(icon: Icons.verified_user_rounded, text: 'Flutify 不接触你的密码'),
+            _Point(
+              icon: Icons.verified_user_rounded,
+              text: context.l10n.loginPasswordPrivate,
+            ),
             _Point(
               icon: Icons.account_circle_outlined,
-              text: '使用 Spotify 官方页面完成账号登录',
+              text: context.l10n.loginOfficialPage,
             ),
-            _Point(icon: Icons.devices_rounded, text: '登录后可遥控你的其他 Spotify 设备'),
+            _Point(
+              icon: Icons.devices_rounded,
+              text: context.l10n.loginRemoteDevices,
+            ),
           ],
         ),
       ),

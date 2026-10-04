@@ -6,7 +6,7 @@ import '../../../widgets/liquid_glass.dart';
 class GlassIconButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final double size;
 
   const GlassIconButton({

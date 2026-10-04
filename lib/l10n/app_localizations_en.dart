@@ -868,7 +868,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageSystem => 'System';
 
   @override
-  String get settingsLanguageZh => '中文';
+  String get settingsLanguageZh => '简体中文';
 
   @override
   String get settingsLanguageEn => 'English';
@@ -1489,4 +1489,149 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsGatewayRecheck => 'Check country/region again';
+
+  @override
+  String get lyricsTranslate => 'Show translation';
+
+  @override
+  String get lyricsCancelTranslation => 'Hide translation';
+
+  @override
+  String get lyricsTranslationFailed =>
+      'Could not find translations. Tap to retry';
+
+  @override
+  String get lyricsTranslating => 'Finding translations · Tap to cancel';
+
+  @override
+  String get settingsLyricsAutoTranslate => 'Translate lyrics automatically';
+
+  @override
+  String get settingsLyricsAutoTranslateSubtitle =>
+      'Use existing Spotify translations, then LRCLIB when fallback is enabled. Chinese script follows the interface; original lyrics stay visible.';
+
+  @override
+  String get settingsLyricsExcludeInterface => 'Skip the interface language';
+
+  @override
+  String get settingsLyricsExcluded => 'Other languages to skip';
+
+  @override
+  String get settingsLyricsExcludedHint =>
+      'Comma-separated: en, ja, zh-Hans (Simplified), zh-Hant (Traditional); zh excludes both. Leave empty to clear.';
+
+  @override
+  String get settingsLyricsExcludedInvalid =>
+      'Enter language codes, e.g. en, ja, zh-Hans, zh-Hant';
+
+  @override
+  String get settingsCanvas => 'Spotify Canvas';
+
+  @override
+  String get settingsCanvasSubtitle =>
+      'Show official looping artwork during playback. Use still artwork when unavailable or when reduced motion is enabled.';
+
+  @override
+  String get settingsLanguageZhHant => '繁體中文';
+
+  @override
+  String get lyricsTranslationUnavailable => 'No translation in this language';
+
+  @override
+  String get settingsLanguageJa => '日本語';
+
+  @override
+  String get homeRefresh => 'Refresh home';
+
+  @override
+  String get homeRefreshFailed =>
+      'Could not refresh. Check your connection and try again.';
+
+  @override
+  String get loginTitle => 'Sign in to Spotify';
+
+  @override
+  String get loginSubtitle =>
+      'Sign in once on Spotify’s official page.\nThe remaining authorization steps finish automatically.';
+
+  @override
+  String get loginTermsNotice =>
+      'Signing in as an official client does not comply with Spotify’s terms of service. Consider using a secondary account.';
+
+  @override
+  String get loginPasswordPrivate => 'Flutify does not access your password';
+
+  @override
+  String get loginOfficialPage => 'Sign in using Spotify’s official page';
+
+  @override
+  String get loginRemoteDevices =>
+      'Control your other Spotify devices after signing in';
+
+  @override
+  String loginSignedInAs(String name) {
+    return 'Signed in as $name';
+  }
+
+  @override
+  String get loginPlaybackReady => 'Full-track playback is ready';
+
+  @override
+  String get loginBack => 'Back';
+
+  @override
+  String get loginFailed => 'Sign-in failed';
+
+  @override
+  String get webLoginTitle => 'Full-track playback: Web sign-in';
+
+  @override
+  String get webLoginCardTitle => 'Full-track playback (Web sign-in)';
+
+  @override
+  String get webLoginReady => 'Ready to play full tracks';
+
+  @override
+  String get webLoginRequired => 'Sign in once to enable full-track playback';
+
+  @override
+  String get webLoginConsentHint =>
+      'If the page asks for confirmation, select Agree to finish authorization. The other steps have completed automatically.';
+
+  @override
+  String get webLoginPreparing => 'Preparing playback credentials…';
+
+  @override
+  String get webLoginAuthorizing => 'Completing account authorization…';
+
+  @override
+  String get webLoginFinishing => 'Finishing sign-in…';
+
+  @override
+  String get webLoginBackgroundHint =>
+      'You are signed in. The remaining steps will finish automatically.';
+
+  @override
+  String get webLoginGoogleHint =>
+      'Registered with Google? Sign in here with your email and password. If you do not have a password, set one using “Forgot password” on Spotify’s website.';
+
+  @override
+  String get loginBrowserFallback =>
+      'Could not open the browser. The sign-in link was copied; paste it into your browser.';
+
+  @override
+  String get loginBrowserTitle => 'Finish signing in with your browser';
+
+  @override
+  String get loginBrowserSubtitle =>
+      'This page will continue automatically after you sign in and approve access.';
+
+  @override
+  String get loginReopen => 'Reopen';
+
+  @override
+  String get loginLinkCopied => 'Sign-in link copied';
+
+  @override
+  String get loginCopyLink => 'Copy link';
 }

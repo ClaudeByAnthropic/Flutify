@@ -10,7 +10,7 @@ import '../services/network/spotify_gateway.dart';
 export '../services/network/proxy_mode.dart' show ProxyMode;
 
 /// 界面语言：跟随系统 / 固定中文 / 固定英文。
-enum AppLanguage { system, zh, en }
+enum AppLanguage { system, zh, zhHant, en, ja }
 
 /// 启动时打开的页面；[last] 为上次关闭时所在的 Tab。
 enum StartPage { home, library, last }
@@ -65,6 +65,10 @@ class AppPreferences {
 
   /// Spotify 没有逐行同步歌词（只有纯文本或完全没有）时，从 LRCLIB 补全。
   final bool lyricsFallback;
+  final bool canvasEnabled;
+  final List<String> lyricsExcludedLanguages;
+  final bool lyricsExcludeInterfaceLanguage;
+  final bool lyricsAutoTranslate;
 
   /// Windows：把当前歌词嵌入任务栏（天气小组件右侧）。
   final bool taskbarLyrics;
@@ -97,6 +101,10 @@ class AppPreferences {
     this.proxyPort = 0,
     this.gateway = const SpotifyGateway(),
     this.lyricsFallback = true,
+    this.canvasEnabled = true,
+    this.lyricsExcludedLanguages = const [],
+    this.lyricsExcludeInterfaceLanguage = true,
+    this.lyricsAutoTranslate = true,
     this.taskbarLyrics = false,
     this.taskbarLyricsColor = TaskbarLyricsColor.auto,
     this.taskbarLyricsCustomColor = defaultTaskbarLyricsCustomColor,
@@ -132,6 +140,10 @@ class AppPreferences {
     int? proxyPort,
     SpotifyGateway? gateway,
     bool? lyricsFallback,
+    bool? canvasEnabled,
+    List<String>? lyricsExcludedLanguages,
+    bool? lyricsExcludeInterfaceLanguage,
+    bool? lyricsAutoTranslate,
     bool? taskbarLyrics,
     TaskbarLyricsColor? taskbarLyricsColor,
     int? taskbarLyricsCustomColor,
@@ -156,6 +168,12 @@ class AppPreferences {
       proxyPort: proxyPort ?? this.proxyPort,
       gateway: gateway ?? this.gateway,
       lyricsFallback: lyricsFallback ?? this.lyricsFallback,
+      canvasEnabled: canvasEnabled ?? this.canvasEnabled,
+      lyricsExcludedLanguages:
+          lyricsExcludedLanguages ?? this.lyricsExcludedLanguages,
+      lyricsExcludeInterfaceLanguage:
+          lyricsExcludeInterfaceLanguage ?? this.lyricsExcludeInterfaceLanguage,
+      lyricsAutoTranslate: lyricsAutoTranslate ?? this.lyricsAutoTranslate,
       taskbarLyrics: taskbarLyrics ?? this.taskbarLyrics,
       taskbarLyricsColor: taskbarLyricsColor ?? this.taskbarLyricsColor,
       taskbarLyricsCustomColor:
@@ -183,6 +201,10 @@ class AppPreferences {
     'proxyPort': proxyPort,
     'gateway': gateway.toJson(),
     'lyricsFallback': lyricsFallback,
+    'canvasEnabled': canvasEnabled,
+    'lyricsExcludedLanguages': lyricsExcludedLanguages,
+    'lyricsExcludeInterfaceLanguage': lyricsExcludeInterfaceLanguage,
+    'lyricsAutoTranslate': lyricsAutoTranslate,
     'taskbarLyrics': taskbarLyrics,
     'taskbarLyricsColor': taskbarLyricsColor.name,
     'taskbarLyricsCustomColor': taskbarLyricsCustomColor,
@@ -234,6 +256,28 @@ class AppPreferences {
       proxyPort: port is int && port > 0 && port <= 65535 ? port : d.proxyPort,
       gateway: SpotifyGateway.fromJson(json['gateway']),
       lyricsFallback: flag(json['lyricsFallback'], d.lyricsFallback),
+      canvasEnabled: flag(json['canvasEnabled'], d.canvasEnabled),
+      lyricsExcludedLanguages: json['lyricsExcludedLanguages'] is List
+          ? List.unmodifiable(
+              (json['lyricsExcludedLanguages'] as List)
+                  .whereType<String>()
+                  .map((v) => v.trim().replaceAll('_', '-'))
+                  .where(
+                    (v) => RegExp(
+                      r'^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?$',
+                    ).hasMatch(v),
+                  )
+                  .toSet(),
+            )
+          : d.lyricsExcludedLanguages,
+      lyricsExcludeInterfaceLanguage: flag(
+        json['lyricsExcludeInterfaceLanguage'],
+        d.lyricsExcludeInterfaceLanguage,
+      ),
+      lyricsAutoTranslate: flag(
+        json['lyricsAutoTranslate'],
+        d.lyricsAutoTranslate,
+      ),
       taskbarLyrics: flag(json['taskbarLyrics'], d.taskbarLyrics),
       taskbarLyricsColor: pick(
         TaskbarLyricsColor.values,
@@ -291,6 +335,10 @@ class AppPreferences {
       other.proxyPort == proxyPort &&
       other.gateway == gateway &&
       other.lyricsFallback == lyricsFallback &&
+      other.canvasEnabled == canvasEnabled &&
+      listEquals(other.lyricsExcludedLanguages, lyricsExcludedLanguages) &&
+      other.lyricsExcludeInterfaceLanguage == lyricsExcludeInterfaceLanguage &&
+      other.lyricsAutoTranslate == lyricsAutoTranslate &&
       other.taskbarLyrics == taskbarLyrics &&
       other.taskbarLyricsColor == taskbarLyricsColor &&
       other.taskbarLyricsCustomColor == taskbarLyricsCustomColor &&
@@ -315,6 +363,10 @@ class AppPreferences {
     proxyPort,
     gateway,
     lyricsFallback,
+    canvasEnabled,
+    Object.hashAll(lyricsExcludedLanguages),
+    lyricsExcludeInterfaceLanguage,
+    lyricsAutoTranslate,
     taskbarLyrics,
     taskbarLyricsColor,
     taskbarLyricsCustomColor,

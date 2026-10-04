@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+
+import '../models/audio_playback_info.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../models/playback_context.dart';
@@ -109,6 +111,11 @@ class PlaybackProvider extends ChangeNotifier {
 
   /// 已经把音频交给播放器的曲目 id；与当前曲目不一致时，点播放需要（重新）加载。
   String? _loadedTrackId;
+  AudioPlaybackInfo _audioPlaybackInfo = const AudioPlaybackInfo();
+  AudioPlaybackInfo get audioPlaybackInfo =>
+      _loadedTrackId != null && _loadedTrackId == _currentTrack?.id
+      ? _audioPlaybackInfo
+      : const AudioPlaybackInfo();
 
   /// 连续「不可播放 → 自动跳过」的次数；超过一轮上下文长度就停下，避免整个歌单都不可播时死循环。
   int _consecutiveSkips = 0;
@@ -537,6 +544,7 @@ class PlaybackProvider extends ChangeNotifier {
         _resumeAudio(track, generation);
         if (startPosition != null) positionNotifier.value = startPosition;
         _loadedTrackId = track.id;
+        _audioPlaybackInfo = audio.playbackInfo;
         _consecutiveSkips = 0;
         _setLoading(false);
         retryNotifier.value = null;

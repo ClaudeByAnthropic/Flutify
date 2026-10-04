@@ -21,13 +21,19 @@ class EmeAudioEngine implements AudioEngine {
   /// 取 Widevine application-certificate。
   final Future<Uint8List> Function() _certFetcher;
 
+  /// Expensive desktop WebView startup happens only when DRM playback is used.
+  final Future<void> Function()? _initialize;
+  Future<void>? _initializing;
+
   EmeAudioEngine({
     required EmePlayer player,
     required Future<Uint8List> Function(Uint8List request) licensePoster,
     required Future<Uint8List> Function() certFetcher,
+    Future<void> Function()? initialize,
   }) : _player = player,
        _licensePoster = licensePoster,
-       _certFetcher = certFetcher {
+       _certFetcher = certFetcher,
+       _initialize = initialize {
     _player.positionStream.listen((p) {
       _position = p;
       _positionController.add(p);
@@ -50,6 +56,7 @@ class EmeAudioEngine implements AudioEngine {
   bool _playing = false;
   ProcessingState _processing = ProcessingState.idle;
   bool _hasSource = false;
+  double _volume = 1;
 
   void _onState(EmePlayerState s) {
     switch (s) {
@@ -110,6 +117,15 @@ class EmeAudioEngine implements AudioEngine {
   }) async {
     _processing = ProcessingState.loading;
     _emit();
+    try {
+      await (_initializing ??= _initialize?.call() ?? Future.value());
+    } catch (_) {
+      _initializing = null;
+      _processing = ProcessingState.idle;
+      _emit();
+      rethrow;
+    }
+    await _player.setVolume(_volume);
     await _player.play(
       m4a: File(content.m4aPath),
       m3u8: content.m3u8,
@@ -155,8 +171,10 @@ class EmeAudioEngine implements AudioEngine {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> setVolume(double volume) =>
-      _player.setVolume(volume.clamp(0.0, 1.0));
+  Future<void> setVolume(double volume) {
+    _volume = volume.clamp(0.0, 1.0);
+    return _player.setVolume(_volume);
+  }
 
   @override
   Future<void> stop() async {

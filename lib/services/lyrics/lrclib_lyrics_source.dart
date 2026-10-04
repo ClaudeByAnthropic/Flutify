@@ -4,8 +4,11 @@ import 'lrc_parser.dart';
 import 'lrclib_candidate.dart';
 import 'lrclib_client.dart';
 import 'lrclib_selector.dart';
+import 'lrclib_translation.dart';
 import 'lyric_script.dart';
 import 'lyrics_disk_cache.dart';
+import 'lyrics_title.dart';
+import 'lyrics_translation.dart';
 import 'zh_script.dart';
 
 /// 一次补全查询的结果：[lyrics] 为 null 表示没找到；[networkError] 表示没找到可能只是网络问题。
@@ -31,6 +34,13 @@ class LrclibLyricsSource {
   final LyricsDiskCache? cache;
   final Duration requestGap;
   final Future<void> Function(Duration) _sleep;
+  final _pending = <String, Future<LrclibResponse>>{};
+  final _recent = <String, ({DateTime at, LrclibResponse response})>{};
+
+  void clearCandidates() {
+    _pending.clear();
+    _recent.clear();
+  }
 
   LrclibLyricsSource(
     this._client, {
@@ -46,8 +56,55 @@ class LrclibLyricsSource {
       : 'v4|${q.title}\u0001${q.artist}\u0001${q.album}';
 
   /// 删除这首歌的本地缓存（「重新获取歌词」）。
-  Future<void> forget(LyricsQuery query) async =>
-      cache?.remove(cacheKey(query));
+  Future<void> forget(LyricsQuery query) async {
+    _pending.remove(cacheKey(query));
+    _recent.remove(cacheKey(query));
+    await cache?.remove(cacheKey(query));
+  }
+
+  Future<LyricsTranslation?> findTranslation(
+    LyricsQuery query,
+    SpotifyLyrics original,
+    String target,
+  ) async {
+    if (!original.isSynced || query.title.trim().isEmpty) return null;
+    final response = await _candidates(query);
+    final result = LrclibTranslation.select(
+      response.candidates,
+      query,
+      original,
+      target,
+    );
+    if (result == null && response.networkError) {
+      throw StateError('LRCLIB translation lookup failed');
+    }
+    return result;
+  }
+
+  Future<LrclibResponse> _candidates(LyricsQuery query) {
+    final key = cacheKey(query);
+    final recent = _recent[key];
+    if (recent != null &&
+        DateTime.now().difference(recent.at) < const Duration(minutes: 10)) {
+      return Future.value(recent.response);
+    }
+    final pending = _pending[key];
+    if (pending != null) return pending;
+    late final Future<LrclibResponse> request;
+    request = _collect(query)
+        .then((response) {
+          if (identical(_pending[key], request) && !response.networkError) {
+            if (_recent.length >= 8) _recent.remove(_recent.keys.first);
+            _recent[key] = (at: DateTime.now(), response: response);
+          }
+          return response;
+        })
+        .whenComplete(() {
+          if (identical(_pending[key], request)) _pending.remove(key);
+        });
+    _pending[key] = request;
+    return request;
+  }
 
   Future<LrclibLookup> find(LyricsQuery query) async {
     final cacheGeneration = cache?.generation;
@@ -60,6 +117,22 @@ class LrclibLyricsSource {
       if (lines.isNotEmpty) return LrclibLookup(_lyrics(lines, lyricLang(hit)));
     }
 
+    final response = await _candidates(query);
+    final selection = LrclibSelector.select(response.candidates, query);
+    if (selection == null)
+      return LrclibLookup(null, networkError: response.networkError);
+    final lines = LrcParser.parse(selection.synced);
+    if (lines.isEmpty)
+      return LrclibLookup(null, networkError: response.networkError);
+    await cache?.write(
+      key,
+      selection.synced,
+      expectedGeneration: cacheGeneration,
+    );
+    return LrclibLookup(_lyrics(lines, selection.lang));
+  }
+
+  Future<LrclibResponse> _collect(LyricsQuery query) async {
     final candidates = <LrclibCandidate>[];
     var networkError = false;
     var first = true;
@@ -71,17 +144,21 @@ class LrclibLyricsSource {
       candidates.addAll(res.candidates);
     }
 
-    final title = query.title;
+    final title = LyricsTitle.search(query.title);
     await add(
       () => _client.get(
-        track: title,
+        track: query.title,
         artist: query.artist,
         album: query.album,
         durationSec: (query.durationMs / 1000).round(),
       ),
     );
+    if (networkError) return LrclibResponse(candidates, networkError: true);
     await add(() => _client.search(track: title, artist: query.primaryArtist));
-    if (candidates.length < 4) await add(() => _client.search(track: title));
+    if (networkError) return LrclibResponse(candidates, networkError: true);
+    // Translated records can live beside an already plentiful set of originals.
+    await add(() => _client.search(track: title));
+    if (networkError) return LrclibResponse(candidates, networkError: true);
     if (candidates.length < 3) {
       final altTitle = detectLang('$title ${query.artist}') == LyricLang.zh
           ? ZhScript.convert(
@@ -97,20 +174,11 @@ class LrclibLyricsSource {
       for (final q in queries) {
         if (candidates.length >= 3) break;
         await add(() => _client.search(q: q));
+        if (networkError) break;
       }
     }
 
-    final selection = LrclibSelector.select(candidates, query);
-    if (selection == null)
-      return LrclibLookup(null, networkError: networkError);
-    final lines = LrcParser.parse(selection.synced);
-    if (lines.isEmpty) return LrclibLookup(null, networkError: networkError);
-    await cache?.write(
-      key,
-      selection.synced,
-      expectedGeneration: cacheGeneration,
-    );
-    return LrclibLookup(_lyrics(lines, selection.lang));
+    return LrclibResponse(candidates, networkError: networkError);
   }
 
   static SpotifyLyrics _lyrics(List<LyricLine> lines, LyricLang lang) =>
@@ -120,7 +188,8 @@ class LrclibLyricsSource {
           LyricLang.zh => 'zh',
           LyricLang.ja => 'ja',
           LyricLang.ko => 'ko',
-          _ => 'en',
+          // Latin script alone does not identify English (French, German, …).
+          _ => 'und',
         },
         provider: LyricsProvider.lrclib,
       );

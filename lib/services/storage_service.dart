@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -72,8 +73,26 @@ class StorageService {
   static Future<StorageService> init() async {
     final prefs = await SharedPreferences.getInstance();
     final storage = StorageService(prefs);
+    await storage.ensureReceiverDeviceId();
     await storage.dropLegacySession();
     return storage;
+  }
+
+  /// An installation ID, independent of machine name and login/logout. Two
+  /// devices with the same host name must not replace one another in Connect.
+  String get receiverDeviceId =>
+      _prefs.getString('connect_receiver_device_id') ?? '';
+
+  Future<String> ensureReceiverDeviceId() async {
+    final current = receiverDeviceId;
+    if (RegExp(r'^[a-f0-9]{40}$').hasMatch(current)) return current;
+    final random = Random.secure();
+    final id = List.generate(
+      20,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+    await _prefs.setString('connect_receiver_device_id', id);
+    return id;
   }
 
   /// 旧版本的 Login5 / 开发者应用会话已不受支持：清掉其令牌（否则残留的 access_token 仍会被当作已配置），

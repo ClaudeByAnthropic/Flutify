@@ -14,6 +14,7 @@ import '../../../../core/theme/flutify_tokens.dart';
 /// 所有参数通过 TweenAnimationBuilder 平滑过渡，行切换时呈现"对焦"动画。
 class LyricLineView extends StatelessWidget {
   final String text;
+  final String? translation;
   final int distance;
   final bool focusAll;
   final VoidCallback? onTap;
@@ -30,6 +31,7 @@ class LyricLineView extends StatelessWidget {
   const LyricLineView({
     super.key,
     required this.text,
+    this.translation,
     required this.distance,
     this.focusAll = false,
     this.onTap,
@@ -74,6 +76,23 @@ class LyricLineView extends StatelessWidget {
               fontSize: fontSize,
               centered: centered,
             );
+            if (translation?.isNotEmpty == true) {
+              result = Column(
+                crossAxisAlignment: centered
+                    ? CrossAxisAlignment.center
+                    : CrossAxisAlignment.start,
+                children: [
+                  result,
+                  const SizedBox(height: 8),
+                  _LineText(
+                    text: translation!,
+                    opacity: v.opacity * 0.78,
+                    fontSize: fontSize * 0.62,
+                    centered: centered,
+                  ),
+                ],
+              );
+            }
             // sigma 过小时跳过滤镜，避免无意义的离屏渲染
             if (v.blur > 0.05) {
               result = ImageFiltered(

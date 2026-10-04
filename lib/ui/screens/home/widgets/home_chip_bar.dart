@@ -22,6 +22,7 @@ class HomeChipBar extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
   final Widget? leading;
+  final Widget? trailing;
 
   /// 与页面背景同位置的渐变切片，吸顶时遮住下方滚动内容。
   final Widget background;
@@ -33,6 +34,7 @@ class HomeChipBar extends StatelessWidget {
     required this.onSelected,
     required this.background,
     this.leading,
+    this.trailing,
   });
 
   static const double _verticalPadding = 8;
@@ -131,6 +133,11 @@ class HomeChipBar extends StatelessWidget {
                 ),
               ),
             ),
+            if (trailing != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: trailing!,
+              ),
           ],
         ),
       ),

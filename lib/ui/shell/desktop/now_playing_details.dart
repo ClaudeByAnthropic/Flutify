@@ -8,6 +8,7 @@ import '../../../models/track.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../services/spotify_api_service.dart';
 import '../../navigation/app_routes.dart';
+import '../../screens/player/widgets/canvas_artwork.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/player_controls.dart';
 import '../shell_layout_controller.dart';
@@ -25,7 +26,11 @@ class NowPlayingDetails extends StatelessWidget {
   /// 内嵌歌词卡的高度：约能看到 6～7 行，又不至于把下面的卡片挤出视野。
   static const double lyricsCardHeight = 340;
 
-  const NowPlayingDetails({super.key, required this.track, this.remote = false});
+  const NowPlayingDetails({
+    super.key,
+    required this.track,
+    this.remote = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +39,12 @@ class NowPlayingDetails extends StatelessWidget {
 
     return ListView(
       // 底部留白随播放栏占位（MediaQuery 底部 padding）：末尾卡片不被悬浮胶囊遮住
-      padding: EdgeInsets.fromLTRB(16, 4, 16, 24 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        4,
+        16,
+        24 + MediaQuery.paddingOf(context).bottom,
+      ),
       children: [
         // 大封面：正方形，随面板宽度缩放
         AspectRatio(
@@ -42,9 +52,22 @@ class NowPlayingDetails extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withAlpha(60), blurRadius: 24, offset: const Offset(0, 8))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(60),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            child: CoverImage(url: track.coverUrl, borderRadius: BorderRadius.circular(12)),
+            child: LayoutBuilder(
+              builder: (context, constraints) => CanvasArtwork(
+                track: track,
+                remote: remote,
+                size: constraints.maxWidth,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -56,12 +79,16 @@ class NowPlayingDetails extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   InkWell(
-                    onTap: track.album == null ? null : () => AppRoutes.openAlbum(context, track.album!),
+                    onTap: track.album == null
+                        ? null
+                        : () => AppRoutes.openAlbum(context, track.album!),
                     child: Text(
                       track.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -69,12 +96,18 @@ class NowPlayingDetails extends StatelessWidget {
                     track.artistNames,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
             ),
-            LikeButton(track: track, size: 22, inactiveColor: colorScheme.onSurfaceVariant),
+            LikeButton(
+              track: track,
+              size: 22,
+              inactiveColor: colorScheme.onSurfaceVariant,
+            ),
           ],
         ),
         const SizedBox(height: 20),
@@ -82,7 +115,10 @@ class NowPlayingDetails extends StatelessWidget {
           height: lyricsCardHeight,
           child: PanelLyricsCard(track: track, remote: remote, expanded: false),
         ),
-        if (track.artists.isNotEmpty) ...[const SizedBox(height: 16), _AboutArtistCard(artist: track.artists.first)],
+        if (track.artists.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _AboutArtistCard(artist: track.artists.first),
+        ],
         if (!remote) ...[const SizedBox(height: 16), const _NextUpCard()],
       ],
     );
@@ -151,7 +187,10 @@ class _AboutArtistCardState extends State<_AboutArtistCard> {
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 10,
-                      child: CoverImage(url: artist.avatarUrl, placeholderIcon: Icons.person_rounded),
+                      child: CoverImage(
+                        url: artist.avatarUrl,
+                        placeholderIcon: Icons.person_rounded,
+                      ),
                     ),
                     // 顶部渐暗，保证白色标题在任何头像上都清晰
                     Positioned.fill(
@@ -160,7 +199,10 @@ class _AboutArtistCardState extends State<_AboutArtistCard> {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.center,
-                            colors: [Colors.black.withAlpha(140), Colors.transparent],
+                            colors: [
+                              Colors.black.withAlpha(140),
+                              Colors.transparent,
+                            ],
                           ),
                         ),
                       ),
@@ -170,7 +212,10 @@ class _AboutArtistCardState extends State<_AboutArtistCard> {
                       top: 12,
                       child: Text(
                         l10n.shellAboutArtist,
-                        style: theme.textTheme.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -184,13 +229,19 @@ class _AboutArtistCardState extends State<_AboutArtistCard> {
                         artist.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       if (followers != null && followers > 0) ...[
                         const SizedBox(height: 4),
                         Text(
-                          l10n.shellMonthlyFollowers(Formatters.formatCompactNumber(l10n, followers)),
-                          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                          l10n.shellMonthlyFollowers(
+                            Formatters.formatCompactNumber(l10n, followers),
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ],
@@ -223,17 +274,27 @@ class _NextUpCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 6, 8),
-      decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
-                child: Text(l10n.queueNextUp, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                child: Text(
+                  l10n.queueNextUp,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               TextButton(
-                onPressed: () => context.read<ShellLayoutController>().switchPanel(RightPanel.queue),
+                onPressed: () => context
+                    .read<ShellLayoutController>()
+                    .switchPanel(RightPanel.queue),
                 child: Text(l10n.queueTitle),
               ),
             ],
@@ -241,7 +302,11 @@ class _NextUpCard extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              CoverImage(url: next.coverUrl, size: 44, borderRadius: BorderRadius.circular(6)),
+              CoverImage(
+                url: next.coverUrl,
+                size: 44,
+                borderRadius: BorderRadius.circular(6),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -251,13 +316,17 @@ class _NextUpCard extends StatelessWidget {
                       next.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     Text(
                       next.artistNames,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),

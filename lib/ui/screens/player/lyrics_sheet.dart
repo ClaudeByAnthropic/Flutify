@@ -10,6 +10,7 @@ import '../../widgets/player_controls.dart';
 import 'lyrics/lyrics_backdrop.dart';
 import 'lyrics/lyrics_glass_controls.dart';
 import 'lyrics/lyrics_view.dart';
+import 'lyrics/lyrics_translation_controls.dart';
 import 'player_modal.dart';
 
 /// 同步歌词面板（Apple Music iOS 风格，手机 / 窄窗口使用）。
@@ -50,40 +51,48 @@ class LyricsSheet extends StatelessWidget {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
     final corner = Radius.circular(context.tokens.corner(32));
 
-    return ClipRRect(
-      borderRadius: BorderRadius.vertical(top: corner),
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.92,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
-            if (track == null)
-              Center(
-                child: EmptyState(
-                  icon: Icons.music_off_rounded,
-                  title: context.l10n.playerNothingPlayingTitle,
-                  message: context.l10n.lyricsNothingPlayingMessage,
-                  onDark: true,
+    return LyricsTranslationScope(
+      key: ValueKey((track?.id, remote)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.vertical(top: corner),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.92,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
+              if (track == null)
+                Center(
+                  child: EmptyState(
+                    icon: Icons.music_off_rounded,
+                    title: context.l10n.playerNothingPlayingTitle,
+                    message: context.l10n.lyricsNothingPlayingMessage,
+                    onDark: true,
+                  ),
+                )
+              else
+                LyricsView(
+                  key: ValueKey((track.id, remote)),
+                  track: track,
+                  remote: remote,
+                  topInset: _headerHeight,
+                  bottomInset: _controlsHeight + bottomSafe,
                 ),
-              )
-            else
-              LyricsView(
-                key: ValueKey((track.id, remote)),
-                track: track,
-                remote: remote,
-                topInset: _headerHeight,
-                bottomInset: _controlsHeight + bottomSafe,
-              ),
-            Positioned(left: 0, right: 0, top: 0, child: _Header(track: track)),
-            if (track != null)
               Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16 + bottomSafe,
-                child: const LyricsGlassControls(),
+                left: 0,
+                right: 0,
+                top: 0,
+                child: _Header(track: track),
               ),
-          ],
+              if (track != null)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16 + bottomSafe,
+                  child: const LyricsGlassControls(),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -152,6 +161,7 @@ class _Header extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (track != null) const LyricsTranslationButton(),
                 if (track != null)
                   LikeButton(
                     track: track!,

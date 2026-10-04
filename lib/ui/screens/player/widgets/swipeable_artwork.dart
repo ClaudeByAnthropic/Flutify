@@ -17,8 +17,14 @@ import '../../../widgets/cover_image.dart';
 class SwipeableArtwork extends StatefulWidget {
   final String url;
   final double size;
+  final Widget? child;
 
-  const SwipeableArtwork({super.key, required this.url, required this.size});
+  const SwipeableArtwork({
+    super.key,
+    required this.url,
+    required this.size,
+    this.child,
+  });
 
   @override
   State<SwipeableArtwork> createState() => _SwipeableArtworkState();
@@ -115,12 +121,14 @@ class _SwipeableArtworkState extends State<SwipeableArtwork> {
                   child: child,
                 ),
               ),
-              child: CoverImage(
-                key: ValueKey(widget.url),
-                url: widget.url,
-                size: size,
-                borderRadius: MD3EShapes.roundedExtraLarge,
-              ),
+              child:
+                  widget.child ??
+                  CoverImage(
+                    key: ValueKey(widget.url),
+                    url: widget.url,
+                    size: size,
+                    borderRadius: MD3EShapes.roundedExtraLarge,
+                  ),
             ),
           ),
         ),

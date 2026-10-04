@@ -21,6 +21,7 @@ import 'library/library_source.dart';
 import 'library/session_library_source.dart';
 import 'library/web_api_library_source.dart';
 import 'lyrics_service.dart';
+import 'canvas/canvas_service.dart';
 import 'pathfinder/desktop_data_source.dart';
 import 'pathfinder/pathfinder_client.dart';
 import 'podcast/podcast_service.dart';
@@ -56,6 +57,7 @@ class SpotifyDataException implements Exception {
 class SpotifyApiService {
   final StorageService _storage;
   final http.Client _client;
+  late final CanvasService canvas = CanvasService(_client, headers: _headers);
 
   /// 鉴权服务；接入后每次请求前自动续期 access_token。未接入时仅使用手动填写的 Token。
   SpotifyAuthService? _auth;
@@ -63,6 +65,7 @@ class SpotifyApiService {
   late final DesktopDataSource _desktop = DesktopDataSource(
     _client,
     headers: _headers,
+    language: () => AppLocale.spotifyLanguage,
   );
 
   /// 歌词服务（color-lyrics）。
@@ -273,7 +276,8 @@ class SpotifyApiService {
 
     final id = idOrUri.split(':').last;
     final data = await _getJson(
-      SpotifyEndpoints.categoryPlaylists.replaceAll('{category_id}', id) + '?limit=20',
+      SpotifyEndpoints.categoryPlaylists.replaceAll('{category_id}', id) +
+          '?limit=20',
     );
     final items = (data['playlists'] as Map<String, dynamic>?)?['items'];
     final playlists = items is List

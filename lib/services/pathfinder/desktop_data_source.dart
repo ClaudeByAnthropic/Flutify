@@ -37,12 +37,15 @@ class DesktopDataSource {
 
   final http.Client _client;
   final Future<Map<String, String>> Function() _headers;
+  /// 将服务端本地化响应按当前请求语言隔离缓存。
+  final String Function()? language;
   final PathfinderClient _pathfinder;
   final Map<String, _CacheEntry> _cache = {};
 
   DesktopDataSource(
     this._client, {
     required Future<Map<String, String>> Function() headers,
+    this.language,
   }) : _headers = headers,
        _pathfinder = PathfinderClient(_client, headers: headers);
 
@@ -51,7 +54,7 @@ class DesktopDataSource {
     PathfinderOperation op,
     Map<String, Object?> variables,
   ) {
-    final key = '${op.name}:${jsonEncode(variables)}';
+    final key = '${language?.call() ?? ''}:${op.name}:${jsonEncode(variables)}';
     final cached = _cache[key];
     if (cached != null && DateTime.now().isBefore(cached.expiresAt))
       return cached.future;
@@ -85,7 +88,8 @@ class DesktopDataSource {
       HomeParser.section(await _homeQuery(facet, homeSectionItemsLimit), uri);
 
   Future<Map<String, dynamic>> _homeQuery(String facet, int itemsLimit) =>
-      _query(PathfinderOperation.home, {
+      // 主页刷新必须重新联网；并发刷新由 SpotifyProvider 合并。
+      _pathfinder.query(PathfinderOperation.home, {
         'homeEndUserIntegration': kDesktopEndUserIntegration,
         'timeZone': _ianaTimeZone(),
         'sp_t': '',

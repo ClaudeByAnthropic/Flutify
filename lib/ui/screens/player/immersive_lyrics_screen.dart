@@ -20,6 +20,7 @@ import 'lyrics/glass_icon_button.dart';
 import 'lyrics/lyrics_backdrop.dart';
 import 'lyrics/lyrics_glass_controls.dart';
 import 'lyrics/lyrics_view.dart';
+import 'lyrics/lyrics_translation_controls.dart';
 
 /// 桌面沉浸式歌词（Apple Music macOS 全屏歌词风格）。
 ///
@@ -148,78 +149,86 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
             onHover: (_) => _restartIdleTimer(),
             child: Material(
               color: Colors.black,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
-                  if (track == null)
-                    Center(
-                      child: EmptyState(
-                        icon: Icons.music_off_rounded,
-                        title: context.l10n.playerNothingPlayingTitle,
-                        message: context.l10n.lyricsNothingPlayingMessage,
-                        onDark: true,
+              child: LyricsTranslationScope(
+                key: ValueKey((track?.id, remote)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
+                    if (track == null)
+                      Center(
+                        child: EmptyState(
+                          icon: Icons.music_off_rounded,
+                          title: context.l10n.playerNothingPlayingTitle,
+                          message: context.l10n.lyricsNothingPlayingMessage,
+                          onDark: true,
+                        ),
+                      )
+                    else
+                      LayoutBuilder(
+                        builder: (context, box) =>
+                            box.maxWidth >= _wideBreakpoint
+                            ? _WideLayout(
+                                track: track,
+                                size: box.biggest,
+                                remote: remote,
+                              )
+                            : _NarrowLayout(
+                                track: track,
+                                size: box.biggest,
+                                remote: remote,
+                                topInset: topInset,
+                              ),
                       ),
-                    )
-                  else
-                    LayoutBuilder(
-                      builder: (context, box) => box.maxWidth >= _wideBreakpoint
-                          ? _WideLayout(
-                              track: track,
-                              size: box.biggest,
-                              remote: remote,
-                            )
-                          : _NarrowLayout(
-                              track: track,
-                              size: box.biggest,
-                              remote: remote,
-                              topInset: topInset,
-                            ),
-                    ),
-                  // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
-                  if (topInset > 0)
+                    // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
+                    if (topInset > 0)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: WindowCaptionButtons.width,
+                        height: topInset,
+                        child: const WindowDragArea(child: SizedBox.expand()),
+                      ),
                     Positioned(
-                      top: 0,
-                      left: 0,
-                      right: WindowCaptionButtons.width,
-                      height: topInset,
-                      child: const WindowDragArea(child: SizedBox.expand()),
-                    ),
-                  Positioned(
-                    top: 24 + topInset,
-                    right: 24,
-                    child: AnimatedOpacity(
-                      opacity: _idle ? 0 : 1,
-                      duration: context.motion(
-                        const Duration(milliseconds: 300),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (DesktopWindow.enabled) ...[
+                      top: 24 + topInset,
+                      right: 24,
+                      child: AnimatedOpacity(
+                        opacity: _idle ? 0 : 1,
+                        duration: context.motion(
+                          const Duration(milliseconds: 300),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (track != null) ...[
+                              const LyricsTranslationButton(size: 44),
+                              const SizedBox(width: 12),
+                            ],
+                            if (DesktopWindow.enabled) ...[
+                              GlassIconButton(
+                                icon: _screen
+                                    ? Icons.fullscreen_exit_rounded
+                                    : Icons.fullscreen_rounded,
+                                tooltip: _screen
+                                    ? l10n.lyricsFillWindow
+                                    : l10n.lyricsFillScreen,
+                                onPressed: _toggleMode,
+                                size: 44,
+                              ),
+                              const SizedBox(width: 12),
+                            ],
                             GlassIconButton(
-                              icon: _screen
-                                  ? Icons.fullscreen_exit_rounded
-                                  : Icons.fullscreen_rounded,
-                              tooltip: _screen
-                                  ? l10n.lyricsFillWindow
-                                  : l10n.lyricsFillScreen,
-                              onPressed: _toggleMode,
+                              icon: Icons.close_fullscreen_rounded,
+                              tooltip: l10n.lyricsExitImmersive,
+                              onPressed: _close,
                               size: 44,
                             ),
-                            const SizedBox(width: 12),
                           ],
-                          GlassIconButton(
-                            icon: Icons.close_fullscreen_rounded,
-                            tooltip: l10n.lyricsExitImmersive,
-                            onPressed: _close,
-                            size: 44,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -329,8 +338,8 @@ class _NarrowLayout extends StatelessWidget {
         Positioned(
           top: 28 + topInset,
           left: 32,
-          // 右侧让出「全屏切换 + 退出」两个玻璃按钮
-          right: 152,
+          // 右侧让出译词、全屏切换和退出按钮。
+          right: 208,
           child: Row(
             children: [
               _Artwork(track: track, size: 56),

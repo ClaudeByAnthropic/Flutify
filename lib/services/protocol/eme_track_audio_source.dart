@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import '../../models/audio_playback_info.dart';
 
 import '../audio/audio_engine.dart';
 import '../cache/cache_location.dart';
@@ -16,6 +17,7 @@ import 'storage_resolver.dart';
 import 'track_audio_loader.dart';
 import 'track_metadata.dart';
 import 'track_playback_media.dart';
+import 'http_range_audio.dart';
 
 /// 流式下载句柄：[readyForPlayback] 在可起播字节数就绪时完成。
 class _StreamingDownloadHandle {
@@ -44,6 +46,8 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
 
   bool isCacheFileInUse(String path) {
     final audio = path.endsWith('.done')
+        ? path.substring(0, path.length - 5)
+        : path.endsWith('.part')
         ? path.substring(0, path.length - 5)
         : path;
     final current = playingPath?.call();
@@ -104,18 +108,33 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
   Future<LoadedAudio> open(
     String trackIdOrUri, {
     void Function(double progress)? progress,
-  }) => load(trackIdOrUri, progress: progress);
+  }) => _loadUri(trackIdOrUri, progress, streaming: true);
 
   @override
   Future<LoadedAudio> load(
     String trackIdOrUri, {
     void Function(double progress)? progress,
+  }) => _loadUri(trackIdOrUri, progress, streaming: false);
+
+  Future<LoadedAudio> _loadUri(
+    String trackIdOrUri,
+    void Function(double)? progress, {
+    required bool streaming,
   }) {
     final id = SpotifyId.fromUri(trackIdOrUri);
-    final key = 'eme:${id.toBase62()}';
+    final episode =
+        trackIdOrUri.startsWith('spotify:episode:') ||
+        trackIdOrUri.contains('/episode/');
+    final key =
+        'eme:${episode ? 'episode' : 'track'}:${id.toBase62()}:${episode && streaming}';
     return _inFlight.putIfAbsent(key, () async {
       try {
-        return await _load(id, progress);
+        return await _load(
+          id,
+          progress,
+          episode: episode,
+          streaming: streaming,
+        );
       } finally {
         _inFlight.remove(key);
       }
@@ -124,11 +143,13 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
 
   Future<LoadedAudio> _load(
     SpotifyId id,
-    void Function(double progress)? progress,
-  ) async {
+    void Function(double progress)? progress, {
+    required bool episode,
+    required bool streaming,
+  }) async {
     debugPrint('[eme-src] 开始加载 ${id.toBase62()}');
     // 缺 sp_dc 时铸不出 Web token，license 必失败；在下载前直接报「需要 Web 登录」
-    if (webSessionReady?.call() == false) {
+    if (!episode && webSessionReady?.call() == false) {
       throw const TrackPlaybackException(
         TrackPlaybackFailure.webSignInRequired,
         '全曲播放需要先完成 Web 登录',
@@ -139,7 +160,7 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
     final TrackPlaybackMedia media;
     try {
       media = await fetchTrackPlaybackMedia(
-        id.toBase62(),
+        'spotify:${episode ? 'episode' : 'track'}:${id.toBase62()}',
         headers: _headers,
         client: _client,
       );
@@ -154,11 +175,73 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
         e,
       );
     }
+    if (episode && media.externalUrls.isNotEmpty) {
+      Object? lastError;
+      for (final url in media.externalUrls) {
+        try {
+          final audio = await HttpRangeAudio.open(_client, url);
+          final dest = File(
+            '${_dir.path}${Platform.pathSeparator}episode-${id.toBase62()}.mp3',
+          );
+          if (!streaming) {
+            _loadingPaths.add(dest.path);
+            final part = File('${dest.path}.part');
+            try {
+              await dest.parent.create(recursive: true);
+              if (!dest.existsSync() || dest.lengthSync() != audio.length) {
+                final sink = part.openWrite();
+                try {
+                  await sink.addStream(audio.read(0));
+                } finally {
+                  await sink.close();
+                }
+                if (dest.existsSync()) dest.deleteSync();
+                await part.rename(dest.path);
+              }
+              await dest.setLastModified(DateTime.now());
+              _recentPaths[dest.path] = DateTime.now().add(
+                const Duration(minutes: 2),
+              );
+            } finally {
+              if (part.existsSync()) part.deleteSync();
+              _loadingPaths.remove(dest.path);
+              unawaited(trimCache());
+            }
+          }
+          progress?.call(1);
+          return LoadedAudio(
+            file: dest,
+            playbackInfo: const AudioPlaybackInfo(format: 'file_urls_external'),
+            source: TrackAudioFile(
+              fileId: Uint8List(0),
+              format: AudioFileFormat.mp3_160,
+            ),
+            durationMs: media.durationMs,
+            trackId: id.toBase62(),
+            stream: streaming ? audio : null,
+          );
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (media.mp4Files.isEmpty)
+        throw TrackPlaybackException(
+          TrackPlaybackFailure.network,
+          '播客音频加载失败',
+          lastError,
+        );
+    }
+    if (episode && webSessionReady?.call() == false) {
+      throw const TrackPlaybackException(
+        TrackPlaybackFailure.webSignInRequired,
+        '此播客需要先完成 Web 登录',
+      );
+    }
     final file = media.selectForFree();
     if (file == null) {
-      throw const TrackPlaybackException(
+      throw TrackPlaybackException(
         TrackPlaybackFailure.unavailable,
-        '这首歌没有可用的 DRM 音频文件',
+        episode ? '这集播客没有可用的音频文件' : '这首歌没有可用的 DRM 音频文件',
       );
     }
     debugPrint(
@@ -217,6 +300,10 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
 
       handedOff = true;
       return LoadedAudio(
+        playbackInfo: AudioPlaybackInfo(
+          bitrate: file.bitrate > 0 ? file.bitrate : null,
+          format: file.format > 0 ? file.format : null,
+        ),
         file: dest,
         source: TrackAudioFile(
           fileId: _hexToBytes(file.fileIdHex),
@@ -262,6 +349,7 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
           },
           // 首段小一点：起播只需 init 段 + 首个媒体段
           segmentBytes: _kMinBytesToPlay,
+          connections: 2,
           onContiguous: (got, total) {
             registration.expectedTotal = total;
             registration.report(got);
@@ -311,6 +399,10 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
 
   @override
   Future<void> prefetch(String trackIdOrUri) async {
+    // Long episodes are read on demand; do not download the next whole episode.
+    if (trackIdOrUri.contains(':episode:') ||
+        trackIdOrUri.contains('/episode/'))
+      return;
     try {
       await load(trackIdOrUri);
     } catch (_) {}

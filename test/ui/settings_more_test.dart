@@ -1,14 +1,18 @@
+import 'dart:convert';
+
 import 'package:flutify_app/core/constants/app_info.dart';
 import 'package:flutify_app/core/utils/artwork_palette.dart';
 import 'package:flutify_app/core/utils/byte_size.dart';
 import 'package:flutify_app/main.dart';
 import 'package:flutify_app/models/app_preferences.dart';
+import 'package:flutify_app/models/appearance.dart';
 import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/protocol/audio_cache_store.dart';
 import 'package:flutify_app/services/protocol/track_audio_loader.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/screens/settings/settings_screen.dart';
+import 'package:flutify_app/ui/screens/settings/sections/language_section.dart';
 import 'package:flutify_app/ui/screens/settings/widgets/shortcuts_dialog.dart';
 import 'package:flutify_app/ui/navigation/tab_navigator.dart';
 import 'package:flutter/material.dart';
@@ -86,6 +90,8 @@ void main() {
   }
 
   Future<void> tapText(WidgetTester tester, String text) async {
+    await tester.ensureVisible(find.text(text).last);
+    await settle(tester);
     await tester.tap(find.text(text).last);
     await settle(tester);
   }
@@ -113,9 +119,47 @@ void main() {
     expect(find.text('Language'), findsWidgets);
     expect(savedPrefs().language, AppLanguage.en);
 
-    await tapText(tester, '中文');
+    await tapText(tester, '日本語');
+    expect(Localizations.localeOf(context).languageCode, 'ja');
+    expect(find.text('アプリの言語'), findsOneWidget);
+    expect(savedPrefs().language, AppLanguage.ja);
+
+    await tapText(tester, '简体中文');
     expect(find.text('语言'), findsWidgets);
     expect(savedPrefs().language, AppLanguage.zh);
+  });
+
+  testWidgets('Japanese is selectable on a narrow screen with large text', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      size: const Size(320, 1800),
+      seed: (s) => s.setAppearanceJson(
+        jsonEncode(
+          AppearanceSettings.defaults.copyWith(fontScale: 1.3).toJson(),
+        ),
+      ),
+    );
+    await openSettings(tester);
+    await tester.scrollUntilVisible(
+      find.byType(LanguageSection),
+      500,
+      scrollable: find
+          .descendant(
+            of: find.byType(SettingsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await settle(tester);
+    await tapText(tester, '日本語');
+    expect(savedPrefs().language, AppLanguage.ja);
+    expect(find.text('アプリの言語'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tapText(tester, '简体中文');
+    expect(savedPrefs().language, AppLanguage.zh);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('lyrics, playback and Connect options apply and persist', (

@@ -4,6 +4,7 @@ import 'lrclib_candidate.dart';
 import 'lyric_script.dart';
 import 'translation_filter.dart';
 import 'zh_script.dart';
+import 'lyrics_title.dart';
 
 /// 选中的歌词：LRC 原文（已按需转换简繁）与判定出的歌曲语言。
 class LrclibSelection {
@@ -71,7 +72,9 @@ class LrclibSelector {
     var bestScore = double.negativeInfinity, altScore = double.negativeInfinity;
     for (final c in candidates) {
       if (c.lines.isEmpty) continue;
-      final score = _score(c, target, title, durSec, wantHant) + (_sameArtist(c, query) ? 15 : 0);
+      final score =
+          _score(c, target, title, durSec, wantHant) +
+          (_sameArtist(c, query) ? 15 : 0);
       if (c.rejected) {
         if (score - 40 > altScore) {
           altScore = score - 40;
@@ -89,7 +92,8 @@ class LrclibSelector {
     // 简繁字形对齐：要简体但库里只有繁体（或反之）时逐字转换，不改动文种
     var synced = pick.synced;
     if (target == LyricLang.zh) {
-      final t = ZhScript.countTraditional(synced), s = ZhScript.countSimplified(synced);
+      final t = ZhScript.countTraditional(synced),
+          s = ZhScript.countSimplified(synced);
       if (!wantHant && t >= 3 && t > s) {
         synced = ZhScript.convert(synced, toSimplified: true);
       } else if (wantHant && s >= 3 && s > t) {
@@ -100,7 +104,10 @@ class LrclibSelector {
   }
 
   /// 歌曲语言：候选歌词按语言投票（曲名一致、时长吻合的票更重），曲名 / 歌手文本各投一张小票。
-  static LyricLang decideSongLang(List<LrclibCandidate> candidates, LyricsQuery query) {
+  static LyricLang decideSongLang(
+    List<LrclibCandidate> candidates,
+    LyricsQuery query,
+  ) {
     final votes = <LyricLang, double>{};
     void vote(LyricLang lang, double w) {
       if (lang == LyricLang.unknown) return;
@@ -137,10 +144,17 @@ class LrclibSelector {
     return best;
   }
 
-  static double _score(LrclibCandidate c, LyricLang target, String title, double durSec, bool wantHant) {
+  static double _score(
+    LrclibCandidate c,
+    LyricLang target,
+    String title,
+    double durSec,
+    bool wantHant,
+  ) {
     var score = langScore(target, c.synced);
     if (target == LyricLang.zh) {
-      final t = ZhScript.countTraditional(c.synced), s = ZhScript.countSimplified(c.synced);
+      final t = ZhScript.countTraditional(c.synced),
+          s = ZhScript.countSimplified(c.synced);
       if (t >= 3 || s >= 3) score += (t > s) == wantHant ? 10 : -25;
     }
     if (_sameTitle(c.trackName, title)) score += 12;
@@ -159,7 +173,10 @@ class LrclibSelector {
 
   /// 判定当前曲目是纯音乐：存在「精确吻合」（曲名一致、歌手对上、时长差 ≤ 5 秒）的纯音乐候选，
   /// 且没有同样精确吻合的带词候选（同一首歌常在库里同时有两种记录，带词的优先）。
-  static bool _isInstrumental(List<LrclibCandidate> candidates, LyricsQuery query) {
+  static bool _isInstrumental(
+    List<LrclibCandidate> candidates,
+    LyricsQuery query,
+  ) {
     final durSec = query.durationMs / 1000;
     bool exact(LrclibCandidate c) =>
         _sameTitle(c.trackName, query.title) &&
@@ -180,5 +197,7 @@ class LrclibSelector {
   static bool _sameArtist(LrclibCandidate c, LyricsQuery query) =>
       ArtistMatcher.compare(query.artist, c.artistName) == ArtistMatch.match;
 
-  static bool _sameTitle(String a, String b) => a.trim().toLowerCase() == b.trim().toLowerCase();
+  static bool _sameTitle(String a, String b) =>
+      LyricsTitle.search(a).toLowerCase() ==
+      LyricsTitle.search(b).toLowerCase();
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import '../../../models/audio_playback_info.dart';
 
 /// track-playback 设备接口（`{spclient}/track-playback/v1/devices…`）。
 ///
@@ -74,7 +75,8 @@ class TrackPlaybackApi {
         )
         .timeout(const Duration(seconds: 10));
     final token =
-        ((jsonDecode(res.body) as Map)['granted_token'] as Map?)?['token'];
+        ((jsonDecode(utf8.decode(res.bodyBytes)) as Map)['granted_token']
+            as Map?)?['token'];
     if (token is! String)
       throw StateError('Web client-token 申请失败：HTTP ${res.statusCode}');
     return _clientToken = token;
@@ -108,6 +110,7 @@ class TrackPlaybackApi {
                 'manifest_formats': [
                   'file_ids_mp3',
                   'file_urls_mp3',
+                  'file_urls_external',
                   'file_ids_mp4',
                   'file_ids_mp4_dual',
                 ],
@@ -131,7 +134,9 @@ class TrackPlaybackApi {
     if (isCurrent != null && !isCurrent()) return;
     _check(res, '注册');
     _seq =
-        ((jsonDecode(res.body) as Map)['initial_seq_num'] as num?)?.toInt() ??
+        ((jsonDecode(utf8.decode(res.bodyBytes)) as Map)['initial_seq_num']
+                as num?)
+            ?.toInt() ??
         0;
   }
 
@@ -146,6 +151,7 @@ class TrackPlaybackApi {
     int positionMs = 0,
     int durationMs = 0,
     int? previousPositionMs,
+    AudioPlaybackInfo audio = const AudioPlaybackInfo(),
   }) async {
     final res = await _client
         .put(
@@ -165,9 +171,8 @@ class TrackPlaybackApi {
               'position': positionMs,
               'duration': durationMs,
               'media_type': 'AUDIO',
-              'bitrate': 128000,
-              'audio_quality': 'HIGH',
-              'format': 10,
+              'bitrate': ?audio.bitrate,
+              'format': ?audio.format,
             },
             'previous_position': ?previousPositionMs,
             'debug_source': debugSource,
@@ -176,7 +181,7 @@ class TrackPlaybackApi {
         .timeout(const Duration(seconds: 10));
     _check(res, '汇报 $debugSource');
     if (res.body.isEmpty) return null;
-    final json = jsonDecode(res.body);
+    final json = jsonDecode(utf8.decode(res.bodyBytes));
     return json is Map<String, dynamic> ? json : null;
   }
 

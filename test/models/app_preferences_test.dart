@@ -17,6 +17,10 @@ void main() {
       proxyHost: '10.0.0.2',
       proxyPort: 8080,
       lyricsFallback: false,
+      lyricsAutoTranslate: false,
+      lyricsExcludeInterfaceLanguage: false,
+      lyricsExcludedLanguages: ['ja', 'fr'],
+      canvasEnabled: false,
       taskbarLyrics: true,
       taskbarLyricsColor: TaskbarLyricsColor.custom,
       taskbarLyricsCustomColor: 0xFF336699,
@@ -28,13 +32,20 @@ void main() {
   test('taskbar lyrics: off by default, bad values are sanitised', () {
     expect(AppPreferences.defaults.taskbarLyrics, isFalse);
     expect(AppPreferences.defaults.lyricsFallback, isTrue);
-    final prefs = AppPreferences.fromJson({'taskbarLyricsColor': 'rainbow', 'taskbarLyricsOpacity': 3});
+    final prefs = AppPreferences.fromJson({
+      'taskbarLyricsColor': 'rainbow',
+      'taskbarLyricsOpacity': 3,
+    });
     expect(prefs.taskbarLyricsColor, TaskbarLyricsColor.auto);
     expect(prefs.taskbarLyricsOpacity, AppPreferences.minTaskbarLyricsOpacity);
   });
 
   test('proxy fields: unknown mode falls back to system, bad port to 0', () {
-    final prefs = AppPreferences.fromJson({'proxyMode': 'socks', 'proxyHost': '  h  ', 'proxyPort': 70000});
+    final prefs = AppPreferences.fromJson({
+      'proxyMode': 'socks',
+      'proxyHost': '  h  ',
+      'proxyPort': 70000,
+    });
     expect(prefs.proxyMode, ProxyMode.system);
     expect(prefs.proxyHost, 'h');
     expect(prefs.proxyPort, 0);

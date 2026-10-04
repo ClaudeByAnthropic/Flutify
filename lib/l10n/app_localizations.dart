@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
+import 'app_localizations_ja.dart';
 import 'app_localizations_zh.dart';
 
 // ignore_for_file: type=lint
@@ -95,7 +96,9 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
+    Locale('ja'),
     Locale('zh'),
+    Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
   /// No description provided for @playbackRetryWaiting.
@@ -1619,7 +1622,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLanguageZh.
   ///
   /// In zh, this message translates to:
-  /// **'中文'**
+  /// **'简体中文'**
   String get settingsLanguageZh;
 
   /// No description provided for @settingsLanguageEn.
@@ -2683,6 +2686,264 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'重新查询国家/地区'**
   String get settingsGatewayRecheck;
+
+  /// No description provided for @lyricsTranslate.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示译词'**
+  String get lyricsTranslate;
+
+  /// No description provided for @lyricsCancelTranslation.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消译词'**
+  String get lyricsCancelTranslation;
+
+  /// No description provided for @lyricsTranslationFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'译词查找失败，点击重试'**
+  String get lyricsTranslationFailed;
+
+  /// No description provided for @lyricsTranslating.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在查找译词 · 点击取消'**
+  String get lyricsTranslating;
+
+  /// No description provided for @settingsLyricsAutoTranslate.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动翻译歌词'**
+  String get settingsLyricsAutoTranslate;
+
+  /// No description provided for @settingsLyricsAutoTranslateSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'优先使用 Spotify 已有译词，开启 LRCLIB 补全后也会查找其译词；中文简繁跟随界面，保留原文。'**
+  String get settingsLyricsAutoTranslateSubtitle;
+
+  /// No description provided for @settingsLyricsExcludeInterface.
+  ///
+  /// In zh, this message translates to:
+  /// **'不自动翻译界面语言'**
+  String get settingsLyricsExcludeInterface;
+
+  /// No description provided for @settingsLyricsExcluded.
+  ///
+  /// In zh, this message translates to:
+  /// **'其他不自动翻译的语言'**
+  String get settingsLyricsExcluded;
+
+  /// No description provided for @settingsLyricsExcludedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'用逗号分隔：en, ja, zh-Hans（简体）, zh-Hant（繁体）；zh 排除全部中文，留空清除'**
+  String get settingsLyricsExcludedHint;
+
+  /// No description provided for @settingsLyricsExcludedInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入语言代码，例如 en、ja、zh-Hans、zh-Hant'**
+  String get settingsLyricsExcludedInvalid;
+
+  /// No description provided for @settingsCanvas.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify Canvas 动态封面'**
+  String get settingsCanvas;
+
+  /// No description provided for @settingsCanvasSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'播放时显示官方短片；无 Canvas 或减少动态效果时显示静态封面。'**
+  String get settingsCanvasSubtitle;
+
+  /// No description provided for @settingsLanguageZhHant.
+  ///
+  /// In zh, this message translates to:
+  /// **'繁體中文'**
+  String get settingsLanguageZhHant;
+
+  /// No description provided for @lyricsTranslationUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无对应语言的译词'**
+  String get lyricsTranslationUnavailable;
+
+  /// No description provided for @settingsLanguageJa.
+  ///
+  /// In zh, this message translates to:
+  /// **'日本語'**
+  String get settingsLanguageJa;
+
+  /// No description provided for @homeRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新首页'**
+  String get homeRefresh;
+
+  /// No description provided for @homeRefreshFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新失败，请检查网络后重试。'**
+  String get homeRefreshFailed;
+
+  /// No description provided for @loginTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录 Spotify'**
+  String get loginTitle;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'在 Spotify 官方登录页登录一次，\n其余授权全部自动完成'**
+  String get loginSubtitle;
+
+  /// No description provided for @loginTermsNotice.
+  ///
+  /// In zh, this message translates to:
+  /// **'以官方客户端身份登录不符合 Spotify 服务条款，建议使用小号。'**
+  String get loginTermsNotice;
+
+  /// No description provided for @loginPasswordPrivate.
+  ///
+  /// In zh, this message translates to:
+  /// **'Flutify 不接触你的密码'**
+  String get loginPasswordPrivate;
+
+  /// No description provided for @loginOfficialPage.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用 Spotify 官方页面完成账号登录'**
+  String get loginOfficialPage;
+
+  /// No description provided for @loginRemoteDevices.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录后可遥控你的其他 Spotify 设备'**
+  String get loginRemoteDevices;
+
+  /// No description provided for @loginSignedInAs.
+  ///
+  /// In zh, this message translates to:
+  /// **'已登录为 {name}'**
+  String loginSignedInAs(String name);
+
+  /// No description provided for @loginPlaybackReady.
+  ///
+  /// In zh, this message translates to:
+  /// **'全曲播放已就绪'**
+  String get loginPlaybackReady;
+
+  /// No description provided for @loginBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回'**
+  String get loginBack;
+
+  /// No description provided for @loginFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录失败'**
+  String get loginFailed;
+
+  /// No description provided for @webLoginTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'全曲播放：Web 登录'**
+  String get webLoginTitle;
+
+  /// No description provided for @webLoginCardTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'全曲播放（Web 登录）'**
+  String get webLoginCardTitle;
+
+  /// No description provided for @webLoginReady.
+  ///
+  /// In zh, this message translates to:
+  /// **'已就绪，可以播放完整曲目'**
+  String get webLoginReady;
+
+  /// No description provided for @webLoginRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录一次以解锁完整曲目播放'**
+  String get webLoginRequired;
+
+  /// No description provided for @webLoginConsentHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'如果页面在等你确认，请点「同意」完成授权；其余步骤已自动完成'**
+  String get webLoginConsentHint;
+
+  /// No description provided for @webLoginPreparing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在获取播放凭据…'**
+  String get webLoginPreparing;
+
+  /// No description provided for @webLoginAuthorizing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在完成账号授权…'**
+  String get webLoginAuthorizing;
+
+  /// No description provided for @webLoginFinishing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在完成登录…'**
+  String get webLoginFinishing;
+
+  /// No description provided for @webLoginBackgroundHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录已完成，剩下的步骤在后台自动进行'**
+  String get webLoginBackgroundHint;
+
+  /// No description provided for @webLoginGoogleHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'用 Google 注册的账号：请在此处使用「邮箱 + 密码」登录；没有密码可先在 Spotify 官网「忘记密码」设置一个。'**
+  String get webLoginGoogleHint;
+
+  /// No description provided for @loginBrowserFallback.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法自动打开浏览器，登录链接已复制，请粘贴到浏览器中打开'**
+  String get loginBrowserFallback;
+
+  /// No description provided for @loginBrowserTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'在浏览器中完成登录'**
+  String get loginBrowserTitle;
+
+  /// No description provided for @loginBrowserSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录并同意授权后，这里会自动继续'**
+  String get loginBrowserSubtitle;
+
+  /// No description provided for @loginReopen.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新打开'**
+  String get loginReopen;
+
+  /// No description provided for @loginLinkCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录链接已复制'**
+  String get loginLinkCopied;
+
+  /// No description provided for @loginCopyLink.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制链接'**
+  String get loginCopyLink;
 }
 
 class _AppLocalizationsDelegate
@@ -2696,17 +2957,31 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'zh'].contains(locale.languageCode);
+      <String>['en', 'ja', 'zh'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when language+script codes are specified.
+  switch (locale.languageCode) {
+    case 'zh':
+      {
+        switch (locale.scriptCode) {
+          case 'Hant':
+            return AppLocalizationsZhHant();
+        }
+        break;
+      }
+  }
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'en':
       return AppLocalizationsEn();
+    case 'ja':
+      return AppLocalizationsJa();
     case 'zh':
       return AppLocalizationsZh();
   }

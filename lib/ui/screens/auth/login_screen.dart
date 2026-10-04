@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../l10n/l10n.dart';
+
 import '../../../providers/auth_provider.dart';
 import '../../../services/auth/web_token_service.dart';
 import '../../widgets/toast/app_toast.dart';
@@ -19,10 +21,12 @@ class LoginScreen extends StatefulWidget {
 
   /// 以全屏对话框形式打开，返回是否登录成功。
   static Future<bool> open(BuildContext context) async {
-    final result = await Navigator.of(
-      context,
-      rootNavigator: true,
-    ).push<bool>(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const LoginScreen()));
+    final result = await Navigator.of(context, rootNavigator: true).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const LoginScreen(),
+      ),
+    );
     return result ?? false;
   }
 
@@ -31,7 +35,10 @@ class LoginScreen extends StatefulWidget {
     final navigator = Navigator.of(context, rootNavigator: true);
     await context.read<AuthProvider>().signOut();
     final result = await navigator.push<bool>(
-      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const LoginScreen(),
+      ),
     );
     return result ?? false;
   }
@@ -82,21 +89,37 @@ class _LoginScreenState extends State<LoginScreen> {
     _finished = true;
     final messenger = ScaffoldMessenger.maybeOf(context);
     final name = _auth.displayName;
+    final l10n = context.l10n;
     // pop 之后本组件即卸载，先抓住根导航再关页
     final navigator = Navigator.of(context, rootNavigator: true);
     navigator.pop(true);
-    AppToast.showOn(messenger, '已登录为 $name', icon: Icons.person_rounded, tone: ToastTone.success);
+    AppToast.showOn(
+      messenger,
+      l10n.loginSignedInAs(name),
+      icon: Icons.person_rounded,
+      tone: ToastTone.success,
+    );
     // 第二步：Web 登录（sp_dc）。可跳过，之后随时在设置页补
     final tokens = navigator.context.read<WebTokenService?>();
     if (tokens != null && !tokens.hasSpDc) {
-      unawaited(Future.microtask(() async {
-        final result = await navigator.push<WebLoginResult?>(
-          MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WebLoginScreen()),
-        );
-        if (result?.webSignedIn ?? false) {
-          AppToast.showOn(messenger, '全曲播放已就绪', icon: Icons.check_circle_rounded, tone: ToastTone.success);
-        }
-      }));
+      unawaited(
+        Future.microtask(() async {
+          final result = await navigator.push<WebLoginResult?>(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => const WebLoginScreen(),
+            ),
+          );
+          if (result?.webSignedIn ?? false) {
+            AppToast.showOn(
+              messenger,
+              l10n.loginPlaybackReady,
+              icon: Icons.check_circle_rounded,
+              tone: ToastTone.success,
+            );
+          }
+        }),
+      );
     }
   }
 
@@ -111,7 +134,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authorizing = context.select<AuthProvider, bool>((a) => a.isAuthorizing);
+    final authorizing = context.select<AuthProvider, bool>(
+      (a) => a.isAuthorizing,
+    );
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return PopScope(
@@ -131,8 +156,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(8),
                       child: IconButton(
-                        icon: Icon(authorizing ? Icons.arrow_back_rounded : Icons.close_rounded),
-                        tooltip: authorizing ? '返回' : '关闭',
+                        icon: Icon(
+                          authorizing
+                              ? Icons.arrow_back_rounded
+                              : Icons.close_rounded,
+                        ),
+                        tooltip: authorizing
+                            ? context.l10n.loginBack
+                            : context.l10n.commonClose,
                         onPressed: _back,
                       ),
                     ),
@@ -144,23 +175,42 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 420),
                           child: AnimatedSwitcher(
-                            duration: Duration(milliseconds: reduceMotion ? 0 : 420),
-                            reverseDuration: Duration(milliseconds: reduceMotion ? 0 : 200),
+                            duration: Duration(
+                              milliseconds: reduceMotion ? 0 : 420,
+                            ),
+                            reverseDuration: Duration(
+                              milliseconds: reduceMotion ? 0 : 200,
+                            ),
                             switchInCurve: Curves.easeOutBack,
                             switchOutCurve: Curves.easeInCubic,
-                            transitionBuilder: (child, animation) => FadeTransition(
-                              opacity: CurvedAnimation(parent: animation, curve: const Interval(0, 0.6)),
-                              child: SlideTransition(
-                                position: Tween(begin: const Offset(0, 0.04), end: Offset.zero).animate(animation),
-                                child: ScaleTransition(
-                                  scale: Tween(begin: 0.96, end: 1.0).animate(animation),
-                                  child: child,
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                                  opacity: CurvedAnimation(
+                                    parent: animation,
+                                    curve: const Interval(0, 0.6),
+                                  ),
+                                  child: SlideTransition(
+                                    position: Tween(
+                                      begin: const Offset(0, 0.04),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: ScaleTransition(
+                                      scale: Tween(
+                                        begin: 0.96,
+                                        end: 1.0,
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
                             child: authorizing
-                                ? const OAuthWaitingView(key: ValueKey('waiting'))
-                                : LoginIntroView(key: const ValueKey('intro'), onSignIn: _signIn),
+                                ? const OAuthWaitingView(
+                                    key: ValueKey('waiting'),
+                                  )
+                                : LoginIntroView(
+                                    key: const ValueKey('intro'),
+                                    onSignIn: _signIn,
+                                  ),
                           ),
                         ),
                       ),
@@ -194,7 +244,10 @@ class _AmbientGlow extends StatelessWidget {
                 gradient: RadialGradient(
                   center: const Alignment(0, -1.1),
                   radius: 1.1,
-                  colors: [colorScheme.primary.withAlpha(40), colorScheme.primary.withAlpha(0)],
+                  colors: [
+                    colorScheme.primary.withAlpha(40),
+                    colorScheme.primary.withAlpha(0),
+                  ],
                 ),
               ),
             ),
@@ -203,7 +256,10 @@ class _AmbientGlow extends StatelessWidget {
                 gradient: RadialGradient(
                   center: const Alignment(1.1, 1.2),
                   radius: 0.9,
-                  colors: [colorScheme.tertiary.withAlpha(22), colorScheme.tertiary.withAlpha(0)],
+                  colors: [
+                    colorScheme.tertiary.withAlpha(22),
+                    colorScheme.tertiary.withAlpha(0),
+                  ],
                 ),
               ),
             ),

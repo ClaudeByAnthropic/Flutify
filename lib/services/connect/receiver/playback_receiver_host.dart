@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../models/audio_playback_info.dart';
 
 import '../../../models/album.dart';
 import '../../../models/artist.dart';
@@ -16,6 +17,10 @@ import 'track_playback_state.dart';
 /// 本机按状态机的「播完自动进入」顺序排队，播完一首由 PlaybackProvider 自己接下一首，
 /// 再由 [ConnectReceiver.onLocalTrackChanged] 对回状态机里的目标状态。
 class PlaybackReceiverHost implements ReceiverHost {
+  @override
+  bool get isAudible => playback.isPlaying && !playback.isBuffering;
+  @override
+  AudioPlaybackInfo get audioPlaybackInfo => playback.audioPlaybackInfo;
   final PlaybackProvider playback;
   late final ConnectReceiver receiver;
 
@@ -71,7 +76,9 @@ class PlaybackReceiverHost implements ReceiverHost {
     final generation = ++_commandGeneration;
     final tracks = [
       for (final i in order)
-        if (machine.trackOf(machine.states[i]) case final t?) _toTrack(t),
+        if (machine.state(i) case final state?)
+          if (machine.trackOf(state) case final t?)
+            if (!t.isAdvertisement) _toTrack(t),
     ];
     if (tracks.isEmpty) return;
     // 交接回来的就是正在放的这首：只对齐进度 / 暂停，不重新加载
@@ -102,7 +109,8 @@ class PlaybackReceiverHost implements ReceiverHost {
       playback.updateReceiverQueue([
         for (final i in order)
           if (machine.state(i) case final state?)
-            if (machine.trackOf(state) case final track?) _toTrack(track),
+            if (machine.trackOf(state) case final track?)
+              if (!track.isAdvertisement) _toTrack(track),
       ]);
     } finally {
       _applyingCount--;

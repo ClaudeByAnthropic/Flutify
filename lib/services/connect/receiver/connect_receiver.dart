@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../../models/audio_playback_info.dart';
+import 'listening_progress.dart';
 
 import '../dealer_client.dart';
 import 'track_playback_api.dart';
@@ -32,6 +34,8 @@ abstract class ReceiverHost {
 
   /// 本机当前进度（毫秒）。
   int get positionMs;
+  bool get isAudible;
+  AudioPlaybackInfo get audioPlaybackInfo;
 
   /// 远程把播放转走 / 登出：本机停止。
   Future<void> stop();
@@ -75,7 +79,8 @@ class ConnectReceiver {
   int _revision = 0;
 
   /// 本状态是否已汇报过「播满 30 秒」。
-  bool _thresholdReported = false;
+  final _listening = ListeningProgress();
+  final _clock = Stopwatch()..start();
 
   ConnectReceiver({
     required this.host,
@@ -219,29 +224,46 @@ class ConnectReceiver {
   Future<void> _replaceState(TpReplaceState cmd) async {
     final revision = ++_revision;
     final prev = _currentTrackUri;
+    final playable = cmd.machine.playableState(cmd.ref.stateIndex);
+    if (playable == null) {
+      // 全广告 / 广告环没有可播放后继：取消旧加载，不展示或播放广告。
+      _clear();
+      _report('state_clear', clear: true);
+      await host.stop();
+      return;
+    }
+    final skippedAd = playable != cmd.ref.stateIndex;
+    if (skippedAd) debugPrint('[Receiver] 跳过广告，加载后续曲目');
     _machine = cmd.machine;
-    _stateIndex = cmd.ref.stateIndex;
+    _stateIndex = playable;
     _paused = cmd.ref.paused;
-    _thresholdReported = false;
-    final position = cmd.seekTo ?? 0;
+    // 广告进度不能成为后续歌曲的起播位置。
+    final seekTo = skippedAd ? 0 : cmd.seekTo;
+    final position = seekTo ?? 0;
+    _listening.anchor(
+      seekTo ?? host.positionMs,
+      _clock.elapsedMilliseconds,
+      reset: prev != _currentTrackUri,
+    );
     host.applyOptions(cmd.machine.options);
     try {
       if (prev != null && prev == _currentTrackUri) {
-        host.updateQueue(cmd.machine, cmd.machine.advanceChain(_stateIndex));
-        await host.sync(positionMs: cmd.seekTo, paused: _paused);
+        host.updateQueue(cmd.machine, cmd.machine.playableChain(_stateIndex));
+        await host.sync(positionMs: seekTo, paused: _paused);
       } else {
         _report('before_track_load', positionMs: position);
         await host.load(
           cmd.machine,
-          cmd.machine.advanceChain(_stateIndex),
+          cmd.machine.playableChain(_stateIndex),
           positionMs: position,
           paused: _paused,
         );
       }
       if (revision != _revision) return;
+      _listening.anchor(seekTo ?? host.positionMs, _clock.elapsedMilliseconds);
       _report(
         _paused ? 'pause' : 'started_playing',
-        positionMs: cmd.seekTo ?? host.positionMs,
+        positionMs: seekTo ?? host.positionMs,
       );
     } catch (e) {
       debugPrint('[Receiver] 执行 replace_state 失败：$e');
@@ -266,14 +288,17 @@ class ConnectReceiver {
     if (m == null || cur == null) return;
     if (_currentTrackUri == trackUri) return;
     int? target;
-    for (final (ref, _) in [
-      (cur.advance, 'advance'),
-      (cur.skipNext, 'next'),
-      (cur.skipPrev, 'prev'),
+    for (final (ref, backwards) in [
+      (cur.advance, false),
+      (cur.skipNext, false),
+      (cur.skipPrev, true),
     ]) {
-      final s = ref == null ? null : m.state(ref.stateIndex);
+      final index = ref == null
+          ? null
+          : m.playableState(ref.stateIndex, backwards: backwards);
+      final s = index == null ? null : m.state(index);
       if (s != null && m.trackOf(s)?.uri == trackUri) {
-        target = ref!.stateIndex;
+        target = index;
         break;
       }
     }
@@ -285,7 +310,7 @@ class ConnectReceiver {
     }
     _stateIndex = target;
     _revision++;
-    _thresholdReported = false;
+    _listening.anchor(0, _clock.elapsedMilliseconds, reset: true);
     _report('started_playing', positionMs: 0, durationMs: durationMs);
   }
 
@@ -296,6 +321,7 @@ class ConnectReceiver {
   }) {
     if (!isActive || paused == _paused) return;
     _paused = paused;
+    _listening.anchor(positionMs, _clock.elapsedMilliseconds);
     _report(
       paused ? 'pause' : 'resume',
       positionMs: positionMs,
@@ -305,6 +331,7 @@ class ConnectReceiver {
 
   void onLocalSeek(int fromMs, int toMs, {required int durationMs}) {
     if (!isActive) return;
+    _listening.anchor(toMs, _clock.elapsedMilliseconds);
     _report(
       'seek',
       positionMs: toMs,
@@ -314,8 +341,13 @@ class ConnectReceiver {
   }
 
   void onLocalProgress(int positionMs, {required int durationMs}) {
-    if (!isActive || _thresholdReported || positionMs < 30000) return;
-    _thresholdReported = true;
+    if (!isActive ||
+        !_listening.sample(
+          positionMs,
+          _clock.elapsedMilliseconds,
+          playing: !_paused && host.isAudible,
+        ))
+      return;
     _report(
       'played_threshold_reached',
       positionMs: positionMs,
@@ -337,6 +369,7 @@ class ConnectReceiver {
     _machine = null;
     _stateIndex = -1;
     _paused = true;
+    _listening.anchor(0, _clock.elapsedMilliseconds, reset: true);
   }
 
   void _report(
@@ -364,6 +397,9 @@ class ConnectReceiver {
           positionMs: positionMs,
           durationMs: duration,
           previousPositionMs: previousPositionMs,
+          audio: clear || debugSource == 'before_track_load'
+              ? const AudioPlaybackInfo()
+              : host.audioPlaybackInfo,
         );
         debugPrint(
           '[Receiver] 汇报 $debugSource（${s?.stateId}, paused=$_paused, ${positionMs}ms）'
@@ -391,6 +427,6 @@ class ConnectReceiver {
     if (state == null || next.trackOf(state)?.uri != _currentTrackUri) return;
     _machine = next;
     _stateIndex = index;
-    host.updateQueue(next, next.advanceChain(index));
+    host.updateQueue(next, next.playableChain(index));
   }
 }

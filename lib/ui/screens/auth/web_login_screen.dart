@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:provider/provider.dart';
 
+import '../../../l10n/l10n.dart';
+
 import '../../../providers/auth_provider.dart';
 import '../../../services/auth/web_login_flow.dart';
 import '../../../services/auth/web_token_service.dart';
@@ -227,10 +229,10 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('全曲播放：Web 登录'),
+        title: Text(context.l10n.webLoginTitle),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
-          tooltip: '关闭',
+          tooltip: context.l10n.commonClose,
           onPressed: () => _finish(null),
         ),
       ),
@@ -243,14 +245,14 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
             _NoticeBar(text: _flow.notice!, icon: Icons.info_outline_rounded),
           if (stage == WebLoginStage.failed)
             _NoticeBar(
-              text: _flow.error ?? '登录失败',
+              text: _flow.error ?? context.l10n.loginFailed,
               icon: Icons.error_outline_rounded,
-              actionLabel: '重试',
+              actionLabel: context.l10n.commonRetry,
               onAction: () => _flow.retry(),
             ),
           if (_revealed && _flow.waitingForDesktop)
-            const _NoticeBar(
-              text: '如果页面在等你确认，请点「同意」完成授权；其余步骤已自动完成',
+            _NoticeBar(
+              text: context.l10n.webLoginConsentHint,
               icon: Icons.touch_app_rounded,
             ),
           Expanded(
@@ -298,9 +300,9 @@ class _ProgressOverlay extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final text = switch (stage) {
-      WebLoginStage.preparing => '正在获取播放凭据…',
-      WebLoginStage.desktopAuthorize => '正在完成账号授权…',
-      _ => '正在完成登录…',
+      WebLoginStage.preparing => context.l10n.webLoginPreparing,
+      WebLoginStage.desktopAuthorize => context.l10n.webLoginAuthorizing,
+      _ => context.l10n.webLoginFinishing,
     };
     return Positioned.fill(
       child: ColoredBox(
@@ -322,7 +324,7 @@ class _ProgressOverlay extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '登录已完成，剩下的步骤在后台自动进行',
+              context.l10n.webLoginBackgroundHint,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -356,8 +358,7 @@ class _GoogleAccountHint extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '用 Google 注册的账号：请在此处使用「邮箱 + 密码」登录；'
-              '没有密码可先在 Spotify 官网「忘记密码」设置一个。',
+              context.l10n.webLoginGoogleHint,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

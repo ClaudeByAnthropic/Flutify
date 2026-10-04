@@ -166,14 +166,150 @@ void main() {
     await dealer.dispose();
   });
 
-  void replace(List<String> ids, {Map<String, bool>? options, int? seek}) {
+  void replaceMachine(
+    Map<String, Object?> value, {
+    int? seek,
+    bool paused = false,
+  }) {
     server.channels.last.pushJson('hm://track-playback/v1/command', {
       'type': 'replace_state',
-      'state_machine': machine(ids, options: options),
-      'state_ref': {'state_index': 0, 'paused': false},
+      'state_machine': value,
+      'state_ref': {'state_index': 0, 'paused': paused},
       if (seek != null) 'seek_to': seek,
     });
   }
+
+  void replace(List<String> ids, {Map<String, bool>? options, int? seek}) =>
+      replaceMachine(machine(ids, options: options), seek: seek);
+
+  Map<String, Object?> withAds(List<String> ids, Set<int> ads) {
+    final value = machine(ids);
+    for (final i in ads) {
+      final meta = ((value['tracks'] as List)[i] as Map)['metadata'] as Map;
+      meta['is_advertisement'] = i.isEven ? 'true' : true;
+    }
+    return value;
+  }
+
+  for (final paused in [false, true]) {
+    test(
+      'leading advertisements are never displayed or loaded (paused=$paused)',
+      () async {
+        final displayed = <String?>[];
+        playback.addListener(() => displayed.add(playback.currentTrack?.id));
+        final reports = <Map<String, dynamic>>[];
+        report = (request) async {
+          reports.add(jsonDecode(request.body) as Map<String, dynamic>);
+          return http.Response('', 204);
+        };
+        replaceMachine(
+          withAds(['ad1', 'ad2', 'song', 'next'], {0, 1}),
+          seek: 22000,
+          paused: paused,
+        );
+        await until(
+          () => reports.any(
+            (r) => r['debug_source'] == (paused ? 'pause' : 'started_playing'),
+          ),
+        );
+        expect(playback.currentTrack?.id, 'song');
+        expect(playback.upNext.map((e) => e.track.id), ['next']);
+        expect(displayed.whereType<String>().toSet(), {'song'});
+        expect(loader.loaded, paused ? isEmpty : ['song']);
+        expect(audio.isPlaying, !paused);
+        expect(playback.position, Duration.zero);
+        expect(
+          reports.every((r) => r['state_ref']['state_id'] == 'song'),
+          isTrue,
+        );
+        expect(reports.every((r) => r['sub_state']['position'] == 0), isTrue);
+        expect(
+          reports.any((r) => r['debug_source'] == 'played_threshold_reached'),
+          isFalse,
+        );
+      },
+    );
+  }
+
+  test(
+    'automatic advance and previous keep Connect state across filtered ads',
+    () async {
+      replaceMachine(withAds(['a', 'ad1', 'ad2', 'b'], {1, 2}));
+      await until(
+        () => playback.currentTrack?.id == 'a' && !playback.isBuffering,
+      );
+      expect(playback.upNext.map((e) => e.track.id), ['b']);
+      audio.emitCompleted();
+      await until(
+        () => playback.currentTrack?.id == 'b' && !playback.isBuffering,
+      );
+      expect(receiver.isActive, isTrue);
+      await playback.previousTrack();
+      await until(
+        () => playback.currentTrack?.id == 'a' && !playback.isBuffering,
+      );
+      expect(receiver.isActive, isTrue);
+      expect(loader.loaded.where((id) => id.startsWith('ad')), isEmpty);
+    },
+  );
+
+  test(
+    'all-ad cycle cancels a pending song without playing any advertisement',
+    () async {
+      loader.gates['old'] = Completer<void>();
+      replace(['old']);
+      await until(() => loader.loaded.contains('old'));
+      final value = withAds(['ad1', 'ad2'], {0, 1});
+      final states = value['states'] as List;
+      (states[1]['transitions'] as Map)['advance'] = {'state_index': 0};
+      replaceMachine(value);
+      await until(() => !receiver.isActive);
+      loader.gates['old']!.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(audio.playedFiles, isEmpty);
+      expect(audio.isPlaying, isFalse);
+      expect(playback.isBuffering, isFalse);
+      expect(playback.currentTrack?.id, 'old');
+      expect(loader.loaded, ['old']);
+      replace(['recovered']);
+      await until(
+        () => playback.currentTrack?.id == 'recovered' && !playback.isBuffering,
+      );
+      expect(audio.isPlaying, isTrue);
+    },
+  );
+
+  test('expanded and same-track queues do not expose advertisements', () async {
+    report = (_) async => http.Response(
+      jsonEncode({
+        'state_machine': withAds(['a', 'ad', 'b'], {1}),
+        'updated_state_ref': {'state_index': 0},
+      }),
+      200,
+    );
+    replace(['a']);
+    await until(() => playback.upNext.isNotEmpty);
+    expect(playback.upNext.map((e) => e.track.id), ['b']);
+    report = null;
+    replaceMachine(withAds(['a', 'ad', 'c'], {1}));
+    await until(() => playback.upNext.last.track.id == 'c');
+    expect(playback.upNext.map((e) => e.track.id), ['c']);
+    expect(loader.loaded, ['a']);
+  });
+
+  test('ad URI is skipped, promotional song title alone is not', () async {
+    final value = machine(['ad', 'song']);
+    final tracks = value['tracks'] as List;
+    tracks[0]['metadata']['uri'] = 'spotify:ad:promo';
+    tracks[1]['metadata']['name'] = '広告ナシで音楽を聴こう。';
+    tracks[1]['metadata']['duration'] = 28000;
+    replaceMachine(value);
+    await until(
+      () => playback.currentTrack?.id == 'song' && !playback.isBuffering,
+    );
+    expect(loader.loaded, ['song']);
+    expect(playback.currentTrack?.name, '広告ナシで音楽を聴こう。');
+  });
 
   test('late load cannot overwrite the latest track or queue', () async {
     loader.gates['a'] = Completer<void>();

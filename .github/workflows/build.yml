@@ -175,7 +175,9 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build windows --release
+      # x64 beta experiments with native CDM and falls back to WebView on load failure.
+      # ARM64 keeps WebView; the CDM helper is currently x64 only.
+      - run: flutter build windows --release --dart-define=FLUTIFY_NATIVE_WIDEVINE=${{ matrix.arch == 'x64' }}
 
       - name: Verify native binary architecture
         run: python tool/verify_windows_arch.py build/windows/${{ matrix.arch }}/runner/Release ${{ matrix.arch }}
@@ -217,6 +219,8 @@ jobs:
     needs: [prepare, android, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -233,15 +237,24 @@ jobs:
           test "$(find . -maxdepth 1 -type f | wc -l)" -eq 8
           sha256sum Flutify-* > SHA256SUMS.txt
 
+      - name: Prepare release notes
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          notes="docs/releases/${RELEASE_TAG}.md"
+          if [ -f "$notes" ]; then
+            cp "$notes" "$RUNNER_TEMP/release-notes.md"
+          else
+            printf '%s\n' 'Windows x64 / ARM64 提供安装版和便携版；Android 提供三种 ABI 与通用 APK。全部平台构建及产物校验通过后发布，校验和见 SHA256SUMS.txt。' '构建通过不代表所有设备兼容性问题已完成实机验证，已知问题见 README。' > "$RUNNER_TEMP/release-notes.md"
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: Flutify ${{ needs.prepare.outputs.tag }}
           prerelease: ${{ contains(needs.prepare.outputs.tag, 'beta') || contains(needs.prepare.outputs.tag, 'alpha') || contains(needs.prepare.outputs.tag, 'rc') }}
-          body: |
-            Windows x64 / ARM64 提供安装版和便携版；Android 提供三种 ABI 与通用 APK。全部平台构建及产物校验通过后发布，校验和见 SHA256SUMS.txt。
-            构建通过不代表所有设备兼容性问题已完成实机验证，已知问题见 README。
+          body_path: ${{ runner.temp }}/release-notes.md
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: dist/*

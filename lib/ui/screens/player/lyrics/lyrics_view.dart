@@ -14,6 +14,7 @@ import '../../../../providers/connect_provider.dart';
 import '../../../../providers/playback_provider.dart';
 import '../../../../providers/preferences_provider.dart';
 import '../../../../providers/spotify_provider.dart';
+import '../../../../services/lyrics/lyrics_translation.dart';
 import '../../../widgets/connect/connect_actions.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/skeleton.dart';
@@ -76,6 +77,11 @@ class _LyricsViewState extends State<LyricsView> {
   final ScrollController _scroll = ScrollController();
 
   SpotifyLyrics? _lyrics;
+  late final LyricsTranslationController _translation;
+  late final bool _ownsTranslation;
+  SpotifyLyrics? _translationLyrics;
+  String? _translationTrackUri;
+  int _loadRevision = 0;
   List<GlobalKey> _lineKeys = const [];
   int _activeIndex = -1;
   bool _browsing = false;
@@ -85,6 +91,9 @@ class _LyricsViewState extends State<LyricsView> {
   AppPreferences _style = AppPreferences.defaults;
 
   bool get _isSynced => _lyrics?.isSynced ?? false;
+  bool get _translationIsCurrent =>
+      identical(_lyrics, _translationLyrics) &&
+      widget.track.uri == _translationTrackUri;
 
   /// 用于切行的时间点：固定提前量 + 远程模式下用户设置的提前量（服务端快照推算会有偏差）。
   int get _lookupMs =>
@@ -95,6 +104,14 @@ class _LyricsViewState extends State<LyricsView> {
   @override
   void initState() {
     super.initState();
+    final shared = context.read<LyricsTranslationController?>();
+    _ownsTranslation = shared == null;
+    _translation =
+        shared ??
+        LyricsTranslationController(
+          lookup: context.read<SpotifyProvider>().fetchLyricsTranslation,
+        );
+    _translation.addListener(_onTranslation);
     if (widget.remote) {
       final connect = context.read<ConnectProvider>();
       _position = connect.position;
@@ -113,6 +130,7 @@ class _LyricsViewState extends State<LyricsView> {
   int _generation = 0;
 
   void _load() {
+    final revision = ++_loadRevision;
     final spotify = context.read<SpotifyProvider>();
     _generation = spotify.lyricsGeneration;
     final cached = spotify.cachedLyrics(widget.track.id);
@@ -122,8 +140,9 @@ class _LyricsViewState extends State<LyricsView> {
     }
     final generation = _generation;
     spotify.fetchLyrics(LyricsQuery.fromTrack(widget.track)).then((lyrics) {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation && revision == _loadRevision) {
         setState(() => _setLyrics(lyrics));
+      }
     });
   }
 
@@ -134,6 +153,25 @@ class _LyricsViewState extends State<LyricsView> {
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _scrollToActive(animate: false),
     );
+  }
+
+  void _onTranslation() {
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToActive(animate: false),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant LyricsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.track.uri != widget.track.uri) {
+      _lyrics = null;
+      // The toolbar listens above this widget. Configure after the frame so a
+      // cached track change cannot notify that ancestor during its build.
+      _load();
+    }
   }
 
   /// 对焦行：前奏阶段（尚未唱到第一句，_activeIndex 为 -1）对焦第一句，
@@ -222,6 +260,8 @@ class _LyricsViewState extends State<LyricsView> {
 
   @override
   void dispose() {
+    _translation.removeListener(_onTranslation);
+    if (_ownsTranslation) _translation.dispose();
     _browseTimer?.cancel();
     _position.removeListener(_onPosition);
     _scroll.dispose();
@@ -241,6 +281,19 @@ class _LyricsViewState extends State<LyricsView> {
       );
     }
     _style = style;
+    final target = Localizations.localeOf(context).toLanguageTag();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _translationLyrics = _lyrics;
+        _translationTrackUri = widget.track.uri;
+        _translation.configure(
+          _lyrics,
+          style,
+          target,
+          query: LyricsQuery.fromTrack(widget.track),
+        );
+      }
+    });
     // 歌词缓存被清空或这首歌被要求重新获取：回到加载态重新取
     final generation = context.select<SpotifyProvider, int>(
       (s) => s.lyricsGeneration,
@@ -338,6 +391,9 @@ class _LyricsViewState extends State<LyricsView> {
                   key: _lineKeys[i],
                   child: LyricLineView(
                     text: lyrics.lines[i].words,
+                    translation: _translationIsCurrent
+                        ? _translation.lines?.elementAtOrNull(i)
+                        : null,
                     fontSize: fontSize,
                     centered: centered,
                     blurScale: _style.lyricsBlur,
@@ -349,7 +405,8 @@ class _LyricsViewState extends State<LyricsView> {
                         : null,
                   ),
                 ),
-              if (lyrics.provider == LyricsProvider.lrclib)
+              if (lyrics.provider == LyricsProvider.lrclib ||
+                  (_translationIsCurrent && _translation.fromLrclib))
                 Padding(
                   padding: const EdgeInsets.only(top: 28),
                   child: Text(

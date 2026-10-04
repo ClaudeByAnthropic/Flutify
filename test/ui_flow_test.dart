@@ -120,7 +120,9 @@ void main() {
     expect(find.text('First synthetic line'), findsOneWidget);
     // 手机只保留内嵌歌词：流动背景和玻璃控制区，不再重复打开全屏面板。
     expect(find.byType(LyricsBackdrop), findsOneWidget);
-    expect(find.byType(LiquidGlass), findsOneWidget);
+    // Playback controls plus the source-translation toolbar button.
+    expect(find.byType(LiquidGlass), findsNWidgets(2));
+    expect(find.byIcon(Icons.translate_rounded), findsOneWidget);
     expect(find.byTooltip('全屏歌词'), findsNothing);
     expect(find.byType(ImageFiltered), findsWidgets);
     // 0:00 时当前行保持清晰。

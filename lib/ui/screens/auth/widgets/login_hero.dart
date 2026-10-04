@@ -16,9 +16,13 @@ class LoginHero extends StatefulWidget {
   State<LoginHero> createState() => _LoginHeroState();
 }
 
-class _LoginHeroState extends State<LoginHero> with SingleTickerProviderStateMixin {
+class _LoginHeroState extends State<LoginHero>
+    with SingleTickerProviderStateMixin {
   /// 一整圈 40 秒：慢到几乎察觉不到，只让画面「活着」。
-  late final AnimationController _spin = AnimationController(vsync: this, duration: const Duration(seconds: 40));
+  late final AnimationController _spin = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 40),
+  );
 
   @override
   void didChangeDependencies() {

@@ -5,8 +5,8 @@ import 'proto_codec.dart';
 
 /// 向 Spotify 声明的客户端身份（目前只有 Windows 桌面端）。
 ///
-/// 同一会话内 access_token 所属的 client_id、client-token 的平台数据、User-Agent 与
-/// `App-Platform` 等请求头必须来自同一种客户端；混用本身就是明显的异常特征，容易触发风控。
+/// 桌面 OAuth 数据请求共用 client_id、client-token 平台数据及请求头。
+/// Web 播放另有独立身份；协议差异与未验证的账号风险见 docs/RISK_REVIEW.md。
 enum SpotifyClientProfile {
   /// Windows 桌面端：桌面版浏览器 OAuth。
   desktop;
@@ -42,7 +42,9 @@ enum SpotifyClientProfile {
   /// 本机 Windows 构建号（如 26200）；非 Windows 或解析失败时用 Windows 10 22H2 的 19045。
   static int _windowsBuild() {
     if (!Platform.isWindows) return 19045;
-    final match = RegExp(r'Build (\d+)').firstMatch(Platform.operatingSystemVersion);
+    final match = RegExp(
+      r'Build (\d+)',
+    ).firstMatch(Platform.operatingSystemVersion);
     return int.tryParse(match?.group(1) ?? '') ?? 19045;
   }
 }

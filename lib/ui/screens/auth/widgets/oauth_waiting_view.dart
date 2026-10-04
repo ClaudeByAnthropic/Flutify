@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../l10n/l10n.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../providers/auth_provider.dart';
@@ -17,12 +19,13 @@ class OAuthWaitingView extends StatelessWidget {
   /// 用系统浏览器打开授权页；打不开时把链接复制到剪贴板并提示手动粘贴。
   static Future<void> launch(BuildContext context, Uri url) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final l10n = context.l10n;
     final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
     if (!opened) {
       await Clipboard.setData(ClipboardData(text: url.toString()));
       AppToast.showOn(
         messenger,
-        '无法自动打开浏览器，登录链接已复制，请粘贴到浏览器中打开',
+        l10n.loginBrowserFallback,
         icon: Icons.content_paste_rounded,
         tone: ToastTone.warning,
       );
@@ -50,15 +53,20 @@ class OAuthWaitingView extends StatelessWidget {
         ),
         const SizedBox(height: 40),
         Text(
-          '在浏览器中完成登录',
+          context.l10n.loginBrowserTitle,
           textAlign: TextAlign.center,
-          style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.8),
+          style: theme.textTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+          ),
         ),
         const SizedBox(height: 12),
         Text(
-          '登录并同意授权后，这里会自动继续',
+          context.l10n.loginBrowserSubtitle,
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 40),
         if (url != null)
@@ -71,7 +79,7 @@ class OAuthWaitingView extends StatelessWidget {
                     onPressed: () => launch(context, url),
                     style: FilledButton.styleFrom(shape: const StadiumBorder()),
                     icon: const Icon(Icons.open_in_new_rounded, size: 20),
-                    label: const Text('重新打开'),
+                    label: Text(context.l10n.loginReopen),
                   ),
                 ),
               ),
@@ -82,19 +90,32 @@ class OAuthWaitingView extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.maybeOf(context);
-                      await Clipboard.setData(ClipboardData(text: url.toString()));
-                      AppToast.showOn(messenger, '登录链接已复制', icon: Icons.link_rounded, tone: ToastTone.success);
+                      final l10n = context.l10n;
+                      await Clipboard.setData(
+                        ClipboardData(text: url.toString()),
+                      );
+                      AppToast.showOn(
+                        messenger,
+                        l10n.loginLinkCopied,
+                        icon: Icons.link_rounded,
+                        tone: ToastTone.success,
+                      );
                     },
-                    style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+                    style: OutlinedButton.styleFrom(
+                      shape: const StadiumBorder(),
+                    ),
                     icon: const Icon(Icons.link_rounded, size: 20),
-                    label: const Text('复制链接'),
+                    label: Text(context.l10n.loginCopyLink),
                   ),
                 ),
               ),
             ],
           ),
         const SizedBox(height: 12),
-        TextButton(onPressed: auth.cancelOAuth, child: const Text('取消')),
+        TextButton(
+          onPressed: auth.cancelOAuth,
+          child: Text(context.l10n.commonCancel),
+        ),
       ],
     );
   }

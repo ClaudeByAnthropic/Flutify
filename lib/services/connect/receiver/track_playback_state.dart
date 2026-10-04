@@ -32,6 +32,7 @@ class TpTrack {
   final List<({String name, String uri})> artists;
   final int durationMs;
   final bool explicit;
+  final bool isAdvertisement;
 
   /// 封面，按尺寸从大到小。
   final List<String> imageUrls;
@@ -44,6 +45,7 @@ class TpTrack {
     this.artists = const [],
     this.durationMs = 0,
     this.explicit = false,
+    this.isAdvertisement = false,
     this.imageUrls = const [],
   });
 
@@ -67,6 +69,10 @@ class TpTrack {
       ],
       durationMs: (meta['duration'] as num?)?.toInt() ?? 0,
       explicit: meta['is_explicit'] == true,
+      isAdvertisement:
+          meta['is_advertisement'] == true ||
+          meta['is_advertisement'] == 'true' ||
+          (meta['uri'] as String? ?? '').startsWith('spotify:ad:'),
       imageUrls: [for (final i in images) i.url],
     );
   }
@@ -177,6 +183,34 @@ class TpStateMachine {
       cur = state(i);
     }
     return out;
+  }
+
+  /// 广告不进入播放器或展示队列，仍保留原状态下标用于服务端同步。
+  List<int> playableChain(int index) => [
+    for (final i in advanceChain(index))
+      if (trackOf(states[i]) case final track?)
+        if (!track.isAdvertisement) i,
+  ];
+
+  /// 只越过广告，不能跨过正常歌曲去匹配任意队列项。
+  int? playableState(int index, {bool backwards = false}) {
+    final visited = <int>{};
+    var i = index;
+    while (visited.add(i)) {
+      final current = state(i);
+      if (current == null) return null;
+      final track = trackOf(current);
+      if (track == null) return null;
+      if (!track.isAdvertisement) return i;
+      final next = backwards
+          ? current.skipPrev
+          : current.advance == null || current.advance?.stateIndex == i
+          ? current.skipNext
+          : current.advance;
+      if (next == null) return null;
+      i = next.stateIndex;
+    }
+    return null;
   }
 }
 

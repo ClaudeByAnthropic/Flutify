@@ -12,6 +12,7 @@ import '../models/playlist.dart';
 import '../models/track.dart';
 import '../models/user_profile.dart';
 import '../services/lyrics/lyrics_resolver.dart';
+import '../services/lyrics/lyrics_translation.dart';
 import '../services/cache/cache_location.dart';
 import '../services/spotify_api_service.dart';
 import '../services/storage_service.dart';
@@ -35,6 +36,8 @@ class SpotifyProvider extends ChangeNotifier {
   String _homeFacet = '';
   bool _isLoadingFeed = false;
   int _feedGeneration = 0;
+  Future<void>? _feedRequest;
+  int _initialGeneration = 0;
 
   // Search
   Timer? _searchTimer;
@@ -92,16 +95,19 @@ class SpotifyProvider extends ChangeNotifier {
   /// 四个请求互不依赖，并行发出；任意一个失败只影响自己的那部分数据，
   /// 失败原因记入 [homeError]（取第一条）。
   Future<void> loadInitialData() async {
+    final initialGeneration = ++_initialGeneration;
     _isLoadingHome = true;
     _homeError = null;
     final feedGeneration = ++_feedGeneration;
+    _feedRequest = null;
+    String? error;
     notifyListeners();
 
     Future<T> guard<T>(Future<T> request, T fallback) async {
       try {
         return await request;
       } catch (e) {
-        _homeError ??= e is SpotifyDataException ? e.toString() : '加载失败：$e';
+        error ??= e is SpotifyDataException ? e.toString() : '加载失败：$e';
         return fallback;
       }
     }
@@ -112,11 +118,12 @@ class SpotifyProvider extends ChangeNotifier {
       guard<List<SpotifyCategory>>(_api.getCategories(), const []),
       guard<List<SpotifyDevice>>(_api.getDevices(), const []),
     ]);
-    if (_disposed) return; // 加载期间 provider 已被销毁（如测试 / 热重载）
+    if (_disposed || initialGeneration != _initialGeneration) return;
     _user = results[0] as SpotifyUser;
     // 加载期间用户已切换筛选标签：以那次请求的结果为准
     if (feedGeneration == _feedGeneration) {
       _home = results[1] as HomeFeed;
+      _homeError = error;
       _isLoadingFeed = false;
     }
     _categories = results[2] as List<SpotifyCategory>;
@@ -132,22 +139,42 @@ class SpotifyProvider extends ChangeNotifier {
   /// 切换主页筛选标签（[facet] 为空 = 全部）：只重新请求主页分区。
   ///
   /// 连续点击时丢弃过期请求的结果；失败时保留旧内容并记入 [homeError]。
-  Future<void> selectHomeFacet(String facet) async {
-    if (facet == _homeFacet && !_home.isEmpty) return;
+  Future<void> selectHomeFacet(String facet) {
+    if (facet == _homeFacet) {
+      if (_feedRequest != null) return _feedRequest!;
+      if (!_home.isEmpty) return Future.value();
+    }
     _homeFacet = facet;
-    final generation = ++_feedGeneration;
-    _isLoadingFeed = true;
-    notifyListeners();
+    return _requestHome();
+  }
 
+  /// 保留当前筛选，仅刷新主页；同一次请求完成前合并重复刷新。
+  Future<void> refreshHome() => _feedRequest ?? _requestHome();
+
+  Future<void> _requestHome() {
+    final generation = ++_feedGeneration;
+    final facet = _homeFacet;
+    _isLoadingFeed = true;
+    _homeError = null;
+    final completion = Completer<void>();
+    _feedRequest = completion.future;
+    notifyListeners();
+    unawaited(_fetchHome(facet, generation).whenComplete(completion.complete));
+    return completion.future;
+  }
+
+  Future<void> _fetchHome(String facet, int generation) async {
     HomeFeed? feed;
+    String? error;
     try {
       feed = await _api.getHome(facet: facet);
-      _homeError = null;
     } catch (e) {
-      _homeError = e is SpotifyDataException ? e.toString() : '加载失败：$e';
+      error = e is SpotifyDataException ? e.toString() : '加载失败：$e';
     }
     if (_disposed || generation != _feedGeneration) return;
     if (feed != null) _home = feed;
+    _homeError = error;
+    _feedRequest = null;
     _isLoadingFeed = false;
     notifyListeners();
   }
@@ -223,6 +250,12 @@ class SpotifyProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   SpotifyLyrics? cachedLyrics(String trackId) => _lyricsCache[trackId];
 
+  Future<LyricsTranslation?> fetchLyricsTranslation(
+    LyricsQuery query,
+    SpotifyLyrics lyrics,
+    String target,
+  ) => _lyrics.translate(query, lyrics, target);
+
   /// 某首歌的歌词取到并写入缓存时发出曲目 ID（任务栏歌词据此补上之前没取到的歌词）。
   Stream<String> get lyricsCached => _lyricsCached.stream;
 
@@ -238,6 +271,7 @@ class SpotifyProvider extends ChangeNotifier {
   }) async {
     _lyricsCache.clear();
     _lyricsInFlight.clear();
+    _lyrics.fallback?.clearCandidates();
     _lyricsGeneration++;
     final cache = _lyrics.fallback?.cache;
     final result = cache != null

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import '../../models/audio_playback_info.dart';
 
 import 'access_point.dart';
 import 'audio_cache_store.dart';
@@ -48,6 +49,7 @@ final Uint8List kAudioAesIv = Uint8List.fromList([
 /// [stream] 为空时 [file] 是已落盘的缓存文件；非空时曲目仍在下载，应按流播放，
 /// 下载完成后才会写入 [file]。
 class LoadedAudio {
+  final AudioPlaybackInfo playbackInfo;
   final File file;
   final TrackAudioFile source;
   final int? durationMs;
@@ -63,6 +65,7 @@ class LoadedAudio {
   final EmeTrackContent? emeContent;
 
   const LoadedAudio({
+    this.playbackInfo = const AudioPlaybackInfo(),
     required this.file,
     required this.source,
     required this.durationMs,

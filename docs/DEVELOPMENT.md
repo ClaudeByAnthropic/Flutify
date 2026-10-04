@@ -21,7 +21,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 胶囊药丸（Stadium Pill / 999dp）：用于分类过滤器、顶部药丸、播放按钮和搜索栏。
   - 宽圆角容器（24dp ~ 28dp）：用于流派卡片、专辑卡片及模态底栏。
 * **MiSans 中英文统一字体 (Expressive Typography)**：内置小米 MiSans（400 / 500 / 600 / 700 四档字重，全量中日韩字形），中文放宽行高、取消负字距，大字重标题与正文同样清晰；不再运行时拉取网络字体。
-* **简体中文界面**：全部界面文案、系统组件（日期选择、文本选择菜单、Tooltip）均为简体中文，数量按中文习惯显示（12 首歌曲、1.2 万 位粉丝、1 小时 23 分钟）。
+* **界面语言**：支持简体中文、繁體中文、English、日本語和跟随系统；系统组件同步切换。部分历史登录及账号文案仍为硬编码中文，尚待迁入本地化资源。
 * **动感反馈与波形动效**：正在播放的曲目带有实时跃动的均衡器波形动画（Waveform Visualizer）。
 
 ### 2. 全面适配 Spotify 核心业务与交互
@@ -29,9 +29,10 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 与官方客户端同一个 home 查询，按服务端分区原样还原（顺序、标题、条目都来自 Spotify）：
     吸顶筛选标签（全部 / 音乐 / 播客，选中后出现二级标签）→ 快捷入口（最多 8 个，宽屏 4 列、手机 2 列）
     → 普通卡架（可带艺人头像，条目多于已显示时有「显示全部」）→ 最近播放 → 推荐流网格（每张卡上方标注推荐理由）。
-  - 请求带 `Accept-Language: zh-CN`（官方简体中文语言包名），分区标题与标签由服务端直接返回中文。
+   - 请求的 `Accept-Language` 跟随界面：简体 `zh-CN`、繁体 `zh-TW`、英文 `en`、日语 `ja`，用于服务端分区标题与标签。
+   - 支持下拉刷新及顶部刷新按钮，保留当前筛选；短列表和空列表也可下拉。刷新直接重新请求主页，并发操作合并，失败提示且保留旧内容；旧请求不得覆盖新筛选结果。浏览等实体缓存按语言区分。
   - 手机端标签栏左侧为头像（点按打开设置）；未登录时主页提示登录，而不是显示「加载失败」。
-  - 播客 / 单集只展示，点按提示暂不支持。
+  - 播客可打开详情并播放单集；保留 `spotify:episode:` URI，支持外部 HTTPS 音频的 Range 按需读取与跳转，并保留受保护 MP4 播放路径。外部源须提供可靠长度；无长度的 chunked 响应暂不支持。
 * **搜索与浏览 (Search & Browse)**：
   - 实时歌曲、艺人、歌单多类型搜索。
   - Spotify 经典 45° 倾斜封面的彩色流派分类卡（Pop、Hip-Hop、Rock、Dance、Chill 等）。
@@ -46,8 +47,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
     中间区域可在「封面 / 歌词 / 播放队列」间切换（底部按钮，再点一次回到封面）；**左右滑动封面切歌**，小幅拖动松手回弹；内嵌歌词右上角可进入全屏歌词。
   - **播放失败提示**：未登录（带「登录」按钮）、曲目不可播放（说明已自动跳过）、网络错误（带「重试」按钮）均以统一的 MD3E 悬浮提示（`AppToast`，见下）告知，连续失败只保留最新一条。
     连续 3 首无法播放时自动暂停、不再跳过（设置 →「播放」可关闭），提示带「下一首」按钮。
-  - **Spotify Connect 遥控**（桌面版会话，免费账号可用的部分）：本机以隐藏观察者身份接入账号的 Connect 网络
-    （dealer 长连接 + connect-state，`services/connect/`），不会出现在别人的设备列表里。
+  - **Spotify Connect 遥控**：观察端通过 dealer / connect-state 跟踪其他设备；本机播放端另通过 track-playback 注册到同账号设备列表（`services/connect/receiver/`）。可用操作取决于账号与服务端策略。
     - 设备面板（`device_picker_sheet.dart`）：桌面端贴在播放栏右下方，移动端为底部面板；
       顶部「当前收听设备」卡片（跳动音柱、远程音量滑块），下方其他设备，点按转移播放；
       远程在用时提供「此设备」：暂停远程，本机从同一首、同一进度继续。
@@ -75,6 +75,11 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
     选词按**原唱语言**投票（同一首歌占多数的语言即原词，曲名 / 歌手只算小票，避免英文歌配上日文译词），翻译版 / 罗马音 / 双语对照降为备选，
     中文歌按曲名与歌手的字形对齐简繁（对照表 `zh_script_table.dart` 由 `tool/gen_zh_script_table.ps1` 调 Windows `LCMapStringEx` 生成）。
     结果按曲目 ID 存进应用数据目录 `lyrics_lrc/`；补全请求因网络失败时不缓存，下次再试。设置 → 歌词 →「补全歌词」可关闭。
+  - **歌词译文**：默认显示歌词源已有译文；优先选 Spotify `alternatives`，缺少时在启用 LRCLIB 补全的前提下查找对应译词或双语记录。没有调用机器翻译服务。
+    目标语言跟随界面，简体和繁体分别匹配；默认跳过与界面同语言的原词，可配置额外排除语言（`zh` 排除两种中文，`zh-Hans` / `zh-Hant` 分别排除），也可关闭自动显示、手动显示或取消。
+    Spotify 译词按原始行索引对齐并保留空行；LRCLIB 记录须通过曲名、艺人、时长与时间轴校验，双语记录还校验原文锚点。没有可靠匹配时显示无该语言译文，原词保留；LRCLIB 译文标明来源。
+  - **Spotify Canvas**：全屏播放器和桌面详情封面支持官方 Canvas 视频、图片和 GIF，维持现有 MD3E 布局；视频静音循环，暂停、离开页面及减弱动效时停止。无 Canvas、加载失败或超限时使用静态封面。
+    当前支持接口返回的 HTTPS 直接媒体 URL，单个媒体上限 12 MB、内存缓存最多 3 个；只返回 manifest / fileId 的记录尚未支持。原生 WebView 视频显示仍需实机验证。
   - **任务栏歌词（Windows）**：原「任务栏歌词」项目的原生 C++ 重写，嵌在 Win11 任务栏天气小组件右侧（`windows/runner/taskbar_lyrics*.cpp`），
     不需要单独的 exe。当前句大字、下一句小字，切句时上滚（300ms）；放不下时缩小或折成两行；无同步歌词时显示封面 + 歌名 + 播放控制。
     没取到歌词（网络抖动 / 限流）时 10 秒、30 秒、90 秒后各重试一次；App 内歌词页先取到时立即同步到任务栏（`SpotifyProvider.lyricsCached`）。
@@ -114,11 +119,12 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 液态玻璃模糊强度 / 不透明度（带实时预览）、字号（85% – 130%）、圆角风格（圆润 / 标准 / 方正）、减弱动效（同时尊重系统设置）。
   - 实现：`AppearanceProvider` 生成主题，主题之外的参数通过 ThemeExtension `FlutifyTokens` 下发（`context.tokens`、`context.motion()`）。
 * **其他设置项**（全部免费账号可用；非外观偏好统一存在 `AppPreferences`，由 `PreferencesProvider` 持久化，播放类偏好由 `PlaybackProvider` 持有）：
-  - 语言：跟随系统 / 中文 / English，切换后同时用新语言重新拉取主页等 Spotify 文案；
-  - 歌词：字号（80% – 140%）、左对齐 / 居中、其他行模糊强度（可关）、LRCLIB 补全歌词、全屏歌词默认铺满屏幕还是窗口；
+  - 语言：跟随系统 / 简体中文 / 繁體中文 / English / 日本語，切换后同时用新语言重新拉取主页等 Spotify 文案；窄屏或大字号时语言选项可横向滚动；
+  - 歌词：字号（80% – 140%）、左对齐 / 居中、其他行模糊强度（可关）、LRCLIB 补全歌词、自动显示源译文及排除语言、全屏歌词默认铺满屏幕还是窗口；
   - 任务栏歌词（仅 Windows）：开关、文字颜色、不透明度；
-  - 播放：音量均衡（读取 Spotify 文件头里的响度数据，只衰减偏响的歌）、歌曲间淡入淡出（0 – 12 秒，单播放器实现，两首不重叠）；
+  - 播放：音量均衡（读取 Spotify 文件头里的响度数据，只衰减偏响的歌）、歌曲间淡入淡出（0 – 12 秒，单播放器实现，两首不重叠）、Spotify Canvas；
   - 启动：打开主页 / 音乐库 / 上次位置；桌面端记住窗口大小、位置与最大化状态（显示器变化导致不可见时回到居中，`screen_retriever` 枚举显示器）；
+    启动阶段不显示加载动画，基础初始化成功后直接进入应用（默认主页）；失败或超过 60 秒显示原因。存储、网络与窗口等基础初始化仍需完成，桌面 DRM WebView 延迟到首次受保护音频播放时创建。
   - Spotify Connect：总开关、设备名称（可一键使用本机设备名）、启动时同步播放状态、远程歌词提前量（±2 秒，只影响歌词切行）；
     本机同时作为 **Connect 播放端**（track-playback 协议，`services/connect/receiver/`）出现在同账号其他设备的设备列表里，
     可被手机 / 桌面版选中并遥控（播放、暂停、切歌、循环、随机、音量），本机的播放状态也会同步给其他设备；
@@ -190,7 +196,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 | **媒体库** | `lib/services/library/` | `LibrarySource` 抽象：桌面会话走 spclient `collection/v2/paging`（protobuf，已点赞歌曲 / 专辑 / 艺人）+ `playlist/v2/user/{u}/rootlist`（歌单）+ Pathfinder 补全曲目与实体；无桌面会话时走 Web API。点赞 / 收藏 / 关注乐观更新并尽力同步到账号（失败记入 `syncError`）；自建歌单仅保存在本机。未登录时媒体库为空 |
 | **歌词** | `lib/services/lyrics_service.dart` | spclient `GET /color-lyrics/v2/track/{id}`，请求头沿用会话身份（桌面会话即桌面端头）；404 = 无歌词（可缓存），其他错误不缓存 |
 | **歌词补全** | `lib/services/lyrics/` | `LyricsResolver` 合并官方与 LRCLIB：官方有逐行同步歌词直接用，否则查 LRCLIB；官方出错且 LRCLIB 也没有时抛原错误 |
-| **协议登录** | `lib/services/auth/` | 只有**桌面版 OAuth**：与官方桌面版相同的 client_id，系统浏览器打开 accounts.spotify.com 登录，本机回环 `127.0.0.1:8898/login` 接收授权码，PKCE 换令牌、refresh_token 续期（被吊销时标记「登录已过期」），并以 Windows 桌面身份申请 `client-token`；旧版本其他登录方式留下的会话启动时清除。会话的 client_id、client-token 平台数据、User-Agent 与 `app-platform` 请求头始终来自同一种客户端身份（`client_profile.dart`）；登出调用 `/api/logout/v1` |
+| **协议登录** | `lib/services/auth/` | 桌面版 OAuth 使用浏览器登录、回环回调与 PKCE，刷新令牌并以桌面身份请求数据；Web DRM / track-playback 另用 Web 会话身份。Android 的桌面 OAuth 平台声明仍使用 Windows 回退值，详见 [风险审查](RISK_REVIEW.md)；不能把两套链路描述为统一的官方客户端身份。 |
 | **桌面端数据层** | `lib/services/pathfinder/` | 桌面版 OAuth 会话下，公开 Web API（api.spotify.com）会因共享 client_id 频繁 429，因此改走官方桌面端自己的内部接口：Pathfinder GraphQL（`api-partner.spotify.com/pathfinder/v2/query`，持久化查询 hash 取自本机 `xpui.spa` 1.3.1.234）负责主页、分类、搜索、专辑、艺人、唱片目录与曲目补全；spclient `playlist/v2` 负责歌单（封面依次取 `pictureSize`、上传封面 `picture`、前几首曲目专辑封面拼的 `mosaic.scdn.co` 四宫格，见 `services/library/playlist_cover.dart`）、`user-profile-view/v3/profile/{用户名}` 负责昵称头像。桌面版令牌不含用户名，登录后用令牌登录一次 AP 取 canonical username（歌单根列表、收藏分页都按用户名寻址；注意 `profile/me` 是用户名为 "me" 的另一个账号，不能用）；旧版本缺用户名的会话启动时自动补齐并重新加载媒体库 |
 | **探测脚本** | `tool/` | 纯 Dart 命令行探针（不属于 App）：`protocol_probe.dart`（播放链路端到端）、`live_probe.dart`（用本机已保存会话实测播放 / 媒体库 / 歌词）、`pathfinder_probe.dart`（Pathfinder 入参探测）、`ap_ports_probe.dart`（AP 网络可达性）。输出只写入 `tool/probe_out/`（已 gitignore，含账号数据，不得进入测试或文档） |
 
@@ -216,9 +222,10 @@ d:/Flutify/app/
 │   ├── l10n/                             # 界面文案（gen-l10n，配置见 l10n.yaml）
 │   │   ├── app_zh.arb                    # 简体中文模板（新增文案先写这里）
 │   │   ├── app_en.arb                    # 英文备用翻译，与模板保持同步
+│   │   ├── app_zh_Hant.arb               # 繁体中文翻译，与模板保持同步
 │   │   ├── app_localizations*.dart       # 自动生成，勿手改
 │   │   ├── l10n.dart                     # context.l10n 扩展
-│   │   ├── app_locale.dart               # 固定 zh_CN + Global*Localizations 代理
+│   │   ├── app_locale.dart               # 简体 / 繁体 / 英文 / 日语 / 系统语言解析
 │   │   └── model_labels.dart             # 专辑类型、播放来源等模型字段 → 界面文案
 │   ├── models/                           # Spotify 对应的数据模型
 │   │   ├── track.dart, album.dart, artist.dart
@@ -328,15 +335,15 @@ App 内的 `FlutifyMark`（登录页、账号卡片）按同一组比例用 Canv
 
 ## 🌐 语言与字体
 
-### 简体中文界面（gen-l10n）
-* `MaterialApp` 固定 `locale: zh_CN`（`lib/l10n/app_locale.dart`），并注册 `GlobalMaterialLocalizations` / `GlobalCupertinoLocalizations` / `GlobalWidgetsLocalizations`，系统组件同样显示中文。
+### 简体、繁体、英文与日语界面（gen-l10n）
+* `MaterialApp` 按偏好选择 `zh-Hans`、`zh-Hant`、`en`、`ja` 或跟随系统（`lib/l10n/app_locale.dart`），注册 Flutter 系统组件本地化代理；系统日语自动匹配 `ja`，系统 `zh-TW` / `zh-HK` / `zh-MO` 解析为繁体，其他不支持的语言回退简体。旧偏好值 `zh` 继续代表简体。
 * 组件内统一使用 `context.l10n.xxx`（`import 'package:flutify_app/l10n/l10n.dart'` 或相对路径）；模型字段到文案的映射（专辑 / 单曲 / 合辑、「正在播放歌单」）放在 `l10n/model_labels.dart`，模型层不含界面语言。
 * 服务层 / Provider 不依赖 `BuildContext`，其错误信息在 UI 层转换后再展示。登录页（`ui/screens/auth/`）与账号卡片的文案为直接书写的中文，尚未迁入 ARB。
 * 用词参照 Spotify 中文版：主页 / 搜索 / 音乐库 / 已点赞的歌曲 / 正在播放 / 播放队列 / 歌词 / 随机播放 / 单曲循环 / 添加到歌单 / 关注。
 
 **新增一条文案：**
 1. 在 `lib/l10n/app_zh.arb` 添加键值（带占位符时写 `@键名.placeholders`，数量用 ICU `plural`，如 `"songCount": "{count, plural, other{{count} 首歌曲}}"`）；
-2. 在 `lib/l10n/app_en.arb` 添加同名英文；
+2. 在 `lib/l10n/app_en.arb`、`lib/l10n/app_zh_Hant.arb` 和 `lib/l10n/app_ja.arb` 添加同名英文、繁体和日语译文；
 3. 运行 `flutter pub get`（或直接 `flutter run` / `flutter gen-l10n`）重新生成 `app_localizations*.dart`；
 4. 代码中使用 `context.l10n.键名`。
 
@@ -374,9 +381,8 @@ cd d:\Flutify\app
 登录页为 MD3E 表现力设计：主视觉是坐落在缓慢自转的十二瓣曲奇形与柔和爆裂形上的品牌标，三条安心说明放在大圆角卡片里，
 等待授权时显示形状变换的加载指示器（`M3ELoadingIndicator`）；减弱动效时形状静止。
 
-**降低风控的做法**（均已实现）：与官方桌面版相同的浏览器授权，App 不接触密码；
-会话内 client_id、client-token 平台数据（`desktop_windows`）、User-Agent、`app-platform` / `spotify-app-version`
-来自同一客户端身份，避免"桌面令牌 + 安卓设备"的混搭特征；令牌只在临近过期时续期，并发续期合并为一次请求；device_id 固定不变。
+浏览器 OAuth 使用 PKCE，桌面数据请求统一从 `client_profile.dart` 取身份参数，令牌续期做并发合并；Connect 播放端使用本地持久化的随机设备 ID。
+Web 播放和桌面数据认证仍是两套身份参数，平台回退、版本常量、网关出口与内部 API 兼容性仍有风险；这些工程修正不能证明或保证账号不受限制。证据、已完成修正及验证范围见 [RISK_REVIEW.md](RISK_REVIEW.md)。
 
 桌面版 OAuth 登录后，数据走桌面端内部接口（见上表「桌面端数据层」），Spotify Connect 遥控也只在这种会话下可用（dealer / connect-state）。
 桌面客户端升级后若出现 `PersistedQueryNotFound`，可用 `tool/pathfinder_probe.dart` 探测并从新的 `xpui.spa` 重新提取 hash。
@@ -405,7 +411,7 @@ $env:FLUTIFY_AUDIT='1'; & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" test -
 若该标签已存在，必须指向本次构建的提交。Windows x64、原生 ARM64 和 Android 全部构建及校验通过后才执行 **Publish release**，
 发布两个 Windows 便携包、两个安装包、四个 Android APK 和 `SHA256SUMS.txt`。不勾选发布时跳过发布 Job 是预期行为。
 
-桌面原生 Widevine 播放的跨平台评估见 [WIDEVINE.md](WIDEVINE.md)。
+桌面原生 Widevine 的跨平台评估与 Windows x64 会话探针实测见 [WIDEVINE.md](WIDEVINE.md)；完整原生授权播放尚未接入。
 
 ---
 

@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'core/utils/file_log.dart';
 import 'core/widgets/app_startup.dart';
 
-import 'package:crypto/crypto.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -38,6 +36,8 @@ import 'services/eme/eme_player.dart';
 import 'services/eme/license_client.dart';
 import 'services/eme/native_drm_audio_engine.dart';
 import 'services/eme/native_drm_player.dart';
+import 'services/eme/windows_native_audio_engine.dart';
+import 'services/eme/windows_native_decryptor.dart';
 import 'services/connect/connect_play_request.dart';
 import 'services/connect/connect_service.dart';
 import 'services/connect/receiver/connect_receiver.dart';
@@ -141,16 +141,38 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
       certFetcher: licenseClient.fetchCert,
     );
   } else {
-    // 加载 HLS.js 引擎（资产打包，供隐藏页用）
-    EmePlayer.hlsJsSource = await rootBundle.loadString('assets/js/hls.min.js');
-    // 自定义 WebView2 环境（关自动播放手势限制，无头页无用户手势）
-    await EmePlayer.ensureEnvironment();
-    await emePlayer.start(); // 启动无头 WebView（窗口缩放/布局切换不影响播放）
-    drmEngine = EmeAudioEngine(
+    // 首页不等待桌面 WebView2；首次播放 DRM 曲目时再初始化。
+    final webEngine = EmeAudioEngine(
       player: emePlayer,
       licensePoster: licenseClient.postLicense,
       certFetcher: licenseClient.fetchCert,
+      initialize: () async {
+        EmePlayer.hlsJsSource = await rootBundle.loadString(
+          'assets/js/hls.min.js',
+        );
+        await EmePlayer.ensureEnvironment();
+        await emePlayer.start();
+      },
     );
+    final nativeExperiment =
+        Platform.isWindows &&
+        (const bool.fromEnvironment('FLUTIFY_NATIVE_WIDEVINE') ||
+            Platform.environment['FLUTIFY_NATIVE_WIDEVINE'] == '1');
+    if (nativeExperiment) {
+      debugPrint(
+        '[native-wv] Experimental native DRM enabled; WebView fallback retained',
+      );
+      drmEngine = WindowsNativeAudioEngine(
+        native: AudioPlayerService(),
+        fallback: webEngine,
+        decryptor: WindowsNativeDecryptor(
+          fetchCertificate: licenseClient.fetchCert,
+          postLicense: licenseClient.postLicense,
+        ),
+      );
+    } else {
+      drmEngine = webEngine;
+    }
   }
   // 路由引擎：本地文件/流式 → just_audio；DRM 曲目 → EME / 原生 DRM
   final audioEngine = RoutedAudioEngine(
@@ -504,11 +526,7 @@ void _startConnectReceiver(
   final tokens = ctx.read<WebTokenService?>();
   if (tokens == null) return;
   final preferences = ctx.read<PreferencesProvider>();
-  final deviceId =
-      md5
-          .convert(utf8.encode('flutify-receiver:${Platform.localHostname}'))
-          .toString() +
-      sha1.convert(utf8.encode('flutify')).toString().substring(0, 8);
+  final deviceId = ctx.read<StorageService>().receiverDeviceId;
   final host = PlaybackReceiverHost(playback);
   String nameOf() {
     final name = preferences.prefs.connectDeviceName;

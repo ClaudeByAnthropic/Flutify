@@ -19,9 +19,9 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Flutify'), findsOneWidget);
-      expect(find.text('准备缓存目录'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Flutify'), findsNothing);
+      expect(find.text('准备缓存目录'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       pending.complete(const MaterialApp(home: Text('Ready')));
       await tester.pumpAndSettle();
       expect(find.text('Ready'), findsOneWidget);
@@ -58,6 +58,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('启动失败：准备缓存目录'), findsOneWidget);
+    expect(find.text('Bad state: cache unavailable'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     // File I/O in readLogTail needs real async execution in a widget test.
     await tester.runAsync(() async {
@@ -83,7 +84,10 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 21));
-      expect(find.text('启动时间较长，请复制诊断信息反馈。'), findsOneWidget);
+      expect(find.text('复制诊断信息'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      await tester.pump(const Duration(seconds: 40));
+      expect(find.textContaining('初始化超时'), findsOneWidget);
       expect(find.text('复制诊断信息'), findsOneWidget);
       pending.complete(const MaterialApp(home: Text('Ready')));
       await tester.pumpAndSettle();

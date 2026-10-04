@@ -8,7 +8,7 @@ import '../../../../l10n/l10n.dart';
 /// 任务栏歌词的实时预览：一段 Windows 11 任务栏（天气小组件 + 歌词 + 居中图标），
 /// 示例歌词每隔几秒上滚一句，与真实任务栏的切句动画一致；颜色 / 不透明度改动即时反映。
 ///
-/// [lightTaskbar] 决定模拟浅色还是深色任务栏（取系统明暗，自动配色也按它取黑 / 白）。
+/// [lightTaskbar] 决定模拟浅色还是深色任务栏（取应用主题，自动配色也按它取黑 / 白）。
 class TaskbarLyricsPreview extends StatefulWidget {
   final Color color;
   final double opacity;

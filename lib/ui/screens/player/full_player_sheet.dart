@@ -27,9 +27,11 @@ import 'immersive_lyrics_screen.dart';
 import 'lyrics/glass_icon_button.dart';
 import 'lyrics/lyrics_backdrop.dart';
 import 'lyrics/lyrics_view.dart';
+import 'lyrics/lyrics_translation_controls.dart';
 import 'queue_list.dart';
 import 'player_modal.dart';
 import 'widgets/swipeable_artwork.dart';
+import 'widgets/canvas_artwork.dart';
 
 /// 全屏播放器中间区域的内容。
 enum _PlayerView { artwork, lyrics, queue }
@@ -333,7 +335,15 @@ class _Middle extends StatelessWidget {
                   .clamp(140.0, 400.0)
                   .clamp(0.0, box.maxHeight * 0.9);
               return Center(
-                child: SwipeableArtwork(url: track.coverUrl, size: size),
+                child: SwipeableArtwork(
+                  url: track.coverUrl,
+                  size: size,
+                  child: CanvasArtwork(
+                    track: track,
+                    size: size,
+                    remote: remote,
+                  ),
+                ),
               );
             },
           ),
@@ -356,29 +366,40 @@ class _InlineLyrics extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 800;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: LyricsView(
-            key: ValueKey((track.id, remote)),
-            track: track,
-            remote: remote,
-            topInset: 16,
-            bottomInset: 8,
+    return LyricsTranslationScope(
+      key: ValueKey((track.id, remote)),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: LyricsView(
+              key: ValueKey((track.id, remote)),
+              track: track,
+              remote: remote,
+              topInset: 40,
+              bottomInset: 8,
+            ),
           ),
-        ),
-        if (isDesktop)
           Positioned(
             top: 0,
             right: 12,
-            child: GlassIconButton(
-              icon: Icons.open_in_full_rounded,
-              size: 36,
-              tooltip: context.l10n.lyricsImmersive,
-              onPressed: () => ImmersiveLyricsScreen.open(context),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const LyricsTranslationButton(),
+                if (isDesktop) ...[
+                  const SizedBox(width: 8),
+                  GlassIconButton(
+                    icon: Icons.open_in_full_rounded,
+                    size: 36,
+                    tooltip: context.l10n.lyricsImmersive,
+                    onPressed: () => ImmersiveLyricsScreen.open(context),
+                  ),
+                ],
+              ],
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }

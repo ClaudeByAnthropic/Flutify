@@ -1,6 +1,7 @@
 import '../../models/lyrics.dart';
 import '../../models/lyrics_query.dart';
 import 'lrclib_lyrics_source.dart';
+import 'lyrics_translation.dart';
 
 /// 合并后的歌词与是否可以缓存（网络问题导致的结果不缓存，下次打开会重试）。
 class ResolvedLyrics {
@@ -27,8 +28,19 @@ class LyricsResolver {
   /// 设置里是否开启了补全；为 false 时行为与只用官方歌词相同。
   final bool Function() _fallbackEnabled;
 
-  LyricsResolver(this._official, {this.fallback, bool Function()? fallbackEnabled})
-    : _fallbackEnabled = fallbackEnabled ?? (() => true);
+  LyricsResolver(
+    this._official, {
+    this.fallback,
+    bool Function()? fallbackEnabled,
+  }) : _fallbackEnabled = fallbackEnabled ?? (() => true);
+
+  Future<LyricsTranslation?> translate(
+    LyricsQuery query,
+    SpotifyLyrics lyrics,
+    String target,
+  ) async => _fallbackEnabled()
+      ? await fallback?.findTranslation(query, lyrics, target)
+      : null;
 
   Future<ResolvedLyrics> resolve(LyricsQuery query) async {
     SpotifyLyrics? official;
@@ -51,6 +63,9 @@ class LyricsResolver {
       if (found.networkError) cacheable = false;
     }
     if (error != null) Error.throwWithStackTrace(error, stack!);
-    return ResolvedLyrics(official ?? const SpotifyLyrics(lines: []), cacheable: cacheable);
+    return ResolvedLyrics(
+      official ?? const SpotifyLyrics(lines: []),
+      cacheable: cacheable,
+    );
   }
 }

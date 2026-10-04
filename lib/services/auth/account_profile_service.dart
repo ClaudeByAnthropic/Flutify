@@ -27,8 +27,10 @@ class AccountProfileService {
     if (username.isEmpty) return null;
     try {
       final res = await _client.get(
-        Uri.parse('${SpotifyEndpoints.defaultSpClientBase}/user-profile-view/v3/profile/'
-            '${Uri.encodeComponent(username)}?playlist_limit=0&artist_limit=0'),
+        Uri.parse(
+          '${SpotifyEndpoints.defaultSpClientBase}/user-profile-view/v3/profile/'
+          '${Uri.encodeComponent(username)}?playlist_limit=0&artist_limit=0',
+        ),
         headers: {
           'Authorization': 'Bearer $accessToken',
           if (clientToken.isNotEmpty) 'client-token': clientToken,
@@ -38,20 +40,29 @@ class AccountProfileService {
         },
       );
       if (res.statusCode != 200) return null;
-      final json = jsonDecode(res.body) as Map<String, dynamic>;
+      final json =
+          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
       final name = (json['name'] as String? ?? '').trim();
       if (name.isEmpty) return null;
-      return AccountProfile(displayName: name, avatarUrl: json['image_url'] as String? ?? '');
+      return AccountProfile(
+        displayName: name,
+        avatarUrl: json['image_url'] as String? ?? '',
+      );
     } catch (_) {
       return null;
     }
   }
 
   /// 公开 `/v1/me`：响应的 id 即用户名，可在 AP 不可达时补全用户名。失败返回 null。
-  Future<AccountProfile?> fetchMe(String accessToken, {SpotifyClientProfile profile = SpotifyClientProfile.desktop}) async {
+  Future<AccountProfile?> fetchMe(
+    String accessToken, {
+    SpotifyClientProfile profile = SpotifyClientProfile.desktop,
+  }) async {
     try {
       final res = await _client.get(
-        Uri.parse('${SpotifyEndpoints.defaultWebApiBase}${SpotifyEndpoints.me}'),
+        Uri.parse(
+          '${SpotifyEndpoints.defaultWebApiBase}${SpotifyEndpoints.me}',
+        ),
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Accept': 'application/json',
@@ -59,12 +70,21 @@ class AccountProfileService {
         },
       );
       if (res.statusCode != 200) return null;
-      final json = jsonDecode(res.body) as Map<String, dynamic>;
-      final images = (json['images'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? const [];
-      images.sort((a, b) => ((b['width'] as num?) ?? 0).compareTo((a['width'] as num?) ?? 0));
+      final json =
+          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final images =
+          (json['images'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [];
+      images.sort(
+        (a, b) =>
+            ((b['width'] as num?) ?? 0).compareTo((a['width'] as num?) ?? 0),
+      );
       return AccountProfile(
         id: json['id'] as String? ?? '',
-        displayName: (json['display_name'] as String?)?.trim().isNotEmpty == true
+        displayName:
+            (json['display_name'] as String?)?.trim().isNotEmpty == true
             ? json['display_name'] as String
             : json['id'] as String? ?? '',
         avatarUrl: images.isEmpty ? '' : images.first['url'] as String? ?? '',
@@ -82,5 +102,9 @@ class AccountProfile {
   final String displayName;
   final String avatarUrl;
 
-  const AccountProfile({this.id = '', required this.displayName, required this.avatarUrl});
+  const AccountProfile({
+    this.id = '',
+    required this.displayName,
+    required this.avatarUrl,
+  });
 }

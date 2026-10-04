@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../l10n/l10n.dart';
+
 import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../services/auth/web_token_service.dart';
 import '../../../widgets/toast/app_toast.dart';
@@ -12,7 +14,7 @@ import '../../auth/web_login_screen.dart';
 /// sp_dc cookie 铸造；本卡片展示 Web 登录态并引导完成一次内嵌 Web 登录来捕获 sp_dc。
 /// 与桌面 OAuth（账号卡片）互补：一个管媒体库 / API，一个管全曲解密密钥。
 ///
-/// 文案与账号卡片一致直接书写中文（未迁入 ARB，见 README 语言与字体一节）。
+/// 文案随应用语言切换。
 class WebLoginCard extends StatefulWidget {
   const WebLoginCard({super.key});
 
@@ -32,7 +34,7 @@ class _WebLoginCardState extends State<WebLoginCard> {
       if (result?.webSignedIn ?? false) {
         AppToast.show(
           context,
-          'Web 登录成功，全曲播放已就绪',
+          context.l10n.webLoginSuccess,
           icon: Icons.check_circle_rounded,
           tone: ToastTone.success,
         );
@@ -85,15 +87,19 @@ class _WebLoginCardState extends State<WebLoginCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '全曲播放（Web 登录）',
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  context.l10n.webLoginCardTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  signedIn ? '已就绪，可以播放完整曲目' : '登录一次以解锁完整曲目播放',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                  signedIn
+                      ? context.l10n.webLoginReady
+                      : context.l10n.webLoginRequired,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -102,12 +108,16 @@ class _WebLoginCardState extends State<WebLoginCard> {
           if (signedIn)
             TextButton(
               onPressed: _busy ? null : _clear,
-              child: const Text('清除'),
+              child: Text(context.l10n.commonClear),
             ),
           const SizedBox(width: 4),
           FilledButton.tonal(
             onPressed: _busy ? null : _login,
-            child: Text(signedIn ? '重新登录' : 'Web 登录'),
+            child: Text(
+              signedIn
+                  ? context.l10n.authSignInAgain
+                  : context.l10n.webLoginAction,
+            ),
           ),
         ],
       ),

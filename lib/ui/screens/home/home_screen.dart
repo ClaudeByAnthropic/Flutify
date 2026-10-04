@@ -11,6 +11,7 @@ import '../../shell/shell_breakpoints.dart';
 import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/user_avatar.dart';
+import '../../widgets/toast/app_toast.dart';
 import '../auth/login_screen.dart';
 import 'widgets/home_chip_bar.dart';
 import 'widgets/home_feed_grid.dart';
@@ -50,6 +51,20 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_hoverTint.value != color) _hoverTint.value = color;
   }
 
+  Future<void> _refresh() async {
+    if (!context.read<SpotifyApiService>().isConfigured) return;
+    final provider = context.read<SpotifyProvider>();
+    await provider.refreshHome();
+    if (!mounted || provider.homeError == null || provider.isLoadingFeed) {
+      return;
+    }
+    AppToast.show(
+      context,
+      context.l10n.homeRefreshFailed,
+      tone: ToastTone.error,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -76,13 +91,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           SafeArea(
             bottom: false,
-            child: CustomScrollView(
-              slivers: [
-                if (!desktop || home.chips.isNotEmpty)
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
                   HomeChipBar(
                     chips: home.chips,
                     selected: facet,
                     onSelected: provider.selectHomeFacet,
+                    trailing: IconButton(
+                      tooltip: context.l10n.homeRefresh,
+                      onPressed:
+                          loading ||
+                              !context.read<SpotifyApiService>().isConfigured
+                          ? null
+                          : _refresh,
+                      icon: const Icon(Icons.refresh_rounded),
+                      iconSize: 20,
+                      visualDensity: VisualDensity.compact,
+                    ),
                     background: HomeTopGradient(
                       tint: _hoverTint,
                       topOffset: MediaQuery.paddingOf(context).top,
@@ -95,15 +123,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: const UserAvatar(size: 32),
                           ),
                   ),
-                ..._content(
-                  context,
-                  home: home,
-                  facet: facet,
-                  loading: loading,
-                  desktop: desktop,
-                ),
-                const ContentBottomSpacer(),
-              ],
+                  ..._content(
+                    context,
+                    home: home,
+                    facet: facet,
+                    loading: loading,
+                    desktop: desktop,
+                  ),
+                  const ContentBottomSpacer(),
+                ],
+              ),
             ),
           ),
         ],
@@ -162,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? l10n.homeLoadFailedMessage
                 : l10n.homeEmptyMessage,
             actionLabel: l10n.commonRetry,
-            onAction: () => context.read<SpotifyProvider>().loadInitialData(),
+            onAction: _refresh,
           ),
         ),
       ];

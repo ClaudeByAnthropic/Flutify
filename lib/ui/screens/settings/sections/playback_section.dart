@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../l10n/l10n.dart';
 import '../../../../providers/playback_provider.dart';
+import '../../../../providers/preferences_provider.dart';
 import '../widgets/settings_section.dart';
 import '../widgets/settings_slider_tile.dart';
 
@@ -16,16 +17,30 @@ class PlaybackSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final playback = context.read<PlaybackProvider>();
-    final (pauseAfterFailures, normalize, fadeSeconds) = context.select<PlaybackProvider, (bool, bool, int)>(
-      (p) => (p.pauseAfterFailures, p.normalizeVolume, p.fadeSeconds),
+    final preferences = context.read<PreferencesProvider>();
+    final canvasEnabled = context.select<PreferencesProvider, bool>(
+      (p) => p.prefs.canvasEnabled,
     );
+    final (pauseAfterFailures, normalize, fadeSeconds) = context
+        .select<PlaybackProvider, (bool, bool, int)>(
+          (p) => (p.pauseAfterFailures, p.normalizeVolume, p.fadeSeconds),
+        );
 
     return SettingsSection(
       title: l10n.settingsPlaybackSection,
       children: [
         SettingsSwitchTile(
+          title: l10n.settingsCanvas,
+          subtitle: l10n.settingsCanvasSubtitle,
+          value: canvasEnabled,
+          onChanged: (v) =>
+              preferences.update(preferences.prefs.copyWith(canvasEnabled: v)),
+        ),
+        SettingsSwitchTile(
           title: l10n.settingsPauseAfterFailures,
-          subtitle: l10n.settingsPauseAfterFailuresSubtitle(PlaybackProvider.failureLimit),
+          subtitle: l10n.settingsPauseAfterFailuresSubtitle(
+            PlaybackProvider.failureLimit,
+          ),
           value: pauseAfterFailures,
           onChanged: playback.setPauseAfterFailures,
         ),
@@ -41,7 +56,9 @@ class PlaybackSection extends StatelessWidget {
           value: fadeSeconds.toDouble(),
           max: PlaybackProvider.maxFadeSeconds.toDouble(),
           divisions: PlaybackProvider.maxFadeSeconds,
-          labelOf: (v) => v.round() == 0 ? l10n.settingsOff : l10n.settingsSeconds(v.round()),
+          labelOf: (v) => v.round() == 0
+              ? l10n.settingsOff
+              : l10n.settingsSeconds(v.round()),
           onChanged: (v) => playback.setFadeSeconds(v.round()),
         ),
       ],

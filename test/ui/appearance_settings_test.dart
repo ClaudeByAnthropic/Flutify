@@ -61,7 +61,7 @@ void main() {
   testWidgets('settings: appearance options apply instantly and persist', (
     tester,
   ) async {
-    await pumpApp(tester, const Size(500, 2400));
+    await pumpApp(tester, const Size(500, 900));
     Navigator.of(
       tester.element(find.byType(MainShell)),
       rootNavigator: true,
@@ -69,11 +69,27 @@ void main() {
     await settle(tester);
 
     // 唯一输入框用于 Connect 设备名，不再展示凭据输入框。
+    final scrollable = find
+        .descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byType(TextField),
+      500,
+      scrollable: scrollable,
+    );
     final fields = tester.widgetList<TextField>(find.byType(TextField));
     expect(fields, hasLength(1));
     expect(fields.single.decoration?.hintText, 'Flutify');
 
     // 主题模式 → 深色；纯黑背景
+    await tester.scrollUntilVisible(
+      find.text('深色'),
+      -500,
+      scrollable: scrollable,
+    );
     await tester.tap(find.text('深色'));
     await settle(tester);
     expect(Theme.of(settingsContext(tester)).brightness, Brightness.dark);
@@ -82,11 +98,21 @@ void main() {
     expect(Theme.of(settingsContext(tester)).colorScheme.surface, Colors.black);
 
     // 圆角 → 方正
+    await tester.scrollUntilVisible(
+      find.text('方正'),
+      300,
+      scrollable: scrollable,
+    );
     await tester.tap(find.text('方正'));
     await settle(tester);
     expect(settingsContext(tester).tokens.squareCorners, isTrue);
 
     // 减弱动效 → MediaQuery.disableAnimations
+    await tester.scrollUntilVisible(
+      find.text('减弱动效'),
+      300,
+      scrollable: scrollable,
+    );
     await tester.tap(find.text('减弱动效'));
     await settle(tester);
     expect(settingsContext(tester).reduceMotion, isTrue);
@@ -96,6 +122,11 @@ void main() {
     expect(storage.appearanceJson, contains('"cornerStyle":"square"'));
 
     // 恢复默认外观
+    await tester.scrollUntilVisible(
+      find.text('恢复默认外观'),
+      300,
+      scrollable: scrollable,
+    );
     await tester.tap(find.text('恢复默认外观'));
     await settle(tester);
     expect(settingsContext(tester).tokens.squareCorners, isFalse);
