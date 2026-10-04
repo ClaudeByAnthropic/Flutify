@@ -5,9 +5,9 @@ class AppInfo {
   AppInfo._();
 
   static const String name = 'Flutify';
-  static const String version = '0.0.4';
-  static const int build = 4;
+  static const String version = '0.0.5';
+  static const int build = 5;
 
-  /// 「0.0.4 (4)」
+  /// 「0.0.5 (5)」
   static String get displayVersion => '$version ($build)';
 }

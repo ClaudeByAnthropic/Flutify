@@ -207,6 +207,14 @@ class ConnectReceiver {
       debugPrint('[Receiver] 命令 $type');
       switch (type) {
         case 'replace_state':
+          // track-playback uses an absent/null state_ref to revoke ownership.
+          // This is a stop command, not an invalid state machine to ignore.
+          if (payload['state_ref'] == null) {
+            _clear();
+            unawaited(host.stop());
+            _report('state_clear', clear: true);
+            continue;
+          }
           final cmd = TpReplaceState.fromJson(payload);
           if (cmd != null) unawaited(_replaceState(cmd));
         case 'set_volume':

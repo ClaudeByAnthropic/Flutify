@@ -57,18 +57,27 @@ class NativeDrmAudioEngine implements AudioEngine {
   bool _playing = false;
   ProcessingState _processing = ProcessingState.idle;
   bool _hasSource = false;
+  bool _playRequested = false;
+  bool _disposed = false;
+  int _generation = 0;
+  Future<void> _loading = Future.value();
 
   void _onState(EmePlayerState s) {
+    if (_disposed || !_hasSource) return;
     switch (s) {
       case EmePlayerState.playing:
-        _playing = true;
+        _playing = _playRequested;
         _processing = ProcessingState.ready;
       case EmePlayerState.buffering:
-        _processing = ProcessingState.buffering;
+        _processing = _playRequested
+            ? ProcessingState.buffering
+            : ProcessingState.ready;
       case EmePlayerState.paused:
         _playing = false;
         _processing = ProcessingState.ready;
       case EmePlayerState.ended:
+        if (!_playRequested) return;
+        _playRequested = false;
         _playing = false;
         _processing = ProcessingState.completed;
       case EmePlayerState.error:
@@ -88,6 +97,7 @@ class NativeDrmAudioEngine implements AudioEngine {
   }
 
   void _emit() {
+    if (_disposed) return;
     _stateController.add(PlayerState(_playing, _processing));
   }
 
@@ -114,25 +124,45 @@ class NativeDrmAudioEngine implements AudioEngine {
     EmeTrackContent content, {
     Duration? initialPosition,
     bool autoplay = true,
-  }) async {
+  }) {
+    final generation = ++_generation;
+    _playRequested = autoplay;
+    _playing = false;
+    _hasSource = false;
     _processing = ProcessingState.loading;
     _emit();
-    // 起本地回环服务（清单按 ExoPlayer 需要把 KEYFORMAT 改写为 Widevine UUID）
-    final urls = await _server.serveHlsForNative(
-      m4a: File(content.m4aPath),
-      m3u8: content.m3u8,
-      licensePoster: _licensePoster,
-      certFetcher: _certFetcher,
-    );
-    await _player.play(
-      hlsUrl: urls.hlsUrl,
-      licenseUrl: urls.licenseUrl,
-      provisionUrl: urls.provisionUrl,
-    );
-    _hasSource = true;
-    if (initialPosition != null && initialPosition > Duration.zero) {
-      await _player.seek(initialPosition);
-    }
+    bool current() => !_disposed && generation == _generation;
+    // The loopback server has a single active manifest. Serialize preparation
+    // so a late old request cannot replace the new track's server contents.
+    final loading = _loading.then((_) async {
+      if (!current()) return;
+      await _player.pause();
+      if (!current()) return;
+      final urls = await _server.serveHlsForNative(
+        m4a: File(content.m4aPath),
+        m3u8: content.m3u8,
+        licensePoster: _licensePoster,
+        certFetcher: _certFetcher,
+      );
+      if (!current()) return;
+      _hasSource = true;
+      await _player.play(
+        hlsUrl: urls.hlsUrl,
+        licenseUrl: urls.licenseUrl,
+        provisionUrl: urls.provisionUrl,
+        autoplay: false,
+        initialPosition: initialPosition ?? Duration.zero,
+      );
+      if (!current() || !_hasSource) return;
+      if (_playRequested) {
+        await play();
+      } else {
+        _processing = ProcessingState.ready;
+        _emit();
+      }
+    });
+    _loading = loading.catchError((Object _) {});
+    return loading;
   }
 
   // just_audio 路径在本引擎上不可用（路由层保证不调用）
@@ -151,7 +181,11 @@ class NativeDrmAudioEngine implements AudioEngine {
 
   @override
   Future<void> play() async {
+    if (_disposed || !_hasSource) return;
+    final generation = _generation;
+    _playRequested = true;
     await _player.resume();
+    if (_disposed || generation != _generation || !_playRequested) return;
     _playing = true;
     _processing = ProcessingState.ready;
     _emit();
@@ -159,7 +193,13 @@ class NativeDrmAudioEngine implements AudioEngine {
 
   @override
   Future<void> pause() async {
+    final generation = ++_generation;
+    _playRequested = false;
+    _playing = false;
+    _processing = _hasSource ? ProcessingState.ready : ProcessingState.idle;
+    _emit();
     await _player.pause();
+    if (_disposed || generation != _generation) return;
     _playing = false;
     _emit();
   }
@@ -173,15 +213,20 @@ class NativeDrmAudioEngine implements AudioEngine {
 
   @override
   Future<void> stop() async {
-    await _player.stop();
+    ++_generation;
+    _playRequested = false;
     _playing = false;
     _processing = ProcessingState.idle;
     _hasSource = false;
     _emit();
+    await _player.stop();
   }
 
   @override
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    ++_generation;
     _player.dispose();
   }
 }

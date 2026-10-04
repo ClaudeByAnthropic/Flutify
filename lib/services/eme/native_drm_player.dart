@@ -47,6 +47,8 @@ class NativeDrmPlayer {
     required String hlsUrl,
     required String licenseUrl,
     required String provisionUrl,
+    bool autoplay = true,
+    Duration initialPosition = Duration.zero,
   }) async {
     lastError = null;
     debugPrint('[ndrm] play: $hlsUrl');
@@ -54,6 +56,8 @@ class NativeDrmPlayer {
       'hlsUrl': hlsUrl,
       'licenseUrl': licenseUrl,
       'provisionUrl': provisionUrl,
+      'autoplay': autoplay,
+      'positionMs': initialPosition.inMilliseconds,
     });
   }
 

@@ -44,6 +44,7 @@ class PlaybackReceiverHost implements ReceiverHost {
   bool _disposed = false;
   final Duration handoverRetryDelay;
   int _commandGeneration = 0;
+  int _handoverGeneration = 0;
 
   /// 本机改了随机 / 循环时调用：经 Connect 命令发给服务端（本机即目标设备），其他设备同步显示。
   void Function(bool shuffle, SpotifyRepeatMode repeat)? onLocalOptions;
@@ -61,6 +62,7 @@ class PlaybackReceiverHost implements ReceiverHost {
 
   void dispose() {
     _disposed = true;
+    ++_handoverGeneration;
     _handoverRetry?.cancel();
     playback.removeListener(_onPlaybackChanged);
     playback.positionNotifier.removeListener(_onPosition);
@@ -187,6 +189,7 @@ class PlaybackReceiverHost implements ReceiverHost {
       return;
     _handoverRetry?.cancel();
     _handingOver = true;
+    final generation = _handoverGeneration;
     _handoverAttempts++;
     unawaited(() async {
       var succeeded = false;
@@ -198,6 +201,12 @@ class PlaybackReceiverHost implements ReceiverHost {
         _handingOver = false;
       }
       if (_disposed) return;
+      if (generation != _handoverGeneration) {
+        // An explicit local resume may have happened while this revoked request
+        // was still in flight. Re-evaluate the current intent, never its result.
+        _tryHandOver();
+        return;
+      }
       if (succeeded) _handedOverUri = track.uri;
       if (!succeeded || playback.currentTrack?.uri != track.uri) {
         _handoverRetry = Timer(handoverRetryDelay, _tryHandOver);
@@ -214,6 +223,11 @@ class PlaybackReceiverHost implements ReceiverHost {
   @override
   Future<void> stop() {
     ++_commandGeneration;
+    ++_handoverGeneration;
+    _handoverRetry?.cancel();
+    _handoverRetry = null;
+    _handedOverUri = null;
+    _handoverAttempts = 0;
     return _apply(playback.pause);
   }
 

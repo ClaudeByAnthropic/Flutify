@@ -429,6 +429,78 @@ void main() {
     },
   );
 
+  for (final explicitNull in [true, false]) {
+    test(
+      'wire transfer revokes playing device (null ref=$explicitNull)',
+      () async {
+        replace(['a', 'b']);
+        await until(() => audio.isPlaying);
+        server.channels.last.pushJson('hm://track-playback/v1/command', {
+          'type': 'replace_state',
+          if (explicitNull) 'state_ref': null,
+        });
+        await until(() => !receiver.isActive && !audio.isPlaying);
+        expect(playback.currentTrack?.id, 'a');
+        // A fresh explicit transfer back must still work, including the same song.
+        replace(['a', 'b']);
+        await until(() => receiver.isActive && audio.isPlaying);
+      },
+    );
+  }
+
+  test('wire transfer cancels an unfinished source load', () async {
+    audio.sourceGate = Completer<void>();
+    replace(['a', 'b']);
+    await until(() => audio.sourceLoads == 1);
+    server.channels.last.pushJson('hm://track-playback/v1/command', {
+      'type': 'replace_state',
+      'state_ref': null,
+    });
+    await until(() => !receiver.isActive && !playback.isLoadingTrack);
+    audio.sourceGate!.complete();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(audio.isPlaying, isFalse);
+    expect(playback.isBuffering, isFalse);
+  });
+
+  for (final resumeBeforeReply in [false, true]) {
+    test(
+      'revoked handover permits local resume (before reply=$resumeBeforeReply)',
+      () async {
+        final handover = Completer<bool>();
+        var attempts = 0;
+        host.handOver = (_) {
+          attempts++;
+          return attempts == 1 ? handover.future : Future.value(true);
+        };
+        final m = TpStateMachine.fromJson(machine(['a']))!;
+        await host.load(m, [0], positionMs: 0, paused: false);
+        audio.stateController.add(PlayerState(true, ProcessingState.ready));
+        await until(() => attempts == 1);
+        server.channels.last.pushJson('hm://track-playback/v1/command', {
+          'type': 'replace_state',
+          'state_ref': null,
+        });
+        await until(() => !audio.isPlaying);
+        audio.stateController.add(PlayerState(false, ProcessingState.ready));
+        if (resumeBeforeReply) {
+          await playback.togglePlayPause();
+          audio.stateController.add(PlayerState(true, ProcessingState.ready));
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          expect(attempts, 1);
+        }
+        handover.complete(true);
+        if (!resumeBeforeReply) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          expect(attempts, 1);
+          await playback.togglePlayPause();
+          audio.stateController.add(PlayerState(true, ProcessingState.ready));
+        }
+        await until(() => attempts == 2);
+      },
+    );
+  }
+
   test('stop immediately after load prevents audio from starting', () async {
     final m = TpStateMachine.fromJson(machine(['a', 'b']))!;
     final loading = host.load(m, [0, 1], positionMs: 0, paused: false);

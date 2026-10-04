@@ -75,7 +75,9 @@ class NativeDrmPlugin(
                         result.error("ndrm_args", "play 需要 hlsUrl / licenseUrl / provisionUrl", null)
                         return
                     }
-                    play(hlsUrl, licenseUrl, provisionUrl)
+                    val autoplay = call.argument<Boolean>("autoplay") ?: true
+                    val positionMs = call.argument<Number>("positionMs")?.toLong() ?: 0L
+                    play(hlsUrl, licenseUrl, provisionUrl, autoplay, positionMs)
                     result.success(null)
                 }
                 "pause" -> { player?.pause(); result.success(null) }
@@ -106,7 +108,8 @@ class NativeDrmPlugin(
     /// 而其自带的 Google provisioning 地址在用户网络被掐（静默重试、永不返回）。
     /// 清单里 KEYFORMAT 已是 Widevine UUID，drm scheme 由 HLS EXT-X-KEY 识别。
     /// 切歌复用同一实例（stop + clearMediaItems 后重新 setMediaItem）。
-    private fun play(hlsUrl: String, licenseUrl: String, provisionUrl: String) {
+    private fun play(hlsUrl: String, licenseUrl: String, provisionUrl: String,
+                     autoplay: Boolean, positionMs: Long) {
         val p = ensurePlayer()
         drmCallback.licenseUrl = licenseUrl
         drmCallback.provisionUrl = provisionUrl
@@ -116,9 +119,10 @@ class NativeDrmPlugin(
             .setUri(hlsUrl)
             .setMimeType(MimeTypes.APPLICATION_M3U8)
             .build()
-        p.setMediaItem(item)
+        // Set the intent before prepare: a revoked transfer must never briefly play.
+        p.playWhenReady = autoplay
+        p.setMediaItem(item, positionMs.coerceAtLeast(0L))
         p.prepare()
-        p.playWhenReady = true
     }
 
     /// DRM 请求全部走 Dart 回环反代；URL 每首歌一样，play() 时更新即可（无并发：赋值在 prepare 前）

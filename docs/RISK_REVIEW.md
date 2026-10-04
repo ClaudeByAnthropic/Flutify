@@ -116,14 +116,14 @@
 
 | 验证 | 结果 | 边界 |
 | --- | --- | --- |
-| `flutter test --no-pub` | 573 项通过，6 项显式跳过 | 包含广告跳过、首页刷新、四种界面语言、源译词、共享歌词控制器切歌和原生播放回退等；使用 HTTP / 播放测试替身，跳过项不计为通过 |
+| `flutter test --no-pub` | 586 项通过，6 项显式跳过 | 包含 Connect 撤销播放状态、切走后立即恢复、Android 原生异步加载取消，以及广告跳过、首页刷新、四种界面语言、源译词和原生播放回退等；使用 HTTP / 播放测试替身，跳过项不计为通过；双设备实机切换仍待验证 |
 | `flutter build windows --release --no-pub --dart-define=FLUTIFY_NATIVE_WIDEVINE=true` | 本地 Windows x64 Release 构建成功，退出 0，118.1 秒 | 包含 CDM 子进程；保留第三方 WebView CMake 开发警告，构建通过不等于真实播放通过；此记录早于发布版本号更新 |
 | ProxyServer `npm test` | 23 项通过 | 包含头清理、出口连接及 WebSocket 等边界；本轮未更改代理代码 |
 | Windows x64 随包 CDM 子进程检查 | Chrome / Edge 组件均退出 0，接口 11 初始化通过；8185 个加密样本被解析，无许可证时返回预期 `kNoKey`，容器重写保持长度 | 无网络、无账号、无许可证交换；不是完整播放实测 |
 | Windows 原生真实许可证实验 | 应用证书 HTTP 200 / 702 B；许可证 HTTP 403 | 403 原因尚未确定，未验证原生出声；WebView 播放日志不能作为原生验证证据 |
 | `dart analyze lib test tool/cdm/native_license_check_test.dart` | 退出 0，无错误或警告；189 条 info / 样式提示 | 分析当前源码与测试，不包含历史构建目录；不代表运行期接口验证通过 |
 
-工作区证据日志在 `D:/Flutify/`：`final-app-tests.log`、`final-app-analysis.log`、`ad-skip-tests.log`、`final-fix-tests.log`、`proxy-test.log`、`native-bridge-check.log`、`native-license-check.log`、`windows-native-build.log`。日志保留本地，不随版本发布。隔离的 Windows 本地构建产物在 `app/build/native-widevine/windows/x64/runner/Release/`。
+工作区证据日志在 `D:/Flutify/`：`connect-final-tests.log`、`connect-final-analysis.log`、`final-app-tests.log`、`final-app-analysis.log`、`ad-skip-tests.log`、`final-fix-tests.log`、`proxy-test.log`、`native-bridge-check.log`、`native-license-check.log`、`windows-native-build.log`。日志保留本地，不随版本发布。隔离的 Windows 本地构建产物在 `app/build/native-widevine/windows/x64/runner/Release/`。
 
 0.05beta 按用户要求提交 GitHub 构建，并明确提示 **Windows 可能不可用（未验证）**。发布版 x64 开启原生 DRM 实验并保留 WebView 加载失败回退；ARM64 保留 WebView。真实账号播放、完整设备兼容性和账号封禁概率未获得验证结论。
 
