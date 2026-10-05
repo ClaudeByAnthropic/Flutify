@@ -5,10 +5,12 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../auth/client_profile.dart';
 import '../auth/proto_codec.dart';
 import '../network/proxy_tunnel.dart';
 import 'ap_codec.dart';
 import 'ap_crypto.dart' as ap_crypto;
+import 'ap_login_request.dart';
 
 /// AP 包类型（librespot `packet.rs`）。
 class ApPacketType {
@@ -305,11 +307,7 @@ class SpotifyAccessPoint {
       final nonce = Uint8List(16);
       Random.secure().nextBytes(nonce);
 
-      final buildInfo = ProtoWriter()
-        ..varintAlways(10, 0) // product = PRODUCT_CLIENT
-        ..varintAlways(20, 0) // product_flags = PRODUCT_FLAG_NONE
-        ..varintAlways(30, 0x27) // platform = PLATFORM_WIN32_X86_64
-        ..int64(40, 124200290); // version（对齐 Spotify 1.2.52.442）
+      final buildInfo = SpotifyClientProfile.desktop.apBuildInfo();
       final dhHello = ProtoWriter()
         ..bytes(10, dh.publicKey)
         ..varintAlways(20, 1); // server_keys_known
@@ -432,31 +430,16 @@ class SpotifyAccessPoint {
     ApCredentials credentials, {
     String? deviceId,
   }) async {
-    final os = switch (Platform.operatingSystem) {
-      'windows' => 1, // OS_WINDOWS
-      'macos' => 2, // OS_OSX
-      'ios' => 3, // OS_IPHONE
-      'linux' => 5, // OS_LINUX
-      'android' => 7, // OS_ANDROID
-      _ => 0,
-    };
-    final sysInfo = ProtoWriter()
-      ..varintAlways(10, 2) // cpu_family = CPU_X86_64
-      ..varintAlways(60, os)
-      ..string(90, 'flutify-protocol')
-      ..string(100, deviceId ?? '');
-    final loginCreds = ProtoWriter()
-      ..string(10, credentials.username ?? '')
-      ..varintAlways(20, credentials.authType)
-      ..bytes(30, credentials.authData);
-    final packet = ProtoWriter()
-      ..message(10, loginCreds)
-      ..message(50, sysInfo)
-      ..string(70, 'flutify 1.0');
+    final packet = encodeApLoginRequest(
+      username: credentials.username,
+      authType: credentials.authType,
+      authData: credentials.authData,
+      deviceId: deviceId,
+    );
 
     final waiter = Completer<ApWelcome>();
     _loginWaiter = waiter;
-    _send(ApPacketType.login, packet.toBytes());
+    _send(ApPacketType.login, packet);
 
     try {
       final welcome = await waiter.future.timeout(const Duration(seconds: 15));

@@ -1707,4 +1707,93 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get loginCopyLink => 'Copy link';
+
+  @override
+  String get updatesTitle => 'Software updates';
+
+  @override
+  String get updatesMode => 'Update preference';
+
+  @override
+  String get updatesManual => 'Manual update';
+
+  @override
+  String get updatesAutomatic => 'Download automatically';
+
+  @override
+  String get updatesDisabled => 'Do not check';
+
+  @override
+  String get updatesHint =>
+      'Check for new versions and release notes automatically. Automatic mode downloads in the background and waits for your confirmation to install, without interrupting playback.';
+
+  @override
+  String get updatesCheck => 'Check for updates';
+
+  @override
+  String get updatesChecking => 'Checking for updates…';
+
+  @override
+  String get updatesCurrent => 'Current version';
+
+  @override
+  String get updatesUpToDate => 'You are up to date';
+
+  @override
+  String get updatesAvailable => 'New version available';
+
+  @override
+  String get updatesNotes => 'Release notes';
+
+  @override
+  String get updatesNoNotes => 'No release notes were provided.';
+
+  @override
+  String get updatesDownload => 'Download update';
+
+  @override
+  String get updatesDownloading => 'Downloading and verifying…';
+
+  @override
+  String get updatesReady => 'Update ready';
+
+  @override
+  String get updatesReadyHint =>
+      'The update has been downloaded and verified. Installation closes the app; you can also continue later from Settings.';
+
+  @override
+  String get updatesAndroidHint =>
+      'The APK has been downloaded and verified. Confirm to open the system installer.';
+
+  @override
+  String get updatesInstall => 'Restart and install';
+
+  @override
+  String get updatesInstallApk => 'Install APK';
+
+  @override
+  String get updatesInstalling => 'Preparing installation…';
+
+  @override
+  String get updatesSkip => 'Skip this version';
+
+  @override
+  String get updatesLater => 'Later';
+
+  @override
+  String get updatesPage => 'Manual update · Release page';
+
+  @override
+  String get updatesFailed => 'Update failed. Retry or visit the release page.';
+
+  @override
+  String get updatesPermission =>
+      'Allow Flutify to install unknown apps, then return and tap “Install APK” again.';
+
+  @override
+  String get updatesUnsupported =>
+      'In-app installation is unavailable on this platform. Use the release page to update manually.';
+
+  @override
+  String get updatesDetails => 'View update';
 }

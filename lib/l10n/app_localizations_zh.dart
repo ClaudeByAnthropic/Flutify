@@ -1625,6 +1625,90 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get loginCopyLink => '复制链接';
+
+  @override
+  String get updatesTitle => '软件更新';
+
+  @override
+  String get updatesMode => '更新方式';
+
+  @override
+  String get updatesManual => '手动更新';
+
+  @override
+  String get updatesAutomatic => '自动下载更新';
+
+  @override
+  String get updatesDisabled => '不检查更新';
+
+  @override
+  String get updatesHint => '自动检查新版本和更新内容。自动模式在后台下载，完成后由你确认安装，不会中断播放。';
+
+  @override
+  String get updatesCheck => '检查更新';
+
+  @override
+  String get updatesChecking => '正在检查更新…';
+
+  @override
+  String get updatesCurrent => '当前版本';
+
+  @override
+  String get updatesUpToDate => '已是最新版本';
+
+  @override
+  String get updatesAvailable => '发现新版本';
+
+  @override
+  String get updatesNotes => '更新内容';
+
+  @override
+  String get updatesNoNotes => '此版本未提供更新说明。';
+
+  @override
+  String get updatesDownload => '下载更新';
+
+  @override
+  String get updatesDownloading => '正在下载并校验…';
+
+  @override
+  String get updatesReady => '更新已就绪';
+
+  @override
+  String get updatesReadyHint => '更新包已下载并通过校验。安装会关闭应用；也可以稍后从设置中继续。';
+
+  @override
+  String get updatesAndroidHint => 'APK 已下载并通过校验。确认后打开系统安装程序。';
+
+  @override
+  String get updatesInstall => '重启并安装';
+
+  @override
+  String get updatesInstallApk => '安装 APK';
+
+  @override
+  String get updatesInstalling => '正在准备安装…';
+
+  @override
+  String get updatesSkip => '跳过本次更新';
+
+  @override
+  String get updatesLater => '稍后';
+
+  @override
+  String get updatesPage => '手动更新 · 发布页面';
+
+  @override
+  String get updatesFailed => '更新失败，请重试或前往发布页面。';
+
+  @override
+  String get updatesPermission => '请允许 Flutify 安装未知来源应用，返回后再次点击「安装 APK」。';
+
+  @override
+  String get updatesUnsupported => '此平台暂不提供应用内安装，请通过发布页面手动更新。';
+
+  @override
+  String get updatesDetails => '查看更新';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -3247,4 +3331,88 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get loginCopyLink => '複製連結';
+
+  @override
+  String get updatesTitle => '軟體更新';
+
+  @override
+  String get updatesMode => '更新方式';
+
+  @override
+  String get updatesManual => '手動更新';
+
+  @override
+  String get updatesAutomatic => '自動下載更新';
+
+  @override
+  String get updatesDisabled => '不檢查更新';
+
+  @override
+  String get updatesHint => '自動檢查新版本與更新內容。自動模式在背景下載，完成後由你確認安裝，不會中斷播放。';
+
+  @override
+  String get updatesCheck => '檢查更新';
+
+  @override
+  String get updatesChecking => '正在檢查更新…';
+
+  @override
+  String get updatesCurrent => '目前版本';
+
+  @override
+  String get updatesUpToDate => '已是最新版本';
+
+  @override
+  String get updatesAvailable => '發現新版本';
+
+  @override
+  String get updatesNotes => '更新內容';
+
+  @override
+  String get updatesNoNotes => '此版本未提供更新說明。';
+
+  @override
+  String get updatesDownload => '下載更新';
+
+  @override
+  String get updatesDownloading => '正在下載並驗證…';
+
+  @override
+  String get updatesReady => '更新已就緒';
+
+  @override
+  String get updatesReadyHint => '更新套件已下載並通過驗證。安裝會關閉應用程式；也可以稍後從設定繼續。';
+
+  @override
+  String get updatesAndroidHint => 'APK 已下載並通過驗證。確認後開啟系統安裝程式。';
+
+  @override
+  String get updatesInstall => '重新啟動並安裝';
+
+  @override
+  String get updatesInstallApk => '安裝 APK';
+
+  @override
+  String get updatesInstalling => '正在準備安裝…';
+
+  @override
+  String get updatesSkip => '略過此次更新';
+
+  @override
+  String get updatesLater => '稍後';
+
+  @override
+  String get updatesPage => '手動更新 · 發布頁面';
+
+  @override
+  String get updatesFailed => '更新失敗，請重試或前往發布頁面。';
+
+  @override
+  String get updatesPermission => '請允許 Flutify 安裝未知來源應用程式，返回後再次點選「安裝 APK」。';
+
+  @override
+  String get updatesUnsupported => '此平台暫不提供應用程式內安裝，請透過發布頁面手動更新。';
+
+  @override
+  String get updatesDetails => '查看更新';
 }

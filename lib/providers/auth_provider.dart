@@ -33,11 +33,25 @@ class AuthProvider extends ChangeNotifier {
   String? _error;
   bool _refreshing = false;
   Uri? _authorizeUrl;
+  int _revision = 0;
+  bool _disposed = false;
 
-  AuthProvider(this._auth) : _status = _auth.isLoggedIn ? AuthStatus.signedIn : AuthStatus.signedOut {
+  AuthProvider(this._auth)
+    : _status = _auth.isLoggedIn ? AuthStatus.signedIn : AuthStatus.signedOut {
     // 恢复的会话缺资料（昵称 / 用户名）时启动后补拉；拿到用户名后媒体库需要重新加载
     unawaited(_backfillProfile());
     _auth.sessionExpired.addListener(notifyListeners);
+    _auth.sessionInvalidated.addListener(_onSessionInvalidated);
+  }
+
+  void _onSessionInvalidated() {
+    ++_revision;
+    _status = AuthStatus.signedOut;
+    _authorizeUrl = null;
+    _refreshing = false;
+    _error = '登录已失效，已清除登录凭据，请重新登录';
+    notifyListeners();
+    onSessionChanged?.call();
   }
 
   /// 资料补拉的退避间隔：登录刚完成时 AP 取用户名可能失败、/v1/me 常被限流，
@@ -52,10 +66,12 @@ class AuthProvider extends ChangeNotifier {
   /// 资料缺失时按 [_profileRetryDelays] 补拉，用户名变化后回调 [onSessionChanged] 刷新依赖数据。
   Future<void> _backfillProfile() async {
     for (final delay in _profileRetryDelays) {
-      if (!_auth.needsProfile) return;
+      if (_disposed || !_auth.needsProfile) return;
       if (delay > Duration.zero) await Future<void>.delayed(delay);
+      if (_disposed || !_auth.needsProfile) return;
       final usernameBefore = _auth.username;
       await _auth.ensureProfile();
+      if (_disposed || !isSignedIn) return;
       if (_auth.username != usernameBefore || !_auth.needsProfile) {
         notifyListeners();
         if (_auth.username != usernameBefore) onSessionChanged?.call();
@@ -65,7 +81,10 @@ class AuthProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    ++_revision;
     _auth.sessionExpired.removeListener(notifyListeners);
+    _auth.sessionInvalidated.removeListener(_onSessionInvalidated);
     super.dispose();
   }
 
@@ -96,13 +115,19 @@ class AuthProvider extends ChangeNotifier {
   /// 授权完成后状态自动切到 [AuthStatus.signedIn] 并回调 [onSessionChanged]。
   Future<Uri?> beginOAuth() async {
     if (_status == AuthStatus.authorizing) return null;
+    final revision = ++_revision;
     _error = null;
     final PendingOAuth pending;
     try {
       pending = await _auth.beginOAuth();
     } catch (e) {
+      if (_disposed || revision != _revision) return null;
       _error = describeError(e);
       notifyListeners();
+      return null;
+    }
+    if (_disposed || revision != _revision) {
+      unawaited(pending.completion.catchError((Object _) {}));
       return null;
     }
     _authorizeUrl = pending.authorizeUrl;
@@ -112,6 +137,7 @@ class AuthProvider extends ChangeNotifier {
     unawaited(
       pending.completion
           .then((_) {
+            if (_disposed || revision != _revision || !_auth.isLoggedIn) return;
             _authorizeUrl = null;
             _status = AuthStatus.signedIn;
             notifyListeners();
@@ -121,7 +147,11 @@ class AuthProvider extends ChangeNotifier {
           })
           .catchError((Object e) {
             // 用户主动取消时状态已被 cancelOAuth 重置，不再覆盖
-            if (_status != AuthStatus.authorizing) return;
+            if (_disposed ||
+                revision != _revision ||
+                _status != AuthStatus.authorizing) {
+              return;
+            }
             _authorizeUrl = null;
             _status = AuthStatus.signedOut;
             _error = describeError(e);
@@ -133,6 +163,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> cancelOAuth() async {
     if (_status != AuthStatus.authorizing) return;
+    ++_revision;
     _status = AuthStatus.signedOut;
     _authorizeUrl = null;
     notifyListeners();
@@ -147,23 +178,28 @@ class AuthProvider extends ChangeNotifier {
   Future<void> refreshToken() async {
     if (!isSignedIn || _refreshing) return;
     _refreshing = true;
+    final revision = _revision;
     _error = null;
     notifyListeners();
     try {
       await _auth.refreshAccessToken();
     } catch (e) {
+      if (_disposed || revision != _revision) return;
       _error = describeError(e);
     }
+    if (_disposed || revision != _revision) return;
     _refreshing = false;
     notifyListeners();
   }
 
   Future<void> signOut() async {
     await _auth.logout();
+    if (_disposed) return;
+    final changed = _status != AuthStatus.signedOut;
     _error = null;
     _status = AuthStatus.signedOut;
     notifyListeners();
-    onSessionChanged?.call();
+    if (changed) onSessionChanged?.call();
   }
 
   void clearError() {
@@ -176,7 +212,9 @@ class AuthProvider extends ChangeNotifier {
   @visibleForTesting
   static String describeError(Object e) {
     if (e is OAuthException) return e.toString();
-    if (e is SocketException || e is TimeoutException || e is http.ClientException) {
+    if (e is SocketException ||
+        e is TimeoutException ||
+        e is http.ClientException) {
       return '无法连接到 Spotify，请检查网络或代理';
     }
     if (e is StateError) return e.message;

@@ -217,7 +217,7 @@ class ConnectService {
                 },
               ],
             },
-      'play_origin': {'feature_identifier': 'flutify'},
+      'play_origin': <String, Object?>{},
       'options': {
         'license': 'on-demand',
         'skip_to': {'track_uri': ?trackUri, 'track_index': ?trackIndex},

@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.0.6+6
+version: 0.0.7+7
 
 environment:
   sdk: ^3.12.0
@@ -94,6 +94,7 @@ flutter:
   # EME 播放器的 HLS.js 引擎（WebView2 隐藏页用，Widevine 全曲播放）
   assets:
     - assets/js/hls.min.js
+    - assets/updates/windows_update.ps1
 
   # MiSans（小米，可免费商用）：全量中日韩字形 TTF，仅打包实际用到的 4 个字重。
   # w800 / w900 没有对应文件，按 CSS 字重匹配规则回落到 Bold。

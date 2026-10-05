@@ -3076,6 +3076,174 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'复制链接'**
   String get loginCopyLink;
+
+  /// No description provided for @updatesTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'软件更新'**
+  String get updatesTitle;
+
+  /// No description provided for @updatesMode.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新方式'**
+  String get updatesMode;
+
+  /// No description provided for @updatesManual.
+  ///
+  /// In zh, this message translates to:
+  /// **'手动更新'**
+  String get updatesManual;
+
+  /// No description provided for @updatesAutomatic.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动下载更新'**
+  String get updatesAutomatic;
+
+  /// No description provided for @updatesDisabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'不检查更新'**
+  String get updatesDisabled;
+
+  /// No description provided for @updatesHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动检查新版本和更新内容。自动模式在后台下载，完成后由你确认安装，不会中断播放。'**
+  String get updatesHint;
+
+  /// No description provided for @updatesCheck.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查更新'**
+  String get updatesCheck;
+
+  /// No description provided for @updatesChecking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在检查更新…'**
+  String get updatesChecking;
+
+  /// No description provided for @updatesCurrent.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前版本'**
+  String get updatesCurrent;
+
+  /// No description provided for @updatesUpToDate.
+  ///
+  /// In zh, this message translates to:
+  /// **'已是最新版本'**
+  String get updatesUpToDate;
+
+  /// No description provided for @updatesAvailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'发现新版本'**
+  String get updatesAvailable;
+
+  /// No description provided for @updatesNotes.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新内容'**
+  String get updatesNotes;
+
+  /// No description provided for @updatesNoNotes.
+  ///
+  /// In zh, this message translates to:
+  /// **'此版本未提供更新说明。'**
+  String get updatesNoNotes;
+
+  /// No description provided for @updatesDownload.
+  ///
+  /// In zh, this message translates to:
+  /// **'下载更新'**
+  String get updatesDownload;
+
+  /// No description provided for @updatesDownloading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载并校验…'**
+  String get updatesDownloading;
+
+  /// No description provided for @updatesReady.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新已就绪'**
+  String get updatesReady;
+
+  /// No description provided for @updatesReadyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新包已下载并通过校验。安装会关闭应用；也可以稍后从设置中继续。'**
+  String get updatesReadyHint;
+
+  /// No description provided for @updatesAndroidHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'APK 已下载并通过校验。确认后打开系统安装程序。'**
+  String get updatesAndroidHint;
+
+  /// No description provided for @updatesInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'重启并安装'**
+  String get updatesInstall;
+
+  /// No description provided for @updatesInstallApk.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装 APK'**
+  String get updatesInstallApk;
+
+  /// No description provided for @updatesInstalling.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在准备安装…'**
+  String get updatesInstalling;
+
+  /// No description provided for @updatesSkip.
+  ///
+  /// In zh, this message translates to:
+  /// **'跳过本次更新'**
+  String get updatesSkip;
+
+  /// No description provided for @updatesLater.
+  ///
+  /// In zh, this message translates to:
+  /// **'稍后'**
+  String get updatesLater;
+
+  /// No description provided for @updatesPage.
+  ///
+  /// In zh, this message translates to:
+  /// **'手动更新 · 发布页面'**
+  String get updatesPage;
+
+  /// No description provided for @updatesFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新失败，请重试或前往发布页面。'**
+  String get updatesFailed;
+
+  /// No description provided for @updatesPermission.
+  ///
+  /// In zh, this message translates to:
+  /// **'请允许 Flutify 安装未知来源应用，返回后再次点击「安装 APK」。'**
+  String get updatesPermission;
+
+  /// No description provided for @updatesUnsupported.
+  ///
+  /// In zh, this message translates to:
+  /// **'此平台暂不提供应用内安装，请通过发布页面手动更新。'**
+  String get updatesUnsupported;
+
+  /// No description provided for @updatesDetails.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看更新'**
+  String get updatesDetails;
 }
 
 class _AppLocalizationsDelegate

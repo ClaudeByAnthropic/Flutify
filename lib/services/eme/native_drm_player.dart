@@ -111,11 +111,9 @@ class NativeDrmPlayer {
       case 'error':
         final msg = '${raw['code']}: ${raw['message']}';
         debugPrint('[ndrm] 播放错误: $msg');
-        lastError = EmePlaybackException(
-          msg,
-          // license 反代 5xx（内含 401/403 冒泡）时提示重新 Web 登录
-          webSignInSuggested: msg.contains('401') || msg.contains('403'),
-        );
+        // Native errors also cover media and provisioning. Authentication is
+        // classified by the Dart relay, not by digits in this generic message.
+        lastError = EmePlaybackException(msg);
         _stateController.add(EmePlayerState.error);
     }
   }

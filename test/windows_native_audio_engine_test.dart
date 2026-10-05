@@ -47,6 +47,35 @@ class DelayedPlayer extends FakeAudioPlayerService {
   }
 }
 
+class FailingCleanupPlayer extends FakeAudioPlayerService {
+  FailingCleanupPlayer({this.failDecode = true});
+  final bool failDecode;
+  var disposeCalls = 0;
+
+  @override
+  Future<void> playStream(
+    ProgressiveAudio audio, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) async {
+    if (failDecode) throw StateError('decoder failed');
+    await super.playStream(
+      audio,
+      initialPosition: initialPosition,
+      autoplay: autoplay,
+    );
+  }
+
+  @override
+  Future<void> stop() async => throw StateError('decoder cleanup failed');
+
+  @override
+  void dispose() {
+    disposeCalls++;
+    super.dispose();
+  }
+}
+
 void main() {
   const content = EmeTrackContent(
     fileIdHex: '0000000000000000000000000000000000000000',
@@ -68,31 +97,36 @@ void main() {
   });
   tearDown(() => engine.dispose());
 
-  test('fallback logs specific safe codes for scheme and HTTP failures', () async {
-    final logs = <String>[];
-    final originalPrint = debugPrint;
-    debugPrint = (String? message, {int? wrapWidth}) {
-      if (message != null) logs.add(message);
-    };
-    addTearDown(() => debugPrint = originalPrint);
-    for (final error in [
-      const CencFormatException(CencFormatFailure.unsupportedEncryptionScheme),
-      LicenseHttpException(403, isCertificate: false),
-    ]) {
-      engine.dispose();
-      engine = WindowsNativeAudioEngine(
-        native: native,
-        fallback: fallback,
-        decryptor: decryptor,
-      );
-      final playing = engine.playEme(content, autoplay: false);
-      decryptor.pending.last.completeError(error);
-      await playing;
-    }
-    expect(logs.join('\n'), contains('unsupportedEncryptionScheme'));
-    expect(logs.join('\n'), contains('license_http_403'));
-    expect(fallback.playedEme, [content, content]);
-  });
+  test(
+    'fallback logs specific safe codes for scheme and HTTP failures',
+    () async {
+      final logs = <String>[];
+      final originalPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message != null) logs.add(message);
+      };
+      addTearDown(() => debugPrint = originalPrint);
+      for (final error in [
+        const CencFormatException(
+          CencFormatFailure.unsupportedEncryptionScheme,
+        ),
+        LicenseHttpException(403, isCertificate: false),
+      ]) {
+        engine.dispose();
+        engine = WindowsNativeAudioEngine(
+          native: native,
+          fallback: fallback,
+          decryptor: decryptor,
+        );
+        final playing = engine.playEme(content, autoplay: false);
+        decryptor.pending.last.completeError(error);
+        await playing;
+      }
+      expect(logs.join('\n'), contains('unsupportedEncryptionScheme'));
+      expect(logs.join('\n'), contains('license_http_403'));
+      expect(fallback.playedEme, [content, content]);
+    },
+  );
 
   test(
     'native success honors pause, seek and volume during license wait',
@@ -136,6 +170,64 @@ void main() {
       expect(native.playedFiles, isEmpty);
       expect(fallback.playedEme, isEmpty);
       expect(memory.length, 0);
+    },
+  );
+  test(
+    'decoder cleanup failure still releases memory and reaches fallback',
+    () async {
+      engine.dispose();
+      final broken = FailingCleanupPlayer();
+      fallback = FakeAudioPlayerService();
+      engine = WindowsNativeAudioEngine(
+        native: broken,
+        fallback: fallback,
+        decryptor: decryptor,
+      );
+      final playing = engine.playEme(content, autoplay: false);
+      var releases = 0;
+      final memory = NativeMemoryAudio(
+        Uint8List(8),
+        onDispose: () => releases++,
+      );
+      decryptor.pending.single.complete(memory);
+      await playing;
+      expect(fallback.playedEme, [content]);
+      expect(engine.hasSource, isTrue);
+      expect(engine.isPlaying, isFalse);
+      expect(memory.length, 0);
+      expect(releases, 1);
+      expect(broken.disposeCalls, 1);
+      await engine.playEme(content, autoplay: false);
+      expect(decryptor.pending.length, 1);
+      expect(fallback.playedEme, [content, content]);
+      engine.dispose();
+      expect(broken.disposeCalls, 1);
+    },
+  );
+  test(
+    'stop cleanup failure retires native playback and next track falls back',
+    () async {
+      engine.dispose();
+      final broken = FailingCleanupPlayer(failDecode: false);
+      fallback = FakeAudioPlayerService();
+      engine = WindowsNativeAudioEngine(
+        native: broken,
+        fallback: fallback,
+        decryptor: decryptor,
+      );
+      final playing = engine.playEme(content);
+      final memory = NativeMemoryAudio(Uint8List(8));
+      decryptor.pending.single.complete(memory);
+      await playing;
+      await engine.stop();
+      expect(engine.hasSource, isFalse);
+      expect(engine.isPlaying, isFalse);
+      expect(memory.length, 0);
+      expect(broken.disposeCalls, 1);
+      await engine.playEme(content);
+      expect(decryptor.pending.length, 1);
+      expect(fallback.playedEme, [content]);
+      expect(engine.hasSource, isTrue);
     },
   );
   test('next track wins even if previous decrypt finishes last', () async {

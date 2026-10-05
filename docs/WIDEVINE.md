@@ -1,6 +1,6 @@
 # 原生 Widevine 播放跨平台评估
 
-核对日期：2026-10-04。Android 使用原生 Media3 / MediaDrm；Windows x64 已接入实验性的原生 CDM 解密与音频播放管线，但真实许可证请求返回 HTTP 403，尚未证明原生曲目能够解密出声。Windows 默认仍使用 WebView2，实验模式失败时也保留该回退。
+核对日期：2026-10-05。Android 使用原生 Media3 / MediaDrm；Windows x64 已接入实验性的原生 CDM 解密与音频播放管线，但真实许可证请求返回 HTTP 403，尚未证明原生曲目能够解密出声。未显式启用实验时使用 WebView2；当前 CI 的 Windows x64 构建启用实验并保留失败回退，ARM64 使用 WebView2。
 
 ## PR #1 的实现
 
@@ -96,6 +96,124 @@ flutter build windows --release --no-pub --dart-define=FLUTIFY_NATIVE_WIDEVINE=t
 
 本轮 Windows x64 Release 已启用原生实验并构建成功（退出 0，670.1 秒），产物为 `app/build/native-format-fix/windows/x64/runner/Release/Flutify.exe`；保留完整目录使用，其中包含 `flutify_cdm_bridge.exe`，不包含 CDM DLL。21 个随包原生程序 / 库的 VC 运行库依赖检查通过；使用新宿主加载本机 Chrome 和 Edge 组件，接口 11 初始化、无许可证时返回 `kNoKey` 及进程关闭均通过，仍不是有许可证的播放验证。构建含第三方 WebView 插件警告，没有编译错误。证据：`windows-native-format-build.log`、`native-format-runtime-check.log`、`native-format-packaged-bridge-check.log`。
 
+### 同一会话的浏览器 / 独立宿主对照（2026-10-05）
+
+这次对照使用同一个新获取的非匿名 Web 令牌、同一份 application certificate（HTTP 200 / 702 B）、同一曲目的 HLS PSSH（87 B），以及相同的 Dart 许可证客户端和代理配置：
+
+| 路径 | 许可证结果 | 已证实的范围 |
+| --- | --- | --- |
+| 本机 Chrome，无头临时配置 | HTTP 200，EME key status 为 `usable` | 该账号与内容数据能在浏览器宿主下取得可用许可证；未播放音频 |
+| Flutify 独立 CDM 宿主，接口 11 | HTTP 403，响应正文 0 B | CENC 的 10,194 个加密样本解析完成、CDM 初始化成功；尚未进行成功的授权解密 |
+
+日志：工作区 `D:/Flutify/native-current-license-check.log`。该结果将调查重点缩小到独立宿主生成请求的兼容性，不能从空的 403 正文断言具体服务端拒绝策略。
+
+已核实的一处接入差异：Chromium 会用真实宿主文件、CDM 文件及对应签名调用 `VerifyCdmHost_0`；发行版实验宿主没有这套验证接入，后续独立诊断探针已接入，结果见下节。该接口的返回值表示验证启动情况，并不等于许可证一定可用。仓库目前只有 Android 的系统 MediaDrm 接入，没有 Windows 独立宿主的签名与完整验证资料；Android 系统接口不能直接用于 Windows。不能以浏览器签名代替 Flutify 宿主签名，也不能把浏览器探针的成功称为原生播放修复。
+
+从仓库根目录显式运行对照（路径替换为本机文件）：
+
+```bat
+set FLUTIFY_CDM_CHECK_PREFS=C:\path\to\shared_preferences.json
+set FLUTIFY_CDM_CHECK_MEDIA=C:\path\to\cached-file-id.m4a
+set FLUTIFY_CDM_CHECK_HELPER=C:\path\to\flutify_cdm_bridge.exe
+set FLUTIFY_CDM_CHECK_METADATA_ONLY=0
+set FLUTIFY_CDM_CHECK_FETCH_MANIFEST=1
+set FLUTIFY_CDM_CHECK_REFRESH_TOKEN=1
+set FLUTIFY_CDM_CHECK_BROWSER=C:\Program Files\Google\Chrome\Application\chrome.exe
+flutter test --no-pub tool/cdm/native_license_check_test.dart
+```
+
+媒体文件名须为缓存的 40 位 file ID。浏览器选项仅用于诊断，可省略；浏览器使用临时配置，许可证仍由 Dart 请求，账号令牌不传入网页。偏好文件只读并克隆到内存，诊断不会更新用户的已保存会话；不记录凭据、许可证正文、内容密钥或明文媒体。
+
+本轮另修复了失败恢复：原生解码器 `stop()` 抛错时，将其释放并禁用本次运行的原生尝试，继续清理媒体内存及回退；许可证和解析失败尚未打开解码器时，不调用其 `stop()`。回归测试复现了修复前清理错误阻断回退，并覆盖修复后回退、停止、内存释放和后续曲目行为。这项稳定性修复不改变上述 HTTP 403 结论。
+
+本轮修复验证：38 项相关回归测试通过，包括原生失败恢复、切歌与取消、CENC/初始化数据，以及语言设置和无障碍布局。启用原生实验的 Windows x64 Release 构建成功，产物为 `app/build/native-recovery-language/windows/x64/runner/Release/Flutify.exe`；随包 21 个 EXE/DLL 的 x64 架构和 VC 运行库依赖检查均通过，须保留整个 Release 目录使用。静态分析没有错误或警告，仅有 3 条原有的构造函数风格提示。证据：工作区 `native-language-regression.log`、`native-language-analyze.log`、`windows-native-recovery-build.log`、`native-recovery-runtime-check.log`。本轮未取得原生授权解密或出声成功的结果。
+
+### 宿主验证开关的本地对照（2026-10-05）
+
+此前同会话的请求元数据对照中，Chrome 生成 4,278 B 请求，客户端身份已加密；独立宿主生成 1,741 B 请求，客户端身份为明文，VMP 字段缺失。两者的 HLS PSSH、请求类型、协议版本和时间检查均一致。Chrome 的 VMP 位于加密身份内，不能由这份元数据证明其具体内容。两种请求都经同一个 Dart HTTP 客户端转发，故不能用“Chrome TLS 与 Dart TLS 不同”解释此前的 200 / 403。证据：`D:/Flutify/native-request-metadata-check.log`。
+
+本次核对 Chromium 的 `CdmAdapter`、`CdmWrapper` 和 `CdmModule`：当前宿主的初始化参数、等待初始化完成、设置证书后创建临时 CENC 会话的顺序与参考实现一致；Chromium 另有 `VerifyCdmHost_0` 宿主文件验证步骤。`media/base/media_switches.cc` 将 `CdmHostVerification` 默认开启，并明确允许测试时关闭。本次只在诊断创建的临时 Chrome 进程中使用该开关，未改变用户浏览器或应用配置。
+
+对照使用同一份新 application certificate（HTTP 200 / 702 B）和缓存 MP4 的 83 B PSSH，每次启动新的临时 Chrome 配置；按“默认开启 → 测试关闭 → 恢复默认”的顺序采集本地请求，再运行本次 Release 随包的原生宿主：
+
+| 路径 | 请求长度 | 客户端身份 | 可观察的 VMP |
+| --- | --- | --- | --- |
+| Chrome 默认宿主验证 | 4,274 B | 加密；证书 provider / serial 匹配 | 加密内不可观察 |
+| Chrome 测试关闭宿主验证 | 1,737 B | 明文 | 缺失 |
+| Chrome 恢复默认宿主验证 | 4,274 B | 加密；证书 provider / serial 匹配 | 加密内不可观察 |
+| 本次随包独立宿主，接口 11 | 1,737 B | 明文 | 缺失 |
+
+Chrome 为本机 `154.0.8037.93`，原生固定加载同一安装目录的 CDM `4.10.3112.0`。本次外部进程模块采样未捕获浏览器的 DLL 路径，不能把实际模块路径核验算作本轮新增证据。所有请求都使用 streaming / new、协议 2.2、128 B 签名、16 B 请求 ID，PSSH 匹配输入且请求时间在 5 分钟内。长度相同和这些字段相同不表示请求逐字节相同。
+
+**结论：在该 Chrome / CDM 环境中，关闭宿主验证可复现独立宿主的请求特征，恢复验证后特征恢复。** 该结果将调查指向宿主验证，但没有证明服务端仅检查 VMP 或身份加密。后续实验证实：即使自身签名缺失，调用验证接口也能开启身份加密，而许可证仍为 403（见下节）。因此不能把“未调用验证接口”“身份未加密”和“宿主认证未通过”视为同一件事，也不能声称补一个调用即可修复。
+
+本次**未发送任何许可证请求**，未刷新账号令牌、请求新媒体或保存挑战正文；只读取偏好内存副本中的网络配置与本地加密媒体，并获取公开应用证书。诊断客户端在 metadata 模式下主动拒绝许可证端点请求。恢复对照整项集成诊断退出 0，元数据解析回归 4 项通过，定向静态分析无问题。日志：`D:/Flutify/host-verification-metadata.log`、`host-verification-parser-tests.log`、`host-verification-analyze.log`。
+
+复现时使用上节的偏好、媒体、宿主和浏览器路径，并额外设置以下变量；无需有效账号令牌，但工具仍要求偏好中有已有 Web 登录记录：
+
+```bat
+set FLUTIFY_CDM_CHECK_METADATA_ONLY=1
+set FLUTIFY_CDM_CHECK_FETCH_MANIFEST=0
+set FLUTIFY_CDM_CHECK_REFRESH_TOKEN=0
+set FLUTIFY_CDM_CHECK_LIBRARY=C:\path\to\widevinecdm.dll
+flutter test --no-pub tool/cdm/native_license_check_test.dart
+```
+
+若不指定浏览器，只采集原生请求元数据。诊断只使用 Chromium 公开测试开关，不修改 CDM、不替换签名、不将测试关闭验证的请求发送给服务端。之前的 interface 10 / 11、预加载系统 `dxva2.dll` 本地对照均未改变明文身份 / 无 VMP 特征；错误证书会被拒绝，回调也未显示 StorageId / FileIO / 平台挑战阻塞请求生成，因此本轮没有重复这些实验。
+
+### 真实自身宿主验证与加密请求复测（2026-10-05）
+
+新增显式诊断 [native_host_verification_probe.cpp](../tool/cdm/native_host_verification_probe.cpp)，复用生产宿主的 CDM 接口、回调与管道协议。探针在 `InitializeCdmModule_4` 之前调用 `VerifyCdmHost_0`，提交当前探针自身 EXE、实际加载的 CDM DLL，以及各自相邻的 `.sig`。本机 CDM 签名可读，探针自身签名缺失；按 Chromium 行为传入无效签名句柄，所有文件句柄交给 CDM 关闭。没有借用其他程序的宿主文件或签名。
+
+接口返回 `verification_call_accepted=1`。依照公开头文件，这只表示接受异步处理；Chromium 的 `ReportMetrics` 实现也没有提供可据此确认认证通过的公开结果。此时 83 B PSSH 生成 **3,682 B** 请求，客户端身份已加密（密文 3,104 B），证书 provider / serial 匹配，VMP 在加密身份内不可观察。**自身 `.sig` 缺失不妨碍本机 CDM 开启隐私模式，但这不证明宿主通过认证。** 此项本地诊断通过，未发送许可证。
+
+接着获取新非匿名 Web 令牌、702 B 应用证书及 87 B HLS PSSH，真实请求长度为 **3,686 B**，仍返回 **403 / 0 B**。这直接否定了“只开启身份加密即可修复”的假设。日志：工作区 `self-host-verification-metadata.log`、`self-host-verification-callback.log`、`self-host-license-check.log`、`self-host-license-callback.log`。
+
+再做四组本地对照，分别为：仅验证接入、初始化后等待 5 秒、验证前预加载系统 `dxva2.dll`、预加载并等待。等待期间宿主继续处理 CDM 定时器；DXVA 仅从 Windows 系统目录加载。四组都生成 **3,682 B / 加密身份 3,104 B** 请求，证书及 PSSH 匹配，均正常关闭；许可证请求数 **0**。可观察字段一致不表示加密正文逐字节相同，也不能排除加密内部状态变化。
+
+因此对“预加载并等待”配置再进行一次同令牌的真实 Chrome / 原生对照：
+
+| 路径 | 请求 / 身份密文长度 | 许可证结果 |
+| --- | --- | --- |
+| Chrome 默认宿主验证 | 4,278 B / 3,696 B | HTTP 200，EME `usable` |
+| 自身宿主验证 + 系统 DXVA + 等待 5 秒 | 3,686 B / 3,104 B | HTTP 403，正文 0 B |
+
+两者共用同一新非匿名 Web 令牌、证书、87 B HLS PSSH、Dart HTTP 客户端及代理配置。原生 CDM 固定为本机 `4.10.3112.0`，接口 11。最终对照共发送两次许可证请求；加上此前单独原生请求，本节共三次。Chrome 成功只验证了可用许可证，没有播放音频；原生未能进入授权解密。日志：`self-host-license-dxva2-settled-check.log`、`self-host-license-dxva2-settled-callback.log`；本地四组日志为 `self-host-verification-{baseline,settled,dxva2,dxva2-settled}-metadata.log` 和对应 `-callback.log`。
+
+**当前结论：验证调用、身份加密、预加载 DXVA 与等待均不足以解决 403。** 同一客户端的成功对照不支持把此次差异归结为账号整体不可用或 TLS 栈差异。Windows 宿主自身有效签名及完整接入资料仍缺失，是继续验证的重要缺口；空的 403 不能证明签名是唯一拒绝原因，身份密文长度差也不能用于推定 VMP 内容。输出保护与持久化接口仍有平台实现差异，未将未知状态改为成功来试探服务器。下一步需要补齐可验证的自身宿主认证条件，或获得许可证服务端的具体拒绝原因，才能继续针对性修复。
+
+该接入仍限于诊断工具，未加入发行宿主。探针 MSVC C++17 `/W4 /WX` 构建通过；四组本地真实 CDM 诊断通过，Dart 定向静态分析无问题。许可证集成诊断因真实 403 退出 1，不计为测试通过。未修改用户的持久化凭据，未保存原始请求、许可证或明文媒体。
+
+从仓库根目录构建探针（MSVC 路径按本机调整）：
+
+```bat
+call D:\VSBuildTools\VC\Auxiliary\Build\vcvars64.bat
+if not exist build\cdm-self-verification mkdir build\cdm-self-verification
+cd build\cdm-self-verification
+cl /nologo /std:c++17 /EHsc /W4 /WX /O2 ..\..\tool\cdm\native_host_verification_probe.cpp /Fe:native_host_verification_probe.exe
+cd ..\..
+```
+
+沿用上节偏好、媒体、CDM 路径及 metadata 模式，将 `FLUTIFY_CDM_CHECK_HELPER` 设为探针的绝对路径，并设置可写日志路径 `FLUTIFY_CDM_HOST_PROBE_LOG`。`FLUTIFY_CDM_HOST_PROBE_PRELOAD_DXVA2=1` 开启系统 DXVA 预加载；`FLUTIFY_CDM_CHECK_SETTLE=1` 开启 5 秒等待，未设置则都不启用。运行同一 `flutter test --no-pub tool/cdm/native_license_check_test.dart`。只有显式将 `FLUTIFY_CDM_CHECK_METADATA_ONLY=0` 才会进入真实许可证诊断；可再设置 `FLUTIFY_CDM_CHECK_BROWSER` 做默认验证模式的浏览器对照。
+
+### 输出保护回调与本机 OPM 检查（2026-10-05）
+
+透明 Host 10 / 11 代理仅记录回调名称，原样转发参数和返回值。初始化过程中确实调用 `QueryOutputProtectionStatus`；未观察到 `RequestStorageId`、`CreateFileIO`、`SendPlatformChallenge` 或 `EnableOutputProtection`。生产宿主目前异步返回 `kQueryFailed, 0, 0`。代理探针正常退出，83 B PSSH 的请求仍为 3,682 B / 身份密文 3,104 B。
+
+临时 Chrome 的 `media` trace 实测 `CdmAdapter::OnQueryOutputProtectionStatusDone` 为 `success=true, link_mask=0, protection_mask=0`。诊断仅输出该布尔值和数值掩码，原始 trace 留在内存；这确认了回调差异，但尚未证明它导致 403，也没有把原生未知状态硬编码为成功。该批次许可证请求数为 0。证据：工作区 `self-host-verification-trace-settled-{metadata,callback}.log`、`self-host-verification-browser-output-{metadata,callback}.log`。
+
+独立 `native_output_capability_probe.cpp` 检查本机真实 OPM 能力：当前为本地会话、一条内置显示链路，输出枚举与 `StartInitialization` 均成功，返回证书可解析。普通 Windows 缓存链验证得到 `chain_errors=0x21`、Microsoft root policy `0x800B0109`；尚需确认 OPM 专用信任锚和验证规则，不能据此断言驱动不可信。尚未执行 `FinishInitialization` 或经过认证的 `GetInformation`，所以未测得 HDCP 状态。未修改信任库、跳过证书验证或配置显示保护，许可证请求数为 0；MSVC `/W4 /WX` 编译通过。证据：工作区 `output-capability-certificate-check.log`。
+
+### 0.07 Windows 本地构建（2026-10-05）
+
+版本 `0.0.7+7` 的 x64 Release 已编译通过，启用原生 Widevine 实验，并修正歌词背景首次暂停后直接关闭的 Ticker 生命周期异常。产物为 `app/build/v007-20261005/windows/x64/runner/Release/Flutify.exe`，文件版本 `0.0.7.7`；21 个 EXE / DLL 架构和 VC 运行库依赖检查通过，便携 ZIP 的 CRC 检查通过。Flutter 全套回归 851 项通过、8 项跳过，Node 测试 25 项通过。证据：工作区 `v007-final-tests.log`、`v007-windows-final-build.log`、`v007-package-check.log`。编译与测试不代表原生许可证、解密出声或更新安装已通过实机验证。
+
+### 此前 Windows 构建（2026-10-05）
+
+按用户要求先构建，再进行上述调查。启用原生实验的 Windows x64 Release 构建成功，退出 0，耗时 **514.4 秒**；产物在 `app/build/session-native-20261005/windows/x64/runner/Release/Flutify.exe`。**须保留整个 Release 目录**，其中包含独立宿主，不包含 CDM DLL。随包 21 个 EXE / DLL 的 x64 架构及 VC 运行库依赖检查通过。第三方 WebView 插件仍有编译警告，没有编译错误。
+
+该历史构建包含 401 清理及当时的应用改动，早于上述 0.07 歌词生命周期修正。随包宿主已用于上面的真实 CDM 请求生成验证，许可证、原生解密和出声仍未验证成功。更新功能和真实 WebView Cookie 清理也不能仅由编译成功视为完成实机验证。证据：`D:/Flutify/windows-session-native-build.log`、`session-native-runtime-check.log`。
+
 ### 证书与组件更新
 
 三者分别处理：
@@ -122,6 +240,7 @@ Windows x64 下一步需要查明真实许可证 HTTP 403 的兼容性原因，�
 ## 资料
 
 - [Widevine 官方概览与许可](https://developers.google.com/widevine/drm/overview)
+- [Chromium CDM 宿主文件验证](https://github.com/chromium/chromium/blob/main/media/cdm/cdm_host_files.cc)
 - [Android Media3 DRM 文档](https://developer.android.com/media/media3/exoplayer/drm)
 - [Microsoft PlayReady 概览](https://learn.microsoft.com/en-us/playready/overview/overview)
 - [Kodi InputStream Adaptive](https://github.com/xbmc/inputstream.adaptive)

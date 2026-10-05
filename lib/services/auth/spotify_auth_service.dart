@@ -13,6 +13,7 @@ import 'client_token_service.dart';
 import 'oauth_client_config.dart';
 import 'oauth_loopback_server.dart';
 import 'oauth_pkce_service.dart';
+import 'session_http_client.dart';
 
 /// Spotify 身份鉴权总控：只有一条登录链路——**在浏览器中登录**（桌面版 OAuth）。
 ///
@@ -54,7 +55,14 @@ class SpotifyAuthService {
     this._usernameResolver,
   ) : _clientTokenService = ClientTokenService(_client),
       _oauth = OAuthPkceService(_client, userAgent: _profile.userAgent),
-      _profiles = AccountProfileService(_client);
+      _profiles = AccountProfileService(_client) {
+    _storage.sessionInvalidated.addListener(() {
+      _refreshInFlight = null;
+      _clientTokenInFlight = null;
+      sessionExpired.value = false;
+      unawaited(_loopback.close());
+    });
+  }
 
   factory SpotifyAuthService(
     StorageService storage, [
@@ -63,7 +71,10 @@ class SpotifyAuthService {
     Future<String> Function(String accessToken, String deviceId)?
     usernameResolver,
   ]) {
-    final http.Client effectiveClient = client ?? http.Client();
+    final http.Client effectiveClient = SessionHttpClient(
+      storage,
+      client ?? http.Client(),
+    );
     return SpotifyAuthService._(
       storage,
       effectiveClient,
@@ -75,6 +86,7 @@ class SpotifyAuthService {
   }
 
   bool get isLoggedIn => _storage.isLoggedIn;
+  ValueListenable<int> get sessionInvalidated => _storage.sessionInvalidated;
   String get username => _storage.username;
   String get displayName => _storage.displayName.isNotEmpty
       ? _storage.displayName
@@ -112,24 +124,32 @@ class SpotifyAuthService {
 
   /// 获取有效的桌面端 client-token；过期、缺失或身份不一致（旧版本留下的）则重新申请。
   Future<String> ensureClientToken() {
+    _storage.checkSession(_storage.sessionEpoch);
     if (_storage.clientToken.isNotEmpty &&
         _storage.clientTokenProfile == _profile.name &&
         _isFresh(_storage.clientTokenExpiry)) {
       return Future.value(_storage.clientToken);
     }
-    return _clientTokenInFlight ??= _requestClientToken().whenComplete(() {
-      _clientTokenInFlight = null;
+    if (_clientTokenInFlight != null) return _clientTokenInFlight!;
+    late final Future<String> pending;
+    pending = _requestClientToken().whenComplete(() {
+      if (identical(_clientTokenInFlight, pending)) _clientTokenInFlight = null;
     });
+    return _clientTokenInFlight = pending;
   }
 
   Future<String> _requestClientToken() async {
+    final epoch = _storage.sessionEpoch;
     final granted = await _clientTokenService.request(
       await _deviceId(),
       _profile,
     );
-    await _storage.setClientToken(granted.token);
-    await _storage.setClientTokenExpiry(granted.expiryEpochMs(DateTime.now()));
-    await _storage.setClientTokenProfile(_profile.name);
+    await _storage.writeSession(epoch, [
+      () => _storage.setClientToken(granted.token),
+      () =>
+          _storage.setClientTokenExpiry(granted.expiryEpochMs(DateTime.now())),
+      () => _storage.setClientTokenProfile(_profile.name),
+    ]);
     return granted.token;
   }
 
@@ -141,6 +161,9 @@ class SpotifyAuthService {
   ///
   /// UI 负责用浏览器打开 [PendingOAuth.authorizeUrl]；[PendingOAuth.completion] 在令牌换取成功后完成。
   Future<PendingOAuth> beginOAuth() async {
+    final epoch = await _storage.beginLoginSession();
+    _refreshInFlight = null;
+    _clientTokenInFlight = null;
     final pkce = OAuthPkceService.generatePkce();
     final state = OAuthPkceService.generateState();
     final codeFuture = await _loopback.start(
@@ -149,7 +172,8 @@ class SpotifyAuthService {
     );
 
     final completion = codeFuture.then(
-      (code) => completeOAuth(code: code, codeVerifier: pkce.verifier),
+      (code) =>
+          _completeOAuth(code: code, codeVerifier: pkce.verifier, epoch: epoch),
     );
     return PendingOAuth(
       authorizeUrl: OAuthPkceService.buildAuthorizeUrl(
@@ -168,19 +192,32 @@ class SpotifyAuthService {
   Future<void> completeOAuth({
     required String code,
     required String codeVerifier,
+  }) => _completeOAuth(
+    code: code,
+    codeVerifier: codeVerifier,
+    epoch: _storage.sessionEpoch,
+  );
+
+  Future<void> _completeOAuth({
+    required String code,
+    required String codeVerifier,
+    required int epoch,
   }) async {
+    _storage.checkSession(epoch);
     final tokens = await _oauth.exchangeCode(
       config: _config,
       code: code,
       codeVerifier: codeVerifier,
     );
-    await _persist(tokens);
+    await _persist(tokens, epoch);
 
     // 立即以桌面身份申请 client-token，之后内部接口与令牌身份一致；失败不影响登录
     try {
       await ensureClientToken();
     } catch (_) {}
+    _storage.checkSession(epoch);
     await _loadProfile();
+    _storage.checkSession(epoch);
   }
 
   // ---------------------------------------------------------------------------
@@ -189,6 +226,7 @@ class SpotifyAuthService {
 
   /// 返回有效 access_token；过期时用 refresh_token 免密续期。
   Future<String> ensureAccessToken() {
+    _storage.checkSession(_storage.sessionEpoch);
     if (_storage.accessToken.isNotEmpty &&
         _isFresh(_storage.accessTokenExpiry)) {
       return Future.value(_storage.accessToken);
@@ -204,9 +242,12 @@ class SpotifyAuthService {
     if (sessionExpired.value) {
       return Future.error(const OAuthException('登录已过期，请重新登录', 'invalid_grant'));
     }
-    return _refreshInFlight ??= _refresh().whenComplete(() {
-      _refreshInFlight = null;
+    if (_refreshInFlight != null) return _refreshInFlight!;
+    late final Future<String> pending;
+    pending = _refresh().whenComplete(() {
+      if (identical(_refreshInFlight, pending)) _refreshInFlight = null;
     });
+    return _refreshInFlight = pending;
   }
 
   /// 等待进行中的续期落盘（关窗前调用）。
@@ -222,14 +263,17 @@ class SpotifyAuthService {
   }
 
   Future<String> _refresh() async {
+    final epoch = _storage.sessionEpoch;
     try {
       final tokens = await _oauth.refresh(
         config: _config,
         refreshToken: _storage.refreshToken,
       );
-      await _persist(tokens);
+      await _persist(tokens, epoch);
     } on OAuthException catch (e) {
-      if (e.isRevoked) sessionExpired.value = true;
+      if (epoch == _storage.sessionEpoch && e.isRevoked) {
+        sessionExpired.value = true;
+      }
       rethrow;
     }
     return _storage.accessToken;
@@ -241,20 +285,29 @@ class SpotifyAuthService {
 
   /// 先确定用户名，再走内部资料接口，失败回退公开 /v1/me（后者常被限流）。
   Future<void> _loadProfile() async {
+    final epoch = _storage.sessionEpoch;
+    _storage.checkSession(epoch);
     if (_storage.username.isEmpty) {
       // 旧版本按 `profile/me` 取到的是另一个账号的资料，先清掉，取不到新资料时宁可显示用户名
-      await _storage.setDisplayName('');
-      await _storage.setAvatarUrl('');
+      await _storage.writeSession(epoch, [
+        () => _storage.setDisplayName(''),
+        () => _storage.setAvatarUrl(''),
+      ]);
       try {
         final username = await _usernameResolver(
           _storage.accessToken,
           _storage.deviceId,
         );
-        if (username.isNotEmpty) await _storage.setUsername(username);
+        if (username.isNotEmpty) {
+          await _storage.writeSession(epoch, [
+            () => _storage.setUsername(username),
+          ]);
+        }
       } catch (_) {
         // AP 不可达时交给 /v1/me 回退（其响应的 id 即用户名）
       }
     }
+    _storage.checkSession(epoch);
     final profile =
         await _profiles.fetchProfileView(
           username: _storage.username,
@@ -262,11 +315,14 @@ class SpotifyAuthService {
           clientToken: _storage.clientToken,
         ) ??
         await _profiles.fetchMe(_storage.accessToken);
+    _storage.checkSession(epoch);
     if (profile == null) return;
-    if (profile.id.isNotEmpty && _storage.username.isEmpty)
-      await _storage.setUsername(profile.id);
-    await _storage.setDisplayName(profile.displayName);
-    await _storage.setAvatarUrl(profile.avatarUrl);
+    await _storage.writeSession(epoch, [
+      if (profile.id.isNotEmpty && _storage.username.isEmpty)
+        () => _storage.setUsername(profile.id),
+      () => _storage.setDisplayName(profile.displayName),
+      () => _storage.setAvatarUrl(profile.avatarUrl),
+    ]);
   }
 
   /// 令牌响应不含用户名：用 access_token 登录 AP，从 APWelcome 取 canonical username。
@@ -308,6 +364,7 @@ class SpotifyAuthService {
 
   /// 登出：尽力通知服务端（`/api/logout/v1`），然后清除全部登录态（保留 device_id）。
   Future<void> logout() async {
+    final epoch = _storage.sessionEpoch;
     // 已失效的会话不必再通知服务端（令牌早已过期）
     final expired = sessionExpired.value;
     sessionExpired.value = false;
@@ -330,24 +387,26 @@ class SpotifyAuthService {
             .timeout(const Duration(seconds: 5));
       } catch (_) {}
     }
-    await _storage.clearLogin();
+    await _storage.invalidateSession(epoch);
   }
 
   // ---------------------------------------------------------------------------
   // 持久化
   // ---------------------------------------------------------------------------
 
-  Future<void> _persist(OAuthTokens tokens) async {
+  Future<void> _persist(OAuthTokens tokens, int epoch) async {
+    await _storage.writeSession(epoch, [
+      _storage.markDesktopSession,
+      () => _storage.setAccessToken(tokens.accessToken),
+      () => _storage.setAccessTokenExpiry(
+        DateTime.now()
+            .add(Duration(seconds: tokens.expiresIn))
+            .millisecondsSinceEpoch,
+      ),
+      if (tokens.refreshToken.isNotEmpty)
+        () => _storage.setRefreshToken(tokens.refreshToken),
+    ]);
     sessionExpired.value = false;
-    await _storage.markDesktopSession();
-    await _storage.setAccessToken(tokens.accessToken);
-    await _storage.setAccessTokenExpiry(
-      DateTime.now()
-          .add(Duration(seconds: tokens.expiresIn))
-          .millisecondsSinceEpoch,
-    );
-    if (tokens.refreshToken.isNotEmpty)
-      await _storage.setRefreshToken(tokens.refreshToken);
   }
 }
 

@@ -85,11 +85,13 @@ class NativeDrmAudioEngine implements AudioEngine {
         _processing = ProcessingState.idle;
         if (_hasSource) {
           // 运行期错误（license / DRM 会话失败等，在 play 返回后才暴露）：
-          // 带上 [_player.lastError] 的原因上报给 PlaybackProvider 转成用户可见提示，
+          // 优先保留本轮 Dart 反代的原始原因及认证分类；Media3 只给出泛化错误。
           // 并把 _hasSource 复位，让上层知道要重试必须重新整载
           _hasSource = false;
           _errorController.add(
-            _player.lastError ?? const EmePlaybackException('unknown'),
+            _server.lastError ??
+                _player.lastError ??
+                const EmePlaybackException('unknown'),
           );
         }
     }

@@ -2,8 +2,8 @@ import 'dart:math';
 
 /// Spotify 鉴权链路的常量与设备标识。
 ///
-/// 只有一种客户端身份：Windows 桌面端浏览器 OAuth。client_id 为桌面版（keymaster），
-/// 版本号取自本机安装的官方桌面版，使 client-token、User-Agent 与令牌所属客户端保持一致。
+/// 桌面 OAuth / AP 使用 Windows 桌面配置，Web 播放使用独立配置和令牌。
+/// 桌面版本统一用于 client-token、User-Agent 和 AP 握手 / 登录。
 class SpotifyAuthConstants {
   SpotifyAuthConstants._();
 

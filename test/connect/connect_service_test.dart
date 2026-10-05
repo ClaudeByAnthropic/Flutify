@@ -585,6 +585,7 @@ void main() {
       final withContext =
           jsonDecode(h.requests[0].body)['command'] as Map<String, dynamic>;
       expect(withContext['endpoint'], 'play');
+      expect(withContext['play_origin'], isEmpty);
       expect(withContext['context'], {
         'uri': 'spotify:album:a1',
         'url': 'context://spotify:album:a1',
@@ -597,6 +598,7 @@ void main() {
       });
       final adHoc =
           jsonDecode(h.requests[1].body)['command'] as Map<String, dynamic>;
+      expect(adHoc['play_origin'], isEmpty);
       expect(adHoc['context'], {
         'uri': '',
         'url': '',

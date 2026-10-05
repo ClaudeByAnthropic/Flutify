@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// SharedPreferences 持久化封装：凭证、配置、媒体库与播放偏好。
@@ -70,6 +72,120 @@ class StorageService {
   final SharedPreferences _prefs;
 
   StorageService(this._prefs);
+
+  int _sessionEpoch = 0;
+  int get sessionEpoch => _sessionEpoch;
+  final ValueNotifier<int> sessionInvalidated = ValueNotifier(0);
+  Future<void>? _sessionCleanup;
+  Future<void>? _cookieCleanup;
+  Future<void> Function()? clearWebViewCookies;
+  final Set<Future<void> Function()> beforeCookieCleanup = {};
+  bool _cookieCleanupNeeded = false;
+  bool get cookieCleanupPending =>
+      _cookieCleanupNeeded ||
+      (_prefs.getBool('auth_cookie_cleanup_pending') ?? false);
+
+  void checkSession(int epoch) {
+    if (epoch != _sessionEpoch ||
+        _sessionCleanup != null ||
+        cookieCleanupPending) {
+      throw StateError('登录状态已清除，请重新登录');
+    }
+  }
+
+  /// Invoke all preference writes before yielding, so invalidation cannot land
+  /// between writes and leave part of an old session behind.
+  Future<void> writeSession(int epoch, List<Future<bool> Function()> writes) {
+    checkSession(epoch);
+    return Future.wait(writes.map((write) => write())).then((results) {
+      if (results.any((ok) => !ok)) throw StateError('无法保存登录凭据');
+      checkSession(epoch);
+    });
+  }
+
+  Future<void> prepareForLogin() async {
+    await _sessionCleanup;
+    if (cookieCleanupPending) await retryCookieCleanup();
+  }
+
+  Future<int> beginLoginSession({int? expectedEpoch}) async {
+    await prepareForLogin();
+    if (expectedEpoch != null) checkSession(expectedEpoch);
+    return ++_sessionEpoch;
+  }
+
+  /// Retry on startup / before login if the WebView plugin could not clear its
+  /// cookie store. Never silently reuse that store after a failed cleanup.
+  Future<void> retryCookieCleanup() {
+    if (_cookieCleanup != null) return _cookieCleanup!;
+    if (!cookieCleanupPending) return Future.value();
+    late final Future<void> pending;
+    pending = _retryCookieCleanup().whenComplete(() {
+      if (identical(_cookieCleanup, pending)) _cookieCleanup = null;
+    });
+    return _cookieCleanup = pending;
+  }
+
+  Future<void> _retryCookieCleanup() async {
+    final clear = clearWebViewCookies;
+    if (clear == null) throw StateError('WebView Cookie 清理尚未就绪');
+    // A previous disk write may have failed along with the cookie cleanup.
+    await clearLogin();
+    await clear();
+    if (!await _prefs.remove('auth_cookie_cleanup_pending')) {
+      throw StateError('无法保存 Cookie 清理状态');
+    }
+    _cookieCleanupNeeded = false;
+  }
+
+  /// Local-only reset. A late 401 from an earlier session cannot log out a new
+  /// login; concurrent rejections share the same cleanup operation.
+  Future<void> invalidateSession(int epoch) {
+    if (_sessionCleanup != null) return _sessionCleanup!;
+    if (epoch != _sessionEpoch) return Future.value();
+    ++_sessionEpoch;
+    final done = Completer<void>();
+    _sessionCleanup = done.future;
+    unawaited(() async {
+      var notified = false;
+      try {
+        // Clear the in-memory preference cache synchronously before any await.
+        final credentialsCleared = clearLogin();
+        final writes = <Future<void>>[credentialsCleared];
+        if (clearWebViewCookies != null) {
+          _cookieCleanupNeeded = true;
+          writes.add(
+            _prefs.setBool('auth_cookie_cleanup_pending', true).then((ok) {
+              if (!ok) throw StateError('无法保存 Cookie 清理状态');
+            }),
+          );
+        }
+        final persisted = Future.wait(writes);
+        notified = true;
+        sessionInvalidated.value++;
+        await persisted;
+        for (final stop in beforeCookieCleanup.toList()) {
+          await stop();
+        }
+        if (clearWebViewCookies != null) await retryCookieCleanup();
+      } catch (_) {
+        // Credentials stay cleared; the durable marker blocks login until the
+        // cookie store can be cleared. Keep the original HTTP error visible.
+        if (!notified) sessionInvalidated.value++;
+      } finally {
+        _sessionCleanup = null;
+        done.complete();
+      }
+    }());
+    return done.future;
+  }
+
+  String get updateMode => _prefs.getString('update_mode') ?? 'manual';
+  Future<bool> setUpdateMode(String value) => _prefs.setString('update_mode', value);
+  String get skippedUpdate => _prefs.getString('update_skipped') ?? '';
+  Future<bool> setSkippedUpdate(String value) => _prefs.setString('update_skipped', value);
+  String get lastUpdateCheck => _prefs.getString('update_last_check') ?? '';
+  Future<bool> setLastUpdateCheck(String value) => _prefs.setString('update_last_check', value);
 
   static Future<StorageService> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -180,8 +296,11 @@ class StorageService {
   String get webAccessToken => _prefs.getString(_keyWebAccessToken) ?? '';
   int get webAccessTokenExpiry => _prefs.getInt(_keyWebAccessTokenExpiry) ?? 0;
   Future<bool> setWebAccessToken(String token, int expiryMs) async {
-    await _prefs.setString(_keyWebAccessToken, token);
-    return _prefs.setInt(_keyWebAccessTokenExpiry, expiryMs);
+    final results = await Future.wait([
+      _prefs.setString(_keyWebAccessToken, token),
+      _prefs.setInt(_keyWebAccessTokenExpiry, expiryMs),
+    ]);
+    return results.every((ok) => ok);
   }
 
   /// 清除 Web 会话（sp_dc + 铸造的 token）。
@@ -206,17 +325,23 @@ class StorageService {
 
   /// 清除全部登录态（登出）。device_id 保留（client-token 与之绑定）。
   Future<void> clearLogin() async {
-    await _prefs.remove(_keyAuthMethod);
-    await _prefs.remove(_keyDisplayName);
-    await _prefs.remove(_keyAvatarUrl);
-    await _prefs.remove(_keyRefreshToken);
-    await _prefs.remove(_keyUsername);
-    await _prefs.remove(_keyAccessToken);
-    await _prefs.remove(_keyAccessTokenExpiry);
-    await _prefs.remove(_keyClientToken);
-    await _prefs.remove(_keyClientTokenExpiry);
-    await _prefs.remove(_keyClientTokenProfile);
-    await _prefs.remove(_keySpClientToken);
+    final results = await Future.wait([
+      _keyAuthMethod,
+      _keyDisplayName,
+      _keyAvatarUrl,
+      _keyRefreshToken,
+      _keyUsername,
+      _keyAccessToken,
+      _keyAccessTokenExpiry,
+      _keyClientToken,
+      _keyClientTokenExpiry,
+      _keyClientTokenProfile,
+      _keySpClientToken,
+      _keySpDc,
+      _keyWebAccessToken,
+      _keyWebAccessTokenExpiry,
+    ].map(_prefs.remove));
+    if (results.any((ok) => !ok)) throw StateError('无法清除登录凭据');
   }
 
   // ---------------------------------------------------------------------------

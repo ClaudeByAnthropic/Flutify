@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutify_app/services/auth/web_login_flow.dart';
+import 'package:flutify_app/services/auth/web_token_exception.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 统一登录流程：Web 登录 → 自动取凭据 → 后台无感完成桌面 OAuth。
@@ -18,6 +21,10 @@ void main() {
     bool desktopSignedIn = true,
     bool mintFails = false,
     bool beginFails = false,
+    Future<String?> Function()? readCookie,
+    Future<void> Function()? prepare,
+    Future<Uri?> Function()? begin,
+    Future<void> Function()? cancel,
   }) {
     final saved = <String>[];
     final mintCalls = <int>[];
@@ -28,21 +35,23 @@ void main() {
     var signedIn = desktopSignedIn;
 
     final flow = WebLoginFlow(
-      readSpDc: () async => cookie.isEmpty ? null : cookie,
+      readSpDc: readCookie ?? () async => cookie.isEmpty ? null : cookie,
       saveSpDc: (v) async => saved.add(v),
       prepareWebToken: () async {
         mintCalls.add(1);
+        if (prepare != null) return prepare();
         if (mintFails) throw StateError('铸造失败');
       },
       desktopSignedIn: () => signedIn,
       beginDesktopOAuth: () async {
         beginCalls.add(1);
+        if (begin != null) return begin();
         if (beginFails) throw StateError('端口被占用');
         return Uri.parse(
           'https://accounts.spotify.com/authorize?client_id=abc&state=s1',
         );
       },
-      cancelDesktopOAuth: () async {},
+      cancelDesktopOAuth: cancel ?? () async {},
       onAuthorizeUrl: authorizeUrls.add,
       onFinished: (_) => finished.add(1),
     );
@@ -124,6 +133,87 @@ void main() {
     expect(t.beginCalls, hasLength(2), reason: 'retry 应重新发起授权');
     t.flow.onDesktopAuthorized();
     expect(t.flow.stage, WebLoginStage.done);
+  });
+
+  test('Web token 401 丢弃 Cookie 并停止桌面授权，重试从 Web 登录开始', () async {
+    final t = build(
+      desktopSignedIn: false,
+      prepare: () async => throw WebTokenHttpException(401),
+    );
+    await t.flow.poll();
+    expect(t.flow.stage, WebLoginStage.failed);
+    expect(t.flow.webSignedIn, isFalse);
+    expect(t.flow.error, contains('重新登录'));
+    expect(t.beginCalls, isEmpty);
+    expect(t.finished, isEmpty);
+    await t.flow.retry();
+    expect(t.flow.stage, WebLoginStage.webSignIn);
+    expect(t.beginCalls, isEmpty);
+  });
+
+  test('会话清除后迟到的 Cookie 读取不能保存旧 Cookie', () async {
+    final cookie = Completer<String?>();
+    final t = build(readCookie: () => cookie.future);
+    final poll = t.flow.poll();
+    t.flow.invalidateSession();
+    cookie.complete('old-cookie');
+    await poll;
+    expect(t.saved, isEmpty);
+    expect(t.flow.webSignedIn, isFalse);
+    expect(t.flow.stage, WebLoginStage.failed);
+  });
+
+  test('取消后迟到的 Web token 成功不能继续桌面授权', () async {
+    final prepared = Completer<void>();
+    final preparing = Completer<void>();
+    final t = build(
+      desktopSignedIn: false,
+      prepare: () {
+        preparing.complete();
+        return prepared.future;
+      },
+    );
+    final poll = t.flow.poll();
+    await preparing.future;
+    await t.flow.cancel();
+    prepared.complete();
+    await poll;
+    expect(t.beginCalls, isEmpty);
+    expect(t.finished, isEmpty);
+  });
+
+  test('会话清除后旧授权启动异常不能覆盖重新登录提示', () async {
+    final authorization = Completer<Uri?>();
+    final starting = Completer<void>();
+    final t = build(
+      desktopSignedIn: false,
+      begin: () {
+        starting.complete();
+        return authorization.future;
+      },
+    );
+    final poll = t.flow.poll();
+    await starting.future;
+    t.flow.invalidateSession();
+    authorization.completeError(StateError('old OAuth failure'));
+    await poll;
+    expect(t.flow.error, contains('重新登录'));
+    expect(t.authorizeUrls, isEmpty);
+    expect(t.finished, isEmpty);
+  });
+
+  test('重试等待取消旧授权时若清除会话，不得重新发起授权', () async {
+    final cancelled = Completer<void>();
+    final t = build(desktopSignedIn: false, cancel: () => cancelled.future);
+    await t.flow.poll();
+    t.flow.onDesktopFailed('retry');
+    final retry = t.flow.retry();
+    t.flow.invalidateSession();
+    cancelled.complete();
+    await retry;
+    expect(t.beginCalls, hasLength(1));
+    expect(t.flow.stage, WebLoginStage.failed);
+    expect(t.flow.webSignedIn, isFalse);
   });
 
   test('beginDesktopOAuth 抛错 / 返回 null 都进 failed', () async {

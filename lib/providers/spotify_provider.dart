@@ -333,7 +333,12 @@ class SpotifyProvider extends ChangeNotifier {
               !_disposed &&
               generation == _lyricsGeneration &&
               epoch == _lyricsEpoch) {
+            // 先删再写：命中的歌排到最新；只留最近 40 首，连续播放很久也不会无限增长
+            _lyricsCache.remove(trackId);
             _lyricsCache[trackId] = resolved.lyrics;
+            while (_lyricsCache.length > 40) {
+              _lyricsCache.remove(_lyricsCache.keys.first);
+            }
             if (!_disposed) _lyricsCached.add(trackId);
           }
           return resolved.lyrics;

@@ -16,6 +16,7 @@ import 'package:flutify_app/ui/screens/settings/sections/language_section.dart';
 import 'package:flutify_app/ui/screens/settings/widgets/shortcuts_dialog.dart';
 import 'package:flutify_app/ui/navigation/tab_navigator.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -98,6 +99,15 @@ void main() {
 
   AppPreferences savedPrefs() => AppPreferences.decode(storage.preferencesJson);
 
+  Future<void> selectLanguage(WidgetTester tester, String label) async {
+    final dropdown = find.byKey(const ValueKey('interface-language'));
+    await tester.ensureVisible(dropdown);
+    await settle(tester);
+    await tester.tap(dropdown);
+    await settle(tester);
+    await tapText(tester, label);
+  }
+
   int currentTab(WidgetTester tester) => tester
       .widget<IndexedStack>(
         find
@@ -113,18 +123,18 @@ void main() {
     await pumpApp(tester);
     await openSettings(tester);
 
-    await tapText(tester, 'English');
+    await selectLanguage(tester, 'English');
     final context = tester.element(find.byType(SettingsScreen));
     expect(Localizations.localeOf(context).languageCode, 'en');
     expect(find.text('Language'), findsWidgets);
     expect(savedPrefs().language, AppLanguage.en);
 
-    await tapText(tester, '日本語');
+    await selectLanguage(tester, '日本語');
     expect(Localizations.localeOf(context).languageCode, 'ja');
     expect(find.text('アプリの言語'), findsOneWidget);
     expect(savedPrefs().language, AppLanguage.ja);
 
-    await tapText(tester, '简体中文');
+    await selectLanguage(tester, '简体中文');
     expect(find.text('语言'), findsWidgets);
     expect(savedPrefs().language, AppLanguage.zh);
   });
@@ -153,14 +163,50 @@ void main() {
           .first,
     );
     await settle(tester);
-    await tapText(tester, '日本語');
+    await selectLanguage(tester, '日本語');
     expect(savedPrefs().language, AppLanguage.ja);
     expect(find.text('アプリの言語'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tapText(tester, '简体中文');
+    await selectLanguage(tester, '简体中文');
     expect(savedPrefs().language, AppLanguage.zh);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'desktop language menu supports keyboard selection and cancel',
+    (tester) async {
+      await pumpApp(tester, size: const Size(1440, 2400));
+      await openSettings(tester);
+      final dropdown = find.byKey(const ValueKey('interface-language'));
+      await tester.ensureVisible(dropdown);
+      tester.widget<FilledButton>(dropdown).focusNode!.requestFocus();
+      await settle(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await settle(tester);
+      // Select the first item (system), then the second item (Simplified Chinese).
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await settle(tester);
+      expect(savedPrefs().language, AppLanguage.zh);
+      expect(
+        find.descendant(of: dropdown, matching: find.text('简体中文')),
+        findsOneWidget,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(savedPrefs().language, AppLanguage.zh);
+      expect(
+        find.descendant(of: dropdown, matching: find.text('简体中文')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
 
   testWidgets('lyrics, playback and Connect options apply and persist', (
     tester,

@@ -56,6 +56,12 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
   InAppWebViewController? _controller;
   late final WebLoginFlow _flow;
   AuthProvider? _auth;
+  late final WebTokenService _tokens;
+  bool _sessionRejected = false;
+  bool _webViewReady = false;
+  bool _preparingLogin = false;
+  String? _preparationError;
+  int _pageRevision = 0;
 
   Timer? _pollTimer;
   Timer? _consentTimer;
@@ -77,6 +83,7 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
   void initState() {
     super.initState();
     final tokens = context.read<WebTokenService>();
+    _tokens = tokens;
     final auth = context.read<AuthProvider?>();
     _auth = auth;
     _flow = WebLoginFlow(
@@ -100,6 +107,8 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
       ),
     );
     _flow.addListener(_onFlowChanged);
+    tokens.sessionInvalidated.addListener(_onSessionInvalidated);
+    tokens.addCookieCleanupHook(_stopRejectedWebView);
     auth?.addListener(_onAuthChanged);
     // 兜底：每 2 秒推一次流程（读 sp_dc 的轮询；跳转路径不固定，不能只靠导航事件）
     _pollTimer = Timer.periodic(
@@ -111,8 +120,8 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
       const Duration(milliseconds: 900),
       (_) => _tryAutoApprove(),
     );
-    // 立即跑一次（WebView 会话里可能已经登录过）
-    unawaited(_flow.poll());
+    // 清理上次失效会话的 Cookie 后才允许创建 WebView。
+    unawaited(_prepareLoginPage());
   }
 
   @override
@@ -122,6 +131,8 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
     _revealTimer?.cancel();
     _flow.removeListener(_onFlowChanged);
     _auth?.removeListener(_onAuthChanged);
+    _tokens.sessionInvalidated.removeListener(_onSessionInvalidated);
+    _tokens.removeCookieCleanupHook(_stopRejectedWebView);
     // 关页时放弃未完成的桌面授权，避免回环端口在后台悬挂
     unawaited(_flow.cancel());
     _flow.dispose();
@@ -143,6 +154,60 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
     setState(() {});
   }
 
+  void _onSessionInvalidated() {
+    if (!mounted || _done) return;
+    ++_pageRevision;
+    _sessionRejected = true;
+    _webViewReady = false;
+    _currentUrl = null;
+    _revealTimer?.cancel();
+    _flow.invalidateSession();
+  }
+
+  Future<void> _stopRejectedWebView() async {
+    if (!mounted || _done) return;
+    try {
+      await _controller?.stopLoading();
+    } catch (_) {}
+    // Let Flutter dispose the old login page before clearing cookies, so its
+    // pending navigation cannot immediately refill the cookie store.
+    await WidgetsBinding.instance.endOfFrame.timeout(
+      const Duration(seconds: 5),
+    );
+    _controller = null;
+  }
+
+  Future<void> _retry() => _prepareLoginPage(retry: true);
+
+  Future<void> _prepareLoginPage({bool retry = false}) async {
+    if (_preparingLogin) return;
+    final revision = _pageRevision;
+    _preparingLogin = true;
+    try {
+      await _tokens.prepareForLogin();
+      if (!mounted || _done || revision != _pageRevision) return;
+      await EmePlayer.ensureEnvironment();
+      if (!mounted || _done || revision != _pageRevision) return;
+      setState(() {
+        _sessionRejected = false;
+        _webViewReady = true;
+        _preparationError = null;
+      });
+      if (retry) await _flow.retry();
+      if (!mounted || _done || revision != _pageRevision) return;
+      await _flow.poll();
+    } catch (_) {
+      if (mounted && !_done && revision == _pageRevision) {
+        setState(() {
+          _webViewReady = false;
+          _preparationError = 'WebView Cookie 清理失败，请重试';
+        });
+      }
+    } finally {
+      _preparingLogin = false;
+    }
+  }
+
   /// AuthProvider 状态 → 流程：已登录即桌面授权完成；失败带错误信息回流程。
   void _onAuthChanged() {
     final auth = _auth;
@@ -158,6 +223,7 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
 
   /// 读 sp_dc：多来源各试一遍（cookie 域绑定可能落在 accounts 或 open 上）。
   Future<String?> _readSpDc() async {
+    if (!_webViewReady || _sessionRejected || !mounted || _done) return null;
     final manager = CookieManager.instance(
       webViewEnvironment: EmePlayer.cachedEnvironment,
     );
@@ -178,7 +244,7 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
 
   /// 桌面授权页装载进 WebView（被进度浮层盖住，用户无感）。
   void _loadAuthorizeUrl(Uri url) {
-    if (!mounted || _done) return;
+    if (!mounted || _done || _sessionRejected || !_webViewReady) return;
     setState(() {
       _revealed = false;
       _currentUrl = url.toString();
@@ -210,7 +276,7 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
   }
 
   void _onNav(String? url) {
-    if (url == null || _done) return;
+    if (url == null || _done || _sessionRejected || !_webViewReady) return;
     _currentUrl = url;
     // 回环回调到达 = 授权码已交给本机服务，等 AuthProvider 换完令牌即可
     if (!isLoopbackRedirect(url)) _tryAutoApprove();
@@ -249,12 +315,13 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
           if (stage == WebLoginStage.webSignIn) const _GoogleAccountHint(),
           if (_flow.notice != null)
             _NoticeBar(text: _flow.notice!, icon: Icons.info_outline_rounded),
-          if (stage == WebLoginStage.failed)
+          if (stage == WebLoginStage.failed || _preparationError != null)
             _NoticeBar(
-              text: _flow.error ?? context.l10n.loginFailed,
+              text:
+                  _preparationError ?? _flow.error ?? context.l10n.loginFailed,
               icon: Icons.error_outline_rounded,
               actionLabel: context.l10n.commonRetry,
-              onAction: () => _flow.retry(),
+              onAction: _retry,
             ),
           if (_revealed && _flow.waitingForDesktop)
             _NoticeBar(
@@ -264,28 +331,29 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
           Expanded(
             child: Stack(
               children: [
-                InAppWebView(
-                  // 复用 EME 的自定义环境：同一用户数据目录只允许一个环境实例，
-                  // 不传会触发插件再建环境（ERROR_INVALID_STATE）导致 WebView 创建失败
-                  webViewEnvironment: EmePlayer.cachedEnvironment,
-                  initialUrlRequest: URLRequest(
-                    url: WebUri(
-                      'https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F',
+                if (_webViewReady && !_sessionRejected)
+                  InAppWebView(
+                    // 复用 EME 的自定义环境：同一用户数据目录只允许一个环境实例，
+                    // 不传会触发插件再建环境（ERROR_INVALID_STATE）导致 WebView 创建失败
+                    webViewEnvironment: EmePlayer.cachedEnvironment,
+                    initialUrlRequest: URLRequest(
+                      url: WebUri(
+                        'https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F',
+                      ),
                     ),
+                    initialSettings: InAppWebViewSettings(
+                      disableContextMenu: true,
+                      supportZoom: false,
+                      // 伪装成纯 Chrome（去掉 WebView2 的 Edg 标识）：Google 按 UA 封嵌入
+                      // WebView（disallowed_useragent），伪装后有概率直接放行 Google 登录
+                      userAgent:
+                          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+                    ),
+                    onWebViewCreated: (controller) => _controller = controller,
+                    onUpdateVisitedHistory: (_, url, _) =>
+                        _onNav(url?.toString()),
+                    onLoadStop: (_, url) => _onNav(url?.toString()),
                   ),
-                  initialSettings: InAppWebViewSettings(
-                    disableContextMenu: true,
-                    supportZoom: false,
-                    // 伪装成纯 Chrome（去掉 WebView2 的 Edg 标识）：Google 按 UA 封嵌入
-                    // WebView（disallowed_useragent），伪装后有概率直接放行 Google 登录
-                    userAgent:
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
-                  ),
-                  onWebViewCreated: (controller) => _controller = controller,
-                  onUpdateVisitedHistory: (_, url, _) =>
-                      _onNav(url?.toString()),
-                  onLoadStop: (_, url) => _onNav(url?.toString()),
-                ),
                 if (showOverlay) _ProgressOverlay(stage: stage),
               ],
             ),

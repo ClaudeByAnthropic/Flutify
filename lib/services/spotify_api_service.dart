@@ -15,6 +15,7 @@ import '../models/track.dart';
 import '../models/track_credits.dart';
 import '../models/user_profile.dart';
 import 'auth/spotify_auth_service.dart';
+import 'auth/session_http_client.dart';
 import 'connect/connect_service.dart';
 import 'library/desktop_library_source.dart';
 import 'library/library_source.dart';
@@ -102,7 +103,7 @@ class SpotifyApiService {
   );
 
   SpotifyApiService(this._storage, [http.Client? client])
-    : _client = client ?? http.Client();
+    : _client = SessionHttpClient(_storage, client ?? http.Client());
 
   void attachAuth(SpotifyAuthService auth) => _auth = auth;
 

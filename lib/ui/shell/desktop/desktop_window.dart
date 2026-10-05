@@ -153,6 +153,12 @@ class DesktopWindow {
     ]);
   }
 
+  /// Update confirmation uses the same session-saving hooks as normal exit.
+  static Future<void> closeForUpdate() async {
+    if (!_enabled || !Platform.isWindows) return;
+    await windowManager.close();
+  }
+
   /// 把窗口带到前台（最小化时先还原）。任务栏歌词「打开 Flutify」使用。
   static Future<void> bringToFront() async {
     if (!_enabled) return;
