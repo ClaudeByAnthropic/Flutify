@@ -65,6 +65,7 @@ app.*.map.json
 /tool/probe_out/
 
 # Android Studio will place build artifacts here
+/android/build/
 /android/app/debug
 /android/app/profile
 /android/app/release
