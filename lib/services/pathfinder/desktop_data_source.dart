@@ -6,6 +6,7 @@ import '../../core/constants/spotify_endpoints.dart';
 import '../../models/album.dart';
 import '../../models/artist.dart';
 import '../../models/category.dart';
+import '../../models/catalog_page.dart';
 import '../../models/home_feed.dart';
 import '../../models/image.dart';
 import '../../models/playlist.dart';
@@ -54,7 +55,7 @@ class DesktopDataSource {
     PathfinderOperation op,
     Map<String, Object?> variables,
   ) {
-    final key = '${language?.call() ?? ''}:${op.name}:${jsonEncode(variables)}';
+    final key = _queryKey(op, variables);
     final cached = _cache[key];
     if (cached != null && DateTime.now().isBefore(cached.expiresAt))
       return cached.future;
@@ -67,6 +68,25 @@ class DesktopDataSource {
     });
     if (_cache.length > 64) _cache.remove(_cache.keys.first);
     return future;
+  }
+
+  String _queryKey(PathfinderOperation op, Map<String, Object?> variables) =>
+      '${language?.call() ?? ''}:${op.name}:${jsonEncode(variables)}';
+
+  /// A transport-successful but malformed page must not poison retries for the
+  /// cache TTL. Only parsed catalog pages are reusable as successful results.
+  Future<T> _catalogQuery<T>(
+    PathfinderOperation op,
+    Map<String, Object?> variables,
+    T Function(Map<String, dynamic>) parse,
+  ) async {
+    final key = _queryKey(op, variables);
+    try {
+      return parse(await _query(op, variables));
+    } catch (_) {
+      _cache.remove(key);
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -135,6 +155,24 @@ class DesktopDataSource {
     return PathfinderParsers.albumPage(data);
   }
 
+  Future<CatalogPage<SpotifyTrack>> albumTracksPage(
+    String id, {
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    _validatePage(offset, limit);
+    return _catalogQuery(
+      PathfinderOperation.getAlbum,
+      {
+        'uri': 'spotify:album:$id',
+        'locale': '',
+        'offset': offset,
+        'limit': limit,
+      },
+      (data) => PathfinderParsers.albumTracksPage(data, offset: offset, limit: limit),
+    );
+  }
+
   Future<({SpotifyArtist artist, List<SpotifyTrack> topTracks})?> artistPage(
     String id,
   ) async {
@@ -147,18 +185,35 @@ class DesktopDataSource {
   }
 
   Future<List<SpotifyAlbum>> artistAlbums(String id) async {
+    return (await artistAlbumsPage(id)).items;
+  }
+
+  Future<CatalogPage<SpotifyAlbum>> artistAlbumsPage(
+    String id, {
+    int offset = 0,
+    int limit = 20,
+  }) async {
+    _validatePage(offset, limit);
     // 唱片目录条目不带艺人信息：复用艺人页查询（通常已缓存）回填艺人名
     SpotifyArtist? artist;
     try {
       artist = (await artistPage(id))?.artist;
     } catch (_) {}
-    final data = await _query(PathfinderOperation.queryArtistDiscographyAll, {
-      'uri': 'spotify:artist:$id',
-      'offset': 0,
-      'limit': 20,
-      'order': 'DATE_DESC',
-    });
-    return PathfinderParsers.discography(data, artist: artist);
+    return _catalogQuery(
+      PathfinderOperation.queryArtistDiscographyAll,
+      {
+        'uri': 'spotify:artist:$id',
+        'offset': offset,
+        'limit': limit,
+        'order': 'DATE_DESC',
+      },
+      (data) => PathfinderParsers.discographyPage(
+        data,
+        artist: artist,
+        offset: offset,
+        limit: limit,
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -173,10 +228,24 @@ class DesktopDataSource {
     })
   >
   search(String term) async {
+    final page = await searchPage(term, limit: 10);
+    return (
+      tracks: page.tracks.items,
+      artists: page.artists.items,
+      playlists: page.playlists.items,
+    );
+  }
+
+  Future<SearchPage> searchPage(
+    String term, {
+    int offset = 0,
+    int limit = 20,
+  }) async {
+    _validatePage(offset, limit);
     final data = await _pathfinder.query(PathfinderOperation.searchDesktop, {
       'searchTerm': term,
-      'offset': 0,
-      'limit': 10,
+      'offset': offset,
+      'limit': limit,
       'numberOfTopResults': 5,
       'includeAudiobooks': false,
       'includeArtistHasConcertsField': false,
@@ -184,7 +253,13 @@ class DesktopDataSource {
       'includeLocalConcertsField': false,
       'includeAuthors': false,
     });
-    return PathfinderParsers.search(data);
+    return PathfinderParsers.searchPage(data, offset: offset, limit: limit);
+  }
+
+  static void _validatePage(int offset, int limit) {
+    if (offset < 0 || limit < 1 || limit > 50) {
+      throw ArgumentError('Catalog offset must be non-negative and limit 1–50');
+    }
   }
 
   // ---------------------------------------------------------------------------

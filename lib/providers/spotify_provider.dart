@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/artist.dart';
+import '../models/catalog_page.dart';
 import '../models/category.dart';
 import '../models/device.dart';
 import '../models/home_feed.dart';
@@ -16,6 +17,8 @@ import '../services/lyrics/lyrics_translation.dart';
 import '../services/cache/cache_location.dart';
 import '../services/spotify_api_service.dart';
 import '../services/storage_service.dart';
+
+enum SearchResultType { tracks, artists, playlists }
 
 /// 远端内容：主页数据、搜索、歌词与 Spotify Connect 设备。
 class SpotifyProvider extends ChangeNotifier {
@@ -44,6 +47,10 @@ class SpotifyProvider extends ChangeNotifier {
   int _searchGeneration = 0;
   String _searchQuery = '';
   bool _isSearching = false;
+  String? _searchError;
+  final Map<SearchResultType, int> _searchNextOffsets = {};
+  final Set<SearchResultType> _searchLoadingMore = {};
+  final Map<SearchResultType, String> _searchPageErrors = {};
   List<SpotifyTrack> _searchTracks = [];
   List<SpotifyArtist> _searchArtists = [];
   List<SpotifyPlaylist> _searchPlaylists = [];
@@ -88,6 +95,13 @@ class SpotifyProvider extends ChangeNotifier {
 
   String get searchQuery => _searchQuery;
   bool get isSearching => _isSearching;
+  String? get searchError => _searchError;
+  bool get searchRequiresSignIn => _searchError != null && !_api.isConfigured;
+  bool searchHasMore(SearchResultType type) =>
+      _searchNextOffsets.containsKey(type);
+  bool isLoadingMoreSearch(SearchResultType type) =>
+      _searchLoadingMore.contains(type);
+  String? searchPageError(SearchResultType type) => _searchPageErrors[type];
   List<SpotifyTrack> get searchTracks => _searchTracks;
   List<SpotifyArtist> get searchArtists => _searchArtists;
   List<SpotifyPlaylist> get searchPlaylists => _searchPlaylists;
@@ -188,40 +202,127 @@ class SpotifyProvider extends ChangeNotifier {
 
   /// 输入时调用：300ms 防抖，并丢弃过期请求的返回结果（避免乱序覆盖）。
   void performSearch(String query) {
+    if (_disposed) return;
     _searchTimer?.cancel();
     _searchQuery = query;
     final generation = ++_searchGeneration;
-
-    if (query.trim().isEmpty) {
-      _searchTracks = [];
-      _searchArtists = [];
-      _searchPlaylists = [];
-      _isSearching = false;
-      notifyListeners();
-      return;
-    }
-
-    if (!_isSearching) {
-      _isSearching = true;
-      notifyListeners();
-    }
-
+    _searchTracks = [];
+    _searchArtists = [];
+    _searchPlaylists = [];
+    _searchNextOffsets.clear();
+    _searchLoadingMore.clear();
+    _searchPageErrors.clear();
+    _searchError = null;
+    _isSearching = query.trim().isNotEmpty;
+    notifyListeners();
+    if (!_isSearching) return;
     _searchTimer = Timer(_searchDebounce, () => _runSearch(query, generation));
   }
 
   Future<void> _runSearch(String query, int generation) async {
-    Map<String, List<dynamic>> results = const {};
+    SearchPage? results;
+    String? error;
     try {
-      results = await _api.search(query);
-    } catch (_) {}
+      results = await _api.searchPage(query);
+    } catch (e) {
+      error = e.toString();
+    }
 
     if (_disposed || generation != _searchGeneration) return;
-
-    _searchTracks = results['tracks']?.cast<SpotifyTrack>() ?? [];
-    _searchArtists = results['artists']?.cast<SpotifyArtist>() ?? [];
-    _searchPlaylists = results['playlists']?.cast<SpotifyPlaylist>() ?? [];
+    if (results != null) _applySearchPage(results);
+    _searchError = error;
     _isSearching = false;
     notifyListeners();
+  }
+
+  /// 只重试失败的首屏；各类型后续页仍通过 [loadMoreSearch] 重试。
+  Future<void> retrySearch() async {
+    if (_disposed || _isSearching || _searchError == null) return;
+    _isSearching = true;
+    _searchError = null;
+    final generation = ++_searchGeneration;
+    notifyListeners();
+    await _runSearch(_searchQuery, generation);
+  }
+
+  /// 各类型独立分页；失败保留已有结果与游标，重试仍取同一页。
+  Future<void> loadMoreSearch(SearchResultType type) async {
+    if (_disposed || _isSearching || _searchLoadingMore.contains(type)) return;
+    final offset = _searchNextOffsets[type];
+    if (offset == null) return;
+    final generation = _searchGeneration;
+    _searchLoadingMore.add(type);
+    _searchPageErrors.remove(type);
+    notifyListeners();
+    SearchPage? page;
+    String? error;
+    try {
+      page = await _api.searchPage(
+        _searchQuery,
+        offset: offset,
+        type: type.name,
+      );
+    } catch (e) {
+      error = e.toString();
+    }
+    if (_disposed || generation != _searchGeneration) return;
+    if (page != null) _applySearchPage(page, type: type, offset: offset);
+    if (error != null) _searchPageErrors[type] = error;
+    _searchLoadingMore.remove(type);
+    notifyListeners();
+  }
+
+  void _applySearchPage(
+    SearchPage page, {
+    SearchResultType? type,
+    int offset = 0,
+  }) {
+    void updateOffset(SearchResultType type, int? nextOffset) {
+      // 服务端偏移量按原始条目计数，不能用去重后的 UI 列表长度代替。
+      if (nextOffset != null && nextOffset > offset) {
+        _searchNextOffsets[type] = nextOffset;
+      } else {
+        _searchNextOffsets.remove(type);
+      }
+    }
+
+    if (type == null || type == SearchResultType.tracks) {
+      _searchTracks = _mergeSearchResults(
+        _searchTracks,
+        page.tracks.items,
+        (t) => t.id.isNotEmpty ? t.id : t.uri,
+      );
+      updateOffset(SearchResultType.tracks, page.tracks.nextOffset);
+    }
+    if (type == null || type == SearchResultType.artists) {
+      _searchArtists = _mergeSearchResults(
+        _searchArtists,
+        page.artists.items,
+        (a) => a.id.isNotEmpty ? a.id : a.uri,
+      );
+      updateOffset(SearchResultType.artists, page.artists.nextOffset);
+    }
+    if (type == null || type == SearchResultType.playlists) {
+      _searchPlaylists = _mergeSearchResults(
+        _searchPlaylists,
+        page.playlists.items,
+        (p) => p.id.isNotEmpty ? p.id : p.uri,
+      );
+      updateOffset(SearchResultType.playlists, page.playlists.nextOffset);
+    }
+  }
+
+  List<T> _mergeSearchResults<T>(
+    List<T> current,
+    List<T> incoming,
+    String Function(T) idOf,
+  ) {
+    final seen = current.map(idOf).where((id) => id.isNotEmpty).toSet();
+    return [
+      ...current,
+      for (final item in incoming)
+        if (idOf(item).isEmpty || seen.add(idOf(item))) item,
+    ];
   }
 
   /// 用户确认搜索（回车或点击结果）时记录历史。

@@ -335,6 +335,12 @@ abstract class AppLocalizations {
   /// **'重试'**
   String get commonRetry;
 
+  /// 分页列表加载下一页的按钮
+  ///
+  /// In zh, this message translates to:
+  /// **'加载更多'**
+  String get commonLoadMore;
+
   /// No description provided for @commonMoreOptions.
   ///
   /// In zh, this message translates to:
@@ -695,6 +701,18 @@ abstract class AppLocalizations {
   /// **'请检查网络连接后重试。'**
   String get searchCategoriesFailedMessage;
 
+  /// 搜索请求失败的标题，与没有匹配结果区分
+  ///
+  /// In zh, this message translates to:
+  /// **'无法加载搜索结果'**
+  String get searchFailedTitle;
+
+  /// 搜索首次加载或续页失败时的提示
+  ///
+  /// In zh, this message translates to:
+  /// **'请检查网络连接后重试，已加载的结果会保留。'**
+  String get searchFailedMessage;
+
   /// No description provided for @searchNoResultsTitle.
   ///
   /// In zh, this message translates to:
@@ -844,6 +862,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'暂无热门歌曲。'**
   String get artistNoPopular;
+
+  /// 艺人专辑二级页面的空列表提示
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无可显示的专辑。'**
+  String get artistNoAlbums;
+
+  /// 艺人歌曲二级页面的空列表提示
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无可显示的歌曲。'**
+  String get artistNoSongs;
 
   /// No description provided for @artistDiscography.
   ///

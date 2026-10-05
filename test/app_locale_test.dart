@@ -8,6 +8,24 @@ void main() {
   tearDown(() => AppLocale.resolved(const Locale('zh', 'CN')));
 
   test(
+    'catalog pagination and search errors are localized in every locale',
+    () async {
+      for (final locale in AppLocale.supportedLocales) {
+        final strings = await AppLocalizations.delegate.load(locale);
+        expect(strings.commonLoadMore, isNotEmpty);
+        expect(strings.searchFailedTitle, isNotEmpty);
+        expect(strings.searchFailedMessage, isNotEmpty);
+        expect(strings.artistNoAlbums, isNotEmpty);
+        expect(strings.artistNoSongs, isNotEmpty);
+        expect(
+          strings.searchFailedTitle,
+          isNot(strings.searchNoResultsTitle('query')),
+        );
+      }
+    },
+  );
+
+  test(
     'Japanese resolves from system, persists and localizes Spotify',
     () async {
       final locale = basicLocaleListResolution([

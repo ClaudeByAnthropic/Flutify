@@ -132,6 +132,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonRetry => '重试';
 
   @override
+  String get commonLoadMore => '加载更多';
+
+  @override
   String get commonMoreOptions => '更多选项';
 
   @override
@@ -339,6 +342,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchCategoriesFailedMessage => '请检查网络连接后重试。';
 
   @override
+  String get searchFailedTitle => '无法加载搜索结果';
+
+  @override
+  String get searchFailedMessage => '请检查网络连接后重试，已加载的结果会保留。';
+
+  @override
   String searchNoResultsTitle(String query) {
     return '未找到与“$query”相关的结果';
   }
@@ -422,6 +431,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get artistNoPopular => '暂无热门歌曲。';
+
+  @override
+  String get artistNoAlbums => '暂无可显示的专辑。';
+
+  @override
+  String get artistNoSongs => '暂无可显示的歌曲。';
 
   @override
   String get artistDiscography => '作品';
@@ -1839,6 +1854,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get commonRetry => '重試';
 
   @override
+  String get commonLoadMore => '載入更多';
+
+  @override
   String get commonMoreOptions => '更多選項';
 
   @override
@@ -2046,6 +2064,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchCategoriesFailedMessage => '請檢查網路連接后重試。';
 
   @override
+  String get searchFailedTitle => '無法載入搜尋結果';
+
+  @override
+  String get searchFailedMessage => '請檢查網路連線後重試，已載入的結果會保留。';
+
+  @override
   String searchNoResultsTitle(String query) {
     return '未找到與“$query”相關的結果';
   }
@@ -2129,6 +2153,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get artistNoPopular => '暫無熱門歌曲。';
+
+  @override
+  String get artistNoAlbums => '暫無可顯示的專輯。';
+
+  @override
+  String get artistNoSongs => '暫無可顯示的歌曲。';
 
   @override
   String get artistDiscography => '作品';

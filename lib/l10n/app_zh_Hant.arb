@@ -58,6 +58,7 @@
   "commonClear": "清除",
   "commonRemove": "移除",
   "commonRetry": "重試",
+  "commonLoadMore": "載入更多",
   "commonMoreOptions": "更多選項",
   "commonShowAll": "顯示全部",
   "commonSeeMore": "查看更多",
@@ -189,6 +190,8 @@
   "searchBrowseAll": "瀏覽全部",
   "searchCategoriesFailedTitle": "無法載入分類",
   "searchCategoriesFailedMessage": "請檢查網路連接后重試。",
+  "searchFailedTitle": "無法載入搜尋結果",
+  "searchFailedMessage": "請檢查網路連線後重試，已載入的結果會保留。",
   "searchNoResultsTitle": "未找到與“{query}”相關的結果",
   "@searchNoResultsTitle": {
     "placeholders": {
@@ -249,6 +252,8 @@
   },
   "artistPopular": "熱門歌曲",
   "artistNoPopular": "暫無熱門歌曲。",
+  "artistNoAlbums": "暫無可顯示的專輯。",
+  "artistNoSongs": "暫無可顯示的歌曲。",
   "artistDiscography": "作品",
   "artistFollow": "關注",
   "artistFollowing": "已關注",

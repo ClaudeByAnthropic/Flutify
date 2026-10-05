@@ -5,8 +5,10 @@ import '../../models/artist.dart';
 import '../../models/category.dart';
 import '../../models/home_feed.dart';
 import '../../models/playlist.dart';
+import '../../models/track.dart';
 import '../screens/detail/album_detail_screen.dart';
 import '../screens/detail/artist_detail_screen.dart';
+import '../screens/detail/artist_catalog_screen.dart';
 import '../screens/detail/playlist_detail_screen.dart';
 import '../screens/detail/podcast_detail_screen.dart';
 import '../screens/home/home_section_screen.dart';
@@ -31,6 +33,25 @@ class AppRoutes {
 
   static void openArtist(BuildContext context, SpotifyArtist artist) =>
       _push(context, ArtistDetailScreen(artist: artist));
+
+  static void openArtistAlbums(BuildContext context, SpotifyArtist artist) =>
+      _push(
+        context,
+        ArtistCatalogScreen(artist: artist, kind: ArtistCatalogKind.albums),
+      );
+
+  static void openArtistSongs(
+    BuildContext context,
+    SpotifyArtist artist, {
+    List<SpotifyTrack> initialTracks = const [],
+  }) => _push(
+    context,
+    ArtistCatalogScreen(
+      artist: artist,
+      kind: ArtistCatalogKind.songs,
+      initialTracks: initialTracks,
+    ),
+  );
 
   /// 播客节目页。[showUri] 为 `spotify:show:xxx`；[initialTitle] / [initialCover] 来自卡片，加载前先展示。
   static void openPodcast(

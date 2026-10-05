@@ -133,6 +133,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonRetry => 'Retry';
 
   @override
+  String get commonLoadMore => 'Load more';
+
+  @override
   String get commonMoreOptions => 'More options';
 
   @override
@@ -344,6 +347,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Check your connection and try again.';
 
   @override
+  String get searchFailedTitle => 'Couldn\'t load search results';
+
+  @override
+  String get searchFailedMessage =>
+      'Check your connection and try again. Your loaded results will stay here.';
+
+  @override
   String searchNoResultsTitle(String query) {
     return 'No results found for \"$query\"';
   }
@@ -432,6 +442,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get artistNoPopular => 'No popular tracks yet.';
+
+  @override
+  String get artistNoAlbums => 'No albums available yet.';
+
+  @override
+  String get artistNoSongs => 'No songs available yet.';
 
   @override
   String get artistDiscography => 'Discography';
