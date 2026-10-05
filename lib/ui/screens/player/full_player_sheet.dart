@@ -20,6 +20,7 @@ import '../../widgets/connect/connect_actions.dart';
 import '../../widgets/connect/remote_progress.dart';
 import '../../widgets/connect/remote_transport_controls.dart';
 import '../../widgets/liquid_glass.dart';
+import '../../widgets/marquee_text.dart';
 import '../../widgets/playback_scrubber.dart';
 import '../../widgets/player_controls.dart';
 import '../../widgets/track_menu.dart';
@@ -31,6 +32,7 @@ import 'lyrics/lyrics_view.dart';
 import 'lyrics/lyrics_translation_controls.dart';
 import 'queue_list.dart';
 import 'player_modal.dart';
+import 'player_expansion.dart';
 import 'widgets/swipeable_artwork.dart';
 import 'widgets/canvas_artwork.dart';
 
@@ -49,10 +51,15 @@ enum _PlayerView { artwork, lyrics, queue }
 /// 本组件只在切歌或播放上下文变化时重建；进度条、播放按钮、随机/循环、
 /// 点赞按钮均为独立订阅的子组件。
 class FullPlayerSheet extends StatefulWidget {
-  const FullPlayerSheet({super.key, this.fullscreen = false});
+  const FullPlayerSheet({
+    super.key,
+    this.fullscreen = false,
+    this.expansionAnimation,
+  });
 
   /// Presentation is selected when opening the route; resizing does not change it.
   final bool fullscreen;
+  final Animation<double>? expansionAnimation;
 
   /// 根据窗口宽度选择以底部面板或对话框形式打开。
   static Future<void> show(BuildContext context) => PlayerModal.show(context, (
@@ -73,6 +80,50 @@ class FullPlayerSheet extends StatefulWidget {
             child: SizedBox(width: 420, height: 720, child: FullPlayerSheet()),
           );
         },
+      );
+    }
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      final origin = PlayerExpansionSource.capture(context);
+      final reduceMotion = context.reduceMotion;
+      final themes = InheritedTheme.capture(
+        from: context,
+        to: Navigator.of(context, rootNavigator: true).context,
+      );
+      return Navigator.of(context, rootNavigator: true).push<void>(
+        PageRouteBuilder<void>(
+          opaque: false,
+          fullscreenDialog: true,
+          barrierColor: Colors.black26,
+          transitionDuration: context.motion(PlayerExpansionMotion.duration),
+          reverseTransitionDuration: context.motion(
+            PlayerExpansionMotion.reverseDuration,
+          ),
+          pageBuilder: (sheetContext, animation, secondaryAnimation) {
+            captureRoute(sheetContext);
+            final media = MediaQuery.of(sheetContext);
+            return themes.wrap(
+              MediaQuery(
+                data: media.copyWith(
+                  padding: media.viewPadding,
+                  disableAnimations: reduceMotion,
+                ),
+                child: FullPlayerSheet(
+                  fullscreen: true,
+                  expansionAnimation: animation,
+                ),
+              ),
+            );
+          },
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              Material(
+                type: MaterialType.transparency,
+                child: PlayerExpansionTransition(
+                  animation: animation,
+                  origin: origin,
+                  child: child,
+                ),
+              ),
+        ),
       );
     }
     return showModalBottomSheet(
@@ -106,6 +157,7 @@ class FullPlayerSheet extends StatefulWidget {
 
 class _FullPlayerSheetState extends State<FullPlayerSheet> {
   _PlayerView _view = _PlayerView.artwork;
+  double _dismissDragDistance = 0;
 
   void _toggle(_PlayerView view) =>
       setState(() => _view = _view == view ? _PlayerView.artwork : view);
@@ -163,12 +215,17 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
     }
     final lyricsMode = _view == _PlayerView.lyrics;
 
-    return ClipRRect(
+    final content = ClipRRect(
       borderRadius: topRadius,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          _GradientBackground(imageUrl: track.coverUrl),
+          PlayerExpansionReveal(
+            animation: widget.expansionAnimation,
+            start: 0,
+            rise: 0,
+            child: _GradientBackground(imageUrl: track.coverUrl),
+          ),
           // 歌词视图：背景交叉淡入为流动封面（与全屏歌词一致的液态玻璃观感）
           AnimatedSwitcher(
             duration: context.motion(const Duration(milliseconds: 420)),
@@ -188,20 +245,38 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
                   view: _view,
                   track: track,
                   remote: remote,
+                  morphArtwork: androidFullscreen,
                 );
                 final column = Column(
                   children: [
-                    _TopBar(track: track, playbackContext: playbackContext),
+                    PlayerExpansionReveal(
+                      animation: widget.expansionAnimation,
+                      start: 0.04,
+                      rise: 0.25,
+                      child: _TopBar(
+                        track: track,
+                        playbackContext: playbackContext,
+                      ),
+                    ),
                     if (compact)
                       SizedBox(height: 200, child: middle)
                     else
                       Expanded(child: middle),
-                    _ControlsGroup(
-                      track: track,
-                      glass: lyricsMode,
-                      remote: remote,
+                    PlayerExpansionReveal(
+                      animation: widget.expansionAnimation,
+                      opacityKey: const ValueKey('player-expansion-controls'),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _ControlsGroup(
+                            track: track,
+                            glass: lyricsMode,
+                            remote: remote,
+                          ),
+                          _BottomBar(view: _view, onToggle: _toggle),
+                        ],
+                      ),
                     ),
-                    _BottomBar(view: _view, onToggle: _toggle),
                   ],
                 );
 
@@ -222,6 +297,22 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
         ],
       ),
     );
+    return androidFullscreen
+        ? GestureDetector(
+            onVerticalDragStart: (_) => _dismissDragDistance = 0,
+            onVerticalDragUpdate: (details) =>
+                _dismissDragDistance += details.delta.dy,
+            onVerticalDragCancel: () => _dismissDragDistance = 0,
+            onVerticalDragEnd: (details) {
+              if (_dismissDragDistance > 100 ||
+                  (details.primaryVelocity ?? 0) > 600) {
+                Navigator.maybePop(context);
+              }
+              _dismissDragDistance = 0;
+            },
+            child: content,
+          )
+        : content;
   }
 }
 
@@ -324,11 +415,13 @@ class _Middle extends StatelessWidget {
   final _PlayerView view;
   final SpotifyTrack track;
   final bool remote;
+  final bool morphArtwork;
 
   const _Middle({
     required this.view,
     required this.track,
     required this.remote,
+    this.morphArtwork = false,
   });
 
   @override
@@ -344,16 +437,18 @@ class _Middle extends StatelessWidget {
               final size = (box.maxWidth * 0.86)
                   .clamp(140.0, 400.0)
                   .clamp(0.0, box.maxHeight * 0.9);
+              final artwork = SwipeableArtwork(
+                url: track.coverUrl,
+                size: size,
+                child: CanvasArtwork(track: track, size: size, remote: remote),
+              );
               return Center(
-                child: SwipeableArtwork(
-                  url: track.coverUrl,
-                  size: size,
-                  child: CanvasArtwork(
-                    track: track,
-                    size: size,
-                    remote: remote,
-                  ),
-                ),
+                child: morphArtwork
+                    ? PlayerArtworkHero(
+                        imageUrl: track.coverUrl,
+                        child: artwork,
+                      )
+                    : artwork,
               );
             },
           ),
@@ -493,15 +588,13 @@ class _TitleRow extends StatelessWidget {
               children: [
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
-                  child: Text(
-                    track.name,
+                  child: MarqueeText(
+                    text: track.name,
                     key: ValueKey(track.id),
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(height: 3),

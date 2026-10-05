@@ -9,9 +9,11 @@ import '../../providers/connect_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../screens/player/device_picker_sheet.dart';
 import '../screens/player/full_player_sheet.dart';
+import '../screens/player/player_expansion.dart';
 import 'connect/connect_actions.dart';
 import 'connect/remote_mini_player.dart';
 import 'cover_image.dart';
+import 'marquee_text.dart';
 import 'playback_scrubber.dart';
 import 'player_controls.dart';
 
@@ -28,7 +30,9 @@ class MiniPlayer extends StatelessWidget {
   Widget build(BuildContext context) {
     // 正在遥控其他设备时换成远程胶囊
     if (ConnectActions.showRemote(context)) return const RemoteMiniPlayer();
-    final track = context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
+    final track = context.select<PlaybackProvider, SpotifyTrack?>(
+      (p) => p.currentTrack,
+    );
     if (track == null) return const SizedBox.shrink();
 
     // 方正风格下胶囊换成 16px 圆角矩形，其余风格保持胶囊
@@ -43,46 +47,62 @@ class MiniPlayer extends StatelessWidget {
       fallback: const Color(0xFF3A3A42),
       builder: (context, artColor) {
         final background = Color.lerp(artColor, Colors.black, 0.35)!;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeOut,
-          margin: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-          decoration: ShapeDecoration(
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+          child: PlayerExpansionSource(
+            key: const ValueKey('mini-player-expansion-source'),
             color: background,
-            shape: shape,
-            shadows: [BoxShadow(color: Colors.black.withAlpha(90), blurRadius: 20, offset: const Offset(0, 6))],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              customBorder: shape,
-              onTap: () => FullPlayerSheet.show(context),
-              child: GestureDetector(
-                onHorizontalDragEnd: (details) {
-                  final v = details.primaryVelocity ?? 0;
-                  if (v.abs() < 300) return;
-                  final playback = context.read<PlaybackProvider>();
-                  v < 0 ? playback.nextTrack() : playback.previousTrack();
-                },
-                child: Stack(
-                  children: [
-                    _MiniPlayerRow(track: track),
-                    // 细进度线：左右内缩到胶囊直线段内，避开两端圆弧
-                    Positioned(
-                      left: 28,
-                      right: 28,
-                      bottom: 3,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(1),
-                        child: PlaybackProgressLine(
-                          height: 2,
-                          color: Colors.white,
-                          backgroundColor: Colors.white.withAlpha(40),
+            borderRadius: tokens.squareCorners
+                ? tokens.radius(16)
+                : BorderRadius.circular(32),
+            compactChild: _MiniPlayerRow(track: track, showArtwork: false),
+            child: AnimatedContainer(
+              duration: context.motion(const Duration(milliseconds: 400)),
+              curve: PlayerExpansionMotion.curve,
+              decoration: ShapeDecoration(
+                color: background,
+                shape: shape,
+                shadows: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(90),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  customBorder: shape,
+                  onTap: () => FullPlayerSheet.show(context),
+                  child: GestureDetector(
+                    onHorizontalDragEnd: (details) {
+                      final v = details.primaryVelocity ?? 0;
+                      if (v.abs() < 300) return;
+                      final playback = context.read<PlaybackProvider>();
+                      v < 0 ? playback.nextTrack() : playback.previousTrack();
+                    },
+                    child: Stack(
+                      children: [
+                        _MiniPlayerRow(track: track),
+                        // 细进度线：左右内缩到胶囊直线段内，避开两端圆弧
+                        Positioned(
+                          left: 28,
+                          right: 28,
+                          bottom: 3,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(1),
+                            child: PlaybackProgressLine(
+                              height: 2,
+                              color: Colors.white,
+                              backgroundColor: Colors.white.withAlpha(40),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -95,8 +115,9 @@ class MiniPlayer extends StatelessWidget {
 
 class _MiniPlayerRow extends StatelessWidget {
   final SpotifyTrack track;
+  final bool showArtwork;
 
-  const _MiniPlayerRow({required this.track});
+  const _MiniPlayerRow({required this.track, this.showArtwork = true});
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +138,17 @@ class _MiniPlayerRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(7, 7, 8, 9),
           child: Row(
             children: [
-              CoverImage(url: track.coverUrl, size: 44, circular: true),
+              if (showArtwork)
+                PlayerArtworkHero(
+                  imageUrl: track.coverUrl,
+                  child: CoverImage(
+                    url: track.coverUrl,
+                    size: 44,
+                    circular: true,
+                  ),
+                )
+              else
+                const SizedBox(width: 44, height: 44),
               const SizedBox(width: 12),
 
               // 歌名 / 艺人（或当前 Connect 设备）
@@ -129,16 +160,21 @@ class _MiniPlayerRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        track.name,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      MarqueeText(
+                        key: PlayerExpansionSource.titleKey(context, track.id),
+                        text: track.name,
+                        edgeFadeInset: 4,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         track.artistNames,
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white70,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -152,7 +188,9 @@ class _MiniPlayerRow extends StatelessWidget {
                   tooltip: activeDeviceName ?? context.l10n.deviceConnectTitle,
                   icon: Icon(
                     Icons.devices_rounded,
-                    color: activeDeviceName != null ? colorScheme.primary : Colors.white70,
+                    color: activeDeviceName != null
+                        ? colorScheme.primary
+                        : Colors.white70,
                     size: 20,
                   ),
                   onPressed: () => DevicePickerSheet.show(context),
@@ -160,7 +198,12 @@ class _MiniPlayerRow extends StatelessWidget {
 
               if (showLike) LikeButton(track: track, size: 22),
 
-              const PlayPauseButton(size: 40, iconSize: 26, background: Colors.transparent, foreground: Colors.white),
+              const PlayPauseButton(
+                size: 40,
+                iconSize: 26,
+                background: Colors.transparent,
+                foreground: Colors.white,
+              ),
             ],
           ),
         );
