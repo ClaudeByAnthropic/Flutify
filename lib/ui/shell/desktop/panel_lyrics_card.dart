@@ -9,6 +9,7 @@ import '../../screens/player/lyrics/lyrics_backdrop.dart';
 import '../../screens/player/lyrics/lyrics_view.dart';
 import '../../screens/player/lyrics/lyrics_translation_controls.dart';
 import '../../widgets/cover_image.dart';
+import '../../widgets/marquee_text.dart';
 import '../shell_layout_controller.dart';
 
 /// 右栏「正在播放」面板里的歌词卡：与全屏歌词同一套液态玻璃观感（流动封面背景 + 白色对焦歌词）。
@@ -154,10 +155,8 @@ class _TrackLabel extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                track.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              MarqueeText(
+                text: track.name,
                 style: textTheme.labelLarge?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
