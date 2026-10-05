@@ -227,7 +227,9 @@ class UpdateService extends ChangeNotifier {
       if (matches.length != 1) throw const FormatException('Missing or duplicate update checksum');
       final digest = matches.single[1]!.toLowerCase();
       if (_disposed || generation != _generation) return;
-      final directory = await (await installer.downloadDirectory()).createTemp('download-');
+      final root = await installer.downloadDirectory();
+      await root.create(recursive: true);
+      final directory = await root.createTemp('download-');
       final file = File(p.join(directory.path, asset.name));
       var lastNotify = DateTime.fromMillisecondsSinceEpoch(0);
       await downloader.download(url: asset.url, size: asset.size, sha256Hex: digest, destination: file,
