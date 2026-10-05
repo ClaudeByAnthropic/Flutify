@@ -11,6 +11,7 @@ class GlassIconButton extends StatelessWidget {
   final double size;
   final bool glass;
   final bool? selected;
+  final BorderRadius? borderRadius;
 
   const GlassIconButton({
     super.key,
@@ -20,10 +21,12 @@ class GlassIconButton extends StatelessWidget {
     this.size = 40,
     this.glass = true,
     this.selected,
+    this.borderRadius,
   });
 
   @override
   Widget build(BuildContext context) {
+    final radius = borderRadius ?? BorderRadius.circular(size / 2);
     final button = Semantics(
       toggled: selected,
       child: AnimatedContainer(
@@ -33,23 +36,21 @@ class GlassIconButton extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           color: selected == true ? Colors.white : Colors.transparent,
-          shape: BoxShape.circle,
+          borderRadius: radius,
         ),
         child: IconButton(
           icon: Icon(icon, size: size * 0.45),
           color: selected == true ? Colors.black87 : Colors.white,
           tooltip: tooltip,
           padding: EdgeInsets.zero,
+          style: IconButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: radius),
+          ),
           isSelected: selected,
           onPressed: onPressed,
         ),
       ),
     );
-    return glass
-        ? LiquidGlass(
-            borderRadius: BorderRadius.circular(size / 2),
-            child: button,
-          )
-        : button;
+    return glass ? LiquidGlass(borderRadius: radius, child: button) : button;
   }
 }

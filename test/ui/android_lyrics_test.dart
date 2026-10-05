@@ -14,11 +14,13 @@ import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/screens/player/full_player_sheet.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/breathing_dots.dart';
+import 'package:flutify_app/ui/screens/player/lyrics/lyric_line_view.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/lyrics_translation_controls.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/lyrics_view.dart';
 import 'package:flutify_app/ui/screens/player/lyrics_sheet.dart';
 import 'package:flutify_app/ui/screens/settings/sections/lyrics_section.dart';
 import 'package:flutify_app/ui/screens/settings/widgets/settings_section.dart';
+import 'package:flutify_app/ui/widgets/liquid_glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -287,11 +289,14 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  for (final sheet in ['full player', 'lyrics sheet']) {
+  for (final (sheet, width) in [
+    for (final width in [320.0, 390.0, 600.0])
+      for (final sheet in ['full player', 'lyrics sheet']) (sheet, width),
+  ]) {
     testWidgets(
-      'Android $sheet shows the intro and bilingual lyrics',
+      'Android $sheet shows the intro and bilingual lyrics at ${width}px',
       (tester) async {
-        tester.view.physicalSize = const Size(320, 844);
+        tester.view.physicalSize = Size(width, 844);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         final paletteEnabled = ArtworkPalette.enabled;
@@ -345,11 +350,33 @@ void main() {
             of: find.byType(LyricsSheet),
             matching: find.text(track.name),
           );
-          expect(buttonRect.bottom, lessThan(tester.getRect(title).top));
-          expect(buttonRect.left, lessThan(tester.getRect(title).left));
+          final cardRect = tester.getRect(
+            find.ancestor(of: title, matching: find.byType(LiquidGlass)).first,
+          );
+          expect(buttonRect.right, closeTo(cardRect.right, 0.1));
+          expect(cardRect.top - buttonRect.bottom, closeTo(6, 0.1));
         } else {
-          expect(buttonRect.left, lessThan(40));
+          final lyricsRect = tester.getRect(
+            find.descendant(
+              of: find.byType(FullPlayerSheet),
+              matching: find.byType(LyricsView),
+            ),
+          );
+          expect(buttonRect.right, closeTo(lyricsRect.right - 12, 0.1));
         }
+        expect(buttonRect.width, greaterThanOrEqualTo(48));
+        expect(buttonRect.height, buttonRect.width);
+        final decoration =
+            tester
+                    .widget<AnimatedContainer>(
+                      find.descendant(
+                        of: find.byType(LyricsTranslationButton),
+                        matching: find.byType(AnimatedContainer),
+                      ),
+                    )
+                    .decoration
+                as BoxDecoration;
+        expect(decoration.borderRadius, BorderRadius.circular(12));
         expect(tester.takeException(), isNull);
         await tester.tap(find.byType(LyricsTranslationButton));
         for (var frame = 0; frame < 8; frame++) {
@@ -590,6 +617,87 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final frameDuration in [
+    const Duration(microseconds: 16667),
+    const Duration(microseconds: 8333),
+  ]) {
+    testWidgets(
+      'Android translated lyric focus is stable at paint time (${frameDuration.inMicroseconds} us)',
+      (tester) async {
+        final source = SpotifyLyrics(
+          language: 'en',
+          lines: List.generate(
+            24,
+            (index) => LyricLine(
+              startTimeMs: index * 5000,
+              words: 'Original line $index',
+            ),
+          ),
+          alternatives: [
+            LyricsAlternative(
+              language: 'zh-Hans',
+              lines: List.generate(
+                24,
+                (index) => '第 $index 句的多行译文\n译文的第二行\n译文的第三行',
+              ),
+            ),
+          ],
+        );
+        final (_, playback) = await pumpLyrics(
+          tester,
+          width: 320,
+          source: source,
+        );
+        playback.positionNotifier.value = const Duration(seconds: 61);
+        await tester.pumpAndSettle();
+        final original = find.text('Original line 12');
+        final row = find.ancestor(
+          of: original,
+          matching: find.byType(LyricLineView),
+        );
+        final collapsedY = tester.getTopLeft(original).dy + 9;
+        final paintErrors = <double>[];
+        var samplePaint = true;
+        addTearDown(() => samplePaint = false);
+        tester.binding.addPersistentFrameCallback((_) {
+          if (!samplePaint) return;
+          final progress = tester
+              .widget<LyricLineView>(row)
+              .translationProgress;
+          final expectedY = collapsedY - 9 * progress;
+          paintErrors.add((tester.getTopLeft(original).dy - expectedY).abs());
+        });
+        for (var toggle = 0; toggle < 3; toggle++) {
+          await tester.tap(find.byType(LyricsTranslationButton));
+          await tester.pump();
+          for (var frame = 0; frame < 75; frame++) {
+            await tester.pump(frameDuration);
+          }
+        }
+        await tester.tap(find.byType(LyricsTranslationButton));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 80));
+        await tester.tap(find.byType(LyricsTranslationButton));
+        await tester.pump();
+        for (var frame = 0; frame < 75; frame++) {
+          await tester.pump(frameDuration);
+        }
+        samplePaint = false;
+        expect(paintErrors, isNotEmpty);
+        expect(
+          paintErrors.reduce(
+            (first, second) => first > second ? first : second,
+          ),
+          lessThan(0.1),
+          reason:
+              'Scroll reflow must be compensated before painting each frame',
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 
   testWidgets(
     'Android lyrics tolerate a first viewport shorter than the header',

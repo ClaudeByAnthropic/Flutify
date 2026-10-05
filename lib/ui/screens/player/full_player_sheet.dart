@@ -385,14 +385,13 @@ class _InlineLyrics extends StatelessWidget {
               key: ValueKey((track.id, remote)),
               track: track,
               remote: remote,
-              topInset: 40,
+              topInset: 56,
               bottomInset: 8,
             ),
           ),
           Positioned(
             top: 0,
-            left: isDesktop ? null : 12,
-            right: isDesktop ? 12 : null,
+            right: 12,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
