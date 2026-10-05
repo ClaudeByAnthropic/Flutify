@@ -41,70 +41,74 @@ class PanelLyricsCard extends StatelessWidget {
       key: ValueKey((track.id, remote)),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            LyricsBackdrop(imageUrl: track.coverUrl),
-            LyricsView(
-              key: ValueKey((track.id, remote)),
-              track: track,
-              remote: remote,
-              topInset: _barHeight + (expanded ? 8 : 0),
-              bottomInset: 16,
-              fontSize: expanded ? 26 : 20,
-              horizontalPadding: 20,
-            ),
-            // 顶部渐暗：保证按钮与标题在任何封面色上都清晰
-            const Positioned(
-              left: 0,
-              right: 0,
-              top: 0,
-              height: _barHeight + 16,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0x66000000), Color(0x00000000)],
+        child: BackdropGroup(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              LyricsBackdrop(imageUrl: track.coverUrl),
+              LyricsView(
+                key: ValueKey((track.id, remote)),
+                track: track,
+                remote: remote,
+                topInset: _barHeight + (expanded ? 8 : 0),
+                bottomInset: 16,
+                fontSize: expanded ? 26 : 20,
+                horizontalPadding: 20,
+              ),
+              // 顶部渐暗：保证按钮与标题在任何封面色上都清晰
+              const Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: _barHeight + 16,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x66000000), Color(0x00000000)],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: 14,
-              right: 10,
-              top: 10,
-              height: 36,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: expanded
-                        ? _TrackLabel(track: track)
-                        : _CardLabel(text: l10n.lyricsTitle),
-                  ),
-                  const LyricsTranslationButton(),
-                  const SizedBox(width: 8),
-                  GlassIconButton(
-                    icon: expanded
-                        ? Icons.close_fullscreen_rounded
-                        : Icons.open_in_full_rounded,
-                    tooltip: expanded ? l10n.lyricsCollapse : l10n.lyricsExpand,
-                    size: 36,
-                    onPressed: layout.toggleLyricsExpanded,
-                  ),
-                  const SizedBox(width: 8),
-                  GlassIconButton(
-                    icon: Icons.fullscreen_rounded,
-                    tooltip: l10n.lyricsImmersive,
-                    size: 36,
-                    onPressed: () => ImmersiveLyricsScreen.open(context),
-                  ),
-                ],
+              Positioned(
+                left: 14,
+                right: 10,
+                top: 10,
+                height: 36,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: expanded
+                          ? _TrackLabel(track: track)
+                          : _CardLabel(text: l10n.lyricsTitle),
+                    ),
+                    const LyricsTranslationButton(),
+                    const SizedBox(width: 8),
+                    GlassIconButton(
+                      icon: expanded
+                          ? Icons.close_fullscreen_rounded
+                          : Icons.open_in_full_rounded,
+                      tooltip: expanded
+                          ? l10n.lyricsCollapse
+                          : l10n.lyricsExpand,
+                      size: 36,
+                      onPressed: layout.toggleLyricsExpanded,
+                    ),
+                    const SizedBox(width: 8),
+                    GlassIconButton(
+                      icon: Icons.fullscreen_rounded,
+                      tooltip: l10n.lyricsImmersive,
+                      size: 36,
+                      onPressed: () => ImmersiveLyricsScreen.open(context),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

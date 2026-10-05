@@ -138,8 +138,13 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
   void dispose() {
     _idleTimer?.cancel();
     DesktopWindow.fullScreen.removeListener(_onSystemFullScreen);
-    DesktopWindow.immersiveWindow.value = false;
-    DesktopWindow.setFullScreen(false);
+    // dispose 跑在帧收尾阶段，此时同步改 ValueNotifier 会让外层（WindowFrame、
+    // LiquidGlass）在 widget 树被锁定时 setState；且路由刚移除的这一帧还没提交。
+    // 推迟到本帧提交之后再恢复窗口外框 / 退出全屏。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DesktopWindow.immersiveWindow.value = false;
+      DesktopWindow.setFullScreen(false);
+    });
     super.dispose();
   }
 
@@ -179,7 +184,19 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
     });
   }
 
-  void _close() => Navigator.of(context).maybePop();
+  bool _closing = false;
+
+  /// 退出：先让玻璃去掉 BackdropFilter 并等其落地，再弹出路由。
+  /// 路由淡出（Opacity 图层里套 BackdropFilter）与随后的退出全屏重排，
+  /// 是 Windows 引擎合成器闪退的触发点，见 [DesktopWindow.fullscreenTransition]。
+  Future<void> _close() async {
+    if (_closing) return;
+    _closing = true;
+    await DesktopWindow.dropGlassForExit();
+    if (!mounted) return;
+    final popped = await Navigator.of(context).maybePop();
+    if (!popped && mounted) _closing = false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -228,95 +245,99 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
                 onHover: (_) => _restartIdleTimer(),
                 child: Material(
                   color: Colors.black,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
-                      if (track == null)
-                        Center(
-                          child: EmptyState(
-                            icon: Icons.music_off_rounded,
-                            title: context.l10n.playerNothingPlayingTitle,
-                            message: context.l10n.lyricsNothingPlayingMessage,
-                            onDark: true,
+                  child: BackdropGroup(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
+                        if (track == null)
+                          Center(
+                            child: EmptyState(
+                              icon: Icons.music_off_rounded,
+                              title: context.l10n.playerNothingPlayingTitle,
+                              message: context.l10n.lyricsNothingPlayingMessage,
+                              onDark: true,
+                            ),
+                          )
+                        else
+                          LayoutBuilder(
+                            builder: (context, box) =>
+                                box.maxWidth >= _wideBreakpoint
+                                ? _WideLayout(
+                                    track: track,
+                                    size: box.biggest,
+                                    remote: remote,
+                                    panel: _panel,
+                                  )
+                                : _NarrowLayout(
+                                    track: track,
+                                    size: box.biggest,
+                                    remote: remote,
+                                    panel: _panel,
+                                    topInset:
+                                        (barTop + _barHeight).clamp(
+                                          topInset,
+                                          double.infinity,
+                                        ) +
+                                        8,
+                                  ),
                           ),
-                        )
-                      else
-                        LayoutBuilder(
-                          builder: (context, box) =>
-                              box.maxWidth >= _wideBreakpoint
-                              ? _WideLayout(
-                                  track: track,
-                                  size: box.biggest,
-                                  remote: remote,
-                                  panel: _panel,
-                                )
-                              : _NarrowLayout(
-                                  track: track,
-                                  size: box.biggest,
-                                  remote: remote,
-                                  panel: _panel,
-                                  topInset:
-                                      (barTop + _barHeight).clamp(
-                                        topInset,
-                                        double.infinity,
-                                      ) +
-                                      8,
-                                ),
-                        ),
-                      // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
-                      if (topInset > 0)
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: captionRight,
-                          height: topInset,
-                          child: const WindowDragArea(child: SizedBox.expand()),
-                        ),
-                      Positioned(
-                        top: barTop,
-                        left: macWindow ? _macBarLeft : 18,
-                        child: idleFade(
-                          _GlassCapsule(
-                            height: _barHeight,
-                            children: [
-                              _CapsuleIcon(
-                                icon: Icons.close_rounded,
-                                tooltip: l10n.lyricsExitImmersive,
-                                onPressed: _close,
-                              ),
-                              if (DesktopWindow.enabled)
-                                _CapsuleIcon(
-                                  icon: _screen
-                                      ? Icons.fullscreen_exit_rounded
-                                      : Icons.fullscreen_rounded,
-                                  tooltip: _screen
-                                      ? l10n.lyricsFillWindow
-                                      : l10n.lyricsFillScreen,
-                                  onPressed: _toggleMode,
-                                ),
-                              if (track != null && _panel == _Panel.lyrics)
-                                const LyricsTranslationButton(
-                                  size: _barHeight,
-                                  glass: false,
-                                ),
-                            ],
+                        // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
+                        if (topInset > 0)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: captionRight,
+                            height: topInset,
+                            child: const WindowDragArea(
+                              child: SizedBox.expand(),
+                            ),
                           ),
-                        ),
-                      ),
-                      if (track != null) ...[
                         Positioned(
-                          right: 20,
-                          bottom: 20,
+                          top: barTop,
+                          left: macWindow ? _macBarLeft : 18,
                           child: idleFade(
-                            _PanelButtons(
-                              panel: _panel,
-                              onToggle: _togglePanel,
+                            _GlassCapsule(
+                              height: _barHeight,
+                              children: [
+                                _CapsuleIcon(
+                                  icon: Icons.close_rounded,
+                                  tooltip: l10n.lyricsExitImmersive,
+                                  onPressed: _close,
+                                ),
+                                if (DesktopWindow.enabled)
+                                  _CapsuleIcon(
+                                    icon: _screen
+                                        ? Icons.fullscreen_exit_rounded
+                                        : Icons.fullscreen_rounded,
+                                    tooltip: _screen
+                                        ? l10n.lyricsFillWindow
+                                        : l10n.lyricsFillScreen,
+                                    onPressed: _toggleMode,
+                                  ),
+                                if (track != null && _panel == _Panel.lyrics)
+                                  const LyricsTranslationButton(
+                                    size: _barHeight,
+                                    glass: false,
+                                  ),
+                              ],
                             ),
                           ),
                         ),
+                        if (track != null) ...[
+                          Positioned(
+                            right: 20,
+                            bottom: 20,
+                            child: idleFade(
+                              _PanelButtons(
+                                panel: _panel,
+                                onToggle: _togglePanel,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
