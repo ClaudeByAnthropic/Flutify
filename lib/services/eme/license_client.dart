@@ -36,7 +36,8 @@ class LicenseHttpException extends StateError {
 /// 行为：
 /// - 每个请求按 [hosts] 顺序换入口尝试；网络类错误（握手被掐 / 超时 / 连接重置）
 ///   换下一个入口；
-/// - HTTP 非 200 是业务错误（403 = 权限 / token 状态），换入口无益，直接抛；
+/// - HTTP 非 200 直接抛出，不轮换入口重试；403 可能涉及身份、权限或 CDM
+///   请求 / 宿主兼容性，仅凭状态码不能确定原因；
 /// - 成功过的入口记进 [lastGoodHost]，下次优先用它，避免每次都先撞一次失败的握手。
 class WidevineLicenseClient {
   WidevineLicenseClient({

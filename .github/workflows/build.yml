@@ -31,6 +31,9 @@ permissions:
 
 env:
   FLUTTER_VERSION: '3.44.0'
+  # macOS 固定 3.44.9：该版本包含 Xcode 27 的 lipo 多架构校验修复
+  # （flutter/flutter#188625）；Windows / Android 暂时保持 3.44.0。
+  FLUTTER_VERSION_MACOS: '3.44.9'
 
 jobs:
   prepare:
@@ -107,8 +110,8 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          flutter build apk --release --split-per-abi --build-number="$ANDROID_BUILD_NUMBER"
-          flutter build apk --release --build-number="$ANDROID_BUILD_NUMBER"
+          flutter build apk --release --split-per-abi --build-number="$ANDROID_BUILD_NUMBER" --dart-define=FLUTIFY_RELEASE_TAG=${{ needs.prepare.outputs.tag }}
+          flutter build apk --release --build-number="$ANDROID_BUILD_NUMBER" --dart-define=FLUTIFY_RELEASE_TAG=${{ needs.prepare.outputs.tag }}
 
       - name: Verify APK signatures, version codes, and media icons
         env:
@@ -180,7 +183,7 @@ jobs:
 
       # x64 beta experiments with native CDM and falls back to WebView on load failure.
       # ARM64 keeps WebView; the CDM helper is currently x64 only.
-      - run: flutter build windows --release --dart-define=FLUTIFY_NATIVE_WIDEVINE=${{ matrix.arch == 'x64' }}
+      - run: flutter build windows --release --dart-define=FLUTIFY_NATIVE_WIDEVINE=${{ matrix.arch == 'x64' }} --dart-define=FLUTIFY_RELEASE_TAG=${{ needs.prepare.outputs.tag }}
 
       - name: Verify native binary architecture
         run: python tool/verify_windows_arch.py build/windows/${{ matrix.arch }}/runner/Release ${{ matrix.arch }}
@@ -227,7 +230,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: ${{ env.FLUTTER_VERSION_MACOS }}
           channel: stable
           cache: true
 
@@ -235,7 +238,7 @@ jobs:
 
       - run: flutter test
 
-      - run: flutter build macos --release
+      - run: flutter build macos --release --dart-define=FLUTIFY_RELEASE_TAG=${{ needs.prepare.outputs.tag }}
 
       # 未签名、未公证：不上 Releases，仅供开发者自测
       - name: Zip

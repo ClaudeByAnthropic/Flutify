@@ -1633,4 +1633,93 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get loginCopyLink => 'リンクをコピー';
+
+  @override
+  String get updatesTitle => 'ソフトウェア更新';
+
+  @override
+  String get updatesMode => '更新方法';
+
+  @override
+  String get updatesManual => '手動更新';
+
+  @override
+  String get updatesAutomatic => '自動ダウンロード';
+
+  @override
+  String get updatesDisabled => '更新を確認しない';
+
+  @override
+  String get updatesHint =>
+      '新しいバージョンと更新内容を自動確認します。自動モードはバックグラウンドでダウンロードし、再生を中断せず、確認後にインストールします。';
+
+  @override
+  String get updatesCheck => '更新を確認';
+
+  @override
+  String get updatesChecking => '更新を確認中…';
+
+  @override
+  String get updatesCurrent => '現在のバージョン';
+
+  @override
+  String get updatesUpToDate => '最新バージョンです';
+
+  @override
+  String get updatesAvailable => '新しいバージョン';
+
+  @override
+  String get updatesNotes => '更新内容';
+
+  @override
+  String get updatesNoNotes => '更新内容は公開されていません。';
+
+  @override
+  String get updatesDownload => '更新をダウンロード';
+
+  @override
+  String get updatesDownloading => 'ダウンロード・検証中…';
+
+  @override
+  String get updatesReady => '更新の準備ができました';
+
+  @override
+  String get updatesReadyHint =>
+      'ダウンロードと検証が完了しました。インストール時にアプリを終了します。設定から後で続行することもできます。';
+
+  @override
+  String get updatesAndroidHint =>
+      'APK のダウンロードと検証が完了しました。確認するとシステムのインストーラーを開きます。';
+
+  @override
+  String get updatesInstall => '再起動してインストール';
+
+  @override
+  String get updatesInstallApk => 'APK をインストール';
+
+  @override
+  String get updatesInstalling => 'インストールの準備中…';
+
+  @override
+  String get updatesSkip => 'このバージョンをスキップ';
+
+  @override
+  String get updatesLater => '後で';
+
+  @override
+  String get updatesPage => '手動更新・リリースページ';
+
+  @override
+  String get updatesFailed => '更新に失敗しました。再試行するかリリースページを開いてください。';
+
+  @override
+  String get updatesPermission =>
+      'Flutify に不明なアプリのインストールを許可し、戻って「APK をインストール」をもう一度押してください。';
+
+  @override
+  String get updatesUnsupported =>
+      'このプラットフォームではアプリ内インストールに対応していません。リリースページから手動で更新してください。';
+
+  @override
+  String get updatesDetails => '更新を表示';
 }

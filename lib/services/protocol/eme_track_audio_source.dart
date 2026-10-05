@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import '../../models/audio_playback_info.dart';
 
 import '../audio/audio_engine.dart';
+import '../auth/auth_constants.dart';
 import '../cache/cache_location.dart';
 import '../eme/fairplay.dart';
 import '../eme/segmented_download.dart';
@@ -90,9 +91,9 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
     final h = <String, String>{
       'Authorization': 'Bearer $token',
       // 桌面端身份（track-playback / sneaktables 用这个）
-      'User-Agent': 'Spotify/130100234 Win32_x86_64/0 (PC desktop)',
-      'app-platform': 'Win32_x86_64',
-      'spotify-app-version': '1.3.1.234.g59d6bf59',
+      'User-Agent': SpotifyAuthConstants.desktopUserAgent,
+      'app-platform': SpotifyAuthConstants.desktopPlatform,
+      'spotify-app-version': SpotifyAuthConstants.desktopVersion,
     };
     if (clientToken != null) h['client-token'] = await clientToken!();
     return h;
@@ -351,7 +352,7 @@ class EmeTrackAudioSource implements TrackAudioSource, AudioCacheStore {
           urls: urls,
           dest: dest,
           headers: const {
-            'User-Agent': 'Spotify/130100234 Win32_x86_64/0 (PC desktop)',
+            'User-Agent': SpotifyAuthConstants.desktopUserAgent,
           },
           // 首段小一点：起播只需 init 段 + 首个媒体段
           segmentBytes: _kMinBytesToPlay,

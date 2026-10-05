@@ -31,6 +31,7 @@ import 'services/audio/audio_engine.dart';
 import 'services/audio/routed_audio_engine.dart';
 import 'services/audio_player_service.dart';
 import 'services/auth/spotify_auth_service.dart';
+import 'services/auth/session_http_client.dart';
 import 'services/auth/web_token_service.dart';
 import 'services/eme/eme_audio_engine.dart';
 import 'services/eme/eme_player.dart';
@@ -65,6 +66,8 @@ import 'services/protocol/eme_track_audio_source.dart';
 import 'services/protocol/track_audio_loader.dart';
 import 'services/spotify_api_service.dart';
 import 'services/storage_service.dart';
+import 'services/updates/update_installer.dart';
+import 'services/updates/update_service.dart';
 import 'services/taskbar_lyrics/taskbar_lyrics_channel.dart';
 import 'services/taskbar_lyrics/taskbar_lyrics_controls.dart';
 import 'ui/screens/main_shell.dart';
@@ -75,9 +78,15 @@ import 'ui/widgets/dynamic_accent_sync.dart';
 import 'ui/widgets/automatic_gateway_binding.dart';
 import 'ui/widgets/playback_session_keeper.dart';
 import 'ui/widgets/taskbar_lyrics_binding.dart';
+import 'ui/widgets/update_prompt.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 解码后位图缓存默认 1000 张 / 100 MiB。封面都按显示尺寸解码（见 CoverImage），
+  // 400 张 / 64 MiB 足够，常驻内存上限直接降低约三分之一。
+  PaintingBinding.instance.imageCache
+    ..maximumSize = 400
+    ..maximumSizeBytes = 64 << 20;
   installFileLog();
   installErrorPlaceholder();
   runApp(AppStartup(initialize: _initializeApp));
@@ -99,6 +108,12 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   // Initialize Core Services
   reportStage('读取设置');
   final storageService = await StorageService.init();
+  storageService.clearWebViewCookies = EmePlayer.clearSessionCookies;
+  try {
+    await storageService.retryCookieCleanup();
+  } catch (_) {
+    debugPrint('[auth] WebView Cookie 清理未完成，下次登录前重试');
+  }
   await CacheDirectoryAccess.restore();
 
   // 网络代理须在任何网络客户端创建前就位；系统代理最多等 1.5 秒，读不到就先直连、后台补读
@@ -134,6 +149,7 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   // 多入口：手机网络下 gae2-spclient 等域名会被掐 TLS 握手，spclient.wg 实测可达，
   // WidevineLicenseClient 按入口列表换域名重试（同一服务，路径一致）。
   final licenseClient = WidevineLicenseClient(
+    client: SessionHttpClient(storageService, http.Client()),
     webToken: webTokenService.ensureWebAccessToken,
     clientToken: authService.ensureClientToken,
   );
@@ -246,6 +262,7 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   // EME 曲目源（Widevine 全曲播放）：AP 密钥被拒的 DRM 曲目走这里。
   // 当前账号 AP RequestKey 全线被拒，EME 是全曲播放的主链路。
   final emeTrackSource = EmeTrackAudioSource(
+    client: SessionHttpClient(storageService, http.Client()),
     cacheDirectory: supportDir.path,
     cacheDirectoryProvider: () =>
         audioCacheLocation.rootFor(CacheCategory.audio),
@@ -287,6 +304,10 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
     lyricsFallback: lyricsFallback,
     lyricsTranslation: lyricsTranslation,
     taskbarLyrics: taskbarLyrics,
+    updateService: UpdateService(
+      storage: storageService,
+      installer: PlatformUpdateInstaller(closeWindows: DesktopWindow.closeForUpdate),
+    ),
   );
 }
 
@@ -325,6 +346,7 @@ class FlutifyApp extends StatelessWidget {
 
   /// 任务栏歌词（Windows）；已包含在 [mediaControls] 里，这里供界面层绑定设置与歌词来源。
   final TaskbarLyricsControls? taskbarLyrics;
+  final UpdateService? updateService;
 
   const FlutifyApp({
     super.key,
@@ -342,6 +364,7 @@ class FlutifyApp extends StatelessWidget {
     this.lyricsFallback,
     this.lyricsTranslation,
     this.taskbarLyrics,
+    this.updateService,
   });
 
   @override
@@ -351,6 +374,7 @@ class FlutifyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<StorageService>.value(value: storageService),
+        ListenableProvider<UpdateService?>.value(value: updateService),
         Provider<AudioEngine>.value(value: audioEngine),
         Provider<EmePlayer>.value(value: emePlayer),
         Provider<SpotifyApiService>.value(value: spotifyApiService),
@@ -580,7 +604,7 @@ void _startConnectReceiver(
   final receiver = ConnectReceiver(
     host: host,
     deviceName: nameOf,
-    client: http.Client(),
+    client: SessionHttpClient(ctx.read<StorageService>(), http.Client()),
     webToken: tokens.ensureWebAccessToken,
     deviceId: deviceId,
   );
@@ -663,6 +687,10 @@ void _startConnectReceiver(
   }
 
   preferences.addListener(apply);
+  tokens.sessionInvalidated.addListener(() {
+    receiver.invalidateSession();
+    apply();
+  });
   apply();
   DesktopWindow.addBeforeCloseHook(
     receiver.stop,
@@ -678,6 +706,18 @@ Object _proxyKey(AppPreferences prefs) => (
   prefs.proxyUsername,
   prefs.gateway,
 );
+
+/// Windows 上整棵界面不向系统暴露语义（无障碍）树。
+///
+/// 引擎 flutter_windows.dll 的无障碍桥有空指针崩溃：只要系统里有任何 UIA 客户端
+/// （读屏、输入法、自动化 / 取词 / 录屏类工具）在读界面，路由切换、Tooltip 增删这类
+/// 语义树大幅变动时就会 0xc0000005 闪退。本机 WER 记录的两处崩溃偏移已用引擎符号还原：
+/// `AccessibilityBridge::CreateRemoveReparentedNodesUpdate`（关闭全屏歌词时）与
+/// `FlutterPlatformNodeDelegateWindows::HitTestSync`，都在无障碍桥里。
+/// 屏蔽后语义树只剩一个根节点，没有节点增删，也就踩不到这个 bug；代价是读屏软件读不到界面。
+/// 测试进程（FLUTTER_TEST）不屏蔽，保留语义相关的测试。
+final bool _excludeWindowsSemantics =
+    Platform.isWindows && !Platform.environment.containsKey('FLUTTER_TEST');
 
 /// 按外观设置生成主题；字号缩放与减弱动效通过 MediaQuery 下发给整棵树。
 class _ThemedApp extends StatelessWidget {
@@ -719,13 +759,16 @@ class _ThemedApp extends StatelessWidget {
             value: systemBarsStyle(Theme.of(context).brightness),
             // 桌面：窗口按钮 / 窄窗口标题条覆盖在所有路由之上
             // macOS 原生菜单栏常驻于此（卸载会清空系统菜单），主界面动作由 MainShell 注册
-            child: MacMenuBar(
-              child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
+            child: ExcludeSemantics(
+              excluding: _excludeWindowsSemantics,
+              child: MacMenuBar(
+                child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
+              ),
             ),
           ),
         );
       },
-      home: const MainShell(),
+      home: const UpdatePromptBinding(child: MainShell()),
     );
   }
 }

@@ -82,13 +82,14 @@ class LyricLineView extends StatelessWidget {
               fontSize: fontSize,
               centered: centered,
             );
-            // sigma 过小时跳过滤镜，避免无意义的离屏渲染
-            if (v.blur > 0.05) {
-              result = ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: v.blur, sigmaY: v.blur),
-                child: result,
-              );
-            }
+            // ImageFiltered 始终留在树里，sigma 过小时只关掉 enabled（同样不产生离屏层）。
+            // 之前按阈值增删这一层，每次对焦动画收尾都会让整行文字卸载重建、
+            // 并在「离屏渲染 ↔ 直接绘制」之间跳变一帧，肉眼就是歌词闪一下。
+            result = ImageFiltered(
+              enabled: v.blur > 0.05,
+              imageFilter: ImageFilter.blur(sigmaX: v.blur, sigmaY: v.blur),
+              child: result,
+            );
             return Transform.scale(
               scale: v.scale,
               alignment: centered ? Alignment.center : Alignment.centerLeft,

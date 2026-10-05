@@ -128,7 +128,12 @@ void main() {
     // 0:00 时当前行保持清晰。
     final firstLine = find.text('First synthetic line');
     expect(
-      find.ancestor(of: firstLine, matching: find.byType(ImageFiltered)),
+      find.ancestor(
+        of: firstLine,
+        matching: find.byWidgetPredicate(
+          (w) => w is ImageFiltered && w.enabled,
+        ),
+      ),
       findsNothing,
     );
 

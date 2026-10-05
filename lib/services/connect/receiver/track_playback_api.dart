@@ -9,7 +9,8 @@ import '../../../models/audio_playback_info.dart';
 /// - 必须用 **Web 播放器身份**：Web token（sp_dc + TOTP）+ Web client-token（`js_sdk_data`），
 ///   再带上 Web 播放器的 `app-platform` / `spotify-app-version` / Origin / Referer；
 ///   桌面 token 注册会被拒。
-/// - client-token 按 [deviceId] 申请一次后缓存，失效（401/403）时 [invalidate] 重新申请。
+/// - client-token 按 [deviceId] 申请后缓存，并发调用合并为一次请求；服务端给出有效期时到期前重新申请，
+///   认证被拒（401）时 [invalidate] 重新申请；403 保留状态交给调用方。
 /// - 每次汇报带递增的 `seq_num`，起点为注册响应里的 `initial_seq_num`。
 class TrackPlaybackApi {
   static const String webClientId = 'd8a5ed958d274c2e8ee717e6a4b0971d';
@@ -20,20 +21,37 @@ class TrackPlaybackApi {
   final http.Client _client;
   final Future<String> Function() _webToken;
   final String deviceId;
-  final String spclientHost;
+  final String _spclientHost;
+  final String? Function()? _spclientHostProvider;
+  final DateTime Function() _now;
+
+  String get spclientHost => _spclientHostProvider?.call() ?? _spclientHost;
 
   String? _clientToken;
+  DateTime? _clientTokenRefreshAt;
+  Future<String>? _clientTokenInFlight;
+  int _clientTokenGeneration = 0;
   int _seq = 0;
 
   TrackPlaybackApi({
     required http.Client client,
     required Future<String> Function() webToken,
     required this.deviceId,
-    this.spclientHost = 'gae2-spclient.spotify.com',
+    String spclientHost = 'gae2-spclient.spotify.com',
+    String? Function()? spclientHostProvider,
+    DateTime Function()? now,
   }) : _client = client,
-       _webToken = webToken;
+       _webToken = webToken,
+       _spclientHost = spclientHost,
+       _spclientHostProvider = spclientHostProvider,
+       _now = now ?? DateTime.now;
 
-  void invalidate() => _clientToken = null;
+  void invalidate() {
+    ++_clientTokenGeneration;
+    _clientToken = null;
+    _clientTokenRefreshAt = null;
+    _clientTokenInFlight = null;
+  }
 
   Future<Map<String, String>> headers() async => {
     'Authorization':
@@ -47,9 +65,24 @@ class TrackPlaybackApi {
     'Content-Type': 'application/json',
   };
 
-  Future<String> _ensureClientToken() async {
+  Future<String> _ensureClientToken() {
     final cached = _clientToken;
-    if (cached != null) return cached;
+    final refreshAt = _clientTokenRefreshAt;
+    if (cached != null && (refreshAt == null || _now().isBefore(refreshAt))) {
+      return Future.value(cached);
+    }
+    final existing = _clientTokenInFlight;
+    if (existing != null) return existing;
+    late final Future<String> pending;
+    pending = _requestClientToken(_clientTokenGeneration).whenComplete(() {
+      if (identical(_clientTokenInFlight, pending)) {
+        _clientTokenInFlight = null;
+      }
+    });
+    return _clientTokenInFlight = pending;
+  }
+
+  Future<String> _requestClientToken(int generation) async {
     final res = await _client
         .post(
           Uri.parse('https://clienttoken.spotify.com/v1/clienttoken'),
@@ -74,11 +107,25 @@ class TrackPlaybackApi {
           }),
         )
         .timeout(const Duration(seconds: 10));
-    final token =
-        ((jsonDecode(utf8.decode(res.bodyBytes)) as Map)['granted_token']
-            as Map?)?['token'];
-    if (token is! String)
+    if (generation != _clientTokenGeneration) return _ensureClientToken();
+    if (res.statusCode != 200) {
       throw StateError('Web client-token 申请失败：HTTP ${res.statusCode}');
+    }
+    final granted =
+        (jsonDecode(utf8.decode(res.bodyBytes)) as Map)['granted_token']
+            as Map?;
+    final token = granted?['token'];
+    if (token is! String || token.isEmpty) {
+      throw StateError('Web client-token 申请失败：HTTP ${res.statusCode}');
+    }
+    final deadlines = [
+      granted?['refresh_after_seconds'],
+      granted?['expires_after_seconds'],
+    ].whereType<int>().where((seconds) => seconds >= 0).toList()..sort();
+    // 未给 TTL 时短期缓存；短 TTL 也必须过期，且不晚于 expires_after。
+    final ttl = deadlines.isEmpty ? 300 : deadlines.first;
+    final refreshIn = (ttl - (ttl ~/ 10).clamp(1, 60)).clamp(0, ttl);
+    _clientTokenRefreshAt = _now().add(Duration(seconds: refreshIn));
     return _clientToken = token;
   }
 
@@ -217,7 +264,7 @@ class TrackPlaybackApi {
   }
 
   void _check(http.Response res, String what) {
-    if (res.statusCode == 401 || res.statusCode == 403) invalidate();
+    if (res.statusCode == 401) invalidate();
     if (res.statusCode >= 300) {
       throw StateError(
         'track-playback $what 失败：HTTP ${res.statusCode} ${res.body}',

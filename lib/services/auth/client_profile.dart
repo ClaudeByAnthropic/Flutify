@@ -24,6 +24,20 @@ enum SpotifyClientProfile {
     'spotify-app-version': SpotifyAuthConstants.desktopVersion,
   };
 
+  /// AP keyexchange.proto BuildInfo，与桌面 HTTP 配置共用版本。
+  ProtoWriter apBuildInfo() => ProtoWriter()
+    ..varintAlways(10, 0) // PRODUCT_CLIENT（proto2 required）
+    ..varintAlways(20, 0) // PRODUCT_FLAG_NONE
+    ..varintAlways(30, 0x27) // PLATFORM_WIN32_X86_64
+    ..int64(40, int.parse(SpotifyAuthConstants.desktopBuildNumber));
+
+  /// AP authentication.proto SystemInfo，使用同一声明的平台。
+  /// 可选的 system_information_string 不发送应用名或计算机名。
+  ProtoWriter apSystemInfo(String? deviceId) => ProtoWriter()
+    ..varintAlways(10, 2) // CPU_X86_64
+    ..varintAlways(60, 1) // OS_WINDOWS
+    ..string(100, deviceId ?? '');
+
   /// 写入 ConnectivitySdkData.platform_specific_data 的 desktop_windows=4（NativeDesktopWindowsData），
   /// 字段取值对齐 librespot（x64 进程）。
   ProtoWriter platformData() => ProtoWriter()

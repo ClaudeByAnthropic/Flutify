@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/theme/flutify_tokens.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../../providers/spotify_provider.dart';
 import '../../../../services/lyrics/lyrics_translation.dart';
@@ -47,7 +46,6 @@ class LyricsTranslationButton extends StatelessWidget {
       icon: Icons.translate_rounded,
       tooltip: label,
       size: size,
-      borderRadius: context.tokens.radius(12),
       glass: glass,
       selected: active,
       onPressed: !controller.available

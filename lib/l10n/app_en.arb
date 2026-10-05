@@ -582,5 +582,34 @@
         "type": "String"
       }
     }
-  }
+  },
+  "updatesTitle": "Software updates",
+  "updatesMode": "Update preference",
+  "updatesManual": "Manual update",
+  "updatesAutomatic": "Download automatically",
+  "updatesDisabled": "Do not check",
+  "updatesHint": "Check for new versions and release notes automatically. Automatic mode downloads in the background and waits for your confirmation to install, without interrupting playback.",
+  "updatesCheck": "Check for updates",
+  "updatesChecking": "Checking for updates…",
+  "updatesCurrent": "Current version",
+  "updatesUpToDate": "You are up to date",
+  "updatesAvailable": "New version available",
+  "updatesNotes": "Release notes",
+  "updatesNoNotes": "No release notes were provided.",
+  "updatesDownload": "Download update",
+  "updatesDownloading": "Downloading and verifying…",
+  "updatesReady": "Update ready",
+  "updatesReadyHint": "The update has been downloaded and verified. Installation closes the app; you can also continue later from Settings.",
+  "updatesAndroidHint": "The APK has been downloaded and verified. Confirm to open the system installer.",
+  "updatesInstall": "Restart and install",
+  "updatesInstallApk": "Install APK",
+  "updatesInstalling": "Preparing installation…",
+  "updatesSkip": "Skip this version",
+  "updatesLater": "Later",
+  "updatesPage": "Manual update · Release page",
+  "updatesFailed": "Update failed. Retry or visit the release page.",
+  "updatesPermission": "Allow Flutify to install unknown apps, then return and tap “Install APK” again.",
+  "updatesUnsupported": "In-app installation is unavailable on this platform. Use the release page to update manually.",
+  "updatesDetails": "View update"
+
 }

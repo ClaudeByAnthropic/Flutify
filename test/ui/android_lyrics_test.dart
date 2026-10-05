@@ -376,7 +376,7 @@ void main() {
                     )
                     .decoration
                 as BoxDecoration;
-        expect(decoration.borderRadius, BorderRadius.circular(12));
+        expect(decoration.borderRadius, BorderRadius.circular(24));
         expect(tester.takeException(), isNull);
         await tester.tap(find.byType(LyricsTranslationButton));
         for (var frame = 0; frame < 8; frame++) {

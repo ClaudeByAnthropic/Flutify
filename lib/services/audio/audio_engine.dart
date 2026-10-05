@@ -35,7 +35,7 @@ class EmePlaybackException implements Exception {
   /// 设备缺 Widevine / CDM：解密无从谈起，重试无意义。
   final bool isWidevineMissing;
 
-  /// sp_dc（Web 登录态）疑似失效（license / token 铸造被拒 401/403）：建议重新 Web 登录。
+  /// 缺少 Web 登录态，或依赖 Web token 的认证端点明确返回 401：建议重新登录。
   final bool webSignInSuggested;
 
   /// 原始错误，仅用于日志排查。

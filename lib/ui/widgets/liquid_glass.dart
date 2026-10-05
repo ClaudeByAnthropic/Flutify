@@ -58,7 +58,8 @@ class LiquidGlass extends StatelessWidget {
         valueListenable: DesktopWindow.fullscreenTransition,
         builder: (context, transitioning, _) {
           if (transitioning) return body;
-          return BackdropFilter(
+          // grouped：外层有 BackdropGroup 时共享同一份背景采样，没有时与普通 BackdropFilter 完全一致
+          return BackdropFilter.grouped(
             filter: ImageFilter.blur(
               sigmaX: sigma,
               sigmaY: sigma,

@@ -52,13 +52,13 @@ abstract class ReceiverHost {
 ///    服务端据此更新其他设备上的显示；
 /// 5. [stop] 时 `DELETE` 注销。
 class ConnectReceiver {
-  static const String defaultDeviceName = 'Flutify';
+  static const String defaultDeviceName = 'Web Player';
 
   final ReceiverHost host;
 
   /// 设备名：每次注册时读取，改名后 [stop] 再 [start] 即生效。
   final String Function() deviceName;
-  final TrackPlaybackApi _api;
+  late final TrackPlaybackApi _api;
   final DealerClient _dealer;
 
   StreamSubscription<String>? _idSub;
@@ -90,12 +90,7 @@ class ConnectReceiver {
     required String deviceId,
     DealerClient? dealer,
     this.registerRetryDelay = const Duration(seconds: 2),
-  }) : _api = TrackPlaybackApi(
-         client: client,
-         webToken: webToken,
-         deviceId: deviceId,
-       ),
-       _dealer =
+  }) : _dealer =
            dealer ??
            DealerClient(
              client: client,
@@ -103,7 +98,14 @@ class ConnectReceiver {
                'Authorization': 'Bearer ${await webToken()}',
                'User-Agent': TrackPlaybackApi.userAgent,
              },
-           );
+           ) {
+    _api = TrackPlaybackApi(
+      client: client,
+      webToken: webToken,
+      deviceId: deviceId,
+      spclientHostProvider: () => _dealer.spclientHost,
+    );
+  }
 
   String get deviceId => _api.deviceId;
 
@@ -112,6 +114,8 @@ class ConnectReceiver {
 
   /// 是否正被远程选中、由本机出声（有当前状态）。
   bool get isActive => _machine != null && _stateIndex >= 0;
+
+  void invalidateSession() => _api.invalidate();
 
   Future<void> start() async {
     if (_started) return;

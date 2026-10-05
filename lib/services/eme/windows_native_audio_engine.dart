@@ -56,6 +56,7 @@ class WindowsNativeAudioEngine implements AudioEngine {
   NativeMemoryAudio? _audio;
   int _generation = 0;
   bool _disabled = false, _disposed = false, _loading = false, _autoplay = true;
+  bool _nativeDisposed = false;
   Duration? _pendingPosition;
   double _volume = 1;
   Future<void> _playerWork = Future.value();
@@ -66,6 +67,32 @@ class WindowsNativeAudioEngine implements AudioEngine {
     final result = _playerWork.then((_) => work());
     _playerWork = result.catchError((Object _) {});
     return result;
+  }
+
+  void _disposeNative() {
+    if (_nativeDisposed) return;
+    _nativeDisposed = true;
+    _native.dispose();
+  }
+
+  Future<void> _stopPlayer(AudioEngine? player) async {
+    if (_disposed || player == null) return;
+    if (!identical(player, _native)) {
+      await player.stop();
+      return;
+    }
+    if (_nativeDisposed) return;
+    try {
+      await _native.stop();
+    } catch (error) {
+      // A failed decoder must not strand the fallback behind its cleanup error.
+      // Retire it before releasing the source; it cannot be reused this run.
+      _disabled = true;
+      _disposeNative();
+      debugPrint(
+        '[native-wv] Native cleanup failed (${error.runtimeType}); decoder retired',
+      );
+    }
   }
 
   @override
@@ -107,7 +134,7 @@ class WindowsNativeAudioEngine implements AudioEngine {
     if (previous != null || previousAudio != null) {
       await _withPlayer(() async {
         try {
-          if (!_disposed) await previous?.stop();
+          await _stopPlayer(previous);
         } finally {
           previousAudio?.dispose();
         }
@@ -177,7 +204,8 @@ class WindowsNativeAudioEngine implements AudioEngine {
         if (identical(_audio, memory)) _audio = null;
         await _withPlayer(() async {
           try {
-            if (!_disposed) await _native.stop();
+            // License/parser failures have not opened the native decoder yet.
+            if (memory != null) await _stopPlayer(_native);
           } finally {
             memory?.dispose();
           }
@@ -277,7 +305,7 @@ class WindowsNativeAudioEngine implements AudioEngine {
     _audio = null;
     await _withPlayer(() async {
       try {
-        if (!_disposed) await active?.stop();
+        await _stopPlayer(active);
       } finally {
         memory?.dispose();
       }
@@ -308,7 +336,7 @@ class WindowsNativeAudioEngine implements AudioEngine {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
-    _native.dispose();
+    _disposeNative();
     _fallback.dispose();
     _audio?.dispose();
     _audio = null;

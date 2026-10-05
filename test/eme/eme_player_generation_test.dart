@@ -78,7 +78,7 @@ void main() {
     expect(await post(cur.licenseUrl), 500);
     await Future<void>.delayed(Duration.zero);
     expect(p.lastError, isNotNull);
-    expect(p.lastError!.webSignInSuggested, isTrue);
+    expect(p.lastError!.webSignInSuggested, isFalse);
     expect(states, [EmePlayerState.error]);
   });
 
@@ -145,7 +145,12 @@ void main() {
     }
 
     test('emePlayHls 接收代次，所有事件经 gsend 携带代次', () {
-      expect(emePageHtml, contains('window.emePlayHls = (fairPlay, gen, autoplay = true, revision = 0, position = 0) =>'));
+      expect(
+        emePageHtml,
+        contains(
+          'window.emePlayHls = (fairPlay, gen, autoplay = true, revision = 0, position = 0) =>',
+        ),
+      );
       final body = pageFn('emePlayHls');
       // 除 gsend 自身定义外，函数体内不得再有裸 send(
       final bare = RegExp(r'(?<![g\w])send\(').allMatches(body).length;
@@ -156,7 +161,9 @@ void main() {
     test('emePlayNativeFps（macOS 原生 HLS + 旧版 EME）同样接收代次、事件经 gsend', () {
       expect(
         emePageHtml,
-        contains('window.emePlayNativeFps = (gen, fileIdHex, autoplay = true, revision = 0, position = 0) =>'),
+        contains(
+          'window.emePlayNativeFps = (gen, fileIdHex, autoplay = true, revision = 0, position = 0) =>',
+        ),
       );
       final body = pageFn('emePlayNativeFps');
       final bare = RegExp(r'(?<![g\w])send\(').allMatches(body).length;
@@ -173,7 +180,12 @@ void main() {
         contains("window.removeEventListener('emeStall', stallListener)"),
       );
       expect(emePageHtml, contains('detail: {stage: tag, gen}'));
-      expect(emePageHtml, contains('if (ev.detail.gen !== myGen || curGen !== myGen || intentGen !== myGen) return;'));
+      expect(
+        emePageHtml,
+        contains(
+          'if (ev.detail.gen !== myGen || curGen !== myGen || intentGen !== myGen) return;',
+        ),
+      );
     });
   });
 }

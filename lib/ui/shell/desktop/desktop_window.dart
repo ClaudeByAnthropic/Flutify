@@ -153,6 +153,12 @@ class DesktopWindow {
     ]);
   }
 
+  /// Update confirmation uses the same session-saving hooks as normal exit.
+  static Future<void> closeForUpdate() async {
+    if (!_enabled || !Platform.isWindows) return;
+    await windowManager.close();
+  }
+
   /// 把窗口带到前台（最小化时先还原）。任务栏歌词「打开 Flutify」使用。
   static Future<void> bringToFront() async {
     if (!_enabled) return;
@@ -175,14 +181,53 @@ class DesktopWindow {
     fullScreen.value = value;
     if (await windowManager.isFullScreen() == value) return;
     // 切换期间（含退出后的两次 setSize 刷新）暂停所有背景模糊，避开引擎合成器崩溃
+    _holdGlass();
+    try {
+      // 必须等 Flutter 真正画出「无 BackdropFilter」的帧之后再让原生改窗口：
+      // 之前同一个微任务里先置标志、立刻调原生，窗口尺寸变化时上一帧的
+      // BackdropFilter 还在图层树里，正是崩溃（0xc0000005）的窗口期。
+      await _afterGlassDropped();
+      await windowManager.setFullScreen(value);
+      if (!value) await _refreshFrame();
+    } finally {
+      // 等原生尺寸与最后一帧落定再恢复模糊
+      Future<void>.delayed(const Duration(milliseconds: 300), _releaseGlass);
+    }
+  }
+
+  /// 玻璃模糊暂停的持有计数：多处（路由退出、全屏切换）可同时持有，全部释放后才恢复。
+  static int _glassHolds = 0;
+
+  static void _holdGlass() {
+    _glassHolds++;
     fullscreenTransition.value = true;
-    await windowManager.setFullScreen(value);
-    if (!value) await _refreshFrame();
-    // 等原生尺寸与最后一帧落定再恢复模糊
-    Future<void>.delayed(
-      const Duration(milliseconds: 300),
-      () => fullscreenTransition.value = false,
-    );
+  }
+
+  static void _releaseGlass() {
+    if (_glassHolds > 0) _glassHolds--;
+    if (_glassHolds == 0) fullscreenTransition.value = false;
+  }
+
+  /// 等两帧：第一帧重建 LiquidGlass 去掉 BackdropFilter，第二帧确保已经提交到合成器。
+  static Future<void> _afterGlassDropped() async {
+    final binding = WidgetsBinding.instance;
+    // 窗口最小化 / 被遮挡时可能不出帧：最多等 300ms，不让切换卡死
+    await (() async {
+      await binding.endOfFrame;
+      await binding.endOfFrame;
+    })().timeout(const Duration(milliseconds: 300), onTimeout: () {});
+  }
+
+  /// 关闭沉浸式歌词前调用：先让玻璃退化为无模糊并等其落地，再返回，
+  /// 这样路由淡出动画（Opacity 图层里套 BackdropFilter）与随后的退出全屏都不会撞上它。
+  /// [hold] 之后自动恢复，期间若发生全屏切换，会等它也结束才恢复。
+  static Future<void> dropGlassForExit({
+    Duration hold = const Duration(milliseconds: 900),
+  }) async {
+    if (!_enabled) return;
+    _holdGlass();
+    Future<void>.delayed(hold, _releaseGlass);
+    await _afterGlassDropped();
   }
 
   /// 退出全屏后强制原生窗口重算边框、重排 Flutter 视图。

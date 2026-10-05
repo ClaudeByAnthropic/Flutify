@@ -8,7 +8,9 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
 
 import '../audio/audio_engine.dart';
+import '../auth/web_token_exception.dart';
 import 'fairplay.dart';
+import 'license_client.dart';
 import 'streaming_download.dart';
 
 /// EME 播放器：用一个**隐藏 1×1 WebView2**（空白本地页 + HLS.js，不加载任何 Spotify 前端）
@@ -141,6 +143,20 @@ class EmePlayer {
 
   /// 已创建的自定义环境（[ensureEnvironment] 完成后可用），供 buildHiddenView 默认使用。
   static WebViewEnvironment? cachedEnvironment;
+
+  /// Clear the same cookie store used by login and EME, including HttpOnly
+  /// cookies. Do not remove CDM data or an external browser's profile.
+  static Future<void> clearSessionCookies() async {
+    final environment = await ensureEnvironment();
+    final cleared = await CookieManager.instance(
+      webViewEnvironment: environment,
+    ).deleteAllCookies();
+    // Android's callback reports whether any cookies were removed; false is
+    // also the normal result for an already empty store.
+    if (!cleared && !Platform.isAndroid) {
+      throw StateError('WebView Cookie 清理失败，请重试');
+    }
+  }
 
   /// 在 runApp 后尽早调用一次（WebView 创建前）。
   static Future<WebViewEnvironment?> ensureEnvironment() {
@@ -532,8 +548,7 @@ class EmePlayer {
       // 只记第一条：随后 hls.js 还会发 fatal 错误事件，别让泛化 details 覆盖真实原因
       lastError ??= EmePlaybackException(
         '$name 反代失败：$error',
-        webSignInSuggested:
-            _usesWebToken(name) && _looksLikeAuthFailure('$error'),
+        webSignInSuggested: _usesWebToken(name) && _isWebAuthFailure(error),
         cause: error,
       );
       _stateController.add(EmePlayerState.error);
@@ -550,17 +565,19 @@ class EmePlayer {
     } catch (_) {}
   }
 
-  /// 401/403 视为 Web 登录态（sp_dc）失效：引导重新 Web 登录。
   /// 这一路反代是否依赖 Web token（sp_dc 铸造）：license 总是；证书只有 FairPlay 要带鉴权
   ///（Widevine 证书只用 client-token）。FairPlay 的原生页面先取证书，Web 登录失效最先在这一步暴露。
   bool _usesWebToken(String relay) =>
       relay == 'license' || (relay == '证书' && _fairPlayMode);
 
-  /// 401/403 = token 被拒；缺 sp_dc = 从没完成过 Web 登录（WebTokenService 抛出的原文）。
-  static bool _looksLikeAuthFailure(String message) =>
-      message.contains('401') ||
-      message.contains('403') ||
-      message.contains('缺少 sp_dc');
+  /// Only an explicit login requirement or an authenticated endpoint's 401
+  /// suggests signing in. A 403 or digits in an arbitrary error are insufficient.
+  static bool _isWebAuthFailure(Object error) => switch (error) {
+    WebSignInRequiredException() => true,
+    WebTokenHttpException(:final statusCode) => statusCode == 401,
+    LicenseHttpException(:final statusCode) => statusCode == 401,
+    _ => false,
+  };
 
   static Future<Uint8List> consolidatedBody(HttpRequest request) async {
     final builder = BytesBuilder();
@@ -817,7 +834,7 @@ class EmePlayer {
   }
 
   /// 按 HLS.js details / 错误文本归类：明确 DRM/CDM 缺失时打标记（重试无意义），
-  /// 401/403 标记为「需重新 Web 登录」，其余按普通运行期失败处理。
+  /// 页面媒体错误不能证明 Web 登录失效；令牌 / 许可证错误由反代按类型判断。
   /// [_fairPlayMode] 时按 FairPlay 判定（macOS 缺 Widevine 是必然，不能拿它当依据）。
   EmePlaybackException _classifyError(String msg) {
     if (_fairPlayMode) {
@@ -827,16 +844,11 @@ class EmePlayer {
       return EmePlaybackException(
         'FairPlay/EME：$msg',
         isWidevineMissing: noFps,
-        webSignInSuggested: !noFps && _looksLikeAuthFailure(msg),
       );
     }
     final noWidevine =
         _widevineUnavailable || msg.toLowerCase().contains('keysystemnoaccess');
-    return EmePlaybackException(
-      msg,
-      isWidevineMissing: noWidevine,
-      webSignInSuggested: !noWidevine && _looksLikeAuthFailure(msg),
-    );
+    return EmePlaybackException(msg, isWidevineMissing: noWidevine);
   }
 
   Future<void> dispose() async {

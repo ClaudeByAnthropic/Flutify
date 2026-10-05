@@ -84,7 +84,7 @@ void main() {
     );
     final fields = tester.widgetList<TextField>(find.byType(TextField));
     expect(fields, hasLength(1));
-    expect(fields.single.decoration?.hintText, 'Flutify');
+    expect(fields.single.decoration?.hintText, 'Web Player');
 
     // 主题模式 → 深色；纯黑背景
     await tester.scrollUntilVisible(
@@ -187,11 +187,15 @@ void main() {
           matching: find.byType(Slider),
         );
         final volume = sliders.last;
+        // 音量条在控制台玻璃内部、进度条之下
+        final controls = find.byType(LyricsGlassControls);
         expect(
           tester.getCenter(volume).dy,
-          greaterThan(
-            tester.getBottomLeft(find.byType(LyricsGlassControls)).dy,
-          ),
+          greaterThan(tester.getCenter(sliders.first).dy),
+        );
+        expect(
+          tester.getCenter(volume).dy,
+          lessThan(tester.getBottomLeft(controls).dy),
         );
         expect(tester.getBottomLeft(volume).dy, lessThanOrEqualTo(size.height));
         expect(tester.takeException(), isNull);

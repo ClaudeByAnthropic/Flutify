@@ -12,12 +12,14 @@ import '../../../widgets/player_controls.dart';
 ///
 /// - 默认（手机全屏歌词）：上一首 / 播放暂停 / 下一首；
 /// - [full] 为 true（桌面沉浸式、全屏播放器歌词视图）：额外带随机与循环；
+/// - [bottom] 非空时放在播放控件下方、玻璃内部（桌面沉浸式的音量条，类似 Apple 锁屏）；
 /// - 遥控远程设备时（[NowPlayingSource.isRemote]）进度与按钮都作用于远程设备，外观不变。
 class LyricsGlassControls extends StatelessWidget {
   final bool full;
   final double maxWidth;
+  final Widget? bottom;
 
-  const LyricsGlassControls({super.key, this.full = false, this.maxWidth = 520});
+  const LyricsGlassControls({super.key, this.full = false, this.maxWidth = 520, this.bottom});
 
   @override
   Widget build(BuildContext context) {
@@ -27,8 +29,14 @@ class LyricsGlassControls extends StatelessWidget {
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: LiquidGlass(
           borderRadius: context.tokens.radius(30),
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-          child: Column(mainAxisSize: MainAxisSize.min, children: remote ? _remote() : _local()),
+          padding: EdgeInsets.fromLTRB(16, 6, 16, bottom == null ? 12 : 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ...(remote ? _remote() : _local()),
+              if (bottom != null) ...[const SizedBox(height: 4), bottom!],
+            ],
+          ),
         ),
       ),
     );

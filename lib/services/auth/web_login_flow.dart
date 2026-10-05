@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'web_token_exception.dart';
 
 /// 统一登录流程：**Web 登录 → 自动取所需凭据 → 后台无感完成桌面 OAuth**。
 ///
@@ -35,7 +36,7 @@ class WebLoginFlow extends ChangeNotifier {
   /// 保存 sp_dc（经插件持久化）。
   final Future<void> Function(String spDc) saveSpDc;
 
-  /// 铸 Web token（顺带验证 sp_dc）；失败只提示不阻断。
+  /// 铸 Web token（顺带验证 sp_dc）；401 终止登录，其他失败提示后继续。
   final Future<void> Function() prepareWebToken;
 
   /// 桌面 OAuth 是否已完成（实时查询，不缓存）。
@@ -63,6 +64,7 @@ class WebLoginFlow extends ChangeNotifier {
   bool _busy = false;
   bool _desktopDone = false;
   bool _finished = false;
+  int _revision = 0;
   DateTime? _desktopStartedAt;
 
   WebLoginStage get stage => _stage;
@@ -105,7 +107,9 @@ class WebLoginFlow extends ChangeNotifier {
 
   @override
   void dispose() {
+    ++_revision;
     _disposed = true;
+    _finished = true;
     super.dispose();
   }
 
@@ -125,37 +129,67 @@ class WebLoginFlow extends ChangeNotifier {
 
   /// 第一段：轮询 sp_dc。读到即保存并进入取凭据阶段。
   Future<void> _captureWebSession() async {
+    final revision = _revision;
     _busy = true;
     try {
       final value = await readSpDc();
+      if (_finished ||
+          revision != _revision ||
+          _stage != WebLoginStage.webSignIn) {
+        return;
+      }
       if (value == null || value.isEmpty) return; // 登录未完成，下个周期再试
       spDc = value;
       notifyListeners();
       await saveSpDc(value);
+      if (_finished ||
+          revision != _revision ||
+          _stage != WebLoginStage.webSignIn) {
+        return;
+      }
       await _prepare();
     } catch (e) {
+      if (_finished ||
+          revision != _revision ||
+          _stage == WebLoginStage.failed) {
+        return;
+      }
       _fail('保存 Web 会话失败：$e');
     } finally {
       _busy = false;
     }
   }
 
-  /// 第二段：铸 Web token（sp_dc + TOTP → /api/token）。失败降级为提示，
-  /// 因为 sp_dc 已到手，token 可以稍后自动重铸。
+  /// 第二段：铸 Web token（sp_dc + TOTP → /api/token）。401 丢弃会话；
+  /// 其他失败降级为提示，token 可以稍后重新获取。
   Future<void> _prepare() async {
+    final revision = _revision;
     _stage = WebLoginStage.preparing;
     notifyListeners();
     try {
       await prepareWebToken();
+      if (_finished || revision != _revision) return;
       _notice = null;
     } catch (e) {
+      if (_finished || revision != _revision) return;
+      if (e is WebTokenHttpException && e.statusCode == 401) {
+        invalidateSession();
+        return;
+      }
       _notice = 'Web token 暂未取到（$e），稍后会自动重试';
+    }
+    if (_finished ||
+        revision != _revision ||
+        _stage != WebLoginStage.preparing) {
+      return;
     }
     await _startDesktop();
   }
 
   /// 第三段：桌面 OAuth 没做就后台无感补上。
   Future<void> _startDesktop() async {
+    final revision = _revision;
+    if (_finished || _stage == WebLoginStage.failed) return;
     if (desktopSignedIn()) {
       _desktopDone = true;
       _complete();
@@ -168,7 +202,13 @@ class WebLoginFlow extends ChangeNotifier {
     try {
       url = await beginDesktopOAuth();
     } catch (e) {
+      if (_finished || revision != _revision) return;
       _fail('无法开始桌面授权：$e');
+      return;
+    }
+    if (_finished ||
+        revision != _revision ||
+        _stage != WebLoginStage.desktopAuthorize) {
       return;
     }
     if (desktopSignedIn()) {
@@ -201,6 +241,7 @@ class WebLoginFlow extends ChangeNotifier {
   /// 失败后重试：Web 会话已到手时直接重发桌面授权（先取消上一次挂着的回环）。
   Future<void> retry() async {
     if (_busy || _finished) return;
+    final revision = _revision;
     _busy = true;
     try {
       _error = null;
@@ -208,7 +249,9 @@ class WebLoginFlow extends ChangeNotifier {
         try {
           await cancelDesktopOAuth?.call();
         } catch (_) {}
+        if (_finished || revision != _revision) return;
         desktopAuthorizeUrl = null;
+        _stage = WebLoginStage.preparing;
         notifyListeners();
         await _startDesktop();
       } else {
@@ -222,6 +265,7 @@ class WebLoginFlow extends ChangeNotifier {
 
   /// 关页清理：取消进行中的桌面授权。
   Future<void> cancel() async {
+    ++_revision;
     if (_finished) return;
     _finished = true;
     try {
@@ -230,6 +274,7 @@ class WebLoginFlow extends ChangeNotifier {
   }
 
   void _complete() {
+    if (_finished) return;
     _finished = true;
     _stage = WebLoginStage.done;
     notifyListeners();
@@ -237,10 +282,22 @@ class WebLoginFlow extends ChangeNotifier {
   }
 
   void _fail(String message) {
+    if (_finished) return;
     // 不置 _finished：失败态可 retry；poll / 授权回调只在对应阶段才推进
     _stage = WebLoginStage.failed;
     _error = message;
     notifyListeners();
+  }
+
+  /// A rejected account session must return to Web login, never continue with
+  /// the captured cookie or a late OAuth completion.
+  void invalidateSession() {
+    ++_revision;
+    spDc = null;
+    _desktopDone = false;
+    desktopAuthorizeUrl = null;
+    _notice = null;
+    _fail('登录已失效，已清除登录状态，请重新登录');
   }
 }
 

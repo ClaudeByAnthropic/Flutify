@@ -51,7 +51,7 @@ class AppPreferences {
   /// 启动后即使未播放，也把本机当前曲目（暂停）同步给 Connect，让其他设备看到 Flutify 的状态。
   final bool connectReportOnLaunch;
 
-  /// 本机在其他设备「设备列表」里显示的名字；空表示默认「Flutify」。
+  /// 本机在其他设备「设备列表」里显示的名字；空表示默认「Web Player」。
   final String connectDeviceName;
 
   /// 远程播放时歌词的提前量（毫秒）：正数让歌词更早切行，负数推迟。只影响歌词，不影响进度条。

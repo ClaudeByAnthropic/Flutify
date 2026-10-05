@@ -15,6 +15,9 @@ class _Server implements EmePlayer {
   Completer<void>? gate;
 
   @override
+  EmePlaybackException? lastError;
+
+  @override
   Future<({String hlsUrl, String licenseUrl, String provisionUrl})>
   serveHlsForNative({
     required File m4a,
@@ -22,6 +25,7 @@ class _Server implements EmePlayer {
     required Future<Uint8List> Function(Uint8List) licensePoster,
     required Future<Uint8List> Function() certFetcher,
   }) async {
+    lastError = null;
     prepared.add(m3u8);
     await gate?.future;
     return (hlsUrl: m3u8, licenseUrl: 'license', provisionUrl: 'provision');
@@ -86,6 +90,63 @@ void main() {
     m4aPath: '$id.m4a',
     m3u8: id,
   );
+
+  Future<void> nativeError(String message) async {
+    await messenger.handlePlatformMessage(
+      events.name,
+      const StandardMethodCodec().encodeSuccessEnvelope({
+        'type': 'error',
+        'code': 'ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED',
+        'message': message,
+      }),
+      (_) {},
+    );
+  }
+
+  for (final status in [401, 403]) {
+    test('native HTTP $status text does not imply Web sign-in', () async {
+      await engine.playEme(content());
+      final errorEvent = engine.emeErrors.first;
+      await nativeError('media or provisioning HTTP $status');
+      final error = await errorEvent;
+      expect(error.webSignInSuggested, isFalse);
+      expect(error.message, contains('HTTP $status'));
+      expect(engine.hasSource, isFalse);
+      expect(engine.isPlaying, isFalse);
+    });
+  }
+
+  for (final signIn in [false, true]) {
+    test(
+      'relay classification $signIn survives generic native error',
+      () async {
+        await engine.playEme(content());
+        final cause = StateError('original relay cause');
+        final relayError = EmePlaybackException(
+          'license relay failed',
+          webSignInSuggested: signIn,
+          cause: cause,
+        );
+        server.lastError = relayError;
+        final errors = <EmePlaybackException>[];
+        final subscription = engine.emeErrors.listen(errors.add);
+        addTearDown(subscription.cancel);
+        await nativeError('DRM session failed');
+        await until(() => errors.isNotEmpty);
+        expect(errors.single, same(relayError));
+        expect(errors.single.cause, same(cause));
+        await nativeError('duplicate media failure');
+        await Future<void>.delayed(Duration.zero);
+        expect(errors, hasLength(1));
+
+        await engine.playEme(content('next'));
+        await nativeError('next track media HTTP 403');
+        await until(() => errors.length == 2);
+        expect(errors.last.webSignInSuggested, isFalse);
+        expect(errors.last.cause, isNull);
+      },
+    );
+  }
 
   test(
     'paused preparation passes intent and seek to native before starting',
