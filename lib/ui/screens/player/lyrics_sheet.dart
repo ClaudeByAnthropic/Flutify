@@ -24,7 +24,7 @@ import 'player_modal.dart';
 class LyricsSheet extends StatelessWidget {
   const LyricsSheet({super.key});
 
-  static const double _headerHeight = 104;
+  static const double _headerHeight = 140;
   static const double _controlsHeight = 150;
 
   static Future<void> show(BuildContext context) =>
@@ -112,15 +112,30 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Column(
         children: [
-          Container(
-            width: 36,
-            height: 5,
-            decoration: BoxDecoration(
-              color: Colors.white38,
-              borderRadius: BorderRadius.circular(3),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 36,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white38,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                if (track != null)
+                  const Positioned(
+                    top: 0,
+                    right: 0,
+                    child: LyricsTranslationButton(),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           LiquidGlass(
             borderRadius: tokens.radius(22),
             padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
@@ -161,7 +176,6 @@ class _Header extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (track != null) const LyricsTranslationButton(),
                 if (track != null)
                   LikeButton(
                     track: track!,

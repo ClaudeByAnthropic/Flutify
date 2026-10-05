@@ -67,7 +67,8 @@ class LyricsView extends StatefulWidget {
   State<LyricsView> createState() => _LyricsViewState();
 }
 
-class _LyricsViewState extends State<LyricsView> {
+class _LyricsViewState extends State<LyricsView>
+    with SingleTickerProviderStateMixin {
   static const Duration _browseHold = Duration(seconds: 3);
 
   /// 提前切行量：进度流约 200ms 一次，加上对焦/滚动动画耗时，
@@ -89,13 +90,23 @@ class _LyricsViewState extends State<LyricsView> {
 
   late final ValueListenable<Duration> _position;
   late final void Function(Duration position) _seek;
-  final ScrollController _scroll = ScrollController();
+  late final ScrollController _scroll = _LyricsScrollController(
+    reflowTarget: _translationLayoutTarget,
+  );
 
   SpotifyLyrics? _lyrics;
   late final LyricsTranslationController _translation;
   late final bool _ownsTranslation;
   SpotifyLyrics? _translationLyrics;
   String? _translationTrackUri;
+  late final AnimationController _translationReveal = AnimationController(
+    vsync: this,
+  )..addListener(_onTranslationFrame);
+  List<String>? _visibleTranslations;
+  double _translationTarget = 0;
+  double _translationScrollStart = 0;
+  double _translationScrollDelta = 0;
+  bool _translationFramePending = false;
   int _loadRevision = 0;
   List<GlobalKey> _lineKeys = const [];
   final GlobalKey _introKey = GlobalKey();
@@ -172,6 +183,13 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   void _setLyrics(SpotifyLyrics lyrics) {
+    _translationReveal.stop();
+    _visibleTranslations = null;
+    _translationTarget = 0;
+    _translationScrollStart = 0;
+    _translationScrollDelta = 0;
+    _translationReveal.value = 0;
+    _translationFramePending = false;
     _lyrics = lyrics;
     _lineKeys = List.generate(lyrics.lines.length, (_) => GlobalKey());
     final lines = lyrics.lines;
@@ -195,10 +213,51 @@ class _LyricsViewState extends State<LyricsView> {
 
   void _onTranslation() {
     if (!mounted) return;
+    final lines = _translationIsCurrent ? _translation.lines : null;
+    if (lines != null) _visibleTranslations = lines;
+    final target = lines == null ? 0.0 : 1.0;
     setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scrollToActive(animate: false),
+    if (target == _translationTarget &&
+        (_translationReveal.isAnimating ||
+            _translationReveal.value == target)) {
+      return;
+    }
+    _animateTranslationTo(target);
+  }
+
+  void _animateTranslationTo(double target) {
+    _translationTarget = target;
+    _translationScrollStart = _translationReveal.value;
+    final position = _scroll.hasClients ? _scroll.position : null;
+    _translationScrollDelta = position == null
+        ? 0
+        : (_activeScrollTarget() ?? position.pixels) - position.pixels;
+    if (!_browsing && position is ScrollPositionWithSingleContext) {
+      position.goIdle();
+    }
+    _translationReveal.animateTo(
+      target,
+      duration: context.motion(_scrollDuration),
+      curve: _scrollCurve,
     );
+  }
+
+  void _onTranslationFrame() {
+    if (!mounted) return;
+    setState(() {
+      _translationFramePending = true;
+      if (_translationTarget == 0 && _translationReveal.value == 0) {
+        _visibleTranslations = null;
+      }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (context.reduceMotion && _translationReveal.isAnimating) {
+      _translationReveal.value = _translationTarget;
+    }
   }
 
   @override
@@ -262,12 +321,13 @@ class _LyricsViewState extends State<LyricsView> {
 
   /// 对焦行顶端的纵坐标：按用户偏好定位在未被控件遮挡的区域内。
   double get _focusTopY =>
-      widget.topInset +
-      (_viewportHeight - widget.topInset - widget.bottomInset).clamp(
-            0.0,
-            double.infinity,
-          ) *
-          _style.lyricsFocusPosition;
+      (widget.topInset +
+              (_viewportHeight - widget.topInset - widget.bottomInset).clamp(
+                    0.0,
+                    double.infinity,
+                  ) *
+                  _style.lyricsFocusPosition)
+          .clamp(0.0, _viewportHeight);
 
   /// 最后一个 startTimeMs <= ms 的行；在第一行之前返回 -1。
   int _indexFor(int ms) {
@@ -291,7 +351,14 @@ class _LyricsViewState extends State<LyricsView> {
     if (index == _activeIndex) return;
     setState(() => _activeIndex = index);
     if (!_browsing) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_translationReveal.isAnimating) {
+          _animateTranslationTo(_translationTarget);
+        } else {
+          _scrollToActive();
+        }
+      });
     }
   }
 
@@ -300,35 +367,65 @@ class _LyricsViewState extends State<LyricsView> {
     return box != null && box.hasSize ? box : null;
   }
 
-  void _scrollToActive({bool animate = true}) {
-    if (!mounted || _lineKeys.isEmpty || _viewportHeight <= 0) return;
+  double? _activeScrollTarget() {
+    if (!mounted || _lineKeys.isEmpty || _viewportHeight <= 0) return null;
     // 只滚歌词自己的滚动区：静态的 Scrollable.ensureVisible 会沿嵌套滚动容器一路向外滚
     // （右栏详情 ListView 会跟着歌词切行整体滑动），这里只改本滚动区的 position。
     final position = _scroll.hasClients ? _scroll.position : null;
-    if (position == null) return;
+    if (position == null || !position.hasContentDimensions) return null;
     final focus = _focusEntryFor(_currentGap);
     final box = _boxOf(
       focus < 0 ? _introKey : _lineKeys[focus.clamp(0, _lineKeys.length - 1)],
     );
-    if (box == null) return;
+    if (box == null) return null;
     final viewport = RenderAbstractViewport.maybeOf(box);
-    if (viewport == null) return;
+    if (viewport == null) return null;
 
     // 对焦项之上正在收起的呼吸点：收起动画与滚动同步进行，结束后对焦项会上移它当前的高度，
     // 目标位置预先扣掉，动画全程平滑、终点准确
     var collapsing = 0.0;
     if (focus >= 0) {
-      collapsing += _boxOf(_introKey)?.size.height ?? 0;
+      final first = _offsetOf(viewport, _lineKeys.first);
+      final intro = _offsetOf(viewport, _introKey);
+      if (first != null && intro != null) collapsing += first - intro;
       for (var i = 0; i < focus; i++) {
-        if (_blank[i]) collapsing += _boxOf(_lineKeys[i])?.size.height ?? 0;
+        if (_blank[i]) {
+          final start = _offsetOf(viewport, _lineKeys[i]);
+          final end = _offsetOf(viewport, _lineKeys[i + 1]);
+          if (start != null && end != null) collapsing += end - start;
+        }
       }
     }
 
-    final reveal = viewport.getOffsetToReveal(box, 0).offset;
-    final target = math.max(
-      position.minScrollExtent,
-      reveal - _focusTopY - collapsing,
-    );
+    final reveal = viewport.getOffsetToReveal(box, 0, rect: Rect.zero).offset;
+    return math.max(position.minScrollExtent, reveal - _focusTopY - collapsing);
+  }
+
+  double? _offsetOf(RenderAbstractViewport viewport, GlobalKey key) {
+    final box = _boxOf(key);
+    return box == null
+        ? null
+        : viewport.getOffsetToReveal(box, 0, rect: Rect.zero).offset;
+  }
+
+  double? _translationLayoutTarget() {
+    if (!_translationFramePending) return null;
+    _translationFramePending = false;
+    if (!mounted || _browsing || !_isSynced) return null;
+    final target = _activeScrollTarget();
+    if (target == null) return null;
+    final distance = _translationTarget - _translationScrollStart;
+    final progress = distance == 0
+        ? 1.0
+        : ((_translationReveal.value - _translationScrollStart) / distance)
+              .clamp(0.0, 1.0);
+    return target - _translationScrollDelta * (1 - progress);
+  }
+
+  void _scrollToActive({bool animate = true}) {
+    final target = _activeScrollTarget();
+    if (target == null) return;
+    final position = _scroll.position;
     if ((target - position.pixels).abs() < 0.5) return;
     if (animate && !context.reduceMotion) {
       position.animateTo(
@@ -368,12 +465,20 @@ class _LyricsViewState extends State<LyricsView> {
     if (_ownsTranslation) _translation.dispose();
     _browseTimer?.cancel();
     _position.removeListener(_onPosition);
+    _translationReveal.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isPlaying = widget.remote
+        ? context.select<ConnectProvider, bool>(
+            (provider) => provider.player.isAudible,
+          )
+        : context.select<PlaybackProvider, bool>(
+            (provider) => provider.isPlaying && !provider.isBuffering,
+          );
     final style = context.select<PreferencesProvider?, AppPreferences>(
       (p) => p?.prefs ?? AppPreferences.defaults,
     );
@@ -439,12 +544,12 @@ class _LyricsViewState extends State<LyricsView> {
             (_) => _scrollToActive(animate: false),
           );
         }
-        return _buildLines(lyrics);
+        return _buildLines(lyrics, isPlaying);
       },
     );
   }
 
-  Widget _buildLines(SpotifyLyrics lyrics) {
+  Widget _buildLines(SpotifyLyrics lyrics, bool isPlaying) {
     final focusY = _focusTopY;
     final centered = _style.lyricsAlign == LyricsAlign.center;
     final fontSize = widget.fontSize * _style.lyricsScale;
@@ -523,6 +628,7 @@ class _LyricsViewState extends State<LyricsView> {
                         gap?.entry == -1 ? gap : null,
                         fontSize,
                         centered,
+                        isPlaying: isPlaying,
                       ),
                     ),
                   for (var i = 0; i < lyrics.lines.length; i++)
@@ -533,6 +639,7 @@ class _LyricsViewState extends State<LyricsView> {
                           gap?.entry == i ? gap : null,
                           fontSize,
                           centered,
+                          isPlaying: isPlaying,
                         ),
                       )
                     else
@@ -541,8 +648,9 @@ class _LyricsViewState extends State<LyricsView> {
                         child: LyricLineView(
                           text: lyrics.lines[i].words,
                           translation: _translationIsCurrent
-                              ? _translation.lines?.elementAtOrNull(i)
+                              ? _visibleTranslations?.elementAtOrNull(i)
                               : null,
+                          translationProgress: _translationReveal.value,
                           fontSize: fontSize,
                           centered: centered,
                           blurScale: _style.lyricsBlur,
@@ -590,7 +698,12 @@ class _LyricsViewState extends State<LyricsView> {
 
   /// 无人声片段占位：[gap] 非空时展开显示呼吸点，否则收起为零高度。
   /// 展开 / 收起与切行滚动同时长同曲线，配合 [_scrollToActive] 的收起补偿保持位置连贯。
-  Widget _gapEntry(_Gap? gap, double fontSize, bool centered) {
+  Widget _gapEntry(
+    _Gap? gap,
+    double fontSize,
+    bool centered, {
+    required bool isPlaying,
+  }) {
     return AnimatedSize(
       duration: context.motion(_scrollDuration),
       curve: _scrollCurve,
@@ -608,6 +721,7 @@ class _LyricsViewState extends State<LyricsView> {
                   child: BreathingDots(
                     key: ValueKey(gap.startMs),
                     position: _position,
+                    isPlaying: isPlaying,
                     leadMs: _lookupMs - _position.value.inMilliseconds,
                     startMs: gap.startMs,
                     endMs: gap.endMs,
@@ -629,6 +743,49 @@ class _Gap {
   final int endMs;
 
   const _Gap(this.entry, this.startMs, this.endMs);
+}
+
+class _LyricsScrollController extends ScrollController {
+  final double? Function() reflowTarget;
+
+  _LyricsScrollController({required this.reflowTarget});
+
+  @override
+  ScrollPosition createScrollPosition(
+    ScrollPhysics physics,
+    ScrollContext context,
+    ScrollPosition? oldPosition,
+  ) => _LyricsScrollPosition(
+    physics: physics,
+    context: context,
+    oldPosition: oldPosition,
+    initialPixels: initialScrollOffset,
+    keepScrollOffset: keepScrollOffset,
+    reflowTarget: reflowTarget,
+  );
+}
+
+class _LyricsScrollPosition extends ScrollPositionWithSingleContext {
+  final double? Function() reflowTarget;
+
+  _LyricsScrollPosition({
+    required super.physics,
+    required super.context,
+    super.oldPosition,
+    super.initialPixels,
+    super.keepScrollOffset,
+    required this.reflowTarget,
+  });
+
+  @override
+  bool applyContentDimensions(double minScrollExtent, double maxScrollExtent) {
+    final target = reflowTarget();
+    if (target != null && hasPixels) {
+      final corrected = target.clamp(minScrollExtent, maxScrollExtent);
+      if (corrected != pixels) correctBy(corrected - pixels);
+    }
+    return super.applyContentDimensions(minScrollExtent, maxScrollExtent);
+  }
 }
 
 /// 歌词加载中的骨架（白色半透明横条，适配深色流动背景）。
