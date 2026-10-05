@@ -56,6 +56,34 @@ test('Android tests release builds using a disposable key and verifies all four 
   assert.match(android, /retention-days: 7/);
 });
 
+test('macOS self-tests retain the validated SDK and never request distribution signing', () => {
+  const macos = job('macos');
+  assert.match(workflow(), /FLUTTER_VERSION_MACOS: '3\.44\.9'/);
+  assert.match(macos, /needs: quality/);
+  assert.match(macos, /flutter-version: \$\{\{ env\.FLUTTER_VERSION_MACOS \}\}/);
+  assert.match(macos, /flutter test --no-pub/);
+  assert.match(macos, /flutter build macos --release --no-pub/);
+  assert.match(macos, /--keepParent build\/macos\/Build\/Products\/Release\/Flutify\.app/);
+  assert.match(macos, /name: self-test-macos/);
+  assert.doesNotMatch(macos, /notarytool|import-codesign|Developer ID/);
+});
+
+test('Windows self-tests build both native architectures and verify their portable bundles', () => {
+  const windows = job('windows');
+  assert.match(windows, /needs: quality/);
+  assert.match(windows, /arch: x64\n\s+runner: windows-latest/);
+  assert.match(windows, /arch: arm64\n\s+runner: windows-11-arm/);
+  assert.match(windows, /559ffa3f75e7402d65a8def9c28389a9b2e6fe42/);
+  assert.match(windows, /windows_arm64/);
+  assert.match(windows, /flutter build windows --release --no-pub/);
+  assert.match(windows, /--dart-define=FLUTIFY_NATIVE_WIDEVINE=\$\{\{ matrix.arch == 'x64' \}\}/);
+  assert.match(windows, /python tool\/verify_windows_arch\.py/);
+  assert.match(windows, /tool\/verify_windows_runtime\.ps1/);
+  assert.match(windows, /THIRD_PARTY_NOTICES\.md/);
+  assert.match(windows, /name: self-test-windows-\$\{\{ matrix.arch \}\}/);
+  assert.match(windows, /if-no-files-found: error/);
+});
+
 test('the separate release pipeline still requires fixed signing secrets and certificate checks', () => {
   const release = read('.github/workflows/build.yml');
   const gradle = read('android/app/build.gradle.kts');

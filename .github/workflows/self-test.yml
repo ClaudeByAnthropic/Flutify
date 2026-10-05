@@ -18,6 +18,7 @@ concurrency:
 
 env:
   FLUTTER_VERSION: '3.44.0'
+  FLUTTER_VERSION_MACOS: '3.44.9'
 
 jobs:
   quality:
@@ -93,5 +94,101 @@ jobs:
         with:
           name: self-test-android
           path: dist/android/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    name: macOS self-test
+    needs: quality
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION_MACOS }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --no-pub
+      - run: flutter build macos --release --no-pub
+      - name: Package self-test app
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent build/macos/Build/Products/Release/Flutify.app "dist/Flutify-self-test-${GITHUB_SHA:0:7}-macos.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: self-test-macos
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    name: Windows ${{ matrix.arch }} self-test
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      BUILD_ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        if: matrix.arch == 'x64'
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+          architecture: ${{ matrix.arch }}
+      # This SDK version has no prebuilt Windows ARM64 archive.
+      - name: Bootstrap native Flutter SDK on Windows ARM64
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          if ($env:PROCESSOR_ARCHITECTURE -ne 'ARM64') { throw 'Expected native ARM64 runner shell' }
+          $sdk = Join-Path $env:RUNNER_TEMP 'flutter-arm64'
+          git clone --depth 1 --branch $env:FLUTTER_VERSION https://github.com/flutter/flutter.git $sdk
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter clone failed' }
+          $revision = git -C $sdk rev-parse HEAD
+          if ($revision -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') { throw 'Unexpected Flutter 3.44.0 revision' }
+          & "$sdk/bin/flutter.bat" --version
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter bootstrap failed' }
+          $dartVersion = & "$sdk/bin/dart.bat" --version 2>&1
+          if ($dartVersion -notmatch 'windows_arm64') { throw "Expected ARM64 Dart: $dartVersion" }
+          "$sdk/bin" >> $env:GITHUB_PATH
+      - run: flutter pub get
+      - run: flutter build windows --release --no-pub --dart-define=FLUTIFY_NATIVE_WIDEVINE=${{ matrix.arch == 'x64' }}
+      - name: Verify native binary architecture
+        run: python tool/verify_windows_arch.py build/windows/${{ matrix.arch }}/runner/Release ${{ matrix.arch }}
+      - name: Verify app-local VC runtime dependencies
+        shell: pwsh
+        run: ./tool/verify_windows_runtime.ps1 -Directory build/windows/${{ matrix.arch }}/runner/Release -BuildDirectory build/windows/${{ matrix.arch }}
+      - name: Package self-test portable bundle
+        shell: pwsh
+        run: |
+          $source = "build/windows/$env:BUILD_ARCH/runner/Release"
+          if (!(Test-Path "$source/Flutify.exe") -or !(Test-Path "$source/data/app.so")) { throw 'Missing release application' }
+          $stage = "dist/self-test-windows-$env:BUILD_ARCH"
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Get-ChildItem -LiteralPath $source -File | Where-Object { $_.Extension -in '.exe', '.dll' } | Copy-Item -Destination $stage
+          Copy-Item -LiteralPath "$source/data" -Destination $stage -Recurse
+          if (Test-Path "$source/native_assets.json") { Copy-Item "$source/native_assets.json" -Destination $stage }
+          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md -Destination $stage
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/Flutify-self-test-$($env:GITHUB_SHA.Substring(0,7))-windows-$env:BUILD_ARCH.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: self-test-windows-${{ matrix.arch }}
+          path: dist/*.zip
           if-no-files-found: error
           retention-days: 7

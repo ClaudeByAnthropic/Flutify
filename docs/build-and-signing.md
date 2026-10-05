@@ -2,11 +2,32 @@
 
 工作流：`.github/workflows/build.yml`。推送 `main` 或手动运行生成 Actions 产物；推送 `v*` 标签在所有构建成功后发布 Release。包含 `alpha`、`beta` 或 `rc` 的标签标为预发布。
 
+## Fork 与功能分支自测
+
+`.github/workflows/self-test.yml` 是独立的 **Self-test** 工作流，不读取任何仓库签名 Secrets，不写标签或发布 Release。它不会修改或替代上面的正式发布流程；在 fork 中手动运行原 `Build`，仍然需要正式签名配置。
+
+- 分支推送自动触发（纯文档变更除外），目标为 `main` 的 PR 也会触发；标签推送不触发。工作流进入默认分支后，可在 Actions 页面手动选择分支运行。
+- 首先分析 `lib/`、`test/`，执行全部 Flutter、Node 和 Python 测试。既有 info 级 lint 会展示但不阻断，error 和 warning 仍阻断；`tool/` 下的独立 Dart 探针不属于应用静态分析范围。没有禁用测试或放行测试失败。
+- 质量检查通过后，并行构建 Android、macOS、Windows x64 / ARM64。SDK 与正式流程一致：Mac 3.44.9，其他平台 3.44.0；Mac 再执行一次该平台的 Flutter 测试。
+- Android 在 runner 临时目录生成一次性 PKCS12 密钥，使用随机密码并屏蔽日志；以 **release 编译模式**生成通用包与三个 ABI 拆分包，按本次证书指纹检查签名、versionCode 和媒体图标。任务完成后删除临时私钥，不上传密钥或密码。
+- Mac 输出未做 Developer ID 签名、公证的 `.app` ZIP；Windows 输出经过架构及运行库校验的便携 ZIP，不生成正式安装程序。
+- 产物名称均包含 `self-test`，在该次 Actions 运行的 Artifacts 中保留 7 天；缺少产物会使任务失败。令牌仅有 `contents: read` 权限，checkout 不持久保存凭据。
+
+**不要把 Android 自测包当成升级包。** 每次运行的签名都不同，基础 versionCode 固定为 1，不能直接覆盖正式版本、现有本机签名版本或上次 CI 自测版本。建议在独立测试设备/模拟器使用，不要为安装自测包卸载当前日常使用版本而丢失应用数据。CI 不自动安装到用户设备，自动化通过也不能替代真机登录和播放验证。
+
+工作流边界和一次性签名的回归测试：
+
+```sh
+node --test tool/test_self_test_workflow.cjs tool/test_self_test_signing.cjs
+```
+
+签名测试在临时目录使用 Bash、OpenSSL 与 JDK 17 的 `keytool`，验证可用证书、每次重新生成以及拒绝覆盖现有密钥；不使用本地正式签名文件。
+
 ## Android
 
-所有 release APK 必须使用同一把 beta 密钥；缺失配置时直接失败，不回退到 debug 签名。调试构建不需要 release 密钥。
+正式发布的 release APK 必须使用同一把 beta 密钥；缺失配置时直接失败，不回退到 debug 或自测签名。调试构建不需要 release 密钥。
 
-仓库已配置下列 Actions Secrets：
+正式发布仓库需要配置下列 Actions Secrets（不会随 fork 复制）：
 
 | Secret | 用途 |
 | --- | --- |
