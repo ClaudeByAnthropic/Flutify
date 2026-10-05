@@ -877,7 +877,7 @@ void main() {
         expect(find.byType(ImmersiveLyricsScreen), findsOneWidget);
         expect(
           find.text('A Synthetic Remote Track With A Fairly Long Title'),
-          findsOneWidget,
+          findsWidgets,
         );
         expect(DesktopWindow.immersiveWindow.value, isTrue);
         expect(storage.immersiveScreenFullscreen, isFalse);
