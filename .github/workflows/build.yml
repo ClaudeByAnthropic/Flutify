@@ -31,6 +31,9 @@ permissions:
 
 env:
   FLUTTER_VERSION: '3.44.0'
+  # macOS 固定 3.44.9：该版本包含 Xcode 27 的 lipo 多架构校验修复
+  # （flutter/flutter#188625）；Windows / Android 暂时保持 3.44.0。
+  FLUTTER_VERSION_MACOS: '3.44.9'
 
 jobs:
   prepare:
@@ -227,7 +230,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: ${{ env.FLUTTER_VERSION_MACOS }}
           channel: stable
           cache: true
 

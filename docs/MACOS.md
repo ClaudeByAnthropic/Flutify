@@ -4,7 +4,7 @@ macOS 支持处于源码自测阶段。现有 Windows / Android Release 保持�
 
 ## 构建
 
-需要 Xcode（含命令行工具）、CocoaPods 与 Flutter 3.44.0，与 CI 使用的 Flutter 版本一致。Xcode 工程与 Podfile 的最低系统版本为 macOS 12.0（较新的 Xcode 不再支持更低的部署目标）；这不是所有系统版本均完成实机验证的声明。
+需要 Xcode（含命令行工具）、CocoaPods 与 Flutter 3.44.9 及以上（CI 的 macOS 任务固定 3.44.9；其他平台仍为 3.44.0）。Xcode 工程与 Podfile 的最低系统版本为 macOS 12.0（较新的 Xcode 不再支持更低的部署目标）；这不是所有系统版本均完成实机验证的声明。
 
 在仓库根目录运行：
 
@@ -19,7 +19,7 @@ Podfile 与 `Podfile.lock` 纳入版本控制；Pods 和 Flutter ephemeral 目�
 
 开发版可用 `flutter run -d macos`。自测 Release 时请通过 `open` 启动 `.app`，不要在终端后台直接执行二进制：macOS 无头 WKWebView 的创建依赖已显示、聚焦的主窗口。
 
-Xcode 27 的 `lipo` 一次只接受一个 `-verify_arch` 参数，Flutter 3.44.0 的 `flutter_tools` 仍按旧行为一次校验多个架构，通用（x86_64 + arm64）Release 构建会在 `release_unpack_macos` 阶段报 “does not contain architectures”。需要更换包含该修复的 Flutter 版本，或对本地 Flutter SDK 打补丁后再构建。
+Xcode 27 的 `lipo` 一次只接受一个 `-verify_arch` 参数，Flutter 3.44.0–3.44.8 的 `flutter_tools` 仍按旧行为一次校验多个架构，通用（x86_64 + arm64）Release 构建会在 `release_unpack_macos` 阶段报 “does not contain architectures”。该问题已在 Flutter 3.44.9 修复（[flutter/flutter#188625](https://github.com/flutter/flutter/pull/188625)），CI 的 macOS 任务固定 3.44.9；本地使用更早版本时需升级 Flutter，或按该 PR 自行打补丁。
 
 ## 适配内容
 
