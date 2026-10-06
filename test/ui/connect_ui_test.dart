@@ -23,6 +23,7 @@ import 'package:flutify_app/ui/widgets/connect/remote_mini_player.dart';
 import 'package:flutify_app/ui/widgets/connect/remote_player_bar.dart';
 import 'package:flutify_app/ui/widgets/desktop_player_bar.dart';
 import 'package:flutify_app/ui/widgets/mini_player.dart';
+import 'package:flutify_app/ui/widgets/marquee_text.dart';
 import 'package:flutify_app/ui/widgets/cover_image.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/lyrics_view.dart';
 import 'package:flutify_app/ui/screens/player/queue_list.dart';
@@ -763,6 +764,38 @@ void main() {
   group('remote lyrics', () {
     const remoteTitle = 'A Synthetic Remote Track With A Fairly Long Title';
 
+    testWidgets('remote mini title restarts after closing the full player', (tester) async {
+      await pumpHost(
+        tester,
+        const Size(390, 844),
+        const MiniPlayer(),
+        cluster: syntheticCluster(playing: false),
+      );
+      double titleOffset() {
+        final title = find.descendant(of: find.byType(RemoteMiniPlayer), matching: find.byType(MarqueeText));
+        final scroll = find.descendant(of: title, matching: find.byType(SingleChildScrollView));
+        return tester.widget<SingleChildScrollView>(scroll).controller!.offset;
+      }
+      await tester.pump(const Duration(milliseconds: 4500));
+      expect(titleOffset(), greaterThan(0));
+      await tester.tap(find.byType(RemoteMiniPlayer));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 650));
+      await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
+      await tester.pump();
+      for (var frame = 0; frame < 10; frame++) {
+        await tester.pump(const Duration(milliseconds: 60));
+      }
+      expect(find.byType(FullPlayerSheet), findsNothing);
+      expect(titleOffset(), 0);
+      await tester.pump(const Duration(seconds: 3));
+      expect(titleOffset(), 0);
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(titleOffset(), greaterThan(0));
+      expect(tester.takeException(), isNull);
+      await unmount(tester);
+    });
+
     testWidgets(
       'tapping the remote capsule opens the full player with remote controls',
       (tester) async {
@@ -774,12 +807,17 @@ void main() {
         );
         await tester.tap(find.byType(RemoteMiniPlayer));
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 650));
 
         final player = find.byType(FullPlayerSheet);
         expect(player, findsOneWidget);
         expect(
-          find.descendant(of: player, matching: find.text(remoteTitle)),
+          find.descendant(
+            of: player,
+            matching: find.byWidgetPredicate(
+              (widget) => widget is MarqueeText && widget.text == remoteTitle,
+            ),
+          ),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
@@ -839,7 +877,7 @@ void main() {
         expect(find.byType(ImmersiveLyricsScreen), findsOneWidget);
         expect(
           find.text('A Synthetic Remote Track With A Fairly Long Title'),
-          findsOneWidget,
+          findsWidgets,
         );
         expect(DesktopWindow.immersiveWindow.value, isTrue);
         expect(storage.immersiveScreenFullscreen, isFalse);
