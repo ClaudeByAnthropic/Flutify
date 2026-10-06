@@ -89,6 +89,7 @@ class _LibrarySidebarItemState extends State<LibrarySidebarItem> {
     }
 
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: Material(
@@ -96,6 +97,7 @@ class _LibrarySidebarItemState extends State<LibrarySidebarItem> {
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
+          mouseCursor: SystemMouseCursors.click,
           onTap: () => entry.open(context),
           child: content,
         ),

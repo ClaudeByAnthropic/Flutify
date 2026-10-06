@@ -127,7 +127,12 @@ class SettingsTile extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 12, 12), child: body),
     );
     if (onTap == null) return content;
-    return InkWell(onTap: onTap, borderRadius: context.tokens.radius(16), child: content);
+    return InkWell(
+      mouseCursor: SystemMouseCursors.click,
+      onTap: onTap,
+      borderRadius: context.tokens.radius(16),
+      child: content,
+    );
   }
 }
 

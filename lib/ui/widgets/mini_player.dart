@@ -75,6 +75,7 @@ class MiniPlayer extends StatelessWidget {
                 type: MaterialType.transparency,
                 child: InkWell(
                   customBorder: shape,
+                  mouseCursor: SystemMouseCursors.click,
                   onTap: () => FullPlayerSheet.show(context),
                   child: GestureDetector(
                     onHorizontalDragEnd: (details) {

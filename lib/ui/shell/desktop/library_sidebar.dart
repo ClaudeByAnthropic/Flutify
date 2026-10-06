@@ -195,6 +195,9 @@ class _Header extends StatelessWidget {
             message: l10n.shellCollapseLibrary,
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
+              mouseCursor: onToggle == null
+                  ? MouseCursor.defer
+                  : SystemMouseCursors.click,
               onTap: onToggle,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

@@ -27,6 +27,7 @@ class PlayerBarCover extends StatelessWidget {
     final radius = BorderRadius.circular(8);
 
     final cover = HoverBuilder(
+      cursor: onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
       builder: (context, hovered) => Stack(
         children: [
           CoverImage(url: url, size: size, borderRadius: radius),
@@ -47,7 +48,7 @@ class PlayerBarCover extends StatelessWidget {
     if (onTap == null) return cover;
     return Tooltip(
       message: layout != null ? context.l10n.shellPlaybackStatus : context.l10n.openNowPlaying,
-      child: InkWell(borderRadius: radius, onTap: onTap, child: cover),
+      child: InkWell(borderRadius: radius, mouseCursor: SystemMouseCursors.click, onTap: onTap, child: cover),
     );
   }
 }

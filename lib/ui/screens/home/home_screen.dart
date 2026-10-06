@@ -118,9 +118,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     leading: desktop
                         ? null
-                        : GestureDetector(
-                            onTap: widget.onOpenSettings,
-                            child: const UserAvatar(size: 32),
+                        : MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: widget.onOpenSettings,
+                              child: const UserAvatar(size: 32),
+                            ),
                           ),
                   ),
                   ..._content(

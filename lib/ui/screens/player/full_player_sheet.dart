@@ -599,19 +599,24 @@ class _TitleRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                GestureDetector(
-                  onTap: track.artists.isEmpty
-                      ? null
-                      : () =>
-                            AppRoutes.openArtist(context, track.artists.first),
-                  child: Text(
-                    track.artistNames,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
+                MouseRegion(
+                  cursor: track.artists.isEmpty
+                      ? MouseCursor.defer
+                      : SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: track.artists.isEmpty
+                        ? null
+                        : () =>
+                              AppRoutes.openArtist(context, track.artists.first),
+                    child: Text(
+                      track.artistNames,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -710,6 +715,7 @@ class _BottomBar extends StatelessWidget {
           Expanded(
             child: InkWell(
               borderRadius: context.tokens.pill,
+              mouseCursor: SystemMouseCursors.click,
               onTap: () => DevicePickerSheet.show(context),
               child: Padding(
                 padding: const EdgeInsets.symmetric(

@@ -186,6 +186,9 @@ class _PersonRow extends StatelessWidget {
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
+        mouseCursor: onTap == null
+            ? MouseCursor.defer
+            : SystemMouseCursors.click,
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(

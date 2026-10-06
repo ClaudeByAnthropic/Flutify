@@ -18,6 +18,7 @@ class CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
+      mouseCursor: SystemMouseCursors.click,
       onTap: onTap,
       borderRadius: context.tokens.radius(MD3EShapes.radiusLarge),
       child: Container(

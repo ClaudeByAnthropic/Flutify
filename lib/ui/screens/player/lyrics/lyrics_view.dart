@@ -53,6 +53,9 @@ class LyricsView extends StatefulWidget {
   /// 创建后不可切换，调用方用包含它的 key 让本地 / 远程切换时重建。
   final bool remote;
 
+  /// 可跳转歌词行的鼠标指针；沉浸式传 [MouseCursor.defer]，由外层控制隐藏光标。
+  final MouseCursor lineCursor;
+
   const LyricsView({
     super.key,
     required this.track,
@@ -61,6 +64,7 @@ class LyricsView extends StatefulWidget {
     this.fontSize = 30,
     this.horizontalPadding = 28,
     this.remote = false,
+    this.lineCursor = SystemMouseCursors.click,
   });
 
   @override
@@ -657,6 +661,7 @@ class _LyricsViewState extends State<LyricsView>
                           // 以对焦行为中心：当句清晰，上下句按行距逐级模糊
                           distance: _isSynced ? rank[i] - focusRank : 0,
                           focusAll: !_isSynced || _browsing,
+                          cursor: widget.lineCursor,
                           onTap: _isSynced
                               ? () => _seekToLine(lyrics.lines[i])
                               : null,

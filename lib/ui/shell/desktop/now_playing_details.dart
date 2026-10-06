@@ -79,6 +79,9 @@ class NowPlayingDetails extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   InkWell(
+                    mouseCursor: track.album == null
+                        ? MouseCursor.defer
+                        : SystemMouseCursors.click,
                     onTap: track.album == null
                         ? null
                         : () => AppRoutes.openAlbum(context, track.album!),
@@ -179,6 +182,7 @@ class _AboutArtistCardState extends State<_AboutArtistCard> {
           borderRadius: BorderRadius.circular(12),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
             onTap: () => AppRoutes.openArtist(context, artist),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

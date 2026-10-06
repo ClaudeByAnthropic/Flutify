@@ -179,9 +179,12 @@ class _DismissibleRow extends StatelessWidget {
           onTap: onTap,
           trailing: ReorderableDragStartListener(
             index: index,
-            child: const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Icon(Icons.drag_handle_rounded, color: Colors.grey),
+            child: const MouseRegion(
+              cursor: SystemMouseCursors.grab,
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Icon(Icons.drag_handle_rounded, color: Colors.grey),
+              ),
             ),
           ),
         ),

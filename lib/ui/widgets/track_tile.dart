@@ -107,6 +107,7 @@ class TrackTile extends StatelessWidget {
     final artistInline = !(columns?.artist ?? false);
 
     return HoverBuilder(
+      cursor: SystemMouseCursors.click,
       builder: (context, hovered) {
         final revealed = hovered || !hoverCapable;
         final playIcon = isPlaying
@@ -117,6 +118,7 @@ class TrackTile extends StatelessWidget {
         );
 
         final row = InkWell(
+          mouseCursor: SystemMouseCursors.click,
           onTap: onTap ?? () => _play(context),
           onLongPress: () => TrackMenu.show(context, track),
           onSecondaryTapUp: (details) =>

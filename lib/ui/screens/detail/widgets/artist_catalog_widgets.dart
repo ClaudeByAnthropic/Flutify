@@ -113,6 +113,7 @@ class ArtistAlbumGrid extends StatelessWidget {
             child: InkWell(
               key: ValueKey('artist-album-${album.id}'),
               borderRadius: context.tokens.radius(12),
+              mouseCursor: SystemMouseCursors.click,
               onTap: () => AppRoutes.openAlbum(context, album),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

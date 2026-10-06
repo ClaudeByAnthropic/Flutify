@@ -38,6 +38,7 @@ class PlayPauseButton extends StatelessWidget {
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
+          mouseCursor: SystemMouseCursors.click,
           onTap: () => context.read<PlaybackProvider>().togglePlayPause(),
           child: Stack(
             alignment: Alignment.center,

@@ -209,6 +209,7 @@ class RemotePlayingStrip extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         customBorder: shape,
+        mouseCursor: SystemMouseCursors.click,
         onTap: () => DevicePickerSheet.show(context),
         child: SizedBox(
           height: height + corner,

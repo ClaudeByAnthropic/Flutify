@@ -16,6 +16,7 @@ class MainFlutterWindow: NSWindow {
     SystemProxyChannel.register(messenger: messenger)
     MediaControlsChannel.register(messenger: messenger)
     EditMenuChannel.register(messenger: messenger)
+    MouseNavigationChannel.register(messenger: messenger)
 
     super.awakeFromNib()
   }
@@ -112,5 +113,33 @@ enum EditMenuChannel {
     if NSStringFromClass(type(of: target)).hasPrefix("Flutter") { return true }
     // undo: / redo: 无视图响应时会落到窗口 / 应用本身：交给 Flutter 处理
     return target is NSWindow || target is NSApplication || target is NSWindowController
+  }
+}
+
+/// 鼠标侧键前进 / 后退的原生兜底。
+///
+/// Logi Options+ 等鼠标驱动在 macOS 上把 MX 系列侧键作为「页面滑动」(NSEventTypeSwipe) 发送，
+/// 只有实现了 `swipeWithEvent:` 的应用（Safari、Finder 等）能收到；Flutter 引擎不处理 swipe 事件，
+/// 因此这里统一监听并转成 Dart 侧的内容历史导航（与顶栏 ‹ › 一致）。
+enum MouseNavigationChannel {
+  private static var monitor: Any?
+
+  static func register(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "flutify/mouse_navigation", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      // 只有原生 -> Dart 推送，没有 Dart -> 原生方法
+      result(FlutterMethodNotImplemented)
+    }
+    monitor = NSEvent.addLocalMonitorForEvents(matching: [.swipe]) { event in
+      // Logi Options+ 的「后退」发送左滑（deltaX +1），「前进」发送右滑（deltaX -1）；
+      // 与 NSEvent.deltaX 的原始定义（-1 右滑 / +1 左滑）方向相反。
+      if event.deltaX < 0 {
+        channel.invokeMethod("forward", arguments: nil)
+      } else if event.deltaX > 0 {
+        channel.invokeMethod("back", arguments: nil)
+      }
+      // 消费事件：避免系统再对「页面滑动」做一次处理
+      return nil
+    }
   }
 }
