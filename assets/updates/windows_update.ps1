@@ -1,6 +1,5 @@
-param([Parameter(Mandatory=$true)][string]$PlanPath, [switch]$PrepareOnly)
+param([Parameter(Mandatory=$true)][string]$PlanPath, [switch]$PrepareOnly, [switch]$LaunchHelper)
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.IO.Compression.FileSystem
 $operation = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($PlanPath))
 $stage = Join-Path $operation 'stage'
 $backup = Join-Path $operation 'backup'
@@ -34,15 +33,51 @@ function Assert-PackagePath([string]$name) {
         throw "Unexpected package entry: $name"
     }
 }
+function Start-Flutify([string]$directory) {
+    # Start-Process resolves WorkingDirectory as a wildcard path in 5.1.
+    # ProcessStartInfo preserves literal installation paths, including brackets.
+    $info = [Diagnostics.ProcessStartInfo]::new()
+    $info.FileName = Join-Path $directory 'Flutify.exe'
+    $info.WorkingDirectory = $directory
+    $info.UseShellExecute = $true
+    $info.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+    $process = [Diagnostics.Process]::Start($info)
+    if ($process) { $process.Dispose() }
+}
 
 try {
-    $plan = Get-Content -LiteralPath $PlanPath -Raw | ConvertFrom-Json
+    if ($LaunchHelper) {
+        # Windows PowerShell 5.1 can exit without executing a script when
+        # started with DETACHED_PROCESS (Dart ProcessStartMode.detached).
+        # Start-Process creates an independent, hidden Windows process instead.
+        # Quote individual path arguments because ArgumentList joins its array.
+        $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+            '-File', ('"' + $PSCommandPath + '"'), '-PlanPath', ('"' + $PlanPath + '"'))
+        Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $arguments -WindowStyle Hidden
+        exit 0
+    }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.File]::WriteAllText((Join-Path $operation 'host.txt'),
+        ('Windows PowerShell ' + $PSVersionTable.PSVersion + ' (' + $PSHOME + ')'))
+    # Dart writes JSON as UTF-8 without a BOM; Windows PowerShell otherwise
+    # decodes it using the system ANSI code page, corrupting non-ASCII paths.
+    $plan = Get-Content -LiteralPath $PlanPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $target = [IO.Path]::GetFullPath($plan.target).TrimEnd('\')
     if ($target -eq [IO.Path]::GetPathRoot($target).TrimEnd('\')) { throw 'Refusing a drive root' }
     Assert-NoLinks $target
     Assert-NoLinks $operation
     if (!(Test-Path -LiteralPath (Join-Path $target 'Flutify.exe') -PathType Leaf)) { throw 'Flutify installation missing' }
-    if ((Get-FileHash -LiteralPath $plan.package -Algorithm SHA256).Hash -ne $plan.checksum) { throw 'Update SHA-256 mismatch' }
+    # Use the runtime directly: inherited PSModulePath values from PowerShell 7
+    # or other hosts can prevent 5.1 from finding the Get-FileHash script module.
+    $hash = [Security.Cryptography.SHA256]::Create()
+    $packageStream = [IO.File]::OpenRead($plan.package)
+    try {
+        $checksum = [BitConverter]::ToString($hash.ComputeHash($packageStream)).Replace('-', '')
+    } finally {
+        $packageStream.Dispose()
+        $hash.Dispose()
+    }
+    if ($checksum -ne $plan.checksum) { throw 'Update SHA-256 mismatch' }
     if ($PrepareOnly) {
         if (!$plan.installer) {
             [IO.Directory]::CreateDirectory($stage) | Out-Null
@@ -83,6 +118,7 @@ try {
         if ((Test-Path -LiteralPath (Join-Path $operation 'cancelled')) -or [DateTime]::UtcNow -gt $deadline) { exit 0 }
         Start-Sleep -Milliseconds 100
     }
+    if (Test-Path -LiteralPath (Join-Path $operation 'cancelled')) { exit 0 }
     if (!$parent.WaitForExit(120000)) { throw 'Application did not close; update cancelled' }
     if (Test-Path -LiteralPath (Join-Path $operation 'cancelled')) { exit 0 }
     if ($plan.installer) {
@@ -113,12 +149,11 @@ try {
             $changed.Add($relative)
             Copy-Item -LiteralPath $file.FullName -Destination $dest -Force
         }
-        [IO.File]::WriteAllText((Join-Path $operation 'success'), 'success')
-        Start-Process -FilePath (Join-Path $target 'Flutify.exe') -WorkingDirectory $target -WindowStyle Hidden
+        Start-Flutify $target
     }
     [IO.File]::WriteAllText((Join-Path $operation 'success'), 'success')
 } catch {
-    $failure = $_.Exception.Message
+    $failure = $_.Exception.Message + "`n" + $_.ScriptStackTrace
     # Only revert paths touched by this operation. User data is never enumerated
     # for deletion; backups remain available if rollback itself fails.
     $rollbackErrors = [Collections.Generic.List[string]]::new()
@@ -137,7 +172,7 @@ try {
     [IO.File]::WriteAllText((Join-Path $operation 'error.txt'), $details)
     [Console]::Error.WriteLine($details)
     if (!$PrepareOnly -and $target -and $changed.Count -gt 0 -and $rollbackErrors.Count -eq 0) {
-        Start-Process -FilePath (Join-Path $target 'Flutify.exe') -WorkingDirectory $target -WindowStyle Hidden
+        Start-Flutify $target
     }
     exit 1
 }

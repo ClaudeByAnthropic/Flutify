@@ -287,6 +287,7 @@ class UpdateService extends ChangeNotifier {
     } catch (e) {
       status = UpdateStatus.ready;
       error = e.toString();
+      debugPrint('[Updates] Installation failed: $e');
     }
     _notify();
   }

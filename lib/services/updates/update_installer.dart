@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'update_release.dart';
+import 'windows_update_runner.dart';
 
 abstract class UpdateInstaller {
   Future<UpdateTarget> target();
@@ -67,28 +68,8 @@ class PlatformUpdateInstaller implements UpdateInstaller {
       'processId': pid,
       'installer': (await target()).platform == UpdatePlatform.windowsInstaller,
     }));
-    final powershell = p.join(Platform.environment['SystemRoot'] ?? r'C:\Windows',
-        'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-    final args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-      '-File', script.path, '-PlanPath', plan.path];
-    final prepared = await Process.run(powershell, [...args, '-PrepareOnly']);
-    if (prepared.exitCode != 0) throw StateError('Unable to prepare update: ${prepared.stderr}');
-    // Detach the helper before normal app shutdown (which saves playback state).
-    await Process.start(powershell, ['-WindowStyle', 'Hidden', ...args],
-        mode: ProcessStartMode.detached);
-    final ready = File(p.join(operation.path, 'waiting'));
-    for (var i = 0; i < 100; i++) {
-      if (await ready.exists()) {
-        await File(p.join(operation.path, 'commit')).writeAsString('commit');
-        await closeWindows();
-        return true;
-      }
-      if (await File(p.join(operation.path, 'error.txt')).exists()) break;
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    // The helper requires an explicit commit file: a slow startup must not
-    // unexpectedly apply an abandoned operation on some later app exit.
-    await File(p.join(operation.path, 'cancelled')).writeAsString('cancelled');
-    throw StateError('Update helper did not start');
+    await launchWindowsUpdateHelper(script: script, plan: plan);
+    await closeWindows();
+    return true;
   }
 }
