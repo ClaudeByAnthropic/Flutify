@@ -22,6 +22,9 @@ class LyricLineView extends StatelessWidget {
   final bool focusAll;
   final VoidCallback? onTap;
 
+  /// 可跳转时显示的鼠标指针；沉浸式歌词传 [MouseCursor.defer]，交给外层控制隐藏光标。
+  final MouseCursor cursor;
+
   /// 字号；行距随字号等比放大。
   final double fontSize;
 
@@ -39,6 +42,7 @@ class LyricLineView extends StatelessWidget {
     required this.distance,
     this.focusAll = false,
     this.onTap,
+    this.cursor = MouseCursor.defer,
     this.fontSize = 30,
     this.centered = false,
     this.blurScale = 1,
@@ -63,39 +67,42 @@ class LyricLineView extends StatelessWidget {
         : (0.52 - d * 0.06).clamp(0.2, 0.46);
     final scale = isActive ? 1.0 : 0.965;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: fontSize * 0.4),
-        child: TweenAnimationBuilder<_LineVisual>(
-          tween: _LineVisualTween(end: _LineVisual(blur, opacity, scale)),
-          duration: context.motion(_duration),
-          curve: const Cubic(0.22, 1.0, 0.36, 1.0),
-          builder: (context, v, _) {
-            // 透明度直接写进文字颜色，省去 Opacity 的离屏图层
-            Widget result = _LineText(
-              text: text,
-              translation: translation,
-              translationProgress: translationProgress,
-              opacity: v.opacity,
-              fontSize: fontSize,
-              centered: centered,
-            );
-            // ImageFiltered 始终留在树里，sigma 过小时只关掉 enabled（同样不产生离屏层）。
-            // 之前按阈值增删这一层，每次对焦动画收尾都会让整行文字卸载重建、
-            // 并在「离屏渲染 ↔ 直接绘制」之间跳变一帧，肉眼就是歌词闪一下。
-            result = ImageFiltered(
-              enabled: v.blur > 0.05,
-              imageFilter: ImageFilter.blur(sigmaX: v.blur, sigmaY: v.blur),
-              child: result,
-            );
-            return Transform.scale(
-              scale: v.scale,
-              alignment: centered ? Alignment.center : Alignment.centerLeft,
-              child: result,
-            );
-          },
+    return MouseRegion(
+      cursor: onTap == null ? MouseCursor.defer : cursor,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: fontSize * 0.4),
+          child: TweenAnimationBuilder<_LineVisual>(
+            tween: _LineVisualTween(end: _LineVisual(blur, opacity, scale)),
+            duration: context.motion(_duration),
+            curve: const Cubic(0.22, 1.0, 0.36, 1.0),
+            builder: (context, v, _) {
+              // 透明度直接写进文字颜色，省去 Opacity 的离屏图层
+              Widget result = _LineText(
+                text: text,
+                translation: translation,
+                translationProgress: translationProgress,
+                opacity: v.opacity,
+                fontSize: fontSize,
+                centered: centered,
+              );
+              // ImageFiltered 始终留在树里，sigma 过小时只关掉 enabled（同样不产生离屏层）。
+              // 之前按阈值增删这一层，每次对焦动画收尾都会让整行文字卸载重建、
+              // 并在「离屏渲染 ↔ 直接绘制」之间跳变一帧，肉眼就是歌词闪一下。
+              result = ImageFiltered(
+                enabled: v.blur > 0.05,
+                imageFilter: ImageFilter.blur(sigmaX: v.blur, sigmaY: v.blur),
+                child: result,
+              );
+              return Transform.scale(
+                scale: v.scale,
+                alignment: centered ? Alignment.center : Alignment.centerLeft,
+                child: result,
+              );
+            },
+          ),
         ),
       ),
     );

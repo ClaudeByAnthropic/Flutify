@@ -29,39 +29,43 @@ class GradientTrackSlider extends StatelessWidget {
         final usable = (width - _height).clamp(1.0, double.infinity);
         void update(double dx) => onChanged(((dx - half) / usable).clamp(0.0, 1.0));
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (d) => update(d.localPosition.dx),
-          onHorizontalDragStart: (d) => update(d.localPosition.dx),
-          onHorizontalDragUpdate: (d) => update(d.localPosition.dx),
-          child: SizedBox(
-            height: _height,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: colors),
-                      borderRadius: BorderRadius.circular(half),
+        return MouseRegion(
+          // 与 Material Slider 的 clickable 默认一致
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (d) => update(d.localPosition.dx),
+            onHorizontalDragStart: (d) => update(d.localPosition.dx),
+            onHorizontalDragUpdate: (d) => update(d.localPosition.dx),
+            child: SizedBox(
+              height: _height,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: colors),
+                        borderRadius: BorderRadius.circular(half),
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  left: value.clamp(0.0, 1.0) * usable,
-                  top: 0,
-                  child: Container(
-                    width: _height,
-                    height: _height,
-                    decoration: BoxDecoration(
-                      color: thumbColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 1))],
+                  Positioned(
+                    left: value.clamp(0.0, 1.0) * usable,
+                    top: 0,
+                    child: Container(
+                      width: _height,
+                      height: _height,
+                      decoration: BoxDecoration(
+                        color: thumbColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 1))],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

@@ -66,6 +66,7 @@ class _EmbedCodePanelState extends State<EmbedCodePanel> with CopiedFlash {
             ),
             FilterChip(
               label: Text(l10n.shareEmbedDark),
+              mouseCursor: SystemMouseCursors.click,
               avatar: Icon(
                 Icons.dark_mode_rounded,
                 size: 18,

@@ -266,6 +266,7 @@ class _DeviceTile extends StatelessWidget {
     final tokens = context.tokens;
     return InkWell(
       borderRadius: tokens.radius(16),
+      mouseCursor: SystemMouseCursors.click,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),

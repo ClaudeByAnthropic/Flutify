@@ -138,6 +138,7 @@ class RemoteTransportControls extends StatelessWidget {
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
+          mouseCursor: SystemMouseCursors.click,
           onTap: () => ConnectActions.run(context, connect.togglePlayPause),
           child: SizedBox.square(
             dimension: s.playSize,

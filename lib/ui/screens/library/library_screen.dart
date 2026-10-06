@@ -159,9 +159,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: widget.onOpenSettings,
-                    child: const UserAvatar(size: 36),
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: widget.onOpenSettings,
+                      child: const UserAvatar(size: 36),
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -364,6 +367,7 @@ class _LibraryGrid extends StatelessWidget {
         return InkWell(
           key: ValueKey(item.id),
           borderRadius: context.tokens.radius(MD3EShapes.radiusMedium),
+          mouseCursor: SystemMouseCursors.click,
           onTap: item.onTap,
           child: Column(
             crossAxisAlignment: item.circular ? CrossAxisAlignment.center : CrossAxisAlignment.start,

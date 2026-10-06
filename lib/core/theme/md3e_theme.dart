@@ -155,7 +155,7 @@ class MD3ETheme {
           shape: tokens.pillShape,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        ).copyWith(mouseCursor: WidgetStateMouseCursor.clickable),
       ),
 
       // Outlined Button (Pill shaped)
@@ -165,7 +165,28 @@ class MD3ETheme {
           side: BorderSide(color: colorScheme.outlineVariant),
           shape: tokens.pillShape,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        ),
+        ).copyWith(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+
+      // 桌面端 Material 默认光标是 adaptiveClickable（非 Web 解析为箭头），
+      // 这里统一为可点击控件显示手型；禁用态由 WidgetStateMouseCursor.clickable 自动解析为箭头。
+      textButtonTheme: TextButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      menuButtonTheme: MenuButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        mouseCursor: WidgetStateMouseCursor.clickable,
       ),
 
       // Chip Theme

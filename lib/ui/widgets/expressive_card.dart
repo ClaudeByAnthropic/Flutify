@@ -65,10 +65,12 @@ class ExpressiveCard extends StatelessWidget {
       width: width,
       margin: margin,
       child: HoverBuilder(
+        cursor: SystemMouseCursors.click,
         builder: (context, hovered) => Material(
           color: hovered ? colorScheme.surfaceContainerHigh : Colors.transparent,
           borderRadius: cardRadius,
           child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
             onTap: onTap,
             borderRadius: cardRadius,
             // 悬停底色由 Material 负责（带动画的 InkWell 悬停色会与之叠加变脏）

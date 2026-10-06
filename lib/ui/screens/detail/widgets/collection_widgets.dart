@@ -55,6 +55,9 @@ class ContextPlayButton extends StatelessWidget {
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
+          mouseCursor: tracks.isEmpty
+              ? MouseCursor.defer
+              : SystemMouseCursors.click,
           onTap: tracks.isEmpty
               ? null
               : () {

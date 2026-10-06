@@ -398,6 +398,7 @@ class _WideLayout extends StatelessWidget {
               bottomInset: 80,
               fontSize: lyricSize,
               horizontalPadding: 16,
+              lineCursor: MouseCursor.defer,
             ),
             queue: () => const Padding(
               padding: EdgeInsets.only(top: 64, bottom: 72),
@@ -499,6 +500,7 @@ class _NarrowLayout extends StatelessWidget {
               bottomInset: _controlsHeight + 56,
               fontSize: 34,
               horizontalPadding: 36,
+              lineCursor: MouseCursor.defer,
             ),
           ),
           queue: () => Padding(
