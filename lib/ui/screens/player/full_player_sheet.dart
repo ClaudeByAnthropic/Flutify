@@ -91,6 +91,7 @@ class FullPlayerSheet extends StatefulWidget {
       );
       return Navigator.of(context, rootNavigator: true).push<void>(
         PageRouteBuilder<void>(
+          settings: const RouteSettings(name: AppRoutes.fullPlayerRouteName),
           opaque: false,
           fullscreenDialog: true,
           barrierColor: Colors.black26,

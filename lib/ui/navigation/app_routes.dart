@@ -13,14 +13,19 @@ import '../screens/detail/playlist_detail_screen.dart';
 import '../screens/detail/podcast_detail_screen.dart';
 import '../screens/home/home_section_screen.dart';
 import '../screens/search/category_screen.dart';
+import '../shell/desktop/desktop_window.dart';
 
 /// 详情页导航入口。
 ///
 /// - 详情页压入「当前 Tab 的嵌套 Navigator」（由 MainShell 注册），播放器常驻可见。
-/// - 从全屏播放器、底部面板等根级弹层中跳转时，先关闭所有弹层（PopupRoute），
+/// - 从播放器中跳转时，关闭根级弹层及播放器页面，但保留内容区的返回历史，
 ///   与 Spotify 的「Go to album / Go to artist」行为一致。
 class AppRoutes {
   AppRoutes._();
+
+  // 播放器的 PageRoute 也是覆盖层，不能只按 PopupRoute 判断。
+  static const fullPlayerRouteName = '/player';
+  static const immersiveLyricsRouteName = '/immersive-lyrics';
 
   /// MainShell 注册：返回当前 Tab 的 NavigatorState。
   static NavigatorState? Function()? contentNavigator;
@@ -85,11 +90,30 @@ class AppRoutes {
   static void openCategory(BuildContext context, SpotifyCategory category) =>
       _push(context, CategoryScreen(category: category));
 
-  static void _push(BuildContext context, Widget page) {
+  static bool _isPlayerOverlay(Route<dynamic> route) =>
+      !route.isFirst &&
+      (route is PopupRoute ||
+          route.settings.name == fullPlayerRouteName ||
+          route.settings.name == immersiveLyricsRouteName);
+
+  static Future<void> _push(BuildContext context, Widget page) async {
     // 先取出两个 Navigator：关闭弹层后 context 可能已失效
     final root = Navigator.of(context, rootNavigator: true);
     final target = contentNavigator?.call() ?? Navigator.of(context);
-    root.popUntil((route) => route is! PopupRoute);
+    Route<dynamic>? immersive;
+    root.popUntil((route) {
+      if (!route.isFirst && route.settings.name == immersiveLyricsRouteName) {
+        immersive = route;
+        return true;
+      }
+      return !_isPlayerOverlay(route);
+    });
+    if (immersive != null) {
+      // 与沉浸式页面的关闭按钮一致：先移除玻璃模糊再淡出，保护桌面合成器。
+      await DesktopWindow.dropGlassForExit();
+      if (!root.mounted || !target.mounted || !immersive!.isCurrent) return;
+      root.popUntil((route) => !_isPlayerOverlay(route));
+    }
     target.push(MaterialPageRoute(builder: (_) => page));
   }
 }
