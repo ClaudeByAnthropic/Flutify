@@ -14,6 +14,7 @@ import '../../../providers/connect_provider.dart';
 import '../../../providers/library_provider.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../services/storage_service.dart';
+import '../../navigation/app_routes.dart';
 import '../../shell/desktop/desktop_window.dart';
 import '../../shell/desktop/window_caption_buttons.dart';
 import '../../widgets/connect/now_playing_source.dart';
@@ -72,6 +73,7 @@ class ImmersiveLyricsScreen extends StatefulWidget {
   static Future<void> _push(BuildContext context) {
     return Navigator.of(context, rootNavigator: true).push(
       PageRouteBuilder<void>(
+        settings: const RouteSettings(name: AppRoutes.immersiveLyricsRouteName),
         opaque: true,
         transitionDuration: context.motion(const Duration(milliseconds: 380)),
         reverseTransitionDuration: context.motion(
