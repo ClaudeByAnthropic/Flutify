@@ -34,7 +34,7 @@ class DesktopWindow {
   static bool? debugMacNativeWindowOverride;
 
   /// macOS 原生交通灯在左上角占用的宽度；顶栏 / 窄窗口标题条的左侧内容需为它留白。
-  /// 交通灯左边距 18pt + 三个 16pt 按钮与 7pt 间距（原生端见 TrafficLightAligner）。
+  /// 为原生交通灯的约 20pt 左边距、三个按钮及其间距留白（见 TrafficLightAligner）。
   static const double macTrafficLightsInset = 96;
 
   /// 窗口最小尺寸：可缩到手机宽度，窄于 `ShellBreakpoints.desktop` 时切换为移动端布局，

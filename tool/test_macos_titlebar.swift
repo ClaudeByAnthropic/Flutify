@@ -3,7 +3,14 @@ import Cocoa
 @main
 enum TitlebarTest {
   static func drain() {
-    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.2))
+    let deadline = Date(timeIntervalSinceNow: 0.2)
+    while Date() < deadline {
+      if let event = NSApp.nextEvent(matching: .any, until: Date(timeIntervalSinceNow: 0.01),
+                                    inMode: .default, dequeue: true) {
+        NSApp.sendEvent(event)
+      }
+      RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
+    }
   }
 
   static func verify(_ window: NSWindow, _ label: String) {
@@ -29,6 +36,7 @@ enum TitlebarTest {
   static func main() {
     _ = NSApplication.shared
     NSApp.setActivationPolicy(.accessory)
+    NSApp.finishLaunching()
     let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 600),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
@@ -53,6 +61,18 @@ enum TitlebarTest {
       drain()
       verify(window, "realignment")
     }
+    window.collectionBehavior.insert(.fullScreenPrimary)
+    window.toggleFullScreen(nil)
+    var deadline = Date(timeIntervalSinceNow: 10)
+    while !window.styleMask.contains(.fullScreen) && Date() < deadline { drain() }
+    precondition(window.styleMask.contains(.fullScreen), "failed to enter native fullscreen")
+    for _ in 0..<10 { drain() }
+    window.toggleFullScreen(nil)
+    deadline = Date(timeIntervalSinceNow: 10)
+    while window.styleMask.contains(.fullScreen) && Date() < deadline { drain() }
+    precondition(!window.styleMask.contains(.fullScreen), "failed to exit native fullscreen")
+    for _ in 0..<10 { drain() }
+    verify(window, "native fullscreen round trip")
     withExtendedLifetime(aligner) { window.close() }
   }
 }

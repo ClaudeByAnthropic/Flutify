@@ -18,7 +18,7 @@ import 'window_caption_buttons.dart';
 /// - 后退 / 前进、主页、搜索框、头像统一 40px 高，与原生交通灯在同一中线上。
 ///
 /// macOS：原生交通灯浮在窗口左上角，原生端把它们对齐到 20pt 留白（上下 = 左侧）并与
-/// 40px 控件中线对齐（见 macos/Runner/MainFlutterWindow.swift 的 TrafficLightAligner），
+/// 40px 控件中线对齐（见 macos/Runner/TrafficLightAligner.swift），
 /// 顶栏左侧为它留白 [DesktopWindow.macTrafficLightsInset]；
 /// 右上角不再为自绘窗口按钮占位（macOS 不渲染自绘按钮）。
 class DesktopTopBar extends StatelessWidget {
