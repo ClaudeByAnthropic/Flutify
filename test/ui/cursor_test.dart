@@ -9,6 +9,7 @@ import 'package:flutify_app/ui/screens/player/lyrics/lyric_line_view.dart';
 import 'package:flutify_app/ui/screens/settings/widgets/gradient_track_slider.dart';
 import 'package:flutify_app/ui/screens/settings/widgets/settings_segmented.dart';
 import 'package:flutify_app/ui/widgets/user_avatar.dart';
+import 'package:flutify_app/ui/widgets/share/share_action_tile.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -87,6 +88,32 @@ void main() {
     final gesture = await mouse(tester);
     await hover(tester, gesture, find.text('b'));
     expect(activeCursor(), SystemMouseCursors.click);
+  });
+
+  testWidgets('分享卡片按复制文本或回调显示手型，无动作保持箭头', (tester) async {
+    final gesture = await mouse(tester);
+    for (final action in ['copy', 'callback', 'none']) {
+      await tester.pumpWidget(
+        wrap(
+          SizedBox(
+            width: 160,
+            height: 130,
+            child: ShareActionTile(
+              icon: Icons.link,
+              label: 'Share action',
+              copyText: action == 'copy' ? 'spotify:track:cursor-test' : null,
+              onTap: action == 'callback' ? () async => null : null,
+            ),
+          ),
+        ),
+      );
+      await hover(tester, gesture, find.byType(ShareActionTile));
+      expect(
+        activeCursor(),
+        action == 'none' ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        reason: action,
+      );
+    }
   });
 
   testWidgets('取色滑杆显示手型', (tester) async {

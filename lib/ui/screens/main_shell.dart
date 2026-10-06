@@ -72,13 +72,13 @@ class _MainShellState extends State<MainShell> {
     _currentIndex = _startIndex();
     AppRoutes.contentNavigator = () =>
         _navigatorKeys[_currentIndex].currentState;
-    AppRoutes.navigateBack = () => _histories[_currentIndex].back();
-    AppRoutes.navigateForward = () => _histories[_currentIndex].forward();
+    AppRoutes.navigateBack = _navigateBack;
+    AppRoutes.navigateForward = _navigateForward;
     // macOS 菜单栏常驻在 App 根部（见 MacMenuBar），这里只登记依赖主界面的动作
     _menuActions = MacMenuActions(
       onSearch: _searchFocus.requestFocus,
-      onBack: () => _histories[_currentIndex].back(),
-      onForward: () => _histories[_currentIndex].forward(),
+      onBack: _navigateBack,
+      onForward: _navigateForward,
       onHome: () => _select(_home),
       onOpenSettings: _openSettings,
       onImmersive: () => ImmersiveLyricsScreen.open(context),
@@ -89,6 +89,21 @@ class _MainShellState extends State<MainShell> {
   }
 
   late final MacMenuActions _menuActions;
+
+  // 根部鼠标监听与原生菜单不受模态路由的焦点隔离保护。
+  // 弹窗、播放器或全屏歌词覆盖主界面时，保留底下的内容历史。
+  bool get _canNavigateContent =>
+      mounted && ModalRoute.of(context)?.isCurrent == true;
+
+  void _navigateBack() {
+    if (!_canNavigateContent) return;
+    _histories[_currentIndex].back();
+  }
+
+  void _navigateForward() {
+    if (!_canNavigateContent) return;
+    _histories[_currentIndex].forward();
+  }
 
   /// 启动页：主页 / 音乐库 / 上次所在 Tab（未注入 Provider 的测试一律主页）。
   int _startIndex() {
@@ -186,16 +201,15 @@ class _MainShellState extends State<MainShell> {
         _searchFocus.requestFocus,
     PlatformShortcuts.primary(LogicalKeyboardKey.keyL):
         _searchFocus.requestFocus,
-    const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () =>
-        _histories[_currentIndex].back(),
-    const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () =>
-        _histories[_currentIndex].forward(),
+    const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): _navigateBack,
+    const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true):
+        _navigateForward,
     // 浏览器式后退 / 前进：鼠标驱动（如 Logi Options+）常把侧键模拟成 ⌘[ / ⌘]
     if (PlatformShortcuts.useMeta) ...{
-      const SingleActivator(LogicalKeyboardKey.bracketLeft, meta: true): () =>
-          _histories[_currentIndex].back(),
-      const SingleActivator(LogicalKeyboardKey.bracketRight, meta: true): () =>
-          _histories[_currentIndex].forward(),
+      const SingleActivator(LogicalKeyboardKey.bracketLeft, meta: true):
+          _navigateBack,
+      const SingleActivator(LogicalKeyboardKey.bracketRight, meta: true):
+          _navigateForward,
     },
     const SingleActivator(LogicalKeyboardKey.f11): () =>
         ImmersiveLyricsScreen.open(context),

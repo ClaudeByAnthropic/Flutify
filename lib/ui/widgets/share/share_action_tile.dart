@@ -62,9 +62,9 @@ class _ShareActionTileState extends State<ShareActionTile> with CopiedFlash {
           type: MaterialType.transparency,
           child: InkWell(
             borderRadius: tokens.radius(20),
-            mouseCursor: widget.onTap == null
-                ? MouseCursor.defer
-                : SystemMouseCursors.click,
+            mouseCursor: widget.copyText != null || widget.onTap != null
+                ? SystemMouseCursors.click
+                : MouseCursor.defer,
             onTap: _handleTap,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
