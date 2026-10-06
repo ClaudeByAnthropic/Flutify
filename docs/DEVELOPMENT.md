@@ -153,7 +153,8 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 * **系统媒体控制**（`services/media_controls/`）：Windows 为自写 C++/WinRT SMTC（`windows/runner/media_controls.cpp`）——
   任务栏 / 锁屏 / 音量浮层媒体卡片、键盘媒体键、拖动进度；Android / iOS 用 audio_service（通知栏、锁屏、耳机线控）。
   runner 编译带 `/utf-8`，避免中文注释在 GBK 代码页下报 C4819。
-* **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：顶栏与标题栏合一（空白处拖动 / 双击最大化，右侧为窗口按钮留位）+ 后退前进、主页、居中搜索、头像；
+* **≥ 800px 桌面三栏**（`ui/shell/desktop/`）：顶栏与标题栏合一（高 56，空白处拖动 / 双击最大化，右侧为窗口按钮留位）+ 后退前进、主页、居中搜索、头像（统一 40px 高）；
+  macOS 原生交通灯由 `MainFlutterWindow.swift` 的 `TrafficLightAligner` 对齐到 20pt 留白（上下 = 左侧）并与 40px 控件中线对齐（窗口缩放 / 进出全屏后重新对齐，宽窄布局切换不跳动）；
   左栏音乐库（筛选、库内搜索、排序，可拖宽，窄于 280px 或手动收起时变为 72px 图标栏；未登录显示登录引导）；
   右栏没有标签切换，分为两个面板：播放栏「播放状态」键打开「正在播放」（大封面、歌名、内嵌歌词卡、关于艺人、接下来播放；
   歌词卡右上角「放大」后撑满整个面板，偏好会记住，旁边是沉浸式歌词入口），队列键打开独立的「播放队列」面板；

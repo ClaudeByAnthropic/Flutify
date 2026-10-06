@@ -3,6 +3,7 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var cacheDirectories: CacheDirectories?
+  private var trafficLightAligner: TrafficLightAligner?
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -17,6 +18,9 @@ class MainFlutterWindow: NSWindow {
     MediaControlsChannel.register(messenger: messenger)
     EditMenuChannel.register(messenger: messenger)
     MouseNavigationChannel.register(messenger: messenger)
+
+    // 交通灯垂直居中到自绘顶栏（宽 56），窗口缩放 / 退出全屏后重新对齐
+    trafficLightAligner = TrafficLightAligner(window: self)
 
     super.awakeFromNib()
   }
@@ -115,7 +119,6 @@ enum EditMenuChannel {
     return target is NSWindow || target is NSApplication || target is NSWindowController
   }
 }
-
 /// 鼠标侧键前进 / 后退的原生兜底。
 ///
 /// Logi Options+ 等鼠标驱动在 macOS 上把 MX 系列侧键作为「页面滑动」(NSEventTypeSwipe) 发送，
@@ -140,6 +143,72 @@ enum MouseNavigationChannel {
       }
       // 消费事件：避免系统再对「页面滑动」做一次处理
       return nil
+    }
+  }
+}
+
+/// 把原生交通灯（红黄绿）对齐到自绘顶栏：左边距与上边距一致（18pt，与 Finder 等原生
+/// 统一工具栏实测值相同）。
+///
+/// 系统默认把交通灯居中在 28pt 高的原生标题栏里（左边距 8、上边距 6），自绘顶栏高 56
+/// （`DesktopTopBar.height`），不对齐时交通灯会显得飘在顶栏上方、左右留白也不一致。
+/// 窗口缩放 / 进出全屏后 AppKit 会重新排布按钮，这里在相应通知里重新对齐（计算基于
+/// 按钮父视图坐标系，兼容 flipped / 非 flipped）。
+final class TrafficLightAligner {
+  private let window: NSWindow
+  private var observers: [NSObjectProtocol] = []
+
+  /// 交通灯距窗口左缘 / 顶缘的留白。
+  ///
+  /// 取 20pt：上下 = 左侧保持一致，同时让交通灯中心（20 + 16/2 = 28）正好落在顶栏
+  /// 40px 控件的中线上（顶栏高 56）。标准窗口按钮的 frame 比辅助功能可见区域小 2pt，
+  /// 这里取 21 使实际渲染位置等于 20pt 留白。
+  private static let targetMargin: CGFloat = 21
+
+  init(window: NSWindow) {
+    self.window = window
+    apply()
+    let center = NotificationCenter.default
+    for name in [
+      NSWindow.didResizeNotification,
+      NSWindow.didEnterFullScreenNotification,
+      NSWindow.didExitFullScreenNotification,
+    ] {
+      observers.append(
+        center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+          self?.apply()
+        }
+      )
+    }
+  }
+
+  deinit {
+    for observer in observers {
+      NotificationCenter.default.removeObserver(observer)
+    }
+  }
+
+  private func apply() {
+    guard let close = window.standardWindowButton(.closeButton),
+          let mini = window.standardWindowButton(.miniaturizeButton),
+          let zoom = window.standardWindowButton(.zoomButton),
+          let parent = close.superview
+    else { return }
+    // 垂直：以父视图坐标系计算中心距顶距离（兼容 flipped / 非 flipped）
+    let flipped = parent.isFlipped
+    let targetCenterFromTop = Self.targetMargin + close.frame.height / 2
+    let currentCenterFromTop = flipped
+      ? close.frame.midY
+      : parent.bounds.height - close.frame.midY
+    let deltaY = targetCenterFromTop - currentCenterFromTop
+    // 水平：换算到窗口坐标求左边距
+    let frameInWindow = parent.convert(close.frame, to: nil)
+    let deltaX = Self.targetMargin - frameInWindow.minX
+    guard abs(deltaX) > 0.5 || abs(deltaY) > 0.5 else { return }
+    for button in [close, mini, zoom] {
+      let x = button.frame.origin.x + deltaX
+      let y = flipped ? button.frame.origin.y + deltaY : button.frame.origin.y - deltaY
+      button.setFrameOrigin(NSPoint(x: x, y: y))
     }
   }
 }

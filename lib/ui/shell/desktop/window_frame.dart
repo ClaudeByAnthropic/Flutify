@@ -25,8 +25,9 @@ class WindowFrame extends StatefulWidget {
   /// 窄窗口标题条高度。
   static const double captionHeight = 32;
 
-  /// macOS 窄窗口标题条高度：原生交通灯（≈20px 高）浮在左上角，加高一些避免与标题相碰。
-  static const double captionHeightMac = 40;
+  /// macOS 窄窗口标题条高度：与 [DesktopTopBar.height] 一致，
+  /// 原生交通灯（原生端下移到该高度的中线）在宽窄布局切换时不会跳动。
+  static const double captionHeightMac = 56;
 
   @override
   State<WindowFrame> createState() => _WindowFrameState();
