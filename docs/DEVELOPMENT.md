@@ -137,7 +137,8 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
   - 存储：音频缓存占用、上限（256 MB – 5 GB，超出按最久未播放淘汰，正在播放与预取的下一首始终保留）、一键清除；
   - 隐私：清除搜索记录、清除歌词缓存（含 LRCLIB 本地缓存）；关于：版本、键盘快捷键一览（桌面端）、开源许可。
 * **桌面端快捷键**：Space 播放/暂停、Ctrl+←/→ 切歌、Ctrl+↑/↓ 音量、Ctrl+S 随机、Ctrl+R 循环、Ctrl+K / Ctrl+L 聚焦搜索、Alt+←/→ 后退 / 前进、F11 沉浸式歌词、Esc 关闭浮层右栏 / 退出沉浸式歌词。
-* **桌面鼠标交互**：鼠标侧键（后退 / 前进）与顶栏 ‹ ›、Alt+←/→ 共用当前 Tab 的内容历史（`main.dart` 根部 `Listener` 捕获 `kBackMouseButton` / `kForwardMouseButton`，经 `AppRoutes.navigateBack / navigateForward` 派发）。
+* **桌面鼠标交互**：鼠标侧键（后退 / 前进）与顶栏 ‹ ›、Alt+←/→、⌘[ / ⌘] 共用当前 Tab 的内容历史（`main.dart` 根部 `Listener` 捕获 `kBackMouseButton` / `kForwardMouseButton`，经 `AppRoutes.navigateBack / navigateForward` 派发）。
+  macOS 上 Logi Options+ 等驱动会把 MX 系列侧键作为「页面滑动」(swipe) 事件发送，Flutter 引擎不处理：由 `macos/Runner/MainFlutterWindow.swift` 的 `MouseNavigationChannel` 原生监听并消费 swipe，经 `flutify/mouse_navigation` 通道（`services/input/mouse_navigation_channel.dart`）接入同一历史桥；触控板双指左右滑同样生效。
   **鼠标指针约定**：可点击控件必须显示手型——自绘 `GestureDetector` 需包 `MouseRegion(cursor: SystemMouseCursors.click)`；`InkWell` / `InkResponse` 需显式传 `mouseCursor`（Material 3 桌面默认 `adaptiveClickable` 是箭头，仅 Web 为手型）；
   Material 按钮 / 菜单 / 弹出菜单 / 分段按钮由 `md3e_theme.dart` 主题统一覆盖为 `WidgetStateMouseCursor.clickable`；禁用态、拖拽把手（grab）、resize 把手与窗口标题栏按钮保持系统惯例。
 

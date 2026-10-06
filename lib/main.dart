@@ -45,6 +45,7 @@ import 'services/connect/connect_play_request.dart';
 import 'services/connect/connect_service.dart';
 import 'services/connect/receiver/connect_receiver.dart';
 import 'services/connect/receiver/playback_receiver_host.dart';
+import 'services/input/mouse_navigation_channel.dart';
 import 'services/lyrics/lrclib_client.dart';
 import 'services/lyrics/lrclib_lyrics_source.dart';
 import 'services/lyrics/lyrics_disk_cache.dart';
@@ -91,6 +92,7 @@ Future<void> main() async {
     ..maximumSizeBytes = 64 << 20;
   installFileLog();
   installErrorPlaceholder();
+  installMacOSMouseNavigation();
   runApp(AppStartup(initialize: _initializeApp));
 }
 

@@ -8,8 +8,10 @@ import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/navigation/app_routes.dart';
 import 'package:flutify_app/ui/screens/detail/playlist_detail_screen.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
+import 'package:flutify_app/ui/shell/desktop/desktop_window.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -80,6 +82,39 @@ void main() {
     expect(find.byType(MainShell), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('⌘[ / ⌘] 与顶栏 ‹ › 行为一致（macOS）', (tester) async {
+    DesktopWindow.debugMacNativeWindowOverride = true;
+    addTearDown(() => DesktopWindow.debugMacNativeWindowOverride = null);
+    // 原生菜单栏在测试里没有平台实现：拦截 Menu.setMenus
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.menu,
+      (call) async => null,
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.menu,
+        null,
+      ),
+    );
+
+    await pumpApp(tester);
+    AppRoutes.openPlaylist(tester.element(find.byType(MainShell)), playlist);
+    await settle(tester);
+    expect(find.byType(PlaylistDetailScreen), findsOneWidget);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.bracketLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await settle(tester);
+    expect(find.byType(PlaylistDetailScreen), findsNothing);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.bracketRight);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await settle(tester);
+    expect(find.byType(PlaylistDetailScreen), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }
 
 Future<void> settle(WidgetTester tester) async {

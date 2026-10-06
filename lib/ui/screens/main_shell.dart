@@ -190,6 +190,13 @@ class _MainShellState extends State<MainShell> {
         _histories[_currentIndex].back(),
     const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () =>
         _histories[_currentIndex].forward(),
+    // 浏览器式后退 / 前进：鼠标驱动（如 Logi Options+）常把侧键模拟成 ⌘[ / ⌘]
+    if (PlatformShortcuts.useMeta) ...{
+      const SingleActivator(LogicalKeyboardKey.bracketLeft, meta: true): () =>
+          _histories[_currentIndex].back(),
+      const SingleActivator(LogicalKeyboardKey.bracketRight, meta: true): () =>
+          _histories[_currentIndex].forward(),
+    },
     const SingleActivator(LogicalKeyboardKey.f11): () =>
         ImmersiveLyricsScreen.open(context),
     // Mac 键盘上 F11 默认是「显示桌面」：另给 ⌘⇧F（与 Apple Music 全屏播放器同键，菜单栏「窗口」里有同一项）
