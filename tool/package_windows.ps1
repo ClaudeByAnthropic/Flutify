@@ -1,6 +1,6 @@
 param(
     [ValidateSet('x64', 'arm64')][string]$Arch = 'x64',
-    [string]$Label = 'v0.08-beta',
+    [string]$Label = 'v0.09-beta',
     [string]$Compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 )
 $ErrorActionPreference = 'Stop'
