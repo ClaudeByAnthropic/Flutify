@@ -55,7 +55,7 @@ def verify(directory, build_number):
                 raise ValueError(f'{name}: missing media notification icon {icon}')
         digest = hashlib.sha256(apk.read_bytes()).hexdigest()
         print(f'{name}: signature verified, versionCode={code[1]}, SHA256={digest}')
-    print('All four APKs use the pinned beta signing certificate.')
+    print('All four APKs use the pinned signing certificate.')
 
 
 if __name__ == '__main__':

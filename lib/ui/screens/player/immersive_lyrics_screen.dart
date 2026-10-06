@@ -21,6 +21,7 @@ import '../../widgets/connect/playback_shortcuts.dart';
 import '../../widgets/cover_image.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/liquid_glass.dart';
+import '../../widgets/marquee_text.dart';
 import '../../widgets/menu/desktop_menu.dart';
 import '../../widgets/toast/app_toast.dart';
 import '../../widgets/track_menu.dart';
@@ -704,16 +705,15 @@ class _TitleRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                track.name,
+              MarqueeText(
+                key: ValueKey(track.id),
+                text: track.name,
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: large ? 21 : 17,
                   letterSpacing: -0.3,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 3),
               Text(

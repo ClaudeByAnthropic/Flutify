@@ -1,18 +1,23 @@
+import 'dart:ui' as ui;
+
 import 'package:flutify_app/core/utils/artwork_palette.dart';
 import 'package:flutify_app/main.dart';
 import 'package:flutify_app/models/playback_context.dart';
 import 'package:flutify_app/models/track.dart';
+import 'package:flutify_app/providers/appearance_provider.dart';
 import 'package:flutify_app/providers/playback_provider.dart';
 import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/spotify_api_service.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/screens/player/full_player_sheet.dart';
+import 'package:flutify_app/ui/screens/player/player_expansion.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/lyrics_view.dart';
 import 'package:flutify_app/ui/screens/player/queue_list.dart';
 import 'package:flutify_app/ui/screens/player/widgets/swipeable_artwork.dart';
 import 'package:flutify_app/ui/shell/mobile/mobile_bottom_bar.dart';
 import 'package:flutify_app/ui/widgets/mini_player.dart';
+import 'package:flutify_app/ui/widgets/marquee_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -71,6 +76,142 @@ void main() {
     );
     await settle(tester);
     return playback;
+  }
+
+  for (final screenWidth in [320.0, 390.0]) {
+    testWidgets('android compact title covers both edges at $screenWidth', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final playback = await pumpPlaying(tester, size: Size(screenWidth, 844));
+      const longTrack = SpotifyTrack(
+        id: 'synthetic-mask',
+        name: 'A Synthetic Song With A Long Scrolling Title For Edge Coverage',
+        durationMs: 180000,
+      );
+      await playback.playTrack(longTrack, contextQueue: [longTrack]);
+      await settle(tester);
+      await tester.pump(const Duration(seconds: 5));
+
+      final title = find.descendant(
+        of: find.byType(MiniPlayer),
+        matching: find.byType(MarqueeText),
+      );
+      final maskFinder = find.descendant(
+        of: title,
+        matching: find.bySubtype<ShaderMask>(),
+      );
+      expect(maskFinder, findsOneWidget);
+      final mask = tester.widget<ShaderMask>(maskFinder);
+      final bounds = Offset.zero & tester.getSize(maskFinder);
+
+      await tester.runAsync(() async {
+        for (final pixelRatio in [1.0, 2.625, 3.0]) {
+          final recorder = ui.PictureRecorder();
+          final canvas = Canvas(recorder)..scale(pixelRatio);
+          canvas.drawRect(
+            bounds,
+            Paint()..shader = mask.shaderCallback(bounds),
+          );
+          final picture = recorder.endRecording();
+          final image = await picture.toImage(
+            (bounds.width * pixelRatio).ceil(),
+            (bounds.height * pixelRatio).ceil(),
+          );
+          final bytes = (await image.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          ))!;
+          final middleRow = image.height ~/ 2;
+          for (final column in [
+            0,
+            1,
+            2,
+            3,
+            image.width - 4,
+            image.width - 3,
+            image.width - 2,
+            image.width - 1,
+          ]) {
+            expect(
+              bytes.getUint8((middleRow * image.width + column) * 4 + 3),
+              0,
+              reason: 'compact title edge $column at DPR $pixelRatio',
+            );
+          }
+          expect(
+            bytes.getUint8(
+              (middleRow * image.width + image.width ~/ 2) * 4 + 3,
+            ),
+            255,
+          );
+          image.dispose();
+          picture.dispose();
+        }
+      });
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
+
+  for (final closeMethod in ['button', 'back', 'drag']) {
+    testWidgets('android mini title restarts after every $closeMethod collapse', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final playback = await pumpPlaying(tester);
+      const longTrack = SpotifyTrack(
+        id: 'synthetic-marquee',
+        name:
+            'A Synthetic Song With A Very Long Title That Keeps Scrolling In The Mini Player',
+        durationMs: 180000,
+      );
+      await playback.playTrack(longTrack, contextQueue: [longTrack]);
+      await settle(tester);
+      double titleOffset() {
+        final title = find.descendant(
+          of: find.byType(MiniPlayer),
+          matching: find.byType(MarqueeText),
+        );
+        final scroll = find.descendant(
+          of: title,
+          matching: find.byType(SingleChildScrollView),
+        );
+        return tester.widget<SingleChildScrollView>(scroll).controller!.offset;
+      }
+
+      await tester.pump(const Duration(milliseconds: 4500));
+      for (var repetition = 0; repetition < 2; repetition++) {
+        expect(titleOffset(), greaterThan(0));
+        await tester.tap(find.byType(MiniPlayer));
+        await settle(tester);
+        await tester.pump(const Duration(seconds: 2));
+        final close = find.descendant(
+          of: find.byType(FullPlayerSheet),
+          matching: find.byIcon(Icons.keyboard_arrow_down_rounded),
+        );
+        switch (closeMethod) {
+          case 'button':
+            await tester.tap(close);
+          case 'back':
+            await tester.binding.handlePopRoute();
+          case 'drag':
+            await tester.drag(close, const Offset(0, 200));
+        }
+        await tester.pump();
+        for (var frame = 0; frame < 10; frame++) {
+          await tester.pump(const Duration(milliseconds: 60));
+        }
+        expect(find.byType(FullPlayerSheet), findsNothing);
+        expect(titleOffset(), 0);
+        await tester.pump(const Duration(seconds: 3));
+        expect(titleOffset(), 0);
+        await tester.pump(const Duration(milliseconds: 1500));
+        expect(titleOffset(), greaterThan(0));
+      }
+      debugDefaultTargetPlatformOverride = null;
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('glass navigation bar with the pill mini player above it', (
@@ -141,6 +282,153 @@ void main() {
       find.descendant(of: player, matching: find.byType(SwipeableArtwork)),
       findsOneWidget,
     );
+  });
+
+  testWidgets('android player expands from the pill and morphs its artwork', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await pumpPlaying(tester);
+    final origin = tester.getRect(
+      find.byKey(const ValueKey('mini-player-expansion-source')),
+    );
+    final artworkOrigin = tester.getRect(find.byType(Hero));
+
+    await tester.tap(find.byType(MiniPlayer));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(BottomSheet), findsNothing);
+
+    Rect surface() {
+      final clip = tester.widget<ClipPath>(
+        find.byKey(const ValueKey('player-expansion-surface')),
+      );
+      return clip.clipper!.getClip(const Size(390, 844)).getBounds();
+    }
+
+    expect(surface(), origin);
+    await tester.pump(const Duration(milliseconds: 120));
+    final expanding = surface();
+    expect(expanding.top, lessThan(origin.top));
+    expect(expanding.bottom, greaterThan(origin.bottom));
+    expect(
+      origin.top - expanding.top,
+      greaterThan(expanding.bottom - origin.bottom),
+    );
+    expect(expanding.top, greaterThan(0));
+    expect(expanding.bottom, lessThan(844));
+
+    final artwork = tester.getRect(
+      find.byKey(const ValueKey('player-artwork-flight')),
+    );
+    expect(artwork.top, lessThan(artworkOrigin.top));
+    expect(artwork.left, greaterThan(artworkOrigin.left));
+    expect(artwork.width, greaterThan(artworkOrigin.width));
+    final artworkClip = tester.widget<ClipRRect>(
+      find.byKey(const ValueKey('player-artwork-flight')),
+    );
+    expect(
+      (artworkClip.borderRadius as BorderRadius).topLeft.x,
+      lessThan(artwork.width / 2),
+    );
+    final compact = tester.widget<Opacity>(
+      find.byKey(const ValueKey('player-expansion-compact')),
+    );
+    expect(compact.opacity, inExclusiveRange(0, 1));
+    final controls = tester.widget<Opacity>(
+      find.byKey(const ValueKey('player-expansion-controls')),
+    );
+    expect(controls.opacity, inExclusiveRange(0, 1));
+
+    await tester.pump(const Duration(milliseconds: 480));
+    expect(surface(), const Rect.fromLTWH(0, 0, 390, 844));
+    await settle(tester);
+    expect(find.byKey(const ValueKey('player-artwork-flight')), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('android player reverses the morph and restores its pill', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await pumpPlaying(tester);
+    final origin = tester.getRect(
+      find.byKey(const ValueKey('mini-player-expansion-source')),
+    );
+    final originalBarriers = find.byType(ModalBarrier).evaluate().length;
+    await tester.tap(find.byType(MiniPlayer));
+    await settle(tester);
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 180));
+    final clip = tester.widget<ClipPath>(
+      find.byKey(const ValueKey('player-expansion-surface')),
+    );
+    final closing = clip.clipper!.getClip(const Size(390, 844)).getBounds();
+    expect(closing.top, inExclusiveRange(0, origin.top));
+    expect(closing.bottom, inExclusiveRange(origin.bottom, 844));
+    await settle(tester);
+    expect(find.byType(FullPlayerSheet), findsNothing);
+    expect(find.byType(ModalBarrier), findsNWidgets(originalBarriers));
+    expect(tester.getRect(find.byType(Hero)).size, const Size(44, 44));
+    debugDefaultTargetPlatformOverride = null;
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('android player respects reduced motion', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await pumpPlaying(tester);
+    final appearance = tester
+        .element(find.byType(MainShell))
+        .read<AppearanceProvider>();
+    appearance.update(appearance.settings.copyWith(reduceMotion: true));
+    await tester.pump();
+    await tester.tap(find.byType(MiniPlayer));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(FullPlayerSheet), findsOneWidget);
+    expect(find.byKey(const ValueKey('player-artwork-flight')), findsNothing);
+    final clip = tester.widget<ClipPath>(
+      find.byKey(const ValueKey('player-expansion-surface')),
+    );
+    expect(
+      clip.clipper!.getClip(const Size(390, 844)).getBounds(),
+      const Rect.fromLTWH(0, 0, 390, 844),
+    );
+    debugDefaultTargetPlatformOverride = null;
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('android player can reverse mid-expansion without jumping', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await pumpPlaying(tester);
+    await tester.tap(find.byType(MiniPlayer));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    Rect surface() => tester
+        .widget<ClipPath>(
+          find.byKey(const ValueKey('player-expansion-surface')),
+        )
+        .clipper!
+        .getClip(const Size(390, 844))
+        .getBounds();
+    final before = surface();
+    Navigator.pop(tester.element(find.byType(FullPlayerSheet)));
+    await tester.pump();
+    expect(surface(), before);
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(surface().height, lessThan(before.height));
+    await settle(tester);
+    expect(find.byType(FullPlayerSheet), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -301,7 +589,7 @@ void main() {
         await settle(tester);
         debugDefaultTargetPlatformOverride = null;
         expect(
-          find.byType(startsAsDialog ? Dialog : BottomSheet),
+          find.byType(startsAsDialog ? Dialog : PlayerExpansionTransition),
           findsOneWidget,
         );
         expect(radius(), initialRadius);

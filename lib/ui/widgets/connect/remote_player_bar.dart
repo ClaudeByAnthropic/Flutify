@@ -10,6 +10,7 @@ import '../../shell/shell_layout_controller.dart';
 import '../desktop_player_bar.dart';
 import '../playback_status_button.dart';
 import '../player_bar_cover.dart';
+import '../marquee_text.dart';
 import 'connect_device_icon.dart';
 import 'remote_progress.dart';
 import 'remote_transport_controls.dart';
@@ -85,10 +86,8 @@ class _RemoteTrackInfo extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              MarqueeText(
+                text: title,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
