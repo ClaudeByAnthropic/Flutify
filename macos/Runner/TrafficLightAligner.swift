@@ -11,6 +11,10 @@ final class TrafficLightAligner {
 
   init(window: NSWindow) {
     self.window = window
+    // AppKit's server-side titlebar drag runs before Flutter hit testing and
+    // otherwise steals mouse selection in the search field's upper half.
+    // WindowDragArea still explicitly starts drags via performDrag(with:).
+    window.isMovable = false
     let center = NotificationCenter.default
     for name in [NSWindow.didResizeNotification, NSWindow.didBecomeKeyNotification,
                  NSWindow.didExitFullScreenNotification] {
@@ -24,11 +28,28 @@ final class TrafficLightAligner {
         self?.transitioning = true
       })
     }
+    // AppKit also stops relocating non-movable windows after display changes.
+    observers.append(center.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
+                                         object: nil, queue: .main) { [weak self] _ in
+      self?.restoreVisibleTitlebar()
+    })
     schedule()
   }
 
   deinit {
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
+  }
+
+  private func restoreVisibleTitlebar() {
+    guard let window = window, !window.styleMask.contains(.fullScreen),
+          let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+    let frame = window.frame
+    let titlebar = NSRect(x: frame.minX, y: frame.maxY - Self.barHeight,
+                         width: frame.width, height: Self.barHeight)
+    guard !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(titlebar) }) else { return }
+    let visible = screen.visibleFrame
+    window.setFrameOrigin(NSPoint(x: visible.minX + max(0, (visible.width - frame.width) / 2),
+                                  y: visible.maxY - frame.height))
   }
 
   private func schedule() {
