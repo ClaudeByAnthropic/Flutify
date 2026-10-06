@@ -72,6 +72,8 @@ class _MainShellState extends State<MainShell> {
     _currentIndex = _startIndex();
     AppRoutes.contentNavigator = () =>
         _navigatorKeys[_currentIndex].currentState;
+    AppRoutes.navigateBack = () => _histories[_currentIndex].back();
+    AppRoutes.navigateForward = () => _histories[_currentIndex].forward();
     // macOS 菜单栏常驻在 App 根部（见 MacMenuBar），这里只登记依赖主界面的动作
     _menuActions = MacMenuActions(
       onSearch: _searchFocus.requestFocus,
@@ -111,6 +113,8 @@ class _MainShellState extends State<MainShell> {
   @override
   void dispose() {
     AppRoutes.contentNavigator = null;
+    AppRoutes.navigateBack = null;
+    AppRoutes.navigateForward = null;
     if (identical(MacMenuBar.actions.value, _menuActions))
       MacMenuBar.actions.value = null;
     _searchController.dispose();

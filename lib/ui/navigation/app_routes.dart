@@ -25,6 +25,10 @@ class AppRoutes {
   /// MainShell 注册：返回当前 Tab 的 NavigatorState。
   static NavigatorState? Function()? contentNavigator;
 
+  /// MainShell 注册：当前 Tab 的后退 / 前进（顶栏 ‹ ›、快捷键与鼠标侧键共用）。
+  static VoidCallback? navigateBack;
+  static VoidCallback? navigateForward;
+
   static void openPlaylist(BuildContext context, SpotifyPlaylist playlist) =>
       _push(context, PlaylistDetailScreen(playlist: playlist));
 

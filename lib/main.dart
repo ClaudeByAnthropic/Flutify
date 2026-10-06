@@ -5,6 +5,7 @@ import 'core/utils/file_log.dart';
 import 'core/widgets/app_startup.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -71,6 +72,7 @@ import 'services/updates/update_service.dart';
 import 'services/taskbar_lyrics/taskbar_lyrics_channel.dart';
 import 'services/taskbar_lyrics/taskbar_lyrics_controls.dart';
 import 'ui/screens/main_shell.dart';
+import 'ui/navigation/app_routes.dart';
 import 'ui/shell/desktop/desktop_window.dart';
 import 'ui/shell/desktop/mac_menu_bar.dart';
 import 'ui/shell/desktop/window_frame.dart';
@@ -719,6 +721,18 @@ Object _proxyKey(AppPreferences prefs) => (
 final bool _excludeWindowsSemantics =
     Platform.isWindows && !Platform.environment.containsKey('FLUTTER_TEST');
 
+/// 桌面鼠标侧键（后退 / 前进）映射到当前 Tab 的内容历史，与顶栏 ‹ › 一致。
+///
+/// 引擎把侧键投递为 [kBackMouseButton] / [kForwardMouseButton] 的指针事件
+/// （macOS / Windows / Linux 桌面均支持），这里在根部统一监听。
+void _onMouseNavigation(PointerDownEvent event) {
+  if (event.buttons & kBackMouseButton != 0) {
+    AppRoutes.navigateBack?.call();
+  } else if (event.buttons & kForwardMouseButton != 0) {
+    AppRoutes.navigateForward?.call();
+  }
+}
+
 /// 按外观设置生成主题；字号缩放与减弱动效通过 MediaQuery 下发给整棵树。
 class _ThemedApp extends StatelessWidget {
   const _ThemedApp();
@@ -761,8 +775,12 @@ class _ThemedApp extends StatelessWidget {
             // macOS 原生菜单栏常驻于此（卸载会清空系统菜单），主界面动作由 MainShell 注册
             child: ExcludeSemantics(
               excluding: _excludeWindowsSemantics,
-              child: MacMenuBar(
-                child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: _onMouseNavigation,
+                child: MacMenuBar(
+                  child: TaskbarLyricsBinding(child: WindowFrame(child: child!)),
+                ),
               ),
             ),
           ),
