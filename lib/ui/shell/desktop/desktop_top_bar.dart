@@ -9,14 +9,17 @@ import '../../widgets/user_avatar.dart';
 import 'desktop_window.dart';
 import 'window_caption_buttons.dart';
 
-/// 桌面端顶栏（与窗口标题栏合一，高 64）。
+/// 桌面端顶栏（与窗口标题栏合一，高 56）。
 ///
 /// 布局：`‹ ›` 后退 / 前进 ─── [⌂] [ 🔍 你想听什么？  Ctrl K ] ─── 头像 · （窗口按钮位）
 /// - 空白处可拖动窗口、双击最大化（[WindowDragArea]）；
 /// - 搜索框居中，输入即切到搜索页；`Ctrl K`（macOS 为 `⌘K`）聚焦；
-/// - 头像打开设置（账号卡片在设置页顶部）。
+/// - 头像打开设置（账号卡片在设置页顶部）；
+/// - 后退 / 前进、主页、搜索框、头像统一 40px 高，与原生交通灯在同一中线上。
 ///
-/// macOS：原生交通灯浮在窗口左上角，顶栏左侧为它留白 [DesktopWindow.macTrafficLightsInset]，
+/// macOS：原生交通灯浮在窗口左上角，原生端把它们对齐到 20pt 留白（上下 = 左侧）并与
+/// 40px 控件中线对齐（见 macos/Runner/TrafficLightAligner.swift），
+/// 顶栏左侧为它留白 [DesktopWindow.macTrafficLightsInset]；
 /// 右上角不再为自绘窗口按钮占位（macOS 不渲染自绘按钮）。
 class DesktopTopBar extends StatelessWidget {
   final ContentHistory history;
@@ -42,7 +45,10 @@ class DesktopTopBar extends StatelessWidget {
     required this.onOpenSettings,
   });
 
-  static const double height = 64;
+  static const double height = 56;
+
+  /// 顶栏交互控件统一高度（后退 / 前进、主页、搜索框、头像）。
+  static const double controlSize = 40;
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +122,7 @@ class DesktopTopBar extends StatelessWidget {
   }
 }
 
-/// 32px 圆形图标按钮（后退 / 前进）；禁用时降低不透明度。
+/// 40px 圆形图标按钮（后退 / 前进）；禁用时降低不透明度。
 class _RoundIconButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
@@ -136,19 +142,21 @@ class _RoundIconButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        fixedSize: const Size(32, 32),
-        minimumSize: const Size(32, 32),
+        fixedSize: const Size.square(DesktopTopBar.controlSize),
+        minimumSize: const Size.square(DesktopTopBar.controlSize),
         padding: EdgeInsets.zero,
-        backgroundColor: colorScheme.surface,
+        backgroundColor: colorScheme.surfaceContainerHigh,
         foregroundColor: colorScheme.onSurface,
-        disabledBackgroundColor: colorScheme.surface.withAlpha(140),
+        disabledBackgroundColor: colorScheme.surfaceContainerHigh.withAlpha(
+          140,
+        ),
         disabledForegroundColor: colorScheme.onSurfaceVariant.withAlpha(110),
       ),
     );
   }
 }
 
-/// 48px 主页按钮：选中时实心图标。
+/// 40px 主页按钮：选中时实心图标。
 class _HomeButton extends StatelessWidget {
   final bool selected;
   final VoidCallback onPressed;
@@ -159,11 +167,11 @@ class _HomeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return IconButton(
-      icon: Icon(selected ? Icons.home_filled : Icons.home_outlined, size: 24),
+      icon: Icon(selected ? Icons.home_filled : Icons.home_outlined, size: 22),
       tooltip: context.l10n.shellHome,
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        fixedSize: const Size(48, 48),
+        fixedSize: const Size.square(DesktopTopBar.controlSize),
         backgroundColor: colorScheme.surfaceContainerHigh,
         foregroundColor: selected
             ? colorScheme.onSurface
@@ -230,7 +238,7 @@ class _SearchFieldState extends State<_SearchField> {
       onExit: (_) => setState(() => _hover = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        height: 48,
+        height: DesktopTopBar.controlSize,
         decoration: ShapeDecoration(
           color: _hover || focused
               ? colorScheme.surfaceContainerHighest
@@ -246,15 +254,15 @@ class _SearchFieldState extends State<_SearchField> {
         ),
         child: Row(
           children: [
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Icon(
               Icons.search_rounded,
-              size: 24,
+              size: 22,
               color: focused
                   ? colorScheme.onSurface
                   : colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: TextField(
                 controller: widget.controller,
@@ -289,7 +297,7 @@ class _SearchFieldState extends State<_SearchField> {
               )
             else if (!focused)
               Container(
-                margin: const EdgeInsets.only(right: 14),
+                margin: const EdgeInsets.only(right: 12),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   border: Border.all(color: colorScheme.outlineVariant),
@@ -331,9 +339,9 @@ class _AccountButton extends StatelessWidget {
           : context.l10n.shellAccountMenu,
       child: IconButton(
         onPressed: onPressed,
-        icon: const UserAvatar(size: 32),
+        icon: const UserAvatar(size: 28),
         style: IconButton.styleFrom(
-          fixedSize: const Size(48, 48),
+          fixedSize: const Size.square(DesktopTopBar.controlSize),
           backgroundColor: colorScheme.surfaceContainerHigh,
           padding: EdgeInsets.zero,
         ),

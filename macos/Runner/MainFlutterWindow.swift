@@ -3,6 +3,7 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var cacheDirectories: CacheDirectories?
+  private var trafficLightAligner: TrafficLightAligner?
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -17,6 +18,9 @@ class MainFlutterWindow: NSWindow {
     MediaControlsChannel.register(messenger: messenger)
     EditMenuChannel.register(messenger: messenger)
     MouseNavigationChannel.register(messenger: messenger)
+
+    // 交通灯垂直居中到自绘顶栏（高 56），窗口缩放 / 退出全屏后重新对齐
+    trafficLightAligner = TrafficLightAligner(window: self)
 
     super.awakeFromNib()
   }
@@ -115,7 +119,6 @@ enum EditMenuChannel {
     return target is NSWindow || target is NSApplication || target is NSWindowController
   }
 }
-
 /// 鼠标侧键前进 / 后退的原生兜底。
 ///
 /// Logi Options+ 等鼠标驱动在 macOS 上把 MX 系列侧键作为「页面滑动」(NSEventTypeSwipe) 发送，

@@ -21,6 +21,19 @@ env:
   FLUTTER_VERSION_MACOS: '3.44.9'
 
 jobs:
+  macos-titlebar:
+    name: macOS native titlebar hit testing
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check native button hit regions and Flutter content access
+        run: |
+          swiftc macos/Runner/TrafficLightAligner.swift tool/test_macos_titlebar.swift -o "$RUNNER_TEMP/titlebar-test"
+          "$RUNNER_TEMP/titlebar-test"
+
   quality:
     name: Analyze and test
     runs-on: ubuntu-latest
