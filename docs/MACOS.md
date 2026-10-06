@@ -1,6 +1,6 @@
 # macOS 开发与自测
 
-macOS 支持处于源码自测阶段。现有 Windows / Android Release 保持不变；macOS `.app` 未做 Developer ID 签名或 Apple 公证，不作为正式安装包发布。
+macOS 测试版随 GitHub Releases 提供 `Flutify-<版本>-macos.zip`，解压后将 `Flutify.app` 放入应用程序目录。包内 `.app` 未做 Developer ID 签名或 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许打开。
 
 ## 构建
 
@@ -52,4 +52,4 @@ flutter build macos --release
 
 `.github/workflows/build.yml` 新增 macOS 测试与 Release 构建任务，将 `Flutify-<构建标签>-macos.zip` 上传到本次运行的 `macos` Artifact。构建标签沿用 `prepare` 任务，支持标签和手动构建。
 
-现有 Release 只依赖 Android / Windows，并只下载这两类 Artifact，因此 macOS 构建完成先后不会改变八个正式安装产物的数量或校验和。正式分发 macOS 包需要另行配置签名、公证、不同架构产物及对应的发布校验。
+Release 等待 Android、Windows 和 macOS 全部构建成功后，下载三端 Artifact，并校验九个安装包齐全后生成 `SHA256SUMS.txt`。macOS ZIP 包含 `.app`，与 Windows / Android 使用同一版本标签；Developer ID 签名和 Apple 公证尚未配置。

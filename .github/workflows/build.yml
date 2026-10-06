@@ -1,8 +1,8 @@
-# 构建 Android / Windows 安装包与未签名的 macOS 自测产物。
-# - 推送 v* 标签：两端构建完成后发布到 GitHub Releases（标签含 beta / alpha / rc 时标为预发布）；
+# 构建并发布 Android / Windows / macOS 安装包。
+# - 推送 v* 标签：三端构建完成后发布到 GitHub Releases（标签含 beta / alpha / rc 时标为预发布）；
 # - 手动运行默认只构建；勾选 publish_release 并填写 release_tag 后，全部构建成功才发布。
 # - 推送到 main：只构建，产物在本次运行的 Artifacts 里。
-# - macOS 只上传未做 Developer ID 签名、公证的自测 Artifact，不参与 Releases。
+# - macOS 测试包随 Release 发布，未做 Developer ID 签名和 Apple 公证。
 name: Build
 
 on:
@@ -243,7 +243,7 @@ jobs:
 
       - run: flutter build macos --release --dart-define=FLUTIFY_RELEASE_TAG=${{ needs.prepare.outputs.tag }}
 
-      # 未签名、未公证：不上 Releases，仅供开发者自测
+      # macOS 测试包：未做 Developer ID 签名和 Apple 公证
       - name: Zip
         run: |
           name="Flutify-${BUILD_LABEL}-macos.zip"
@@ -258,14 +258,14 @@ jobs:
   release:
     name: Publish release
     if: needs.prepare.outputs.publish == 'true'
-    needs: [prepare, android, windows]
+    needs: [prepare, android, windows, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
-          pattern: '{android,windows-*}'
+          pattern: '{android,windows-*,macos}'
           path: dist
           merge-multiple: true
 
@@ -274,10 +274,10 @@ jobs:
           BUILD_LABEL: ${{ needs.prepare.outputs.label }}
         run: |
           cd dist
-          for suffix in windows-x64.zip windows-x64-setup.exe windows-arm64.zip windows-arm64-setup.exe android-arm64-v8a.apk android-armeabi-v7a.apk android-x86_64.apk android-universal.apk; do
+          for suffix in windows-x64.zip windows-x64-setup.exe windows-arm64.zip windows-arm64-setup.exe android-arm64-v8a.apk android-armeabi-v7a.apk android-x86_64.apk android-universal.apk macos.zip; do
             test -s "Flutify-${BUILD_LABEL}-${suffix}" || { echo "Missing package: ${suffix}"; exit 1; }
           done
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 8
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 9
           sha256sum Flutify-* > SHA256SUMS.txt
 
       - name: Prepare release notes
@@ -288,7 +288,7 @@ jobs:
           if [ -f "$notes" ]; then
             cp "$notes" "$RUNNER_TEMP/release-notes.md"
           else
-            printf '%s\n' 'Windows x64 / ARM64 提供安装版和便携版；Android 提供三种 ABI 与通用 APK。全部平台构建及产物校验通过后发布，校验和见 SHA256SUMS.txt。' '构建通过不代表所有设备兼容性问题已完成实机验证，已知问题见 README。' > "$RUNNER_TEMP/release-notes.md"
+            printf '%s\n' 'Windows x64 / ARM64 提供安装版和便携版；Android 提供三种 ABI 与通用 APK；macOS 提供未做 Developer ID 签名和 Apple 公证的测试 ZIP。全部平台构建及产物校验通过后发布，校验和见 SHA256SUMS.txt。' '构建通过不代表所有设备兼容性问题已完成实机验证，已知问题见 README。' > "$RUNNER_TEMP/release-notes.md"
           fi
 
       - uses: softprops/action-gh-release@v2

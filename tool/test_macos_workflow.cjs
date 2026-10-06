@@ -24,11 +24,12 @@ test('macOS tests and builds using the validated build label', () => {
   assert.match(macos, /name: macos/);
 });
 
-test('unsigned macOS artifacts cannot enter the existing release', () => {
+test('release waits for macOS and includes its package in checksums', () => {
   const release = job('release');
-  assert.match(release, /needs: \[prepare, android, windows\]/);
-  assert.match(release, /pattern: '\{android,windows-\*\}'/);
+  assert.match(release, /needs: \[prepare, android, windows, macos\]/);
+  assert.match(release, /pattern: '\{android,windows-\*,macos\}'/);
   assert.match(release, /merge-multiple: true/);
-  assert.match(release, /-eq 8/);
+  assert.match(release, /android-universal\.apk macos\.zip; do/);
+  assert.match(release, /-eq 9/);
   assert.match(release, /sha256sum Flutify-\*/);
 });

@@ -54,69 +54,78 @@ class DesktopTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final macButtons = DesktopWindow.macNativeWindow;
-    return WindowDragArea(
-      child: SizedBox(
-        height: height,
-        child: Row(
-          children: [
-            // macOS 原生交通灯浮在左上角，顶栏内容为它留白
-            SizedBox(
-              width: macButtons ? DesktopWindow.macTrafficLightsInset : 16,
-            ),
-            ListenableBuilder(
-              listenable: history,
-              builder: (context, _) => Row(
-                children: [
-                  _RoundIconButton(
-                    icon: Icons.chevron_left_rounded,
-                    tooltip: l10n.shellBack,
-                    onPressed: history.canGoBack ? history.back : null,
-                  ),
-                  const SizedBox(width: 8),
-                  _RoundIconButton(
-                    icon: Icons.chevron_right_rounded,
-                    tooltip: l10n.shellForward,
-                    onPressed: history.canGoForward ? history.forward : null,
-                  ),
-                ],
+    return SizedBox(
+      height: height,
+      child: Stack(
+        children: [
+          // 拖窗只接收空白处事件，不能作为输入框的祖先参与文字选择的手势竞争。
+          const Positioned.fill(
+            child: WindowDragArea(child: SizedBox.expand()),
+          ),
+          Row(
+            children: [
+              // macOS 原生交通灯浮在左上角，顶栏内容为它留白
+              SizedBox(
+                width: macButtons ? DesktopWindow.macTrafficLightsInset : 16,
               ),
-            ),
-            // 中间区域：主页按钮 + 搜索框整体居中，两侧留白都是拖动区
-            Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        _HomeButton(selected: homeSelected, onPressed: onHome),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _SearchField(
-                            controller: searchController,
-                            focusNode: searchFocus,
-                            onChanged: onSearchChanged,
-                            onSubmitted: onSearchSubmitted,
-                            onActivated: onSearchActivated,
+              ListenableBuilder(
+                listenable: history,
+                builder: (context, _) => Row(
+                  children: [
+                    _RoundIconButton(
+                      icon: Icons.chevron_left_rounded,
+                      tooltip: l10n.shellBack,
+                      onPressed: history.canGoBack ? history.back : null,
+                    ),
+                    const SizedBox(width: 8),
+                    _RoundIconButton(
+                      icon: Icons.chevron_right_rounded,
+                      tooltip: l10n.shellForward,
+                      onPressed: history.canGoForward ? history.forward : null,
+                    ),
+                  ],
+                ),
+              ),
+              // 中间区域：主页按钮 + 搜索框整体居中，两侧留白都是拖动区
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          _HomeButton(
+                            selected: homeSelected,
+                            onPressed: onHome,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _SearchField(
+                              controller: searchController,
+                              focusNode: searchFocus,
+                              onChanged: onSearchChanged,
+                              onSubmitted: onSearchSubmitted,
+                              onActivated: onSearchActivated,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            _AccountButton(onPressed: onOpenSettings),
-            // 窗口按钮由 WindowFrame 浮在右上角（所有页面都可见），这里只留出位置；
-            // macOS 用原生交通灯，无自绘按钮不占位
-            SizedBox(
-              width: DesktopWindow.enabled && !macButtons
-                  ? 8 + WindowCaptionButtons.width
-                  : 16,
-            ),
-          ],
-        ),
+              _AccountButton(onPressed: onOpenSettings),
+              // 窗口按钮由 WindowFrame 浮在右上角（所有页面都可见），这里只留出位置；
+              // macOS 用原生交通灯，无自绘按钮不占位
+              SizedBox(
+                width: DesktopWindow.enabled && !macButtons
+                    ? 8 + WindowCaptionButtons.width
+                    : 16,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

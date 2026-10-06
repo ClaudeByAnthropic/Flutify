@@ -21,7 +21,11 @@ class DesktopWindow {
   static bool _enabled = false;
 
   /// 自绘标题栏是否生效。
-  static bool get enabled => _enabled;
+  static bool get enabled => debugEnabledOverride ?? _enabled;
+
+  /// 测试用：启用真实的窗口手势，并由测试接管 window_manager 原生通道。
+  @visibleForTesting
+  static bool? debugEnabledOverride;
 
   /// 是否运行在「macOS 原生窗口按钮」模式：原生交通灯浮在左上角，红色关闭按钮只隐藏
   /// 窗口（音乐继续播放），真正退出走 Cmd+Q。窗口 chrome / 快捷键 / 原生菜单统一按它分支；

@@ -4,7 +4,7 @@
 
 # Flutify
 
-一个让你呼吸通畅的 Spotify 第三方客户端 · Windows / Android / macOS（源码自测）
+一个让你呼吸通畅的 Spotify 第三方客户端 · Windows / Android / macOS（测试版）
 
 [下载](https://github.com/is-hp-is-mad/Flutify/releases) · 当前版本 [![最新版本（含 Beta）](https://img.shields.io/github/v/release/is-hp-is-mad/Flutify?include_prereleases&sort=date&label=release&cacheSeconds=300)](https://github.com/is-hp-is-mad/Flutify/releases)
 
@@ -51,7 +51,7 @@
 | Windows 10 / 11，Intel / AMD | `*-windows-x64-setup.exe` 或 `*-windows-x64.zip` | 安装版或解压即用的便携版 |
 | Windows ARM64 | `*-windows-arm64-setup.exe` 或 `*-windows-arm64.zip` | 原生 ARM64 安装版或便携版 |
 | Android | `*-android-arm64-v8a.apk` | 绝大多数手机选这个；不确定就选 `*-android-universal.apk` |
-| macOS | 源码构建 / Actions `macos` Artifact | 未签名、未公证，不进入 Releases；见 [macOS 开发说明](docs/MACOS.md) |
+| macOS | Releases 中的 `*-macos.zip` | 测试版，未做 Developer ID 签名和 Apple 公证；见 [macOS 开发说明](docs/MACOS.md) |
 
 Windows 便携版解压后运行 `Flutify.exe`。两种发行方式均附带 MSVC 运行库；播放仍需 WebView2 运行时（Windows 11 通常已安装）。安装版默认安装到当前用户目录，也可更改位置。
 
