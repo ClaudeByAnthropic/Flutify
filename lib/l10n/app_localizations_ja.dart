@@ -132,6 +132,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get commonRetry => '再試行';
 
   @override
+  String get commonLoadMore => 'さらに読み込む';
+
+  @override
   String get commonMoreOptions => 'その他のオプション';
 
   @override
@@ -329,6 +332,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get searchCategoriesFailedMessage => '接続を確認して再試行してください。';
 
   @override
+  String get searchFailedTitle => '検索結果を読み込めませんでした';
+
+  @override
+  String get searchFailedMessage => '接続を確認して再試行してください。読み込み済みの結果は保持されます。';
+
+  @override
   String searchNoResultsTitle(String query) {
     return '「$query」の検索結果はありません';
   }
@@ -413,6 +422,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get artistNoPopular => '人気の曲はまだありません。';
+
+  @override
+  String get artistNoAlbums => '表示できるアルバムはまだありません。';
+
+  @override
+  String get artistNoSongs => '表示できる曲はまだありません。';
 
   @override
   String get artistDiscography => 'ディスコグラフィー';

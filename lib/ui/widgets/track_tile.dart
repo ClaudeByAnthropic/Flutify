@@ -37,6 +37,12 @@ class TrackTile extends StatelessWidget {
   final PlaybackContext? playbackContext;
   final VoidCallback? onTap;
 
+  /// Context-specific second line, e.g. album and year in an artist's catalog.
+  final String? subtitle;
+
+  /// Keep the menu discoverable in catalog lists even before pointer hover.
+  final bool alwaysShowMore;
+
   /// 桌面表格列（歌单页）：给出时按列显示艺人 / 专辑 / 添加日期，紧凑视图不显示封面；
   /// 为 null 时是普通曲目行（封面 + 歌名 / 艺人两行）。
   final TrackTableColumns? columns;
@@ -49,6 +55,8 @@ class TrackTile extends StatelessWidget {
     this.contextQueue,
     this.playbackContext,
     this.onTap,
+    this.subtitle,
+    this.alwaysShowMore = false,
     this.columns,
   });
 
@@ -216,7 +224,7 @@ class TrackTile extends StatelessWidget {
                             if (track.explicit) const _ExplicitBadge(),
                             Expanded(
                               child: Text(
-                                track.artistNames,
+                                subtitle ?? track.artistNames,
                                 style: secondary,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -314,7 +322,7 @@ class TrackTile extends StatelessWidget {
                 ),
 
                 _Reveal(
-                  visible: revealed,
+                  visible: revealed || alwaysShowMore,
                   fixedExtent: hoverCapable,
                   child: Builder(
                     // 独立 context：桌面菜单锚定在按钮下方
