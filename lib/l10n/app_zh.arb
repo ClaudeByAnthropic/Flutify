@@ -493,6 +493,18 @@
   "settingsMotionSection": "动效",
   "settingsReduceMotion": "减弱动效",
   "settingsReduceMotionSubtitle": "关闭流动背景、过渡与悬停等装饰性动画",
+  "settingsPowerSaving": "省电模式",
+  "settingsPowerSavingSubtitle": "玻璃改用磨砂底、歌词页背景不再流动；歌词滚动与动效全部保留",
+  "settingsFrameRate": "帧率上限",
+  "settingsFrameRateSubtitle": "降低可明显减少 GPU 占用，动画速度不变",
+  "settingsFrameRateFollow": "跟随屏幕",
+  "settingsFrameRateCustom": "自定义",
+  "settingsFrameRateValue": "{fps} fps",
+  "@settingsFrameRateValue": {
+    "placeholders": {
+      "fps": {"type": "int"}
+    }
+  },
   "settingsResetAppearance": "恢复默认外观",
   "settingsCustomColorTitle": "自定义强调色",
   "settingsHue": "色相",

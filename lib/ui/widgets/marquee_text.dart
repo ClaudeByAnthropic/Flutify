@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 
 class MarqueeText extends StatefulWidget {
   final String text;
@@ -32,7 +34,7 @@ class MarqueeText extends StatefulWidget {
 }
 
 class _MarqueeTextState extends State<MarqueeText>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _edgeFadeWidth = 24.0 * 0.7;
 
   /// 起步时左侧渐隐带相对文字位移的展开倍速：16.8px 的柔边在文字移动约 4px 内铺满。
@@ -71,6 +73,8 @@ class _MarqueeTextState extends State<MarqueeText>
 
   @override
   void dispose() {
+    _delay?.cancel();
+    _ticker.dispose();
     _controller.removeListener(_handleAnimationTick);
     _controller.dispose();
     _scrollController.dispose();
@@ -217,16 +221,41 @@ class _MarqueeTextState extends State<MarqueeText>
     ).createShader(bounds);
   }
 
+  /// [_controller] 的值只表示滚动段进度（0~1 对应 0~滚动距离），不再自己计时。
   double get _scrollOffset {
     if (_scrollDistance == 0 || _scrollDuration == Duration.zero) return 0;
+    return _scrollDistance * _controller.value;
+  }
 
-    final total = _controller.duration!.inMicroseconds;
-    final start = widget.startDelay.inMicroseconds / total;
-    final scroll = _scrollDuration.inMicroseconds / total;
-    final value = _controller.value;
-    if (value <= start) return 0;
-    if (value >= start + scroll) return _scrollDistance;
-    return _scrollDistance * ((value - start) / scroll);
+  /// 每轮「静止 startDelay → 滚动 _scrollDuration」，与原先 repeat 整段时长的语义一致：
+  /// 进度一律由帧时间戳相对 [_origin] 推算。区别只在静止段停掉逐帧回调、由 [_delay]
+  /// 定时器在静止结束时唤醒——静止期间画面不变，不该逐帧带动整窗重绘。
+  late final Ticker _ticker = createTicker((_) => _syncLap());
+  Duration _origin = Duration.zero;
+  Timer? _delay;
+
+  Duration get _frameTime =>
+      SchedulerBinding.instance.currentSystemFrameTimeStamp;
+
+  void _syncLap() {
+    if (!_shouldAnimate) return;
+    final cycle = (widget.startDelay + _scrollDuration).inMicroseconds;
+    final pos = Duration(
+      microseconds: (_frameTime - _origin).inMicroseconds % cycle,
+    );
+    if (pos < widget.startDelay) {
+      _controller.value = 0;
+      _ticker.stop();
+      _delay?.cancel();
+      _delay = Timer(widget.startDelay - pos, () {
+        if (mounted && _shouldAnimate && !_ticker.isActive) _ticker.start();
+      });
+    } else {
+      _controller.value =
+          (pos - widget.startDelay).inMicroseconds /
+          _scrollDuration.inMicroseconds;
+      if (!_ticker.isActive) _ticker.start();
+    }
   }
 
   double _measureText(
@@ -307,6 +336,8 @@ class _MarqueeTextState extends State<MarqueeText>
   }
 
   void _applyConfiguration(_MarqueeConfiguration configuration) {
+    _delay?.cancel();
+    _ticker.stop();
     _controller.stop();
     _controller.value = 0;
     _viewportWidth = configuration.viewportWidth;
@@ -321,8 +352,9 @@ class _MarqueeTextState extends State<MarqueeText>
           (_scrollDistance / widget.pixelsPerSecond * 1000).round(),
         ),
       );
-      _controller.duration = widget.startDelay + _scrollDuration;
-      _controller.repeat();
+      _controller.duration = _scrollDuration;
+      _origin = _frameTime;
+      _syncLap();
     } else {
       _scrollDistance = 0;
       _scrollDuration = Duration.zero;
@@ -334,6 +366,8 @@ class _MarqueeTextState extends State<MarqueeText>
   }
 
   void _resetAnimation() {
+    _delay?.cancel();
+    _ticker.stop();
     _controller.stop();
     _controller.value = 0;
     _viewportWidth = 0;

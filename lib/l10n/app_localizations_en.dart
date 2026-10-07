@@ -894,6 +894,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'Turns off flowing backgrounds, transitions and hover animations';
 
   @override
+  String get settingsPowerSaving => 'Power saving';
+
+  @override
+  String get settingsPowerSavingSubtitle =>
+      'Glass uses a frosted fill and the lyrics background stops flowing; lyric scrolling and effects stay';
+
+  @override
+  String get settingsFrameRate => 'Frame rate limit';
+
+  @override
+  String get settingsFrameRateSubtitle =>
+      'Lower values noticeably cut GPU usage; animation speed is unchanged';
+
+  @override
+  String get settingsFrameRateFollow => 'Display';
+
+  @override
+  String get settingsFrameRateCustom => 'Custom';
+
+  @override
+  String settingsFrameRateValue(int fps) {
+    return '$fps fps';
+  }
+
+  @override
   String get settingsResetAppearance => 'Reset appearance';
 
   @override

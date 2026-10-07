@@ -867,6 +867,29 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsReduceMotionSubtitle => '关闭流动背景、过渡与悬停等装饰性动画';
 
   @override
+  String get settingsPowerSaving => '省电模式';
+
+  @override
+  String get settingsPowerSavingSubtitle => '玻璃改用磨砂底、歌词页背景不再流动；歌词滚动与动效全部保留';
+
+  @override
+  String get settingsFrameRate => '帧率上限';
+
+  @override
+  String get settingsFrameRateSubtitle => '降低可明显减少 GPU 占用，动画速度不变';
+
+  @override
+  String get settingsFrameRateFollow => '跟随屏幕';
+
+  @override
+  String get settingsFrameRateCustom => '自定义';
+
+  @override
+  String settingsFrameRateValue(int fps) {
+    return '$fps fps';
+  }
+
+  @override
   String get settingsResetAppearance => '恢复默认外观';
 
   @override
@@ -2587,6 +2610,29 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsReduceMotionSubtitle => '關閉流動背景、過渡與懸停等裝飾性動畫';
+
+  @override
+  String get settingsPowerSaving => '省電模式';
+
+  @override
+  String get settingsPowerSavingSubtitle => '玻璃改用磨砂底、歌詞頁背景不再流動；歌詞捲動與動效全部保留';
+
+  @override
+  String get settingsFrameRate => '幀率上限';
+
+  @override
+  String get settingsFrameRateSubtitle => '降低可明顯減少 GPU 佔用，動畫速度不變';
+
+  @override
+  String get settingsFrameRateFollow => '跟隨螢幕';
+
+  @override
+  String get settingsFrameRateCustom => '自訂';
+
+  @override
+  String settingsFrameRateValue(int fps) {
+    return '$fps fps';
+  }
 
   @override
   String get settingsResetAppearance => '恢復預設外觀';

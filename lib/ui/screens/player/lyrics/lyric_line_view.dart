@@ -96,10 +96,14 @@ class LyricLineView extends StatelessWidget {
                 imageFilter: ImageFilter.blur(sigmaX: v.blur, sigmaY: v.blur),
                 child: result,
               );
-              return Transform.scale(
-                scale: v.scale,
-                alignment: centered ? Alignment.center : Alignment.centerLeft,
-                child: result,
+              // 每行独立图层：别处（跑马灯、波形、当前句进度）重绘时本行图层原样保留，
+              // 引擎光栅缓存可直接复用已模糊好的结果，不必每帧重做模糊
+              return RepaintBoundary(
+                child: Transform.scale(
+                  scale: v.scale,
+                  alignment: centered ? Alignment.center : Alignment.centerLeft,
+                  child: result,
+                ),
               );
             },
           ),

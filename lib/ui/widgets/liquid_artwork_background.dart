@@ -1,22 +1,21 @@
-import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'liquid_artwork_painter.dart';
 
 /// Apple Music 歌词页的"流动封面"背景。
 ///
 /// 做法：同一张封面放大成三份，以不同速度、不同中心缓慢旋转，
-/// 再整体做一次大半径模糊，得到颜色持续流动的液态渐变。
+/// 再整体做一次大半径模糊，得到颜色持续流动的液态渐变（绘制见 [LiquidArtworkPainter]）。
 ///
 /// 性能：
 /// - 封面以 128px 解码，模糊半径很大，原图分辨率毫无意义；
+/// - 模糊在 1/8 分辨率的离屏画布上完成再放大，不再每帧做全屏全分辨率的大模糊；
 /// - 整个背景包在 RepaintBoundary 里，前景歌词滚动不会触发它重绘；
 /// - [animate] 为 false（暂停播放）时停止旋转，与 Apple Music 行为一致；
 /// - 旋转一圈 40 秒、又叠了 σ=70 的大模糊，30fps 与 60fps 肉眼无差别，
-///   所以动画只按 30fps 推进：这一层每帧都要重新做全屏大模糊，还会连带让上面
-///   所有玻璃重新采样背景，帧率减半即 GPU 占用减半。
+///   所以动画只按 30fps 推进：背景每变一帧，上面所有玻璃都要重新采样，帧率减半即 GPU 占用减半。
 class LiquidArtworkBackground extends StatefulWidget {
   final String imageUrl;
   final Color fallback;
@@ -30,101 +29,166 @@ class LiquidArtworkBackground extends StatefulWidget {
   });
 
   @override
-  State<LiquidArtworkBackground> createState() => _LiquidArtworkBackgroundState();
+  State<LiquidArtworkBackground> createState() =>
+      _LiquidArtworkBackgroundState();
 }
 
-class _LiquidArtworkBackgroundState extends State<LiquidArtworkBackground> with SingleTickerProviderStateMixin {
+class _LiquidArtworkBackgroundState extends State<LiquidArtworkBackground>
+    with SingleTickerProviderStateMixin {
   static const Duration _period = Duration(seconds: 40);
-  // 略小于 1/30 秒：vsync 抖动时也不会被误判成「还没到点」而掉到 20fps
-  static const Duration _minFrameGap = Duration(milliseconds: 30);
+  static const Duration _frameInterval = Duration(microseconds: 33333);
+  static const Duration _fadeIn = Duration(milliseconds: 400);
 
-  late final Ticker _ticker;
+  /// 用定时器而不是 Ticker 推进相位：Ticker 每个 vsync 都会回调并预约下一帧，
+  /// 即使回调里跳过更新，引擎仍会重新合成整个窗口（含所有玻璃），
+  /// 165Hz 屏上就是每秒 165 次整窗重绘。定时器只在相位真正变化时才让引擎出帧。
+  Timer? _timer;
+  final Stopwatch _clock = Stopwatch();
 
-  /// 旋转相位（0~1 循环）。只有这个 notifier 变化才会重建三块封面。
+  /// 所在路由被遮住等情况下 TickerMode 关闭，与 Ticker 一样停止流动。
+  bool _tickerEnabled = true;
+
+  /// 旋转相位（0~1 循环）。只有这个 notifier 变化才会重绘封面。
   final ValueNotifier<double> _phase = ValueNotifier<double>(0);
 
   /// 本次启动前的相位：暂停后继续从原处转，不回到起点。
   double _resumeFrom = 0;
-  Duration _lastEmit = Duration.zero;
+
+  /// 封面淡入：与原 CachedNetworkImage 的 400ms 淡入一致；内存缓存命中时直接显示。
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: _fadeIn,
+  );
+
+  ImageStream? _stream;
+  ImageInfo? _artwork;
+  late final ImageStreamListener _listener = ImageStreamListener(
+    _onImage,
+    onError: _onImageError,
+  );
+
+  /// 正在同步 addListener：此时回调的图片来自内存缓存，不做淡入。
+  bool _resolvingSync = false;
 
   @override
-  void initState() {
-    super.initState();
-    // 即使首次为暂停状态也提前创建，避免 dispose 才初始化并访问失效的 context。
-    _ticker = createTicker(_tick);
-    if (widget.animate) _start();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _syncAnimation();
+    _resolveImage();
   }
 
   @override
   void didUpdateWidget(LiquidArtworkBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.animate == oldWidget.animate) return;
-    widget.animate ? _start() : _stop();
+    if (widget.imageUrl != oldWidget.imageUrl) _resolveImage();
+    _syncAnimation();
   }
 
+  // ---- 封面加载 ----
+
+  void _resolveImage() {
+    if (widget.imageUrl.isEmpty) {
+      _setStream(null);
+      return;
+    }
+    final provider = ResizeImage(
+      CachedNetworkImageProvider(widget.imageUrl),
+      width: 128,
+    );
+    _setStream(provider.resolve(createLocalImageConfiguration(context)));
+  }
+
+  void _setStream(ImageStream? stream) {
+    if (stream != null && stream.key == _stream?.key) return;
+    _inLifecycle = true;
+    _stream?.removeListener(_listener);
+    _replaceArtwork(null);
+    _fade.value = 0;
+    _stream = stream;
+    _resolvingSync = true;
+    stream?.addListener(_listener);
+    _resolvingSync = false;
+    _inLifecycle = false;
+  }
+
+  void _onImage(ImageInfo info, bool synchronousCall) {
+    _replaceArtwork(info);
+    if (_resolvingSync || synchronousCall) {
+      _fade.value = 1;
+    } else {
+      _fade.forward(from: 0);
+    }
+  }
+
+  /// 加载失败：只显示主色底，与原 errorWidget 一致。
+  void _onImageError(Object error, StackTrace? stackTrace) =>
+      _replaceArtwork(null);
+
+  /// 生命周期内（didChangeDependencies / didUpdateWidget / 同步命中）本就会重建，
+  /// 只有异步回调才需要 setState。
+  void _replaceArtwork(ImageInfo? info) {
+    if (!mounted) {
+      info?.dispose();
+      return;
+    }
+    final old = _artwork;
+    _artwork = info;
+    if (!_inLifecycle) setState(() {});
+    old?.dispose();
+  }
+
+  bool _inLifecycle = false;
+
+  // ---- 旋转动画 ----
+
+  void _syncAnimation() =>
+      widget.animate && _tickerEnabled ? _start() : _stop();
+
   void _start() {
-    if (_ticker.isActive) return;
-    _lastEmit = Duration.zero;
-    _ticker.start();
+    if (_timer != null) return;
+    _clock
+      ..reset()
+      ..start();
+    _timer = Timer.periodic(_frameInterval, (_) => _tick());
   }
 
   void _stop() {
-    if (!_ticker.isActive) return;
-    _ticker.stop();
+    if (_timer == null) return;
+    _timer!.cancel();
+    _timer = null;
+    _clock.stop();
     _resumeFrom = _phase.value;
   }
 
-  void _tick(Duration elapsed) {
-    if (elapsed - _lastEmit < _minFrameGap) return;
-    _lastEmit = elapsed;
+  void _tick() {
     _phase.value =
-        (_resumeFrom + elapsed.inMicroseconds / _period.inMicroseconds) % 1.0;
+        (_resumeFrom + _clock.elapsedMicroseconds / _period.inMicroseconds) %
+        1.0;
   }
 
   @override
   void dispose() {
-    _ticker.dispose();
+    _stream?.removeListener(_listener);
+    _artwork?.dispose();
+    _timer?.cancel();
+    _fade.dispose();
     _phase.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final fallback = ColoredBox(color: widget.fallback);
-    // 图片失败或无封面时，退化为主色 + 深色的静态渐变，不留空白
-    final artwork = widget.imageUrl.isEmpty
-        ? fallback
-        : CachedNetworkImage(
-            imageUrl: widget.imageUrl,
-            memCacheWidth: 128,
-            fit: BoxFit.cover,
-            fadeInDuration: const Duration(milliseconds: 400),
-            placeholder: (_, _) => fallback,
-            errorWidget: (_, _, _) => fallback,
-          );
-
     return RepaintBoundary(
       child: Stack(
         fit: StackFit.expand,
         children: [
           ColoredBox(color: widget.fallback),
-          ClipRect(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 70, sigmaY: 70, tileMode: TileMode.decal),
-              child: AnimatedBuilder(
-                animation: _phase,
-                builder: (context, _) {
-                  final t = _phase.value * 2 * math.pi;
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _blob(artwork, const Alignment(-0.6, -0.5), scale: 1.9, angle: t),
-                      _blob(artwork, const Alignment(0.7, 0.2), scale: 1.6, angle: -t * 1.3 + 1.2),
-                      _blob(artwork, const Alignment(-0.3, 0.8), scale: 1.4, angle: t * 0.7 + 2.4, opacity: 0.8),
-                    ],
-                  );
-                },
-              ),
+          CustomPaint(
+            painter: LiquidArtworkPainter(
+              phase: _phase,
+              fade: _fade,
+              image: _artwork?.image,
             ),
           ),
           // 压暗一层，保证白色歌词在任何封面上都有足够对比度
@@ -133,30 +197,15 @@ class _LiquidArtworkBackgroundState extends State<LiquidArtworkBackground> with 
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0x59000000), Color(0x33000000), Color(0x80000000)],
+                colors: [
+                  Color(0x59000000),
+                  Color(0x33000000),
+                  Color(0x80000000),
+                ],
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _blob(Widget artwork, Alignment alignment, {required double scale, required double angle, double opacity = 1}) {
-    return Align(
-      alignment: alignment,
-      child: FractionallySizedBox(
-        widthFactor: 0.75,
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: Opacity(
-            opacity: opacity,
-            child: Transform.rotate(
-              angle: angle,
-              child: Transform.scale(scale: scale, child: artwork),
-            ),
-          ),
-        ),
       ),
     );
   }

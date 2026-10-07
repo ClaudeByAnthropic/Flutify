@@ -441,8 +441,10 @@ class _WideLayout extends StatelessWidget {
                         const SizedBox(height: 26),
                         _TitleRow(track: track),
                         const SizedBox(height: 18),
+                        // 左栏与右侧歌词面板不重叠，下方只有流动背景
                         LyricsGlassControls(
                           full: true,
+                          backdrop: false,
                           maxWidth: contentWidth,
                           bottom: _VolumeRow(remote: remote),
                         ),
@@ -766,7 +768,9 @@ class _GlassCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 歌名行只出现在宽屏左栏与窄屏顶部标题区，歌词不会滑到下方
     return LiquidGlass(
+      backdrop: false,
       borderRadius: BorderRadius.circular(size / 2),
       child: _ToggleDisc(
         active: false,
@@ -841,7 +845,9 @@ class _GlassCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 胶囊在歌词区上方的顶栏留白内（窄屏歌词从胶囊下方开始，宽屏位于左栏顶部）
     return LiquidGlass(
+      backdrop: false,
       borderRadius: BorderRadius.circular(height / 2),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: SizedBox(

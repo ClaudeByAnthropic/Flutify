@@ -67,9 +67,9 @@ Windows 便携版解压后运行 `Flutify.exe`。两种发行方式均附带 MSV
 
 需要自建入口时，按 [FlutifyPS 部署与接入说明](https://github.com/is-hp-is-mad/FlutifyPS#部署) 在服务器上部署，然后在「设置 → 网络 → Spotify 反代」中填写包含路径的 HTTPS 地址、用户名和密码。FlutifyPS 支持 Docker 与 Node.js / systemd，服务器也可配置独立出口代理。
 
-## 🧪 Beta 已知问题
+## 🧪 已知问题
 
-- **0.09beta：Windows 完整播放兼容性尚未验证，可能不可用。** 本地编译通过不代表真实播放验证通过；x64 开启实验性原生 Widevine，加载失败回退 WebView2，ARM64 继续使用 WebView2。原生实验的许可证请求仍返回 HTTP 403，尚未验证原生出声，详见 [Widevine 实验记录](docs/WIDEVINE.md)。本版改动见 [0.09 更新日志](docs/releases/v0.09-beta.md)。
+- **0.12（正式版）：Windows 原生 Widevine 仍为实验性。** x64 开启实验性原生 Widevine，加载失败回退 WebView2，ARM64 继续使用 WebView2。原生实验的许可证请求仍返回 HTTP 403，尚未验证原生出声，详见 [Widevine 实验记录](docs/WIDEVINE.md)。本版改动见 [0.12 更新日志](docs/releases/v0.12.md)。
 
 - Android 已接入 Media3 / 系统 Widevine 原生播放；设备 DRM 支持和厂商系统媒体卡片仍有兼容性差异
 - vivo 媒体卡片、手机与 PC 间控制权转移、手机歌词退出遮罩及 Windows 左对齐任务栏歌词仍需实机反馈

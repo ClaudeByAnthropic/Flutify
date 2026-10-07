@@ -862,6 +862,31 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsReduceMotionSubtitle => '動く背景、画面切り替え、ホバー時のアニメーションを無効にします';
 
   @override
+  String get settingsPowerSaving => '省電力モード';
+
+  @override
+  String get settingsPowerSavingSubtitle =>
+      'ガラスをすりガラス風の塗りに切り替え、歌詞画面の背景を静止します。歌詞のスクロールと演出はそのまま';
+
+  @override
+  String get settingsFrameRate => 'フレームレート上限';
+
+  @override
+  String get settingsFrameRateSubtitle =>
+      '下げると GPU 使用率が大きく減ります。アニメーションの速さは変わりません';
+
+  @override
+  String get settingsFrameRateFollow => '画面に合わせる';
+
+  @override
+  String get settingsFrameRateCustom => 'カスタム';
+
+  @override
+  String settingsFrameRateValue(int fps) {
+    return '$fps fps';
+  }
+
+  @override
   String get settingsResetAppearance => '外観をリセット';
 
   @override

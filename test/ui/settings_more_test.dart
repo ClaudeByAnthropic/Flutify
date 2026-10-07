@@ -57,7 +57,7 @@ void main() {
   // 高度给足：移动端设置页是懒加载单列，一屏放下全部分组，测试无需滚动
   Future<void> pumpApp(
     WidgetTester tester, {
-    Size size = const Size(500, 5200),
+    Size size = const Size(500, 6400),
     TrackAudioSource? loader,
     Future<void> Function(StorageService storage)? seed,
   }) async {

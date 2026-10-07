@@ -13,6 +13,7 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
+import 'core/render/frame_rate_binding.dart';
 import 'core/theme/system_bars.dart';
 import 'core/theme/app_text_scaler.dart';
 import 'core/utils/error_placeholder.dart';
@@ -82,9 +83,9 @@ import 'ui/widgets/automatic_gateway_binding.dart';
 import 'ui/widgets/playback_session_keeper.dart';
 import 'ui/widgets/taskbar_lyrics_binding.dart';
 import 'ui/widgets/update_prompt.dart';
-
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // 必须先于任何其他 binding 创建：帧率上限在帧调度入口生效
+  FrameRateBinding.ensureInitialized();
   // 解码后位图缓存默认 1000 张 / 100 MiB。封面都按显示尺寸解码（见 CoverImage），
   // 400 张 / 64 MiB 足够，常驻内存上限直接降低约三分之一。
   PaintingBinding.instance.imageCache
@@ -743,6 +744,8 @@ class _ThemedApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final appearance = context.watch<AppearanceProvider>();
     final settings = appearance.settings;
+    // 设置变化必然重建这里；setter 对同值是空操作
+    FrameRateBinding.maybeInstance?.frameRateLimit = settings.frameRateLimit;
     final language = context.select<PreferencesProvider, AppLanguage>(
       (p) => p.prefs.language,
     );

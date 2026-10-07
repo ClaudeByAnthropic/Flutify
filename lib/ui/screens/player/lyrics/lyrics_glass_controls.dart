@@ -19,7 +19,10 @@ class LyricsGlassControls extends StatelessWidget {
   final double maxWidth;
   final Widget? bottom;
 
-  const LyricsGlassControls({super.key, this.full = false, this.maxWidth = 520, this.bottom});
+  /// 见 [LiquidGlass.backdrop]：下方没有歌词滑过（宽屏沉浸式左栏）时传 false。
+  final bool backdrop;
+
+  const LyricsGlassControls({super.key, this.full = false, this.maxWidth = 520, this.bottom, this.backdrop = true});
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +31,7 @@ class LyricsGlassControls extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: LiquidGlass(
+          backdrop: backdrop,
           borderRadius: context.tokens.radius(30),
           padding: EdgeInsets.fromLTRB(16, 6, 16, bottom == null ? 12 : 8),
           child: Column(

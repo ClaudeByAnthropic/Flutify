@@ -1667,6 +1667,48 @@ abstract class AppLocalizations {
   /// **'关闭流动背景、过渡与悬停等装饰性动画'**
   String get settingsReduceMotionSubtitle;
 
+  /// No description provided for @settingsPowerSaving.
+  ///
+  /// In zh, this message translates to:
+  /// **'省电模式'**
+  String get settingsPowerSaving;
+
+  /// No description provided for @settingsPowerSavingSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'玻璃改用磨砂底、歌词页背景不再流动；歌词滚动与动效全部保留'**
+  String get settingsPowerSavingSubtitle;
+
+  /// No description provided for @settingsFrameRate.
+  ///
+  /// In zh, this message translates to:
+  /// **'帧率上限'**
+  String get settingsFrameRate;
+
+  /// No description provided for @settingsFrameRateSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'降低可明显减少 GPU 占用，动画速度不变'**
+  String get settingsFrameRateSubtitle;
+
+  /// No description provided for @settingsFrameRateFollow.
+  ///
+  /// In zh, this message translates to:
+  /// **'跟随屏幕'**
+  String get settingsFrameRateFollow;
+
+  /// No description provided for @settingsFrameRateCustom.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义'**
+  String get settingsFrameRateCustom;
+
+  /// No description provided for @settingsFrameRateValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'{fps} fps'**
+  String settingsFrameRateValue(int fps);
+
   /// No description provided for @settingsResetAppearance.
   ///
   /// In zh, this message translates to:

@@ -32,6 +32,9 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
   /// 方正风格：胶囊形状也改为小圆角矩形。
   final bool squareCorners;
 
+  /// 省电模式（见 [AppearanceSettings.powerSaving]）。
+  final bool powerSaving;
+
   const FlutifyTokens({
     required this.accent,
     required this.onAccent,
@@ -40,6 +43,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
     required this.glassOpacity,
     required this.cornerScale,
     required this.squareCorners,
+    this.powerSaving = false,
   });
 
   /// 由外观设置与本次主题实际使用的强调色生成。
@@ -52,6 +56,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
       glassOpacity: s.glassOpacity,
       cornerScale: s.cornerStyle.scale,
       squareCorners: s.cornerStyle == CornerStyle.square,
+      powerSaving: s.powerSaving,
     );
   }
 
@@ -85,6 +90,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
     double? glassOpacity,
     double? cornerScale,
     bool? squareCorners,
+    bool? powerSaving,
   }) {
     return FlutifyTokens(
       accent: accent ?? this.accent,
@@ -94,6 +100,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
       glassOpacity: glassOpacity ?? this.glassOpacity,
       cornerScale: cornerScale ?? this.cornerScale,
       squareCorners: squareCorners ?? this.squareCorners,
+      powerSaving: powerSaving ?? this.powerSaving,
     );
   }
 
@@ -108,6 +115,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
       glassOpacity: lerpDouble(glassOpacity, other.glassOpacity, t)!,
       cornerScale: lerpDouble(cornerScale, other.cornerScale, t)!,
       squareCorners: t < 0.5 ? squareCorners : other.squareCorners,
+      powerSaving: t < 0.5 ? powerSaving : other.powerSaving,
     );
   }
 }

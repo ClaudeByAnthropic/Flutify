@@ -92,6 +92,9 @@ void main() {
       -500,
       scrollable: scrollable,
     );
+    // 反向滚动按步长停下时目标可能只是「已构建」而仍在视口外，再对齐一次
+    await tester.ensureVisible(find.text('深色'));
+    await settle(tester);
     await tester.tap(find.text('深色'));
     await settle(tester);
     expect(Theme.of(settingsContext(tester)).brightness, Brightness.dark);
