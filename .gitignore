@@ -78,3 +78,7 @@ tool/**/*.pdb
 tool/**/*.ilk
 tool/**/*.lib
 tool/**/*.exp
+
+# 仅本地保留的文档
+docs/RISK_REVIEW.md
+docs/WIDEVINE.md

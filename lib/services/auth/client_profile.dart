@@ -6,7 +6,7 @@ import 'proto_codec.dart';
 /// 向 Spotify 声明的客户端身份（目前只有 Windows 桌面端）。
 ///
 /// 桌面 OAuth 数据请求共用 client_id、client-token 平台数据及请求头。
-/// Web 播放另有独立身份；协议差异与未验证的账号风险见 docs/RISK_REVIEW.md。
+/// Web 播放另有独立身份；协议差异带来的账号风险尚未验证。
 enum SpotifyClientProfile {
   /// Windows 桌面端：桌面版浏览器 OAuth。
   desktop;

@@ -204,7 +204,7 @@ Flutify 是一个采用 **Google Material 3 Expressive (MD3E)** 设计语言打�
 | **媒体库** | `lib/services/library/` | `LibrarySource` 抽象：桌面会话走 spclient `collection/v2/paging`（protobuf，已点赞歌曲 / 专辑 / 艺人）+ `playlist/v2/user/{u}/rootlist`（歌单）+ Pathfinder 补全曲目与实体；无桌面会话时走 Web API。点赞 / 收藏 / 关注乐观更新并尽力同步到账号（失败记入 `syncError`）；自建歌单仅保存在本机。未登录时媒体库为空 |
 | **歌词** | `lib/services/lyrics_service.dart` | spclient `GET /color-lyrics/v2/track/{id}`，请求头沿用会话身份（桌面会话即桌面端头）；404 = 无歌词（可缓存），其他错误不缓存 |
 | **歌词补全** | `lib/services/lyrics/` | `LyricsResolver` 合并官方与 LRCLIB：官方有逐行同步歌词直接用，否则查 LRCLIB；官方出错且 LRCLIB 也没有时抛原错误 |
-| **协议登录** | `lib/services/auth/` | 桌面版 OAuth 使用浏览器登录、回环回调与 PKCE，刷新令牌并以桌面身份请求数据；Web DRM / track-playback 另用 Web 会话身份。Android 的桌面 OAuth 平台声明仍使用 Windows 回退值，详见 [风险审查](RISK_REVIEW.md)；不能把两套链路描述为统一的官方客户端身份。 |
+| **协议登录** | `lib/services/auth/` | 桌面版 OAuth 使用浏览器登录、回环回调与 PKCE，刷新令牌并以桌面身份请求数据；Web DRM / track-playback 另用 Web 会话身份。Android 的桌面 OAuth 平台声明仍使用 Windows 回退值；不能把两套链路描述为统一的官方客户端身份。 |
 | **桌面端数据层** | `lib/services/pathfinder/` | 桌面版 OAuth 会话下，公开 Web API（api.spotify.com）会因共享 client_id 频繁 429，因此改走官方桌面端自己的内部接口：Pathfinder GraphQL（`api-partner.spotify.com/pathfinder/v2/query`，持久化查询 hash 取自本机 `xpui.spa` 1.3.1.234）负责主页、分类、搜索、专辑、艺人、唱片目录与曲目补全；spclient `playlist/v2` 负责歌单（封面依次取 `pictureSize`、上传封面 `picture`、前几首曲目专辑封面拼的 `mosaic.scdn.co` 四宫格，见 `services/library/playlist_cover.dart`）、`user-profile-view/v3/profile/{用户名}` 负责昵称头像。桌面版令牌不含用户名，登录后用令牌登录一次 AP 取 canonical username（歌单根列表、收藏分页都按用户名寻址；注意 `profile/me` 是用户名为 "me" 的另一个账号，不能用）；旧版本缺用户名的会话启动时自动补齐并重新加载媒体库 |
 | **探测脚本** | `tool/` | 纯 Dart 命令行探针（不属于 App）：`protocol_probe.dart`（播放链路端到端）、`live_probe.dart`（用本机已保存会话实测播放 / 媒体库 / 歌词）、`pathfinder_probe.dart`（Pathfinder 入参探测）、`ap_ports_probe.dart`（AP 网络可达性）。输出只写入 `tool/probe_out/`（已 gitignore，含账号数据，不得进入测试或文档） |
 
@@ -390,7 +390,7 @@ cd d:\Flutify\app
 等待授权时显示形状变换的加载指示器（`M3ELoadingIndicator`）；减弱动效时形状静止。
 
 浏览器 OAuth 使用 PKCE，桌面数据请求统一从 `client_profile.dart` 取身份参数，令牌续期做并发合并；Connect 播放端使用本地持久化的随机设备 ID。
-Web 播放和桌面数据认证仍是两套身份参数，平台回退、版本常量、网关出口与内部 API 兼容性仍有风险；这些工程修正不能证明或保证账号不受限制。证据、已完成修正及验证范围见 [RISK_REVIEW.md](RISK_REVIEW.md)。
+Web 播放和桌面数据认证仍是两套身份参数，平台回退、版本常量、网关出口与内部 API 兼容性仍有风险；这些工程修正不能证明或保证账号不受限制。
 
 桌面版 OAuth 登录后，数据走桌面端内部接口（见上表「桌面端数据层」），Spotify Connect 遥控也只在这种会话下可用（dealer / connect-state）。
 桌面客户端升级后若出现 `PersistedQueryNotFound`，可用 `tool/pathfinder_probe.dart` 探测并从新的 `xpui.spa` 重新提取 hash。
@@ -419,7 +419,6 @@ $env:FLUTIFY_AUDIT='1'; & "D:\flutter-sdk\3.44.0\flutter\bin\flutter.bat" test -
 若该标签已存在，必须指向本次构建的提交。Windows x64、原生 ARM64 和 Android 全部构建及校验通过后才执行 **Publish release**，
 发布两个 Windows 便携包、两个安装包、四个 Android APK 和 `SHA256SUMS.txt`。不勾选发布时跳过发布 Job 是预期行为。
 
-桌面原生 Widevine 播放的跨平台评估见 [WIDEVINE.md](WIDEVINE.md)。
 macOS 使用单独的 FairPlay / WebKit 播放链路；CI 只上传未签名自测产物，不参与 Windows / Android 的 Release 发布，详见 [MACOS.md](MACOS.md)。
 
 ---
