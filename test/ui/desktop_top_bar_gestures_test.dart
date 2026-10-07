@@ -29,6 +29,7 @@ void main() {
     TargetPlatform.linux,
   });
   final calls = <String>[];
+  var maximized = false;
   late TextEditingController controller;
   late FocusNode focus;
   late ContentHistory history;
@@ -39,12 +40,14 @@ void main() {
     focus = FocusNode();
     history = ContentHistory();
     calls.clear();
+    maximized = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call.method);
-          if (call.method == 'isMaximized' || call.method == 'isFullScreen') {
-            return false;
-          }
+          if (call.method == 'isMaximized') return maximized;
+          if (call.method == 'isFullScreen') return false;
+          if (call.method == 'maximize') maximized = true;
+          if (call.method == 'unmaximize') maximized = false;
           return null;
         });
   });
@@ -59,10 +62,10 @@ void main() {
     history.dispose();
   });
 
-  Future<void> pumpBar(WidgetTester tester) async {
+  Future<void> pumpBar(WidgetTester tester, {double width = 1280}) async {
     DesktopWindow.debugMacNativeWindowOverride =
         defaultTargetPlatform == TargetPlatform.macOS;
-    await tester.binding.setSurfaceSize(const Size(1280, 800));
+    await tester.binding.setSurfaceSize(Size(width, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ChangeNotifierProvider<AuthProvider>(
@@ -115,7 +118,7 @@ void main() {
   );
 
   testWidgets(
-    'blank title bar still drags and double-clicks to maximize',
+    'blank title bar still drags and double-clicks to maximize and restore',
     (tester) async {
       await pumpBar(tester);
       const blank = Offset(260, 28);
@@ -132,6 +135,13 @@ void main() {
       await tester.tapAt(blank, kind: PointerDeviceKind.mouse);
       await tester.pumpAndSettle();
       expect(calls, contains('maximize'));
+      await tester.pump(const Duration(milliseconds: 500));
+      calls.clear();
+      await tester.tapAt(blank, kind: PointerDeviceKind.mouse);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tapAt(blank, kind: PointerDeviceKind.mouse);
+      await tester.pumpAndSettle();
+      expect(calls, ['isMaximized', 'unmaximize']);
     },
     variant: desktopPlatforms,
   );
@@ -159,9 +169,96 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.tapAt(point, kind: PointerDeviceKind.mouse);
       await tester.pumpAndSettle();
-      expect(calls, isNot(contains('maximize')));
+      expect(calls, isEmpty);
       expect(controller.selection.isCollapsed, isFalse);
     },
     variant: desktopPlatforms,
+  );
+
+  testWidgets(
+    'search decoration and clear button never start a window drag',
+    (tester) async {
+      await pumpBar(tester);
+      for (final icon in [Icons.search_rounded, Icons.close_rounded]) {
+        await tester.drag(
+          find.byIcon(icon),
+          const Offset(40, 30),
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(calls, isEmpty);
+      await tester.tap(
+        find.byIcon(Icons.close_rounded),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+      expect(controller.text, isEmpty);
+      expect(focus.hasFocus, isTrue);
+      expect(calls, isEmpty);
+    },
+    variant: desktopPlatforms,
+  );
+
+  testWidgets(
+    'a vertical mouse drag inside search never moves the window',
+    (tester) async {
+      await pumpBar(tester);
+      await tester.drag(
+        find.byType(TextField),
+        const Offset(0, 40),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+    },
+    variant: desktopPlatforms,
+  );
+
+  for (final width in [800.0, 1360.0]) {
+    testWidgets(
+      'macOS blank titlebar regions remain draggable at width $width',
+      (tester) async {
+        await pumpBar(tester, width: width);
+        final field = tester.getRect(find.byType(TextField));
+        final home = tester.getRect(
+          find.widgetWithIcon(IconButton, Icons.home_filled),
+        );
+        for (final point in [
+          const Offset(90, 28),
+          Offset(field.center.dx, 4),
+          Offset(field.center.dx, 52),
+          Offset(home.left - 8, 28),
+          Offset(width - 8, 28),
+        ]) {
+          calls.clear();
+          await tester.dragFrom(
+            point,
+            const Offset(30, 20),
+            kind: PointerDeviceKind.mouse,
+          );
+          await tester.pumpAndSettle();
+          expect(calls, ['startDragging'], reason: 'blank area at $point');
+        }
+        expect(tester.getSize(find.byType(DesktopTopBar)).height, 56);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    );
+  }
+
+  testWidgets(
+    'disabled desktop integration makes no native calls',
+    (tester) async {
+      DesktopWindow.debugEnabledOverride = false;
+      await pumpBar(tester);
+      await tester.dragFrom(
+        const Offset(90, 28),
+        const Offset(30, 20),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 }

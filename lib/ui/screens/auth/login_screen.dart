@@ -7,6 +7,9 @@ import '../../../l10n/l10n.dart';
 
 import '../../../providers/auth_provider.dart';
 import '../../../services/auth/web_token_service.dart';
+import '../../shell/desktop/desktop_window.dart';
+import '../../shell/desktop/window_frame.dart';
+import '../../shell/shell_breakpoints.dart';
 import '../../widgets/toast/app_toast.dart';
 import 'web_login_screen.dart';
 import 'widgets/login_intro_view.dart';
@@ -138,6 +141,10 @@ class _LoginScreenState extends State<LoginScreen> {
       (a) => a.isAuthorizing,
     );
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final macTitlebar =
+        DesktopWindow.enabled &&
+        DesktopWindow.macNativeWindow &&
+        ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
 
     return PopScope(
       canPop: !authorizing,
@@ -148,23 +155,38 @@ class _LoginScreenState extends State<LoginScreen> {
         body: Stack(
           children: [
             const _AmbientGlow(),
+            if (macTitlebar)
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: WindowFrame.captionHeightMac,
+                child: WindowDragArea(child: SizedBox.expand()),
+              ),
             SafeArea(
               child: Column(
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: IconButton(
-                        icon: Icon(
-                          authorizing
-                              ? Icons.arrow_back_rounded
-                              : Icons.close_rounded,
+                      padding: EdgeInsets.fromLTRB(
+                        macTitlebar ? DesktopWindow.macTrafficLightsInset : 8,
+                        8,
+                        8,
+                        8,
+                      ),
+                      child: MouseRegion(
+                        child: IconButton(
+                          icon: Icon(
+                            authorizing
+                                ? Icons.arrow_back_rounded
+                                : Icons.close_rounded,
+                          ),
+                          tooltip: authorizing
+                              ? context.l10n.loginBack
+                              : context.l10n.commonClose,
+                          onPressed: _back,
                         ),
-                        tooltip: authorizing
-                            ? context.l10n.loginBack
-                            : context.l10n.commonClose,
-                        onPressed: _back,
                       ),
                     ),
                   ),
