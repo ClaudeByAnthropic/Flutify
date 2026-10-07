@@ -5,13 +5,13 @@ class AppInfo {
   AppInfo._();
 
   static const String name = 'Flutify';
-  static const String version = '0.0.12';
-  static const int build = 12;
+  static const String version = '0.0.13';
+  static const int build = 13;
   static const String _buildReleaseTag = String.fromEnvironment(
-    'FLUTIFY_RELEASE_TAG', defaultValue: 'v0.12',
+    'FLUTIFY_RELEASE_TAG', defaultValue: 'v0.13',
   );
-  static const String releaseTag = _buildReleaseTag == '' ? 'v0.12' : _buildReleaseTag;
+  static const String releaseTag = _buildReleaseTag == '' ? 'v0.13' : _buildReleaseTag;
 
-  /// 「0.0.12 (12)」
+  /// 「0.0.13 (13)」
   static String get displayVersion => '$version ($build)';
 }
