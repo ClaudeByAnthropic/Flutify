@@ -356,13 +356,11 @@ void main() {
           expect(buttonRect.right, closeTo(cardRect.right, 0.1));
           expect(cardRect.top - buttonRect.bottom, closeTo(6, 0.1));
         } else {
-          final lyricsRect = tester.getRect(
-            find.descendant(
-              of: find.byType(FullPlayerSheet),
-              matching: find.byType(LyricsView),
-            ),
+          final cardRect = tester.getRect(
+            find.byKey(const ValueKey('lyrics-control-card')),
           );
-          expect(buttonRect.right, closeTo(lyricsRect.right - 12, 0.1));
+          expect(buttonRect.right, closeTo(cardRect.right, 0.1));
+          expect(cardRect.top - buttonRect.bottom, closeTo(8, 0.1));
         }
         expect(buttonRect.width, greaterThanOrEqualTo(48));
         expect(buttonRect.height, buttonRect.width);

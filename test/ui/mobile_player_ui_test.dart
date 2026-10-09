@@ -378,6 +378,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final closeMethod in ['button', 'back', 'drag']) {
+    testWidgets('android $closeMethod collapse restores info with artwork', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await pumpPlaying(tester);
+      final origin = tester.getRect(
+        find.byKey(const ValueKey('mini-player-expansion-source')),
+      );
+      final artworkOrigin = tester.getRect(find.byType(Hero));
+      await tester.tap(find.byType(MiniPlayer));
+      await settle(tester);
+      final expandedArtwork = tester.getRect(
+        find.descendant(
+          of: find.byType(FullPlayerSheet),
+          matching: find.byType(Hero),
+        ),
+      );
+      final close = find.byIcon(Icons.keyboard_arrow_down_rounded);
+      switch (closeMethod) {
+        case 'button':
+          await tester.tap(close);
+        case 'back':
+          await tester.binding.handlePopRoute();
+        case 'drag':
+          await tester.drag(close, const Offset(0, 200));
+      }
+      await tester.pump();
+      await tester.pump();
+
+      // Sample the entire return, including the first 68% when the old compact
+      // row stayed hidden even though the artwork was already moving home.
+      for (var frame = 0; frame < 7; frame++) {
+        await tester.pump(const Duration(milliseconds: 60));
+        final artwork = tester.getRect(
+          find.byKey(const ValueKey('player-artwork-flight')),
+        );
+        final returned =
+            (expandedArtwork.width - artwork.width) /
+            (expandedArtwork.width - artworkOrigin.width);
+        final compact = find.byKey(const ValueKey('player-expansion-compact'));
+        expect(compact, findsOneWidget);
+        expect(
+          tester.widget<Opacity>(compact).opacity,
+          closeTo(returned, 0.001),
+          reason: 'Song info and buttons must fade in as the artwork returns',
+        );
+        final rowReturned =
+            (tester.getTopLeft(compact).dy + 16) / (origin.top + 16);
+        expect(
+          rowReturned,
+          closeTo(returned, 0.001),
+          reason: 'The compact row must travel home on the artwork timeline',
+        );
+      }
+      await settle(tester);
+      expect(find.byType(FullPlayerSheet), findsNothing);
+      expect(tester.getRect(find.byType(Hero)), artworkOrigin);
+      debugDefaultTargetPlatformOverride = null;
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('android player respects reduced motion', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -398,6 +462,14 @@ void main() {
     expect(
       clip.clipper!.getClip(const Size(390, 844)).getBounds(),
       const Rect.fromLTWH(0, 0, 390, 844),
+    );
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(FullPlayerSheet), findsNothing);
+    expect(
+      find.byKey(const ValueKey('player-expansion-compact')),
+      findsNothing,
     );
     debugDefaultTargetPlatformOverride = null;
     expect(tester.takeException(), isNull);
@@ -420,11 +492,17 @@ void main() {
         .getClip(const Size(390, 844))
         .getBounds();
     final before = surface();
+    final compact = find.byKey(const ValueKey('player-expansion-compact'));
+    final compactBefore = tester.getRect(compact);
+    final opacityBefore = tester.widget<Opacity>(compact).opacity;
     Navigator.pop(tester.element(find.byType(FullPlayerSheet)));
     await tester.pump();
     expect(surface(), before);
+    expect(tester.getRect(compact), compactBefore);
+    expect(tester.widget<Opacity>(compact).opacity, opacityBefore);
     await tester.pump(const Duration(milliseconds: 16));
     expect(surface().height, lessThan(before.height));
+    expect(tester.widget<Opacity>(compact).opacity, greaterThan(opacityBefore));
     await settle(tester);
     expect(find.byType(FullPlayerSheet), findsNothing);
     debugDefaultTargetPlatformOverride = null;
