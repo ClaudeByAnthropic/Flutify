@@ -184,6 +184,10 @@ class PlaybackProvider extends ChangeNotifier {
   bool _isPlaying = false;
   bool _isBuffering = false;
 
+  // Internal pauses while replacing a source are not user pauses. Keep the
+  // playback session active until the new source reports playing or is cancelled.
+  bool _isStartingPlayback = false;
+
   /// 正在通过协议链路加载曲目（下载 + 解密），此时播放器还没有新音源。
   bool _isLoadingTrack = false;
   Duration _duration = Duration.zero;
@@ -243,6 +247,11 @@ class PlaybackProvider extends ChangeNotifier {
   PlaybackContext get playbackContext => _context;
   bool get isPlaying => _isPlaying;
 
+  /// Playback intent for system media controls, including automatic transitions
+  /// and pending starts. Unlike [isPlaying], this survives internal source pauses
+  /// so Android does not drop its foreground service / wake lock between tracks.
+  bool get isPlaybackActive => _isPlaying || _isStartingPlayback;
+
   /// 缓冲中：播放器自身缓冲，或正在下载 / 解密整首曲目。
   bool get isBuffering => _isBuffering || _isLoadingTrack;
   bool get isLoadingTrack => _isLoadingTrack;
@@ -295,12 +304,19 @@ class PlaybackProvider extends ChangeNotifier {
     ++_playIntent;
     ++_loadGeneration;
     _cancelRetry();
+    _isStartingPlayback = false;
+    if (_isPlaying) _scheduleSave();
+    _isPlaying = false;
+    _isBuffering = false;
     if (_isLoadingTrack) {
       _loadedTrackId = null;
       _resumeAt = position;
-      _setLoading(false);
+      _isLoadingTrack = false;
     }
-    await _audio.pause();
+    // Dispatch before notifying: a listener may issue a newer resume command.
+    final pausing = Future<void>.sync(_audio.pause);
+    notifyListeners();
+    await pausing;
   }
 
   bool isCurrent(String trackId) => _currentTrack?.id == trackId;
@@ -330,12 +346,30 @@ class PlaybackProvider extends ChangeNotifier {
     });
 
     _stateSub = _audio.playerStateStream.listen((state) {
+      final generation = _loadGeneration;
       final ps = state.processingState;
       final playing = state.playing && ps != ProcessingState.completed;
       final buffering =
           ps == ProcessingState.loading || ps == ProcessingState.buffering;
+      final ended = ps == ProcessingState.completed &&
+          _lastProcessingState != ProcessingState.completed;
+      _lastProcessingState = ps;
 
-      if (_isPlaying != playing || _isBuffering != buffering) {
+      // Set continuation intent BEFORE notifying media controls of completion.
+      // Loading the next source (and repeat-one's seek) can take arbitrarily long.
+      final wasStarting = _isStartingPlayback;
+      if (ended) {
+        _isStartingPlayback = !_stopAfterCurrent &&
+            (_repeatMode == SpotifyRepeatMode.track || canSkipNext);
+      } else if (playing &&
+          _loadedTrackId != null &&
+          _loadedTrackId == _currentTrack?.id) {
+        _isStartingPlayback = false;
+      }
+
+      if (_isPlaying != playing ||
+          _isBuffering != buffering ||
+          wasStarting != _isStartingPlayback) {
         // 暂停时记下进度：之后关掉 App 也能从这里继续
         if (_isPlaying && !playing) _scheduleSave();
         _isPlaying = playing;
@@ -344,11 +378,9 @@ class PlaybackProvider extends ChangeNotifier {
       }
 
       // 只在「进入 completed」的那一刻处理，避免重复事件导致连跳多首。
-      if (ps == ProcessingState.completed &&
-          _lastProcessingState != ProcessingState.completed) {
+      if (ended && generation == _loadGeneration) {
         _handleTrackEnded();
       }
-      _lastProcessingState = ps;
     });
 
     // EME 运行期错误（license / HLS fatal 等在加载成功后才暴露）：
@@ -360,20 +392,38 @@ class PlaybackProvider extends ChangeNotifier {
     if (_stopAfterCurrent) {
       // 睡眠定时器「本首结束时」：停在本首开头，不接下一首（单曲循环也停）
       _stopAfterCurrent = false;
-      unawaited(_audio.pause());
+      unawaited(pause());
       seekTo(Duration.zero);
       notifyListeners();
       return;
     }
     if (_repeatMode == SpotifyRepeatMode.track) {
-      seekTo(Duration.zero);
-      unawaited(_audio.play());
+      unawaited(_repeatCurrentTrack());
     } else {
       nextTrack();
     }
   }
 
+  Future<void> _repeatCurrentTrack() async {
+    final track = _currentTrack;
+    if (track == null) return;
+    final generation = ++_loadGeneration;
+    try {
+      await seekTo(Duration.zero);
+      if (generation != _loadGeneration) return;
+      _resumeAudio(track, generation);
+    } catch (error) {
+      if (generation != _loadGeneration) return;
+      await _handleLoadFailure(track, _asPlaybackFailure(error));
+    }
+  }
+
   void _resumeAudio(SpotifyTrack track, int generation) {
+    // just_audio can already be playing after repeat-one's seek. Its no-op
+    // play() then emits no new state, so do not re-arm the pending-start flag.
+    _isStartingPlayback = !_isPlaying;
+    notifyListeners();
+    if (generation != _loadGeneration) return;
     // play() 要到暂停 / 结束才完成；异步起播错误仍需进入可重试的错误状态。
     unawaited(
       _audio.play().catchError((Object error) async {
@@ -429,7 +479,9 @@ class PlaybackProvider extends ChangeNotifier {
     Duration? startAt,
     bool deferLoad = false,
   }) async {
-    ++_playIntent;
+    final intent = ++_playIntent;
+    _isStartingPlayback = !deferLoad;
+    if (deferLoad) _isPlaying = false;
     _currentTrack = track;
     _duration = Duration(milliseconds: track.durationMs);
     positionNotifier.value = startAt ?? Duration.zero;
@@ -441,6 +493,7 @@ class PlaybackProvider extends ChangeNotifier {
       _playbackError = null;
     }
     notifyListeners();
+    if (intent != _playIntent) return;
     if (deferLoad) {
       // 只切到这首歌、暂停在 startAt，点播放时才加载（_loadedTrackId 不匹配 → 重新加载）
       ++_loadGeneration;
@@ -467,10 +520,19 @@ class PlaybackProvider extends ChangeNotifier {
     _cancelRetry();
     if (connectionError == null) _networkRetries = 0;
     _loadedTrackId = null;
+    _isStartingPlayback = true;
     loadProgressNotifier.value = 0;
     _setLoading(true);
+    if (generation != _loadGeneration) return;
     // 新曲目加载期间先停掉上一首，避免「点了新歌还在放旧歌」
-    await _audio.pause();
+    try {
+      await _audio.pause();
+    } catch (error) {
+      if (generation == _loadGeneration) {
+        await _handleLoadFailure(track, _asPlaybackFailure(error));
+      }
+      return;
+    }
     if (generation != _loadGeneration) return;
 
     if (connectionError != null) {
@@ -541,10 +603,11 @@ class PlaybackProvider extends ChangeNotifier {
           await _audio.seek(startPosition!);
           if (generation != _loadGeneration) return;
         }
-        _resumeAudio(track, generation);
-        if (startPosition != null) positionNotifier.value = startPosition;
         _loadedTrackId = track.id;
         _audioPlaybackInfo = audio.playbackInfo;
+        _resumeAudio(track, generation);
+        if (generation != _loadGeneration) return;
+        if (startPosition != null) positionNotifier.value = startPosition;
         _consecutiveSkips = 0;
         _setLoading(false);
         retryNotifier.value = null;
@@ -609,6 +672,11 @@ class PlaybackProvider extends ChangeNotifier {
       consecutiveFailures: failures,
     );
     _errorController.add(_playbackError!);
+    if (!canSkip) {
+      _isStartingPlayback = false;
+      _isPlaying = false;
+      _isBuffering = false;
+    }
     _setLoading(false);
     if (canSkip) {
       _consecutiveSkips++;
@@ -914,7 +982,7 @@ class PlaybackProvider extends ChangeNotifier {
       await pause();
       return;
     }
-    if (_isPlaying) {
+    if (isPlaybackActive) {
       await pause();
     } else if (_loadedTrackId != track.id) {
       // 还没加载过 / 上次加载失败（重试）
@@ -1088,6 +1156,7 @@ class PlaybackProvider extends ChangeNotifier {
     ++_loadGeneration;
     _cancelRetry();
     _isLoadingTrack = false;
+    _isStartingPlayback = false;
     _loadedTrackId = null;
     _currentTrack = null;
     _context = PlaybackContext.none;
