@@ -54,18 +54,31 @@ class LyricsResolver {
 
   /// 翻译按钮或自动翻译明确发起的查询，不依赖「预加载双语歌词」开关。
   /// 网易云提供中文社区译词；只转换译词字形，不把原文转字形冒充翻译。
+  /// 部分译文允许继续查已有备用源；只换成覆盖更多且不丢行的整份译词，
+  /// 保留准确的来源标识。补查失败时返回已有译文，无任何译文才报告网络错误。
   Future<LyricsTranslation?> translate(
     LyricsQuery query,
     SpotifyLyrics lyrics,
     String target,
   ) async {
-    final embedded = LyricsTranslationController.official(lyrics, target);
-    if (embedded != null) return embedded;
-    if (!lyrics.isSynced || lyrics.lines.isEmpty) return null;
+    var best = LyricsTranslationController.official(lyrics, target);
+    if ((best?.isCompleteFor(lyrics) ?? false) ||
+        !lyrics.isSynced ||
+        lyrics.lines.isEmpty) {
+      return best;
+    }
+    void consider(LyricsTranslation? candidate) {
+      if (candidate?.improvesCoverageOf(best, lyrics) ?? false) {
+        best = candidate;
+      }
+    }
+
     final language = LyricsLanguage.normalize(target);
     var networkError = false;
     final source = translation;
-    if (source != null && language.startsWith('zh')) {
+    if (source != null &&
+        language.startsWith('zh') &&
+        best?.provider != LyricsProvider.netease) {
       try {
         final found = await source.find(query, lyrics.lines);
         networkError = found.networkError;
@@ -78,16 +91,18 @@ class LyricsResolver {
             lines.map((l) => l.words).join('\n'),
           );
           if (code.startsWith('zh')) {
-            return LyricsTranslation(
-              List.unmodifiable(
-                lines.map(
-                  (line) => ZhScript.convert(
-                    line.words,
-                    toSimplified: language != 'zh-Hant',
+            consider(
+              LyricsTranslation(
+                List.unmodifiable(
+                  lines.map(
+                    (line) => ZhScript.convert(
+                      line.words,
+                      toSimplified: language != 'zh-Hant',
+                    ),
                   ),
                 ),
+                LyricsProvider.netease,
               ),
-              LyricsProvider.netease,
             );
           }
         }
@@ -95,12 +110,18 @@ class LyricsResolver {
         networkError = true;
       }
     }
+    if (best?.isCompleteFor(lyrics) ?? false) return best;
     if (_fallbackEnabled()) {
-      final found = await fallback?.findTranslation(query, lyrics, target);
-      if (found != null) return found;
+      try {
+        consider(await fallback?.findTranslation(query, lyrics, target));
+      } catch (_) {
+        networkError = true;
+      }
     }
-    if (networkError) throw StateError('Lyrics translation source unavailable');
-    return null;
+    if (best == null && networkError) {
+      throw StateError('Lyrics translation source unavailable');
+    }
+    return best;
   }
 
   Future<ResolvedLyrics> resolve(LyricsQuery query) async {
