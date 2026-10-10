@@ -13,20 +13,31 @@ abstract final class PlayerLyricsMotion {
   static const idleDelay = Duration(milliseconds: 3500);
 }
 
+/// Apple Music 6.5.3's content transition timing, adapted to one shared flight.
+abstract final class PlayerQueueMotion {
+  static const curve = Cubic(0.25, 0.1, 0.25, 1);
+  static const duration = Duration(milliseconds: 500);
+  static const rise = 24.0;
+}
+
 /// UI-only motion and inactivity state; playback ticks must not call [activity].
 class PlayerLyricsController extends ChangeNotifier {
   PlayerLyricsController({required TickerProvider vsync})
     : transition = AnimationController(vsync: vsync),
+      queueTransition = AnimationController(vsync: vsync),
       chrome = AnimationController(vsync: vsync, value: 1) {
     transition.addListener(notifyListeners);
+    queueTransition.addListener(notifyListeners);
     chrome.addListener(notifyListeners);
   }
 
   final AnimationController transition;
+  final AnimationController queueTransition;
   final AnimationController chrome;
   final Set<int> _pointers = {};
   Timer? _timer;
   bool _lyrics = false;
+  bool _queue = false;
   bool _idle = false;
   bool _active = true;
   bool _reduceMotion = false;
@@ -35,6 +46,8 @@ class PlayerLyricsController extends ChangeNotifier {
   bool _disposed = false;
 
   bool get controlsVisible => !_idle;
+  double get lyricsProgress =>
+      (transition.value - queueTransition.value).clamp(0.0, 1.0);
 
   void configure({
     required bool reduceMotion,
@@ -47,7 +60,8 @@ class PlayerLyricsController extends ChangeNotifier {
     _reduceMotion = reduceMotion;
     _accessibleNavigation = accessibleNavigation;
     if (reduceMotion) {
-      transition.value = _lyrics ? 1 : 0;
+      transition.value = _lyrics || _queue ? 1 : 0;
+      queueTransition.value = _queue ? 1 : 0;
       chrome.value = _idle ? 0 : 1;
     }
     if (accessibleNavigation) {
@@ -57,19 +71,35 @@ class PlayerLyricsController extends ChangeNotifier {
     }
   }
 
-  void setLyrics(bool value) {
-    if (_lyrics == value) return;
-    _lyrics = value;
+  void setLyrics(bool value) => setView(lyrics: value, queue: false);
+
+  void setView({required bool lyrics, required bool queue}) {
+    assert(!lyrics || !queue);
+    if (_lyrics == lyrics && _queue == queue) return;
+    final queueFlight = queue || _queue;
+    _lyrics = lyrics;
+    _queue = queue;
     _timer?.cancel();
     _reveal();
+    final duration = _reduceMotion
+        ? Duration.zero
+        : queueFlight
+        ? PlayerQueueMotion.duration
+        : PlayerLyricsMotion.duration;
+    final curve = queueFlight
+        ? PlayerQueueMotion.curve
+        : PlayerLyricsMotion.curve;
     // Easing the controller itself starts every reversal at its current value.
     // Switching between forward/reverse CurvedAnimations can otherwise jump.
     transition
-        .animateTo(
-          value ? 1 : 0,
-          duration: _reduceMotion ? Duration.zero : PlayerLyricsMotion.duration,
-          curve: PlayerLyricsMotion.curve,
-        )
+        .animateTo(lyrics || queue ? 1 : 0, duration: duration, curve: curve)
+        .whenCompleteOrCancel(() {
+          if (!_disposed) _scheduleIdle();
+        });
+    // Retarget from both current values, even on a three-way interruption.
+    // Equal timing keeps queue <= shared progress; the remainder is lyrics.
+    queueTransition
+        .animateTo(queue ? 1 : 0, duration: duration, curve: curve)
         .whenCompleteOrCancel(() {
           if (!_disposed) _scheduleIdle();
         });
@@ -129,6 +159,7 @@ class PlayerLyricsController extends ChangeNotifier {
         _interactionSuspended ||
         _pointers.isNotEmpty ||
         transition.isAnimating ||
+        queueTransition.isAnimating ||
         transition.value != 1) {
       return;
     }
@@ -150,6 +181,7 @@ class PlayerLyricsController extends ChangeNotifier {
     _disposed = true;
     _timer?.cancel();
     transition.dispose();
+    queueTransition.dispose();
     chrome.dispose();
     super.dispose();
   }

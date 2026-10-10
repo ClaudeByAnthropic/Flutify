@@ -2,6 +2,55 @@ import 'package:flutify_app/ui/screens/player/player_lyrics_motion.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'three-way retargeting keeps pane weights bounded and continuous',
+    (tester) async {
+      final motion = PlayerLyricsController(vsync: const TestVSync());
+      addTearDown(motion.dispose);
+      for (final (lyrics, queue) in [
+        (false, true),
+        (true, false),
+        (false, false),
+        (false, true),
+        (false, false),
+        (true, false),
+      ]) {
+        final before = (
+          motion.transition.value,
+          motion.queueTransition.value,
+          motion.lyricsProgress,
+        );
+        motion.setView(lyrics: lyrics, queue: queue);
+        expect((
+          motion.transition.value,
+          motion.queueTransition.value,
+          motion.lyricsProgress,
+        ), before);
+        await tester.pump();
+        for (var frame = 0; frame < 11; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(
+            motion.queueTransition.value,
+            lessThanOrEqualTo(motion.transition.value + 0.00001),
+          );
+          expect(
+            motion.lyricsProgress + motion.queueTransition.value,
+            closeTo(motion.transition.value, 0.00001),
+          );
+        }
+      }
+      motion.configure(reduceMotion: true, accessibleNavigation: false);
+      expect(motion.transition.value, 1);
+      expect(motion.lyricsProgress, 1);
+      expect(motion.queueTransition.value, 0);
+      motion.setView(lyrics: false, queue: true);
+      expect(motion.transition.value, 1);
+      expect(motion.queueTransition.value, 1);
+      await tester.pump(const Duration(seconds: 5));
+      expect(motion.controlsVisible, isTrue);
+    },
+  );
+
   testWidgets('unchanged dependency configuration cannot restart idle', (
     tester,
   ) async {

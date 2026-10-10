@@ -71,11 +71,15 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
   final PlayerLyricsGeometry _geometry = PlayerLyricsGeometry();
   bool _tickerEnabled = true;
   bool _appActive = true;
+  bool _queueMounted = false;
+
+  bool get _cardMode => widget.lyricsMode || widget.queueMode;
 
   @override
   void initState() {
     super.initState();
     _motion = PlayerLyricsController(vsync: this);
+    _queueMounted = widget.queueMode;
     _appActive =
         WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
@@ -90,7 +94,7 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
       reduceMotion: context.reduceMotion,
       accessibleNavigation: MediaQuery.accessibleNavigationOf(context),
     );
-    _motion.setLyrics(widget.lyricsMode);
+    _motion.setView(lyrics: widget.lyricsMode, queue: widget.queueMode);
     _motion.setInteractionSuspended(widget.interactionSuspended);
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
     _motion.setActive(_appActive && _tickerEnabled);
@@ -99,7 +103,8 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
   @override
   void didUpdateWidget(AndroidPlayerScene oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _motion.setLyrics(widget.lyricsMode);
+    _queueMounted = _queueMounted || widget.queueMode;
+    _motion.setView(lyrics: widget.lyricsMode, queue: widget.queueMode);
     _motion.setInteractionSuspended(widget.interactionSuspended);
   }
 
@@ -139,8 +144,8 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
   Widget _cardHitRegion(Widget child) => GestureDetector(
     behavior: HitTestBehavior.opaque,
     excludeFromSemantics: true,
-    onTap: widget.lyricsMode ? () {} : null,
-    onVerticalDragUpdate: widget.lyricsMode ? (_) {} : null,
+    onTap: _cardMode ? () {} : null,
+    onVerticalDragUpdate: _cardMode ? (_) {} : null,
     child: child,
   );
 
@@ -172,7 +177,13 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
         animation: _motion,
         builder: (context, _) {
           final progress = _motion.transition.value;
-          final hasLyrics = widget.lyricsMode || progress > 0;
+          final lyricsProgress = _motion.lyricsProgress;
+          final queueProgress = _motion.queueTransition.value;
+          final hasLyrics = widget.lyricsMode || lyricsProgress > 0;
+          // Neither pane owns gestures/accessibility during the crossfade:
+          // a tap on an outgoing row must not play or seek the incoming pane.
+          final lyricsInteractive = widget.lyricsMode && lyricsProgress == 1;
+          final queueInteractive = widget.queueMode && queueProgress == 1;
           Widget slot(PlayerSceneSlot id, Widget child) =>
               LayoutId(id: id, child: child);
           return Stack(
@@ -183,7 +194,7 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                 IgnorePointer(
                   child: Opacity(
                     key: const ValueKey('lyrics-background-blend'),
-                    opacity: progress,
+                    opacity: lyricsProgress,
                     child: widget.lyricsBackground,
                   ),
                 ),
@@ -203,6 +214,8 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                           progress: progress,
                           chrome: _motion.chrome.value,
                           geometry: _geometry,
+                          lyricsProgress: lyricsProgress,
+                          queueProgress: queueProgress,
                           controlsHeightReduction:
                               widget.controlsHeightReduction,
                           footerHeightReduction: widget.footerHeightReduction,
@@ -211,27 +224,44 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                           if (hasLyrics)
                             slot(
                               PlayerSceneSlot.lyrics,
-                              IgnorePointer(
-                                ignoring: !widget.lyricsMode,
-                                child: Opacity(
-                                  opacity: progress,
-                                  child: widget.lyrics,
+                              ExcludeFocus(
+                                excluding: !lyricsInteractive,
+                                child: ExcludeSemantics(
+                                  excluding: !lyricsInteractive,
+                                  child: IgnorePointer(
+                                    ignoring: !lyricsInteractive,
+                                    child: Opacity(
+                                      opacity: lyricsProgress,
+                                      child: widget.lyrics,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           slot(
                             PlayerSceneSlot.queue,
-                            IgnorePointer(
-                              ignoring: !widget.queueMode,
-                              child: AnimatedOpacity(
-                                duration: context.motion(
-                                  PlayerLyricsMotion.duration,
+                            Offstage(
+                              offstage: !widget.queueMode && queueProgress == 0,
+                              child: TickerMode(
+                                enabled: widget.queueMode,
+                                child: ExcludeFocus(
+                                  excluding: !queueInteractive,
+                                  child: ExcludeSemantics(
+                                    excluding: !queueInteractive,
+                                    child: IgnorePointer(
+                                      ignoring: !queueInteractive,
+                                      child: Opacity(
+                                        key: const ValueKey(
+                                          'player-queue-opacity',
+                                        ),
+                                        opacity: queueProgress,
+                                        child: _queueMounted
+                                            ? widget.queue
+                                            : const SizedBox.expand(),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                curve: PlayerLyricsMotion.curve,
-                                opacity: widget.queueMode ? 1 : 0,
-                                child: widget.queueMode
-                                    ? widget.queue
-                                    : const SizedBox.expand(),
                               ),
                             ),
                           ),
@@ -288,42 +318,31 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                             _body(
                               PlayerSceneSlot.artwork,
                               Semantics(
-                                label: widget.lyricsMode
+                                label: _cardMode
                                     ? MaterialLocalizations.of(
                                         context,
                                       ).backButtonTooltip
                                     : null,
                                 button:
-                                    widget.lyricsMode &&
-                                    widget.onArtworkTap != null,
+                                    _cardMode && widget.onArtworkTap != null,
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
-                                  onTap: widget.lyricsMode
-                                      ? widget.onArtworkTap
-                                      : null,
-                                  onVerticalDragUpdate: widget.lyricsMode
+                                  onTap: _cardMode ? widget.onArtworkTap : null,
+                                  onVerticalDragUpdate: _cardMode
                                       ? (_) {}
                                       : null,
                                   child: IgnorePointer(
                                     ignoring:
                                         widget.lyricsMode || widget.queueMode,
                                     child: ExcludeSemantics(
-                                      excluding:
-                                          widget.lyricsMode || widget.queueMode,
-                                      child: Opacity(
-                                        opacity: widget.queueMode
-                                            ? progress
-                                            : 1,
-                                        child: LayoutBuilder(
-                                          builder: (context, box) =>
-                                              widget.queueMode && progress == 0
-                                              ? const SizedBox.shrink()
-                                              : widget.artworkBuilder(
-                                                  context,
-                                                  box.maxWidth,
-                                                  progress,
-                                                ),
-                                        ),
+                                      excluding: _cardMode,
+                                      child: LayoutBuilder(
+                                        builder: (context, box) =>
+                                            widget.artworkBuilder(
+                                              context,
+                                              box.maxWidth,
+                                              progress,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -333,11 +352,17 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                           ),
                           slot(
                             PlayerSceneSlot.toolbar,
-                            IgnorePointer(
-                              ignoring: !widget.lyricsMode,
-                              child: _chrome(
-                                widget.translation,
-                                factor: progress,
+                            ExcludeFocus(
+                              excluding: !lyricsInteractive,
+                              child: ExcludeSemantics(
+                                excluding: !lyricsInteractive,
+                                child: IgnorePointer(
+                                  ignoring: !lyricsInteractive,
+                                  child: _chrome(
+                                    widget.translation,
+                                    factor: lyricsProgress,
+                                  ),
+                                ),
                               ),
                             ),
                           ),

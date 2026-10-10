@@ -3,6 +3,8 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/widgets.dart';
 
+import 'player_lyrics_motion.dart';
+
 enum PlayerSceneSlot {
   top,
   title,
@@ -54,6 +56,8 @@ class PlayerLyricsLayout extends MultiChildLayoutDelegate {
     required this.geometry,
     this.controlsHeightReduction = 0,
     this.footerHeightReduction = 0,
+    this.lyricsProgress,
+    this.queueProgress = 0,
   });
 
   final double progress;
@@ -61,6 +65,8 @@ class PlayerLyricsLayout extends MultiChildLayoutDelegate {
   final PlayerLyricsGeometry geometry;
   final double controlsHeightReduction;
   final double footerHeightReduction;
+  final double? lyricsProgress;
+  final double queueProgress;
 
   void _position(PlayerSceneSlot slot, Offset position) {
     geometry._positions[slot] = position;
@@ -228,20 +234,33 @@ class PlayerLyricsLayout extends MultiChildLayoutDelegate {
       );
       _position(
         PlayerSceneSlot.lyrics,
-        Offset(0, contentTop + (1 - progress) * lyricsHeight),
+        Offset(
+          0,
+          contentTop + (1 - (lyricsProgress ?? progress)) * lyricsHeight,
+        ),
       );
     }
     layoutChild(
       PlayerSceneSlot.queue,
-      BoxConstraints.tight(Size(contentWidth, contentHeight)),
+      BoxConstraints.tight(
+        Size(
+          contentWidth,
+          landscape ? contentHeight : math.max(0, surfaceY - 8 - contentTop),
+        ),
+      ),
     );
-    _position(PlayerSceneSlot.queue, Offset(0, contentTop));
+    _position(
+      PlayerSceneSlot.queue,
+      Offset(0, contentTop + PlayerQueueMotion.rise * (1 - queueProgress)),
+    );
   }
 
   @override
   bool shouldRelayout(PlayerLyricsLayout oldDelegate) =>
       progress != oldDelegate.progress ||
       chrome != oldDelegate.chrome ||
+      lyricsProgress != oldDelegate.lyricsProgress ||
+      queueProgress != oldDelegate.queueProgress ||
       controlsHeightReduction != oldDelegate.controlsHeightReduction ||
       footerHeightReduction != oldDelegate.footerHeightReduction ||
       geometry != oldDelegate.geometry;

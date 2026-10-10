@@ -380,7 +380,7 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
           track: track,
           compact: true,
           lyricsProgress: progress,
-          onTap: _view == _PlayerView.lyrics
+          onTap: _view != _PlayerView.artwork
               ? () => _showDestinations(context, track)
               : null,
         ),
