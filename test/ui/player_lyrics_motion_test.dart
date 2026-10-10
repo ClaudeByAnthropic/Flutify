@@ -1,4 +1,5 @@
 import 'package:flutify_app/ui/screens/player/player_lyrics_motion.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -23,7 +24,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 75));
       expect(motion.chrome.value, inExclusiveRange(0, 0.5));
-      await tester.pump(const Duration(milliseconds: 225));
+      await tester.pump(
+        PlayerLyricsMotion.foldDuration - const Duration(milliseconds: 75),
+      );
       expect(motion.chrome.value, 0);
 
       motion.activity();
@@ -34,12 +37,14 @@ void main() {
       expect(motion.controlsVisible, isTrue);
       await tester.pump(const Duration(milliseconds: 1));
       expect(motion.controlsVisible, isFalse);
-      await tester.pump(const Duration(milliseconds: 301));
+      await tester.pump(
+        PlayerLyricsMotion.foldDuration + const Duration(milliseconds: 1),
+      );
       expect(motion.chrome.value, 0);
     },
   );
 
-  testWidgets('queue entry redirects a footer-touch reveal back into folding', (
+  testWidgets('queue entry keeps folded lyrics closed after a footer touch', (
     tester,
   ) async {
     final motion = PlayerLyricsController(vsync: const TestVSync());
@@ -48,14 +53,13 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 641));
       await tester.pump(const Duration(milliseconds: 3500));
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(PlayerLyricsMotion.foldDuration);
       expect(motion.chrome.value, 0);
-      // The scene wakes on pointer-down before the footer dispatches onTap.
       motion.pointerDown(1);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 75));
       var previous = motion.chrome.value;
-      expect(previous, inExclusiveRange(0, 1));
+      expect(previous, 0);
       motion.pointerUp(1);
       motion.setView(lyrics: false, queue: true);
       expect(motion.chrome.value, previous);
@@ -254,17 +258,170 @@ void main() {
     motion.dispose();
   });
 
-  testWidgets('untracked pointer releases do not reveal an idle card', (
+  testWidgets('untracked pointer events do not reveal an idle card', (
     tester,
   ) async {
     final motion = PlayerLyricsController(vsync: const TestVSync());
     motion.configure(reduceMotion: true, accessibleNavigation: false);
     motion.setLyrics(true);
     await tester.pump(const Duration(milliseconds: 3500));
+    motion.pointerMove(99, const Offset(0, 60));
     motion.pointerUp(99);
     expect(motion.controlsVisible, isFalse);
     motion.dispose();
   });
+
+  testWidgets('folded lyrics accumulate downward motion per pointer', (
+    tester,
+  ) async {
+    final motion = PlayerLyricsController(vsync: const TestVSync());
+    addTearDown(motion.dispose);
+    motion.configure(reduceMotion: true, accessibleNavigation: false);
+    motion.setLyrics(true);
+    await tester.pump(PlayerLyricsMotion.idleDelay);
+    final movement = Offset(0, kTouchSlop / 2 + 1);
+    motion.pointerDown(1);
+    motion.pointerDown(2);
+    motion.pointerMove(1, movement);
+    motion.pointerMove(2, movement);
+    expect(motion.controlsVisible, isFalse);
+    motion.pointerUp(1);
+    motion.pointerDown(1);
+    motion.pointerMove(1, movement);
+    expect(motion.controlsVisible, isFalse);
+    motion.pointerMove(1, movement);
+    expect(motion.controlsVisible, isTrue);
+    motion.pointerUp(1);
+    await tester.pump(const Duration(seconds: 5));
+    expect(motion.controlsVisible, isTrue);
+    motion.pointerUp(2);
+    await tester.pump(PlayerLyricsMotion.idleDelay);
+    expect(motion.controlsVisible, isFalse);
+  });
+
+  for (final reduced in [false, true]) {
+    testWidgets('upward swipes fold lyrics and reverse in place ($reduced)', (
+      tester,
+    ) async {
+      final motion = PlayerLyricsController(vsync: const TestVSync());
+      addTearDown(motion.dispose);
+      motion.configure(reduceMotion: reduced, accessibleNavigation: false);
+      motion.setLyrics(true);
+      await tester.pump();
+      await tester.pump(
+        PlayerLyricsMotion.duration + const Duration(milliseconds: 1),
+      );
+      motion.pointerDown(1);
+      motion.pointerMove(1, const Offset(0, -8));
+      expect(motion.controlsVisible, isTrue);
+      motion.pointerMove(1, const Offset(0, -32));
+      expect(motion.controlsVisible, isFalse);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final folding = motion.chrome.value;
+      motion.pointerMove(1, const Offset(0, 32));
+      expect(motion.controlsVisible, isTrue);
+      expect(motion.chrome.value, reduced ? 1 : folding);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final revealing = motion.chrome.value;
+      motion.pointerMove(1, const Offset(0, -32));
+      expect(motion.controlsVisible, isFalse);
+      expect(motion.chrome.value, reduced ? 0 : revealing);
+      motion.pointerUp(1);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(motion.chrome.value, 0);
+      expect(motion.controlsVisible, isFalse);
+    });
+  }
+
+  testWidgets('fold animation keeps a soft tail past 300 milliseconds', (
+    tester,
+  ) async {
+    final motion = PlayerLyricsController(vsync: const TestVSync());
+    addTearDown(motion.dispose);
+    motion.setLyrics(true);
+    await tester.pump();
+    await tester.pump(
+      PlayerLyricsMotion.duration + const Duration(milliseconds: 1),
+    );
+    await tester.pump(PlayerLyricsMotion.idleDelay);
+    expect(motion.controlsVisible, isFalse);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 75));
+    final early = motion.chrome.value;
+    expect(early, inExclusiveRange(0, 0.5));
+    await tester.pump(const Duration(milliseconds: 225));
+    expect(motion.chrome.value, inExclusiveRange(0, early));
+    await tester.pump(const Duration(milliseconds: 121));
+    expect(motion.chrome.value, 0);
+  });
+
+  testWidgets('continuous swipes do not restart chrome animations', (
+    tester,
+  ) async {
+    final motion = PlayerLyricsController(vsync: const TestVSync());
+    addTearDown(motion.dispose);
+    motion.setLyrics(true);
+    await tester.pump();
+    await tester.pump(
+      PlayerLyricsMotion.duration + const Duration(milliseconds: 1),
+    );
+    motion.pointerDown(1);
+    motion.pointerMove(1, const Offset(0, -40));
+    await tester.pump();
+    for (var frame = 0; frame < 6; frame++) {
+      await tester.pump(const Duration(milliseconds: 70));
+      motion.pointerMove(1, const Offset(0, -4));
+    }
+    expect(motion.controlsVisible, isFalse);
+    expect(motion.chrome.value, 0);
+    motion.pointerMove(1, const Offset(0, 40));
+    await tester.pump();
+    for (var frame = 0; frame < 6; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      motion.pointerMove(1, const Offset(0, 4));
+    }
+    expect(motion.controlsVisible, isTrue);
+    expect(motion.chrome.value, 1);
+    motion.pointerUp(1);
+    await tester.pump(
+      PlayerLyricsMotion.idleDelay - const Duration(milliseconds: 1),
+    );
+    expect(motion.controlsVisible, isTrue);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(motion.controlsVisible, isFalse);
+    await tester.pump(
+      PlayerLyricsMotion.foldDuration + const Duration(milliseconds: 1),
+    );
+    expect(motion.chrome.value, 0);
+  });
+
+  for (final guard in ['accessibility', 'inactive', 'modal', 'queue']) {
+    testWidgets('upward swipe preserves visible controls for $guard', (
+      tester,
+    ) async {
+      final motion = PlayerLyricsController(vsync: const TestVSync());
+      addTearDown(motion.dispose);
+      motion.configure(
+        reduceMotion: true,
+        accessibleNavigation: guard == 'accessibility',
+      );
+      motion.setView(lyrics: guard != 'queue', queue: guard == 'queue');
+      await tester.pump();
+      motion.activity();
+      motion.setActive(guard != 'inactive');
+      motion.setInteractionSuspended(guard == 'modal');
+      expect(motion.controlsVisible, isTrue);
+      motion.pointerDown(1);
+      motion.pointerMove(1, const Offset(0, -40));
+      motion.pointerUp(1);
+      expect(motion.controlsVisible, isTrue);
+      expect(motion.chrome.value, 1);
+      motion.setActive(false);
+    });
+  }
 
   testWidgets('all scene motion eases nonlinearly and reverses in place', (
     tester,
@@ -298,7 +455,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 75));
     expect(motion.chrome.value, lessThan(0.5));
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(PlayerLyricsMotion.foldDuration);
     expect(motion.chrome.value, 0);
     motion.dispose();
   });

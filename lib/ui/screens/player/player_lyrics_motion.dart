@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 
 /// Shared Apple-style timing for the Android player's coordinated transitions.
 abstract final class PlayerLyricsMotion {
@@ -10,6 +11,8 @@ abstract final class PlayerLyricsMotion {
   static const curve = Cubic(0.22, 0.8, 0.22, 1);
   static const duration = Duration(milliseconds: 640);
   static const chromeDuration = Duration(milliseconds: 300);
+  static const foldCurve = Cubic(0.32, 0.72, 0, 1);
+  static const foldDuration = Duration(milliseconds: 420);
   static const idleDelay = Duration(milliseconds: 3500);
 }
 
@@ -34,7 +37,7 @@ class PlayerLyricsController extends ChangeNotifier {
   final AnimationController transition;
   final AnimationController queueTransition;
   final AnimationController chrome;
-  final Set<int> _pointers = {};
+  final Map<int, Offset> _pointers = {};
   Timer? _timer;
   bool _lyrics = false;
   bool _queue = false;
@@ -80,7 +83,7 @@ class PlayerLyricsController extends ChangeNotifier {
     assert(!lyrics || !queue);
     if (_lyrics == lyrics && _queue == queue) return;
     final queueFlight = queue || _queue;
-    // Pointer-down wakes chrome before a footer onTap changes the view. Retain
+    // A footer onTap changes views after pointer-down. Retain
     // that gesture's origin even with reduced motion, where chrome snaps to 1.
     final keepFolded =
         queue &&
@@ -131,7 +134,7 @@ class PlayerLyricsController extends ChangeNotifier {
   }
 
   void _reveal() {
-    final changed = _idle;
+    if (!_idle) return;
     _idle = false;
     chrome.animateTo(
       1,
@@ -140,7 +143,7 @@ class PlayerLyricsController extends ChangeNotifier {
           : PlayerLyricsMotion.chromeDuration,
       curve: PlayerLyricsMotion.curve,
     );
-    if (changed) notifyListeners();
+    notifyListeners();
   }
 
   void activity() {
@@ -154,14 +157,36 @@ class PlayerLyricsController extends ChangeNotifier {
 
   void pointerDown(int pointer) {
     if (_pointers.isEmpty) _gestureStartedFolded = _idle;
-    _pointers.add(pointer);
-    activity();
+    _pointers[pointer] = Offset.zero;
+    if (!_lyrics || !_idle) activity();
+  }
+
+  void pointerMove(int pointer, Offset delta) {
+    final previous = _pointers[pointer];
+    if (previous == null) return;
+    final reversing =
+        (previous.dy < 0 && delta.dy > 0) || (previous.dy > 0 && delta.dy < 0);
+    final movement = reversing ? delta : previous + delta;
+    _pointers[pointer] = movement;
+    if (_lyrics &&
+        movement.dy.abs() > kTouchSlop &&
+        movement.dy.abs() > movement.dx.abs()) {
+      if (movement.dy < 0) {
+        if (_active && !_accessibleNavigation && !_interactionSuspended) {
+          _fold();
+        }
+      } else {
+        activity();
+      }
+      return;
+    }
+    if (!_lyrics || !_idle) activity();
   }
 
   void pointerUp(int pointer) {
     // Global release/cancel recovery also observes unrelated pointers.
-    if (!_pointers.remove(pointer)) return;
-    activity();
+    if (_pointers.remove(pointer) == null) return;
+    if (!_lyrics || !_idle) activity();
   }
 
   void setInteractionSuspended(bool suspended) {
@@ -203,13 +228,13 @@ class PlayerLyricsController extends ChangeNotifier {
   }
 
   void _fold() {
+    if (_idle) return;
+    _timer?.cancel();
     _idle = true;
     chrome.animateTo(
       0,
-      duration: _reduceMotion
-          ? Duration.zero
-          : PlayerLyricsMotion.chromeDuration,
-      curve: PlayerLyricsMotion.curve,
+      duration: _reduceMotion ? Duration.zero : PlayerLyricsMotion.foldDuration,
+      curve: PlayerLyricsMotion.foldCurve,
     );
     notifyListeners();
   }

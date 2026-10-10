@@ -12,6 +12,7 @@ import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/screens/player/full_player_sheet.dart';
 import 'package:flutify_app/ui/screens/player/player_expansion.dart';
+import 'package:flutify_app/ui/screens/player/player_lyrics_motion.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/lyrics_view.dart';
 import 'package:flutify_app/ui/screens/player/queue_list.dart';
 import 'package:flutify_app/ui/screens/player/widgets/swipeable_artwork.dart';
@@ -292,6 +293,81 @@ void main() {
 
   for (final reduced in [false, true]) {
     testWidgets(
+      'folded lyrics card blank tap reveals only after release ($reduced)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(disableAnimations: reduced);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await pumpPlaying(tester);
+        await tester.tap(find.byType(MiniPlayer));
+        await settle(tester);
+        final player = find.byType(FullPlayerSheet);
+        final lyricsButton = find.descendant(
+          of: player,
+          matching: find.byTooltip('歌词'),
+        );
+        await tester.tap(lyricsButton);
+        await settle(tester);
+        final lyricsState = tester.state(find.byType(LyricsView));
+        final card = find.byKey(const ValueKey('lyrics-control-card'));
+        final expanded = tester.getRect(card);
+        await tester.pump(PlayerLyricsMotion.idleDelay);
+        await tester.pump(
+          PlayerLyricsMotion.foldDuration + const Duration(milliseconds: 1),
+        );
+        final folded = tester.getRect(card);
+        final deviceButton = tester.getRect(
+          find
+              .ancestor(
+                of: find.descendant(
+                  of: player,
+                  matching: find.byIcon(Icons.devices_rounded),
+                ),
+                matching: find.byType(InkWell),
+              )
+              .first,
+        );
+        final blank = Offset(
+          (deviceButton.right + tester.getRect(lyricsButton).left) / 2,
+          folded.center.dy,
+        );
+        expect(blank.dx, greaterThan(deviceButton.right));
+        final tap = await tester.startGesture(blank);
+        await tester.pump();
+        expect(tester.getRect(card), folded);
+        await tap.moveBy(const Offset(0, 4));
+        await tester.pump();
+        expect(tester.getRect(card), folded);
+        await tap.up();
+        await tester.pump();
+        await tester.pump(
+          PlayerLyricsMotion.chromeDuration + const Duration(milliseconds: 1),
+        );
+        expect(tester.getRect(card), expanded);
+        expect(tester.state(find.byType(LyricsView)), same(lyricsState));
+        await tester.dragFrom(blank, const Offset(0, -60));
+        await tester.pump();
+        await tester.pump(
+          PlayerLyricsMotion.foldDuration + const Duration(milliseconds: 1),
+        );
+        expect(tester.getRect(card), folded);
+        await tester.dragFrom(blank, const Offset(60, 0));
+        await tester.pump(const Duration(milliseconds: 301));
+        expect(tester.getRect(card), folded);
+        final cancelled = await tester.startGesture(blank);
+        await cancelled.cancel();
+        await tester.pump(const Duration(milliseconds: 301));
+        expect(tester.getRect(card), folded);
+        expect(tester.takeException(), isNull);
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+
+    testWidgets(
       'folded lyrics footer tap enters queue without reopening ($reduced)',
       (tester) async {
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -312,7 +388,9 @@ void main() {
           final card = find.byKey(const ValueKey('lyrics-control-card'));
           final expanded = tester.getRect(card);
           await tester.pump(const Duration(milliseconds: 3500));
-          await tester.pump(const Duration(milliseconds: 301));
+          await tester.pump(
+            PlayerLyricsMotion.foldDuration + const Duration(milliseconds: 1),
+          );
           final folded = tester.getRect(card);
           expect(folded.top, greaterThan(expanded.top));
           await tester.tap(

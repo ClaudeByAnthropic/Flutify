@@ -1,4 +1,5 @@
 import 'package:flutify_app/ui/screens/player/android_player_scene.dart';
+import 'package:flutify_app/ui/screens/player/player_lyrics_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -98,7 +99,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 150));
     expect(tester.getRect(card).top, greaterThan(expanded.top));
     expect(tester.getRect(queue).height, greaterThan(listBefore.height));
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(
+      PlayerLyricsMotion.foldDuration - const Duration(milliseconds: 150),
+    );
     expect(tester.getRect(card).top, footerBefore.top);
     expect(tester.getRect(footer), footerBefore);
     expect(tester.getRect(queue).bottom, footerBefore.top - 8);
@@ -117,7 +120,7 @@ void main() {
     expect(tester.getRect(card), expanded);
     await hold.cancel();
     await tester.pump(const Duration(milliseconds: 3500));
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(PlayerLyricsMotion.foldDuration);
     expect(tester.getRect(card).top, footerBefore.top);
     expect(tester.takeException(), isNull);
   });
@@ -254,7 +257,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 700));
       final expanded = tester.getRect(card);
       await tester.pump(const Duration(milliseconds: 3500));
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(PlayerLyricsMotion.foldDuration);
       final folded = tester.getRect(card);
       final foldedCover = tester.getRect(cover);
       expect(folded.top, greaterThan(expanded.top));

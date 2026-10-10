@@ -144,7 +144,7 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
   Widget _cardHitRegion(Widget child) => GestureDetector(
     behavior: HitTestBehavior.opaque,
     excludeFromSemantics: true,
-    onTap: _cardMode ? () {} : null,
+    onTap: _cardMode ? _motion.activity : null,
     onVerticalDragUpdate: _cardMode ? (_) {} : null,
     child: child,
   );
@@ -167,7 +167,7 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
   Widget build(BuildContext context) => Listener(
     behavior: HitTestBehavior.translucent,
     onPointerDown: (event) => _motion.pointerDown(event.pointer),
-    onPointerMove: (_) => _motion.activity(),
+    onPointerMove: (event) => _motion.pointerMove(event.pointer, event.delta),
     onPointerUp: (event) => _motion.pointerUp(event.pointer),
     onPointerCancel: (event) => _motion.pointerUp(event.pointer),
     onPointerSignal: (_) => _motion.activity(),
