@@ -290,6 +290,52 @@ void main() {
     });
   }
 
+  for (final reduced in [false, true]) {
+    testWidgets(
+      'folded lyrics footer tap enters queue without reopening ($reduced)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(disableAnimations: reduced);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        try {
+          await pumpPlaying(tester);
+          await tester.tap(find.byType(MiniPlayer));
+          await settle(tester);
+          final player = find.byType(FullPlayerSheet);
+          await tester.tap(
+            find.descendant(of: player, matching: find.byTooltip('歌词')),
+          );
+          await settle(tester);
+          final card = find.byKey(const ValueKey('lyrics-control-card'));
+          final expanded = tester.getRect(card);
+          await tester.pump(const Duration(milliseconds: 3500));
+          await tester.pump(const Duration(milliseconds: 301));
+          final folded = tester.getRect(card);
+          expect(folded.top, greaterThan(expanded.top));
+          await tester.tap(
+            find.descendant(of: player, matching: find.byTooltip('播放队列')),
+          );
+          await tester.pump();
+          for (var frame = 0; frame < 33; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+            expect(
+              tester.getRect(card),
+              folded,
+              reason: 'handoff frame $frame',
+            );
+          }
+          expect(find.byType(QueueList), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
+
   testWidgets('android queue card preserves reorder, swipe removal and play', (
     tester,
   ) async {

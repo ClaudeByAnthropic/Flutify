@@ -245,7 +245,11 @@ class PlayerLyricsLayout extends MultiChildLayoutDelegate {
       BoxConstraints.tight(
         Size(
           contentWidth,
-          landscape ? contentHeight : math.max(0, surfaceY - 8 - contentTop),
+          // Reveal rows in the space released by the retracting card. The top
+          // and row widths stay fixed, preserving the list's scroll anchor.
+          landscape
+              ? contentHeight
+              : math.max(0, surfaceY + hiddenOffset - 8 - contentTop),
         ),
       ),
     );

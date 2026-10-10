@@ -37,7 +37,7 @@ void main() {
                   key: ValueKey('controls'),
                   height: 100,
                 ),
-                footer: const SizedBox(height: 48),
+                footer: const SizedBox(key: ValueKey('footer'), height: 48),
                 artworkBuilder: (context, size, progress) => const ColoredBox(
                   key: ValueKey('cover'),
                   color: Colors.blue,
@@ -73,6 +73,54 @@ void main() {
     );
     return mode;
   }
+
+  testWidgets('queue automatically folds and gives its space to the list', (
+    tester,
+  ) async {
+    final scroll = ScrollController();
+    addTearDown(scroll.dispose);
+    var taps = 0;
+    final mode = await scene(tester, scroll: scroll, onQueueTap: () => taps++);
+    final card = find.byKey(const ValueKey('lyrics-control-card'));
+    final footer = find.byKey(const ValueKey('footer'));
+    final queue = find.byKey(const ValueKey('queue'));
+    mode.value = _View.queue;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 501));
+    await tester.pump();
+    final expanded = tester.getRect(card);
+    final listBefore = tester.getRect(queue);
+    final listElement = tester.element(queue);
+    final footerBefore = tester.getRect(footer);
+    scroll.jumpTo(400);
+    await tester.pump();
+    final rowBefore = tester.getRect(find.text('Queue 7'));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(tester.getRect(card).top, greaterThan(expanded.top));
+    expect(tester.getRect(queue).height, greaterThan(listBefore.height));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(tester.getRect(card).top, footerBefore.top);
+    expect(tester.getRect(footer), footerBefore);
+    expect(tester.getRect(queue).bottom, footerBefore.top - 8);
+    expect(scroll.offset, 400);
+    expect(tester.getRect(find.text('Queue 7')), rowBefore);
+    expect(tester.element(queue), same(listElement));
+
+    await tester.tapAt(tester.getCenter(footer));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.getRect(card), expanded);
+    expect(scroll.offset, 400);
+    expect(taps, 0, reason: 'waking from the footer cannot play a queue item');
+    final hold = await tester.startGesture(tester.getCenter(footer));
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.getRect(card), expanded);
+    await hold.cancel();
+    await tester.pump(const Duration(milliseconds: 3500));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.getRect(card).top, footerBefore.top);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'queue entry and exit keep shared elements and the outgoing list alive',
@@ -196,7 +244,7 @@ void main() {
   });
 
   testWidgets(
-    'folded lyrics reveal continuously into a persistent queue card',
+    'folded lyrics stay folded in queue and reveal continuously on return',
     (tester) async {
       final mode = await scene(tester);
       final card = find.byKey(const ValueKey('lyrics-control-card'));
@@ -205,12 +253,25 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 700));
       final expanded = tester.getRect(card);
-      final smallCover = tester.getRect(cover);
       await tester.pump(const Duration(milliseconds: 3500));
       await tester.pump(const Duration(milliseconds: 300));
       final folded = tester.getRect(card);
+      final foldedCover = tester.getRect(cover);
       expect(folded.top, greaterThan(expanded.top));
       mode.value = _View.queue;
+      await tester.pump();
+      expect(tester.getRect(card), folded);
+      for (var frame = 0; frame < 32; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.getRect(card), folded);
+        expect(tester.getRect(cover), foldedCover);
+      }
+      final queue = tester.getRect(find.byKey(const ValueKey('queue')));
+      expect(queue.bottom, folded.top - 8);
+      await tester.pump(const Duration(seconds: 5));
+      expect(tester.getRect(card), folded);
+      expect(tester.getRect(find.byKey(const ValueKey('queue'))), queue);
+      mode.value = _View.lyrics;
       await tester.pump();
       expect(tester.getRect(card), folded);
       await tester.pump(const Duration(milliseconds: 150));
@@ -220,12 +281,6 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 500));
       expect(tester.getRect(card), expanded);
-      expect(tester.getRect(cover), smallCover);
-      final queue = tester.getRect(find.byKey(const ValueKey('queue')));
-      expect(queue.bottom, lessThanOrEqualTo(expanded.top));
-      await tester.pump(const Duration(seconds: 5));
-      expect(tester.getRect(card), expanded);
-      expect(tester.getRect(find.byKey(const ValueKey('queue'))), queue);
       expect(tester.takeException(), isNull);
     },
   );
@@ -291,10 +346,16 @@ void main() {
       expect(find.byKey(const ValueKey('lyrics')), findsNothing);
       await tester.pump(const Duration(seconds: 5));
       expect(
-        tester.getRect(cover),
-        small,
-        reason: 'queue controls never idle-fold',
+        tester.getRect(cover).top,
+        greaterThan(small.top),
+        reason: 'queue automatically folds after the content handoff',
       );
+      await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('footer'))),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.getRect(cover), small);
       mode.value = _View.lyrics;
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 160));
@@ -341,12 +402,17 @@ void main() {
         expect(find.semantics.byLabel('Queue 7'), findsNothing);
         mode.value = _View.queue;
         await tester.pump();
+        await tester.pump();
         expect(scroll.offset, 400);
         expect(
           tester.element(find.byKey(const ValueKey('queue'))),
           same(queueElement),
         );
         expect(taps, 1);
+        await tester.tapAt(
+          tester.getCenter(find.byKey(const ValueKey('footer'))),
+        );
+        await tester.pump();
         await tester.tapAt(
           tester.getCenter(find.byKey(const ValueKey('cover'))),
         );

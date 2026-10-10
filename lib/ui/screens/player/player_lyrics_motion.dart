@@ -38,6 +38,8 @@ class PlayerLyricsController extends ChangeNotifier {
   Timer? _timer;
   bool _lyrics = false;
   bool _queue = false;
+  bool _foldQueueAfterEntry = false;
+  bool _gestureStartedFolded = false;
   bool _idle = false;
   bool _active = true;
   bool _reduceMotion = false;
@@ -59,6 +61,7 @@ class PlayerLyricsController extends ChangeNotifier {
     }
     _reduceMotion = reduceMotion;
     _accessibleNavigation = accessibleNavigation;
+    _gestureStartedFolded = false;
     if (reduceMotion) {
       transition.value = _lyrics || _queue ? 1 : 0;
       queueTransition.value = _queue ? 1 : 0;
@@ -77,10 +80,31 @@ class PlayerLyricsController extends ChangeNotifier {
     assert(!lyrics || !queue);
     if (_lyrics == lyrics && _queue == queue) return;
     final queueFlight = queue || _queue;
+    // Pointer-down wakes chrome before a footer onTap changes the view. Retain
+    // that gesture's origin even with reduced motion, where chrome snaps to 1.
+    final keepFolded =
+        queue &&
+        _pointers.isEmpty &&
+        !_accessibleNavigation &&
+        !_interactionSuspended &&
+        (_idle || _gestureStartedFolded);
+    _gestureStartedFolded = false;
     _lyrics = lyrics;
     _queue = queue;
+    // An already-folded lyrics card stays folded when entering the queue.
+    // Otherwise finish the shared-element flight before retracting the card.
+    _foldQueueAfterEntry =
+        queue &&
+        !keepFolded &&
+        _active &&
+        !_accessibleNavigation &&
+        !_interactionSuspended;
     _timer?.cancel();
-    _reveal();
+    if (keepFolded) {
+      _fold();
+    } else {
+      _reveal();
+    }
     final duration = _reduceMotion
         ? Duration.zero
         : queueFlight
@@ -121,12 +145,15 @@ class PlayerLyricsController extends ChangeNotifier {
 
   void activity() {
     _timer?.cancel();
+    // Explicit interaction during entry takes precedence over automatic folding.
+    _foldQueueAfterEntry = false;
     if (!_active) return;
     _reveal();
     _scheduleIdle();
   }
 
   void pointerDown(int pointer) {
+    if (_pointers.isEmpty) _gestureStartedFolded = _idle;
     _pointers.add(pointer);
     activity();
   }
@@ -140,6 +167,7 @@ class PlayerLyricsController extends ChangeNotifier {
   void setInteractionSuspended(bool suspended) {
     if (_interactionSuspended == suspended) return;
     _interactionSuspended = suspended;
+    _gestureStartedFolded = false;
     activity();
   }
 
@@ -148,32 +176,42 @@ class PlayerLyricsController extends ChangeNotifier {
     _active = active;
     _timer?.cancel();
     _pointers.clear();
+    _gestureStartedFolded = false;
     if (active) activity();
   }
 
   void _scheduleIdle() {
     _timer?.cancel();
     if (!_active ||
-        !_lyrics ||
+        (!_lyrics && !_queue) ||
+        _idle ||
         _accessibleNavigation ||
         _interactionSuspended ||
         _pointers.isNotEmpty ||
         transition.isAnimating ||
         queueTransition.isAnimating ||
-        transition.value != 1) {
+        transition.value != 1 ||
+        queueTransition.value != (_queue ? 1 : 0)) {
       return;
     }
-    _timer = Timer(PlayerLyricsMotion.idleDelay, () {
-      _idle = true;
-      chrome.animateTo(
-        0,
-        duration: _reduceMotion
-            ? Duration.zero
-            : PlayerLyricsMotion.chromeDuration,
-        curve: PlayerLyricsMotion.curve,
-      );
-      notifyListeners();
-    });
+    if (_foldQueueAfterEntry) {
+      _foldQueueAfterEntry = false;
+      _fold();
+    } else {
+      _timer = Timer(PlayerLyricsMotion.idleDelay, _fold);
+    }
+  }
+
+  void _fold() {
+    _idle = true;
+    chrome.animateTo(
+      0,
+      duration: _reduceMotion
+          ? Duration.zero
+          : PlayerLyricsMotion.chromeDuration,
+      curve: PlayerLyricsMotion.curve,
+    );
+    notifyListeners();
   }
 
   @override
