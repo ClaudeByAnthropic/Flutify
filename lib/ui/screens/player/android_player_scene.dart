@@ -18,15 +18,21 @@ class AndroidPlayerScene extends StatefulWidget {
     required this.topBar,
     this.title,
     this.titleBuilder,
-    required this.controls,
-    required this.footer,
+    this.controls,
+    this.controlsBuilder,
+    this.footer,
+    this.footerBuilder,
+    this.controlsHeightReduction = 0,
+    this.footerHeightReduction = 0,
     required this.artworkBuilder,
     required this.lyrics,
     required this.translation,
     required this.queue,
     this.onArtworkTap,
     this.interactionSuspended = false,
-  }) : assert((title == null) != (titleBuilder == null));
+  }) : assert((title == null) != (titleBuilder == null)),
+       assert((controls == null) != (controlsBuilder == null)),
+       assert((footer == null) != (footerBuilder == null));
 
   final bool lyricsMode;
   final bool queueMode;
@@ -38,8 +44,15 @@ class AndroidPlayerScene extends StatefulWidget {
 
   /// Alternative to [title], using the artwork's already-eased progress (0–1).
   final Widget Function(BuildContext context, double progress)? titleBuilder;
-  final Widget controls;
-  final Widget footer;
+  final Widget? controls;
+  final Widget Function(BuildContext context, double progress)? controlsBuilder;
+  final Widget? footer;
+  final Widget Function(BuildContext context, double progress)? footerBuilder;
+
+  /// Expanded minus compact height, keeping flight endpoints fixed while
+  /// controls reflow. Builders must interpolate their heights with progress.
+  final double controlsHeightReduction;
+  final double footerHeightReduction;
   final Widget Function(BuildContext context, double size, double progress)
   artworkBuilder;
   final Widget lyrics;
@@ -190,6 +203,9 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                           progress: progress,
                           chrome: _motion.chrome.value,
                           geometry: _geometry,
+                          controlsHeightReduction:
+                              widget.controlsHeightReduction,
+                          footerHeightReduction: widget.footerHeightReduction,
                         ),
                         children: [
                           if (hasLyrics)
@@ -251,12 +267,21 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                             PlayerSceneSlot.controls,
                             _body(
                               PlayerSceneSlot.controls,
-                              _cardHitRegion(widget.controls),
+                              _cardHitRegion(
+                                widget.controlsBuilder?.call(
+                                      context,
+                                      progress,
+                                    ) ??
+                                    widget.controls!,
+                              ),
                             ),
                           ),
                           slot(
                             PlayerSceneSlot.footer,
-                            _cardHitRegion(widget.footer),
+                            _cardHitRegion(
+                              widget.footerBuilder?.call(context, progress) ??
+                                  widget.footer!,
+                            ),
                           ),
                           slot(
                             PlayerSceneSlot.artwork,

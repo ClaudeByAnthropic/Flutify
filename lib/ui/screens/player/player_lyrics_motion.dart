@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 
 /// Shared Apple-style timing for the Android player's coordinated transitions.
 abstract final class PlayerLyricsMotion {
-  static const curve = Cubic(0.32, 0.72, 0, 1);
+  // Responsive takeoff with a long, gentle landing; no bounce or second easing
+  // on any component. The scene's geometry receives this already-eased value.
+  static const curve = Cubic(0.22, 0.8, 0.22, 1);
   static const duration = Duration(milliseconds: 640);
   static const chromeDuration = Duration(milliseconds: 300);
   static const idleDelay = Duration(milliseconds: 3500);
