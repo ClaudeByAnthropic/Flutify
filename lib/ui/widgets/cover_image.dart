@@ -47,19 +47,29 @@ class CoverImage extends StatelessWidget {
     final placeholder = ColoredBox(
       color: colorScheme.surfaceContainerHigh,
       child: Center(
-        child: Icon(placeholderIcon, color: colorScheme.onSurfaceVariant.withAlpha(120)),
+        child: Icon(
+          placeholderIcon,
+          color: colorScheme.onSurfaceVariant.withAlpha(120),
+        ),
       ),
     );
 
     if (url.isEmpty) return placeholder;
 
+    // 淡入由 Ticker 驱动。封面所在子树被 TickerMode 暂停时（例如歌词视图里的小封面），
+    // 淡入动画停在透明、旧图又立刻移除，换歌后就只剩深色占位。暂停时直接显示新图。
+    final fadeIn = TickerMode.valuesOf(context).enabled
+        ? const Duration(milliseconds: 150)
+        : Duration.zero;
+
     return CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
       memCacheWidth: _cacheWidth(context, logicalWidth),
-      fadeInDuration: const Duration(milliseconds: 150),
+      fadeInDuration: fadeIn,
       fadeOutDuration: Duration.zero,
-      placeholder: (_, _) => ColoredBox(color: colorScheme.surfaceContainerHigh),
+      placeholder: (_, _) =>
+          ColoredBox(color: colorScheme.surfaceContainerHigh),
       errorWidget: (_, _, _) => placeholder,
     );
   }

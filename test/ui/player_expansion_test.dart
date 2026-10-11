@@ -90,4 +90,79 @@ void main() {
       },
     );
   }
+
+  testWidgets('collapse follows the pill as it is now, not as it was opened', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = AnimationController(
+      vsync: tester,
+      duration: PlayerExpansionMotion.duration,
+      reverseDuration: PlayerExpansionMotion.reverseDuration,
+    );
+    PlayerExpansionLook look = (
+      color: Colors.red,
+      compactChild: const Text('opened with', textDirection: TextDirection.ltr),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PlayerExpansionTransition(
+          animation: controller,
+          origin: PlayerExpansionOrigin(
+            bounds: const Rect.fromLTWH(10, 654, 370, 64),
+            color: look.color,
+            borderRadius: const BorderRadius.all(Radius.circular(32)),
+            compactChild: look.compactChild,
+            currentLook: () => look,
+          ),
+          child: const ColoredBox(color: Colors.blue),
+        ),
+      ),
+    );
+    controller.forward();
+    await tester.pump();
+    await tester.pump(PlayerExpansionMotion.duration);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(controller.isCompleted, isTrue);
+
+    // The track changes while the player covers the pill.
+    look = (
+      color: Colors.green,
+      compactChild: const Text('playing now', textDirection: TextDirection.ltr),
+    );
+    controller.reverse();
+    await tester.pump();
+    final compact = find.byKey(const ValueKey('player-expansion-compact'));
+    final surface = find.byKey(const ValueKey('player-expansion-surface'));
+    Color pillColor() => tester
+        .widget<ColoredBox>(
+          find.descendant(of: surface, matching: find.byType(ColoredBox)).first,
+        )
+        .color;
+    while (controller.isAnimating) {
+      await tester.pump(const Duration(milliseconds: 30));
+      if (compact.evaluate().isEmpty) break;
+      expect(find.text('opened with'), findsNothing);
+      expect(
+        find.descendant(of: compact, matching: find.text('playing now')),
+        findsOneWidget,
+      );
+      expect(pillColor(), Colors.green);
+    }
+
+    // Without a live source the opening snapshot is all there is.
+    const snapshot = PlayerExpansionOrigin(
+      bounds: Rect.fromLTWH(10, 654, 370, 64),
+      color: Colors.red,
+      borderRadius: BorderRadius.all(Radius.circular(32)),
+      compactChild: Text('opened with', textDirection: TextDirection.ltr),
+    );
+    expect(snapshot.look.color, Colors.red);
+    expect(snapshot.look.compactChild, same(snapshot.compactChild));
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    expect(tester.takeException(), isNull);
+  });
 }

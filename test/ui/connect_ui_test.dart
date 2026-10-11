@@ -764,7 +764,9 @@ void main() {
   group('remote lyrics', () {
     const remoteTitle = 'A Synthetic Remote Track With A Fairly Long Title';
 
-    testWidgets('remote mini title restarts after closing the full player', (tester) async {
+    testWidgets('remote mini title restarts after closing the full player', (
+      tester,
+    ) async {
       await pumpHost(
         tester,
         const Size(390, 844),
@@ -772,10 +774,17 @@ void main() {
         cluster: syntheticCluster(playing: false),
       );
       double titleOffset() {
-        final title = find.descendant(of: find.byType(RemoteMiniPlayer), matching: find.byType(MarqueeText));
-        final scroll = find.descendant(of: title, matching: find.byType(SingleChildScrollView));
+        final title = find.descendant(
+          of: find.byType(RemoteMiniPlayer),
+          matching: find.byType(MarqueeText),
+        );
+        final scroll = find.descendant(
+          of: title,
+          matching: find.byType(SingleChildScrollView),
+        );
         return tester.widget<SingleChildScrollView>(scroll).controller!.offset;
       }
+
       await tester.pump(const Duration(milliseconds: 4500));
       expect(titleOffset(), greaterThan(0));
       await tester.tap(find.byType(RemoteMiniPlayer));
@@ -898,7 +907,7 @@ void main() {
     );
 
     testWidgets(
-      'lyrics / queue buttons switch the right panel; closing both centers the artwork',
+      'lyrics / queue buttons switch the shared scene view; closing both returns to the artwork',
       (tester) async {
         await pumpHost(
           tester,
@@ -908,7 +917,7 @@ void main() {
         );
         await tester.tap(find.text('immersive'));
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 800));
         final screen = find.byType(ImmersiveLyricsScreen);
         expect(
           find.descendant(of: screen, matching: find.byType(LyricsView)),
@@ -919,7 +928,7 @@ void main() {
         await tester.tap(
           find.descendant(
             of: screen,
-            matching: find.byIcon(Icons.format_list_bulleted_rounded),
+            matching: find.byIcon(Icons.queue_music_rounded),
           ),
         );
         await tester.pump();
@@ -933,11 +942,11 @@ void main() {
           findsOneWidget,
         );
 
-        // 再点一次关闭面板：封面列移到正中
+        // 再点一次回到封面：横屏时大封面在左侧内容区居中，控制卡片留在右侧
         await tester.tap(
           find.descendant(
             of: screen,
-            matching: find.byIcon(Icons.format_list_bulleted_rounded),
+            matching: find.byIcon(Icons.queue_music_rounded),
           ),
         );
         await tester.pump();
@@ -946,10 +955,14 @@ void main() {
           find.descendant(of: screen, matching: find.byType(QueueList)),
           findsNothing,
         );
+        final card = tester.getRect(
+          find.byKey(const ValueKey('lyrics-control-card')),
+        );
         final art = tester.getCenter(
           find.descendant(of: screen, matching: find.byType(CoverImage)).first,
         );
-        expect(art.dx, closeTo(640, 2));
+        expect(art.dx, lessThan(card.left));
+        expect(art.dx, closeTo((card.left - 16) / 2, 2));
         expect(tester.takeException(), isNull);
 
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);

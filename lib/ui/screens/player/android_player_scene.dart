@@ -30,6 +30,7 @@ class AndroidPlayerScene extends StatefulWidget {
     required this.queue,
     this.onArtworkTap,
     this.interactionSuspended = false,
+    this.maxLandscapeWidth = 960,
   }) : assert((title == null) != (titleBuilder == null)),
        assert((controls == null) != (controlsBuilder == null)),
        assert((footer == null) != (footerBuilder == null));
@@ -60,6 +61,9 @@ class AndroidPlayerScene extends StatefulWidget {
   final Widget queue;
   final VoidCallback? onArtworkTap;
   final bool interactionSuspended;
+
+  /// Content width cap when the scene is laid out in landscape.
+  final double maxLandscapeWidth;
 
   @override
   State<AndroidPlayerScene> createState() => _AndroidPlayerSceneState();
@@ -205,7 +209,7 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                       maxWidth:
                           MediaQuery.orientationOf(context) ==
                               Orientation.landscape
-                          ? 960
+                          ? widget.maxLandscapeWidth
                           : 480,
                     ),
                     child: ClipRect(

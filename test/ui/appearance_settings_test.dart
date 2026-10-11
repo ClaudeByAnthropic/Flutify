@@ -8,7 +8,6 @@ import 'package:flutify_app/services/eme/eme_player.dart';
 import 'package:flutify_app/services/storage_service.dart';
 import 'package:flutify_app/ui/screens/main_shell.dart';
 import 'package:flutify_app/ui/screens/player/immersive_lyrics_screen.dart';
-import 'package:flutify_app/ui/screens/player/lyrics/lyrics_glass_controls.dart';
 import 'package:flutify_app/ui/screens/player/lyrics/lyrics_translation_controls.dart';
 import 'package:flutify_app/ui/screens/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
@@ -190,8 +189,8 @@ void main() {
           matching: find.byType(Slider),
         );
         final volume = sliders.last;
-        // 音量条在控制台玻璃内部、进度条之下
-        final controls = find.byType(LyricsGlassControls);
+        // 音量条在播放控件下方、同一块玻璃卡片内部，进度条之下
+        final controls = find.byKey(const ValueKey('lyrics-control-card'));
         expect(
           tester.getCenter(volume).dy,
           greaterThan(tester.getCenter(sliders.first).dy),
