@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../services/network/proxy_mode.dart';
+import 'playback_state.dart' show SpotifyRepeatMode;
 import '../services/network/spotify_gateway.dart';
 
 /// 网络代理：跟随系统 / 不使用（直连）/ 手动指定 HTTP 代理。
@@ -41,6 +42,9 @@ class AppPreferences {
   final double lyricsBlur;
 
   final StartPage startPage;
+
+  /// 启动时的循环方式（无循环 / 列表循环 / 单曲循环）；覆盖上次会话里记下的循环状态。
+  final SpotifyRepeatMode defaultRepeatMode;
 
   /// 桌面端：记住窗口大小与位置（含最大化状态）。
   final bool rememberWindow;
@@ -102,6 +106,7 @@ class AppPreferences {
     this.lyricsFocusPosition = 0.16,
     this.lyricsBlur = 1.0,
     this.startPage = StartPage.home,
+    this.defaultRepeatMode = SpotifyRepeatMode.off,
     this.rememberWindow = true,
     this.connectEnabled = true,
     this.connectReportOnLaunch = false,
@@ -146,6 +151,7 @@ class AppPreferences {
     double? lyricsFocusPosition,
     double? lyricsBlur,
     StartPage? startPage,
+    SpotifyRepeatMode? defaultRepeatMode,
     bool? rememberWindow,
     bool? connectEnabled,
     bool? connectReportOnLaunch,
@@ -176,6 +182,7 @@ class AppPreferences {
       lyricsFocusPosition: lyricsFocusPosition ?? this.lyricsFocusPosition,
       lyricsBlur: lyricsBlur ?? this.lyricsBlur,
       startPage: startPage ?? this.startPage,
+      defaultRepeatMode: defaultRepeatMode ?? this.defaultRepeatMode,
       rememberWindow: rememberWindow ?? this.rememberWindow,
       connectEnabled: connectEnabled ?? this.connectEnabled,
       connectReportOnLaunch:
@@ -213,6 +220,7 @@ class AppPreferences {
     'lyricsFocusPosition': lyricsFocusPosition,
     'lyricsBlur': lyricsBlur,
     'startPage': startPage.name,
+    'defaultRepeatMode': defaultRepeatMode.name,
     'rememberWindow': rememberWindow,
     'connectEnabled': connectEnabled,
     'connectReportOnLaunch': connectReportOnLaunch,
@@ -267,6 +275,11 @@ class AppPreferences {
       ),
       lyricsBlur: number(json['lyricsBlur'], d.lyricsBlur, 0, maxLyricsBlur),
       startPage: pick(StartPage.values, json['startPage'], d.startPage),
+      defaultRepeatMode: pick(
+        SpotifyRepeatMode.values,
+        json['defaultRepeatMode'],
+        d.defaultRepeatMode,
+      ),
       rememberWindow: flag(json['rememberWindow'], d.rememberWindow),
       connectEnabled: flag(json['connectEnabled'], d.connectEnabled),
       connectReportOnLaunch: flag(
@@ -360,6 +373,7 @@ class AppPreferences {
       other.lyricsFocusPosition == lyricsFocusPosition &&
       other.lyricsBlur == lyricsBlur &&
       other.startPage == startPage &&
+      other.defaultRepeatMode == defaultRepeatMode &&
       other.rememberWindow == rememberWindow &&
       other.connectEnabled == connectEnabled &&
       other.connectReportOnLaunch == connectReportOnLaunch &&
@@ -391,6 +405,7 @@ class AppPreferences {
     lyricsFocusPosition,
     lyricsBlur,
     startPage,
+    defaultRepeatMode,
     rememberWindow,
     connectEnabled,
     connectReportOnLaunch,

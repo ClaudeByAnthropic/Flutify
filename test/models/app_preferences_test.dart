@@ -1,4 +1,6 @@
 import 'package:flutify_app/models/app_preferences.dart';
+import 'package:flutify_app/models/playback_state.dart'
+    show SpotifyRepeatMode;
 import 'package:flutter_test/flutter_test.dart';
 
 /// 偏好的序列化：往返一致；坏数据 / 越界值回退或夹紧，不会导致启动失败。
@@ -10,6 +12,7 @@ void main() {
       lyricsAlign: LyricsAlign.center,
       lyricsBlur: 0,
       startPage: StartPage.last,
+      defaultRepeatMode: SpotifyRepeatMode.track,
       rememberWindow: false,
       connectEnabled: false,
       remoteLyricsLeadMs: -300,
@@ -97,6 +100,7 @@ void main() {
       'lyricsScale': 9.0,
       'lyricsAlign': 42,
       'lyricsBlur': -3,
+      'defaultRepeatMode': 'forever',
       'startPage': null,
       'rememberWindow': 'yes',
       'connectEnabled': false,
@@ -106,6 +110,7 @@ void main() {
     expect(prefs.lyricsScale, AppPreferences.maxLyricsScale);
     expect(prefs.lyricsAlign, LyricsAlign.left);
     expect(prefs.lyricsBlur, 0);
+    expect(prefs.defaultRepeatMode, SpotifyRepeatMode.off);
     expect(prefs.startPage, StartPage.home);
     expect(prefs.rememberWindow, isTrue);
     expect(prefs.connectEnabled, isFalse);

@@ -1149,6 +1149,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsStartPageLast => 'Last page';
 
   @override
+  String get settingsDefaultRepeat => 'Default repeat mode';
+
+  @override
+  String get settingsDefaultRepeatSubtitle =>
+      'Repeat mode used when the app starts, replacing the state from the last session';
+
+  @override
+  String get settingsRepeatOff => 'No repeat';
+
+  @override
+  String get settingsRepeatList => 'Repeat list';
+
+  @override
+  String get settingsRepeatTrack => 'Repeat track';
+
+  @override
   String get settingsRememberWindow => 'Remember window size and position';
 
   @override

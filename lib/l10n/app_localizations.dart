@@ -2129,6 +2129,36 @@ abstract class AppLocalizations {
   /// **'上次位置'**
   String get settingsStartPageLast;
 
+  /// No description provided for @settingsDefaultRepeat.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认循环方式'**
+  String get settingsDefaultRepeat;
+
+  /// No description provided for @settingsDefaultRepeatSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'应用启动时使用的循环方式，覆盖上次退出时的状态'**
+  String get settingsDefaultRepeatSubtitle;
+
+  /// No description provided for @settingsRepeatOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'不循环'**
+  String get settingsRepeatOff;
+
+  /// No description provided for @settingsRepeatList.
+  ///
+  /// In zh, this message translates to:
+  /// **'列表循环'**
+  String get settingsRepeatList;
+
+  /// No description provided for @settingsRepeatTrack.
+  ///
+  /// In zh, this message translates to:
+  /// **'单曲循环'**
+  String get settingsRepeatTrack;
+
   /// No description provided for @settingsRememberWindow.
   ///
   /// In zh, this message translates to:
