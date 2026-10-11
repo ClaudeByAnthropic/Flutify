@@ -97,6 +97,7 @@ class _LyricsViewState extends State<LyricsView>
 
   /// 歌词区可视高度（由 LayoutBuilder 写入），用于定位当前行。
   double _viewportHeight = 0;
+  double _viewportWidth = 0;
 
   late final ValueListenable<Duration> _position;
   late final void Function(Duration position) _seek;
@@ -452,8 +453,13 @@ class _LyricsViewState extends State<LyricsView>
   }
 
   /// 对焦行顶端的纵坐标：按用户偏好定位在未被控件遮挡的区域内。
+  /// Apple 样式的歌词铺满整个场景（控件卡片浮在上面），设置值按 0.5 折算成视口比例，
+  /// 默认 16% 对应原来的 8%。
   double get _focusTopY => widget.appleMusicStyle
-      ? math.max(widget.topInset, _viewportHeight * .08 - 2)
+      ? math.max(
+          widget.topInset,
+          _viewportHeight * (_style.lyricsFocusPosition * .5) - 2,
+        )
       : (widget.topInset +
                 (_viewportHeight - widget.topInset - widget.bottomInset).clamp(
                       0.0,
@@ -803,9 +809,11 @@ class _LyricsViewState extends State<LyricsView>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 窗口尺寸变化后按相同比例重新定位当前行。
-        if (constraints.maxHeight != _viewportHeight) {
+        // 窗口尺寸变化（含只改宽度、换行变化）后按相同比例重新定位当前行。
+        if (constraints.maxHeight != _viewportHeight ||
+            constraints.maxWidth != _viewportWidth) {
           _viewportHeight = constraints.maxHeight;
+          _viewportWidth = constraints.maxWidth;
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _scrollToActive(animate: false),
           );
@@ -1019,6 +1027,8 @@ class _LyricsViewState extends State<LyricsView>
     final controlTop = (1 - widget.bottomInset / math.max(1, rect.height))
         .clamp(.07, 1.0);
     final fadeStart = math.max(.07, controlTop - .2775);
+    // 对焦位置上移到渐隐区内时，顶部渐隐随之缩短，避免当前行被淡掉
+    final topFade = (_focusTopY / math.max(1, rect.height)).clamp(0.0, .07);
     return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -1032,7 +1042,7 @@ class _LyricsViewState extends State<LyricsView>
       ],
       stops: [
         0,
-        .07,
+        topFade,
         fadeStart,
         fadeStart + (controlTop - fadeStart) * (.24 / .2775),
         controlTop,

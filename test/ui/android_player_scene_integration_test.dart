@@ -357,4 +357,41 @@ void main() {
     await _frames(tester);
     debugDefaultTargetPlatformOverride = null;
   });
+
+  testWidgets(
+    'scene width cap follows the layout orientation, not the window',
+    (tester) async {
+      await _open(tester);
+      await tester.tap(find.byTooltip('歌词'));
+      await _frames(tester);
+      final card = find.byKey(const ValueKey('lyrics-control-card'));
+
+      // 窗口宽于高，但封顶到 960 后比高度还窄：布局走竖屏，内容必须仍限宽 480。
+      tester.view.physicalSize = const Size(1100, 1000);
+      await _frames(tester);
+      expect(tester.getRect(card).width, lessThanOrEqualTo(480));
+      expect(
+        tester.getSize(find.byType(LyricsView)).width,
+        lessThanOrEqualTo(480),
+      );
+
+      // 真正的横屏：封顶宽度内左右分栏，控制卡片收窄在右侧，歌词在左侧。
+      tester.view.physicalSize = const Size(1100, 700);
+      await _frames(tester);
+      final landscapeCard = tester.getRect(card);
+      final lyrics = tester.getRect(find.byType(LyricsView));
+      expect(landscapeCard.width, lessThanOrEqualTo(360));
+      expect(lyrics.right, lessThanOrEqualTo(landscapeCard.left));
+      expect(landscapeCard.right, lessThanOrEqualTo(1100));
+
+      // 回到窄竖屏：重新铺满 480 以内
+      tester.view.physicalSize = const Size(390, 844);
+      await _frames(tester);
+      expect(tester.getRect(card).width, lessThanOrEqualTo(390));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _frames(tester);
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
 }

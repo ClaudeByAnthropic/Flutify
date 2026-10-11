@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -203,178 +205,199 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                   ),
                 ),
               SafeArea(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth:
-                          MediaQuery.orientationOf(context) ==
-                              Orientation.landscape
-                          ? widget.maxLandscapeWidth
-                          : 480,
-                    ),
-                    child: ClipRect(
-                      child: CustomMultiChildLayout(
-                        delegate: PlayerLyricsLayout(
-                          progress: progress,
-                          chrome: _motion.chrome.value,
-                          geometry: _geometry,
-                          lyricsProgress: lyricsProgress,
-                          queueProgress: queueProgress,
-                          controlsHeightReduction:
-                              widget.controlsHeightReduction,
-                          footerHeightReduction: widget.footerHeightReduction,
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    // 与 PlayerLyricsLayout 的横屏判定一致：封顶后的宽度 >= 600 且大于高度，
+                    // 否则按竖屏限宽（不再依赖整窗的 MediaQuery 方向，避免宽窗口走了竖屏布局却不限宽）
+                    final capped = math.min(
+                      box.maxWidth,
+                      widget.maxLandscapeWidth,
+                    );
+                    final landscape = capped >= 600 && capped > box.maxHeight;
+                    return Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: landscape ? widget.maxLandscapeWidth : 480,
                         ),
-                        children: [
-                          if (hasLyrics)
-                            slot(
-                              PlayerSceneSlot.lyrics,
-                              ExcludeFocus(
-                                excluding: !lyricsInteractive,
-                                child: ExcludeSemantics(
-                                  excluding: !lyricsInteractive,
-                                  child: IgnorePointer(
-                                    ignoring: !lyricsInteractive,
-                                    child: Opacity(
-                                      opacity: lyricsProgress,
-                                      child: widget.lyrics,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                        child: ClipRect(
+                          child: CustomMultiChildLayout(
+                            delegate: PlayerLyricsLayout(
+                              progress: progress,
+                              chrome: _motion.chrome.value,
+                              geometry: _geometry,
+                              lyricsProgress: lyricsProgress,
+                              queueProgress: queueProgress,
+                              controlsHeightReduction:
+                                  widget.controlsHeightReduction,
+                              footerHeightReduction:
+                                  widget.footerHeightReduction,
                             ),
-                          slot(
-                            PlayerSceneSlot.queue,
-                            Offstage(
-                              offstage: !widget.queueMode && queueProgress == 0,
-                              child: TickerMode(
-                                enabled: widget.queueMode,
-                                child: ExcludeFocus(
-                                  excluding: !queueInteractive,
-                                  child: ExcludeSemantics(
-                                    excluding: !queueInteractive,
-                                    child: IgnorePointer(
-                                      ignoring: !queueInteractive,
-                                      child: Opacity(
-                                        key: const ValueKey(
-                                          'player-queue-opacity',
-                                        ),
-                                        opacity: queueProgress,
-                                        child: _queueMounted
-                                            ? widget.queue
-                                            : const SizedBox.expand(),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          slot(
-                            PlayerSceneSlot.surface,
-                            IgnorePointer(
-                              ignoring: progress == 0,
-                              child: Opacity(
-                                opacity: progress,
-                                child: _cardHitRegion(
-                                  LiquidGlass(
-                                    key: const ValueKey('lyrics-control-card'),
-                                    borderRadius: context.tokens.radius(28),
-                                    child: const ColoredBox(
-                                      color: Color(0x59101216),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          slot(
-                            PlayerSceneSlot.title,
-                            _body(
-                              PlayerSceneSlot.title,
-                              _cardHitRegion(
-                                widget.titleBuilder?.call(context, progress) ??
-                                    widget.title!,
-                              ),
-                            ),
-                          ),
-                          slot(
-                            PlayerSceneSlot.controls,
-                            _body(
-                              PlayerSceneSlot.controls,
-                              _cardHitRegion(
-                                widget.controlsBuilder?.call(
-                                      context,
-                                      progress,
-                                    ) ??
-                                    widget.controls!,
-                              ),
-                            ),
-                          ),
-                          slot(
-                            PlayerSceneSlot.footer,
-                            _cardHitRegion(
-                              widget.footerBuilder?.call(context, progress) ??
-                                  widget.footer!,
-                            ),
-                          ),
-                          slot(
-                            PlayerSceneSlot.artwork,
-                            _body(
-                              PlayerSceneSlot.artwork,
-                              Semantics(
-                                label: _cardMode
-                                    ? MaterialLocalizations.of(
-                                        context,
-                                      ).backButtonTooltip
-                                    : null,
-                                button:
-                                    _cardMode && widget.onArtworkTap != null,
-                                child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: _cardMode ? widget.onArtworkTap : null,
-                                  onVerticalDragUpdate: _cardMode
-                                      ? (_) {}
-                                      : null,
-                                  child: IgnorePointer(
-                                    ignoring:
-                                        widget.lyricsMode || widget.queueMode,
+                            children: [
+                              if (hasLyrics)
+                                slot(
+                                  PlayerSceneSlot.lyrics,
+                                  ExcludeFocus(
+                                    excluding: !lyricsInteractive,
                                     child: ExcludeSemantics(
-                                      excluding: _cardMode,
-                                      child: LayoutBuilder(
-                                        builder: (context, box) =>
-                                            widget.artworkBuilder(
-                                              context,
-                                              box.maxWidth,
-                                              progress,
+                                      excluding: !lyricsInteractive,
+                                      child: IgnorePointer(
+                                        ignoring: !lyricsInteractive,
+                                        child: Opacity(
+                                          opacity: lyricsProgress,
+                                          child: widget.lyrics,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              slot(
+                                PlayerSceneSlot.queue,
+                                Offstage(
+                                  offstage:
+                                      !widget.queueMode && queueProgress == 0,
+                                  child: TickerMode(
+                                    enabled: widget.queueMode,
+                                    child: ExcludeFocus(
+                                      excluding: !queueInteractive,
+                                      child: ExcludeSemantics(
+                                        excluding: !queueInteractive,
+                                        child: IgnorePointer(
+                                          ignoring: !queueInteractive,
+                                          child: Opacity(
+                                            key: const ValueKey(
+                                              'player-queue-opacity',
                                             ),
+                                            opacity: queueProgress,
+                                            child: _queueMounted
+                                                ? widget.queue
+                                                : const SizedBox.expand(),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
-                          slot(
-                            PlayerSceneSlot.toolbar,
-                            ExcludeFocus(
-                              excluding: !lyricsInteractive,
-                              child: ExcludeSemantics(
-                                excluding: !lyricsInteractive,
-                                child: IgnorePointer(
-                                  ignoring: !lyricsInteractive,
-                                  child: _chrome(
-                                    widget.translation,
-                                    factor: lyricsProgress,
+                              slot(
+                                PlayerSceneSlot.surface,
+                                IgnorePointer(
+                                  ignoring: progress == 0,
+                                  child: Opacity(
+                                    opacity: progress,
+                                    child: _cardHitRegion(
+                                      LiquidGlass(
+                                        key: const ValueKey(
+                                          'lyrics-control-card',
+                                        ),
+                                        borderRadius: context.tokens.radius(28),
+                                        child: const ColoredBox(
+                                          color: Color(0x59101216),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                              slot(
+                                PlayerSceneSlot.title,
+                                _body(
+                                  PlayerSceneSlot.title,
+                                  _cardHitRegion(
+                                    widget.titleBuilder?.call(
+                                          context,
+                                          progress,
+                                        ) ??
+                                        widget.title!,
+                                  ),
+                                ),
+                              ),
+                              slot(
+                                PlayerSceneSlot.controls,
+                                _body(
+                                  PlayerSceneSlot.controls,
+                                  _cardHitRegion(
+                                    widget.controlsBuilder?.call(
+                                          context,
+                                          progress,
+                                        ) ??
+                                        widget.controls!,
+                                  ),
+                                ),
+                              ),
+                              slot(
+                                PlayerSceneSlot.footer,
+                                _cardHitRegion(
+                                  widget.footerBuilder?.call(
+                                        context,
+                                        progress,
+                                      ) ??
+                                      widget.footer!,
+                                ),
+                              ),
+                              slot(
+                                PlayerSceneSlot.artwork,
+                                _body(
+                                  PlayerSceneSlot.artwork,
+                                  Semantics(
+                                    label: _cardMode
+                                        ? MaterialLocalizations.of(
+                                            context,
+                                          ).backButtonTooltip
+                                        : null,
+                                    button:
+                                        _cardMode &&
+                                        widget.onArtworkTap != null,
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: _cardMode
+                                          ? widget.onArtworkTap
+                                          : null,
+                                      onVerticalDragUpdate: _cardMode
+                                          ? (_) {}
+                                          : null,
+                                      child: IgnorePointer(
+                                        ignoring:
+                                            widget.lyricsMode ||
+                                            widget.queueMode,
+                                        child: ExcludeSemantics(
+                                          excluding: _cardMode,
+                                          child: LayoutBuilder(
+                                            builder: (context, box) =>
+                                                widget.artworkBuilder(
+                                                  context,
+                                                  box.maxWidth,
+                                                  progress,
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              slot(
+                                PlayerSceneSlot.toolbar,
+                                ExcludeFocus(
+                                  excluding: !lyricsInteractive,
+                                  child: ExcludeSemantics(
+                                    excluding: !lyricsInteractive,
+                                    child: IgnorePointer(
+                                      ignoring: !lyricsInteractive,
+                                      child: _chrome(
+                                        widget.translation,
+                                        factor: lyricsProgress,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              slot(PlayerSceneSlot.top, widget.topBar),
+                            ],
                           ),
-                          slot(PlayerSceneSlot.top, widget.topBar),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
             ],
