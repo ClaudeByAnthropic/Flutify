@@ -603,6 +603,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lyricsFromLrclib => '歌词来自 LRCLIB';
 
   @override
+  String get lyricsFromQqMusic => '歌词来自 QQ 音乐';
+
+  @override
+  String get lyricsFromNetease => '歌词来自网易云音乐';
+
+  @override
   String get lyricsImmersive => '沉浸式歌词';
 
   @override
@@ -621,7 +627,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lyricsFillWindow => '只铺满窗口（F11）';
 
   @override
+  String get lyricsPinControls => '固定控制区（不自动收起）';
+
+  @override
+  String get lyricsUnpinControls => '取消固定控制区';
+
+  @override
   String get deviceConnectTitle => '连接到设备';
+
+  @override
+  String get deviceConnectShort => '畅联';
 
   @override
   String get deviceConnectDescription =>
@@ -971,6 +986,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lyricsTranslationFromNetease => '译词来自网易云音乐社区';
 
   @override
+  String get lyricsTranslationFromQqMusic => '译词来自 QQ 音乐';
+
+  @override
   String get settingsLyricsSize => '歌词字号';
 
   @override
@@ -981,9 +999,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLyricsAlignCenter => '居中';
-
-  @override
-  String get settingsLyricsBlur => '其他行模糊';
 
   @override
   String get settingsLyricsImmersiveScreen => '全屏歌词铺满整个屏幕';
@@ -1000,11 +1015,45 @@ class AppLocalizationsZh extends AppLocalizations {
       'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选';
 
   @override
+  String get settingsLyricsSourceOrder => '歌词来源优先级';
+
+  @override
+  String get settingsLyricsSourceOrderSubtitle =>
+      '拖动右侧手柄调整顺序，越靠前越优先。原文与中文译词都按此顺序在各来源之间查找。';
+
+  @override
+  String get settingsLyricsSourceSpotify => 'Spotify';
+
+  @override
+  String get settingsLyricsSourceQqMusic => 'QQ 音乐';
+
+  @override
+  String get settingsLyricsSourceNetease => '网易云音乐';
+
+  @override
+  String get settingsLyricsSourceLrclib => 'LRCLIB';
+
+  @override
+  String get settingsLyricsSourceRoleSpotify => '原文，自带译文';
+
+  @override
+  String get settingsLyricsSourceRoleLrclib => '原文与译文';
+
+  @override
+  String get settingsLyricsSourceRoleCommunity => '原文与中文译词';
+
+  @override
+  String get settingsLyricsSourceDisabled => '已在「补全歌词」中关闭';
+
+  @override
+  String get settingsLyricsSourceDrag => '拖动排序';
+
+  @override
   String get settingsLyricsBilingual => '社区歌词翻译';
 
   @override
   String get settingsLyricsBilingualSubtitle =>
-      '加载歌词时预取中文译词，也供任务栏歌词使用。关闭后仍可通过翻译按钮或自动翻译查找译词；查询会发送曲名与歌手到网易云音乐。';
+      '加载歌词时预取中文译词，优先 QQ 音乐，缺失或不完整时查网易云，启用补全时最后查 LRCLIB，也供任务栏歌词使用。关闭后仍可手动或自动查询；曲名与歌手会发送到查询来源。';
 
   @override
   String get settingsTaskbarLyricsSection => '任务栏歌词';
@@ -1564,7 +1613,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLyricsAutoTranslateSubtitle =>
-      '自动查找歌词源已有的译文。中文译词会按曲名、歌手查询网易云；启用 LRCLIB 补全时也会查找对照版。简繁体跟随界面。';
+      '自动查找已有译文。中文译词按曲名、歌手优先查询 QQ 音乐，缺失或不完整时查网易云，启用补全时最后查 LRCLIB；只采用不丢失已译行的更完整版本。简繁体跟随界面。';
 
   @override
   String get settingsLyricsExcludeInterface => '不自动翻译界面语言';
@@ -2366,6 +2415,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lyricsFromLrclib => '歌詞來自 LRCLIB';
 
   @override
+  String get lyricsFromQqMusic => '歌詞來自 QQ 音樂';
+
+  @override
+  String get lyricsFromNetease => '歌詞來自網易雲音樂';
+
+  @override
   String get lyricsImmersive => '沉浸式歌詞';
 
   @override
@@ -2384,7 +2439,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lyricsFillWindow => '只鋪滿視窗（F11）';
 
   @override
+  String get lyricsPinControls => '固定控制區（不自動收起）';
+
+  @override
+  String get lyricsUnpinControls => '取消固定控制區';
+
+  @override
   String get deviceConnectTitle => '連接到裝置';
+
+  @override
+  String get deviceConnectShort => '暢聯';
 
   @override
   String get deviceConnectDescription =>
@@ -2734,6 +2798,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lyricsTranslationFromNetease => '譯詞來自網易雲音樂社群';
 
   @override
+  String get lyricsTranslationFromQqMusic => '譯詞來自 QQ 音樂';
+
+  @override
   String get settingsLyricsSize => '歌詞字號';
 
   @override
@@ -2744,9 +2811,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsLyricsAlignCenter => '居中';
-
-  @override
-  String get settingsLyricsBlur => '其他行模糊';
 
   @override
   String get settingsLyricsImmersiveScreen => '全螢幕歌詞鋪滿整個螢幕';
@@ -2763,11 +2827,45 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Spotify 沒有逐行同步歌詞時，從 LRCLIB 開放歌詞庫補全，并按原唱語言挑選';
 
   @override
+  String get settingsLyricsSourceOrder => '歌詞來源優先順序';
+
+  @override
+  String get settingsLyricsSourceOrderSubtitle =>
+      '拖曳右側把手調整順序，越靠前越優先。原文與中文譯詞都依此順序在各來源之間查找。';
+
+  @override
+  String get settingsLyricsSourceSpotify => 'Spotify';
+
+  @override
+  String get settingsLyricsSourceQqMusic => 'QQ 音樂';
+
+  @override
+  String get settingsLyricsSourceNetease => '網易雲音樂';
+
+  @override
+  String get settingsLyricsSourceLrclib => 'LRCLIB';
+
+  @override
+  String get settingsLyricsSourceRoleSpotify => '原文，內建譯文';
+
+  @override
+  String get settingsLyricsSourceRoleLrclib => '原文與譯文';
+
+  @override
+  String get settingsLyricsSourceRoleCommunity => '原文與中文譯詞';
+
+  @override
+  String get settingsLyricsSourceDisabled => '已在「補全歌詞」中關閉';
+
+  @override
+  String get settingsLyricsSourceDrag => '拖曳排序';
+
+  @override
   String get settingsLyricsBilingual => '社群歌詞翻譯';
 
   @override
   String get settingsLyricsBilingualSubtitle =>
-      '載入歌詞時預先取得中文譯詞，也供工作列歌詞使用。關閉後仍可透過翻譯按鈕或自動翻譯尋找譯詞；查詢會傳送曲名與歌手至網易雲音樂。';
+      '載入歌詞時預先取得中文譯詞，優先 QQ 音樂，缺失或不完整時查網易雲，啟用補全時最後查 LRCLIB，也供工作列歌詞使用。關閉後仍可手動或自動查詢；曲名與歌手會傳送至查詢來源。';
 
   @override
   String get settingsTaskbarLyricsSection => '任務欄歌詞';
@@ -3326,7 +3424,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsLyricsAutoTranslateSubtitle =>
-      '自動尋找歌詞來源已有的譯文。中文譯詞會依曲名、歌手查詢網易雲；啟用 LRCLIB 補全時也會尋找對照版。簡繁體跟隨介面。';
+      '自動尋找已有譯文。中文譯詞依曲名、歌手優先查詢 QQ 音樂，缺失或不完整時查網易雲，啟用補全時最後查 LRCLIB；只採用不遺失已譯行的更完整版本。簡繁體跟隨介面。';
 
   @override
   String get settingsLyricsExcludeInterface => '不自動翻譯界面語言';

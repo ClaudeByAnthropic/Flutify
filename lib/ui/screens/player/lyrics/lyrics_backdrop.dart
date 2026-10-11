@@ -1,33 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../../core/theme/flutify_tokens.dart';
-import '../../../../core/utils/artwork_palette.dart';
-import '../../../widgets/connect/now_playing_source.dart';
 import '../../../widgets/liquid_artwork_background.dart';
+import '../../../widgets/apple_music_background.dart';
 
 /// 所有歌词界面共用的液态背景：封面流动模糊 + 压暗层。
 ///
 /// 全屏歌词、全屏播放器的歌词视图、桌面右栏歌词、沉浸式歌词都使用它，观感一致。
-/// 单独订阅播放状态（本机或正在遥控的远程设备）：暂停、「减弱动效」或「省电模式」时停止流动，且不牵连歌词重建。
+/// 与 Android 原生背景一致：暂停时背景仍缓慢流动；仅在「减弱动效」或省电模式下停止流动。
 class LyricsBackdrop extends StatelessWidget {
   final String imageUrl;
+  final bool reducedEffects;
 
-  const LyricsBackdrop({super.key, required this.imageUrl});
+  const LyricsBackdrop({
+    super.key,
+    required this.imageUrl,
+    this.reducedEffects = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isPlaying = NowPlayingSource.isPlaying(context);
-    // 省电模式：保留封面配色，只是不再流动
-    final animate =
-        isPlaying && !context.reduceMotion && !context.tokens.powerSaving;
-    return ArtworkColorBuilder(
-      imageUrl: imageUrl,
-      fallback: const Color(0xFF1E2838),
-      builder: (context, artColor) => LiquidArtworkBackground(
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return AppleMusicBackground(
         imageUrl: imageUrl,
-        fallback: Color.lerp(artColor, Colors.black, 0.35)!,
-        animate: animate,
-      ),
+        reducedEffects: reducedEffects,
+      );
+    }
+    // 非歌词视图（封面/队列）只显示静态模糊封面，与 Android 的 reducedEffects 一致，
+    // 切到歌词时再恢复流动，避免在 Windows 上整个播放器持续重绘。
+    final animate =
+        !context.reduceMotion && !context.tokens.powerSaving && !reducedEffects;
+    // 与 Android 原生背景同一配方：黑底、同样的旋转/饱和度/压暗/模糊
+    return LiquidArtworkBackground(
+      imageUrl: imageUrl,
+      animate: animate,
+      dark: Theme.of(context).brightness == Brightness.dark,
     );
   }
 }

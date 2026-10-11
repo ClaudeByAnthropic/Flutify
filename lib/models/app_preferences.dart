@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../services/network/proxy_mode.dart';
+import 'lyrics_source.dart';
 import 'playback_state.dart' show SpotifyRepeatMode;
 import '../services/network/spotify_gateway.dart';
 
 /// 网络代理：跟随系统 / 不使用（直连）/ 手动指定 HTTP 代理。
 /// ProxyMode 已移至 services/network/proxy_mode.dart（纯 Dart，供命令行探针复用），这里再导出保持兼容。
 export '../services/network/proxy_mode.dart' show ProxyMode;
+export 'lyrics_source.dart';
 
 /// 界面语言：跟随系统 / 固定中文 / 固定英文。
 enum AppLanguage { system, zh, zhHant, en, ja }
@@ -37,9 +39,6 @@ class AppPreferences {
 
   /// 当前歌词行顶端在可见歌词区域中的纵向比例，避开顶部 / 底部控件。
   final double lyricsFocusPosition;
-
-  /// 非当前行的模糊强度倍率：0 = 不模糊，1 = 默认（Apple Music 观感），2 = 加倍。
-  final double lyricsBlur;
 
   final StartPage startPage;
 
@@ -76,6 +75,9 @@ class AppPreferences {
 
   /// Spotify 没有逐行同步歌词（只有纯文本或完全没有）时，从 LRCLIB 补全。
   final bool lyricsFallback;
+
+  /// 歌词来源优先级，始终包含 [LyricsSource.values] 里的每一项各一次。
+  final List<LyricsSource> lyricsSourceOrder;
   final bool canvasEnabled;
   final List<String> lyricsExcludedLanguages;
   final bool lyricsExcludeInterfaceLanguage;
@@ -104,7 +106,6 @@ class AppPreferences {
     this.lyricsScale = 1.0,
     this.lyricsAlign = LyricsAlign.left,
     this.lyricsFocusPosition = 0.16,
-    this.lyricsBlur = 1.0,
     this.startPage = StartPage.home,
     this.defaultRepeatMode = SpotifyRepeatMode.off,
     this.rememberWindow = true,
@@ -119,6 +120,7 @@ class AppPreferences {
     this.gateway = const SpotifyGateway(),
     this.proxyUsername = '',
     this.lyricsFallback = true,
+    this.lyricsSourceOrder = LyricsSource.defaultOrder,
     this.canvasEnabled = true,
     this.lyricsExcludedLanguages = const [],
     this.lyricsExcludeInterfaceLanguage = true,
@@ -137,7 +139,6 @@ class AppPreferences {
   static const double maxLyricsScale = 1.4;
   static const double minLyricsFocusPosition = 0.10;
   static const double maxLyricsFocusPosition = 0.70;
-  static const double maxLyricsBlur = 2.0;
   static const int maxRemoteLyricsLeadMs = 2000;
   static const int minTaskbarLyricsOpacity = 15;
   static const int defaultTaskbarLyricsCustomColor = 0xFF1ED760;
@@ -149,7 +150,6 @@ class AppPreferences {
     double? lyricsScale,
     LyricsAlign? lyricsAlign,
     double? lyricsFocusPosition,
-    double? lyricsBlur,
     StartPage? startPage,
     SpotifyRepeatMode? defaultRepeatMode,
     bool? rememberWindow,
@@ -164,6 +164,7 @@ class AppPreferences {
     SpotifyGateway? gateway,
     String? proxyUsername,
     bool? lyricsFallback,
+    List<LyricsSource>? lyricsSourceOrder,
     bool? canvasEnabled,
     List<String>? lyricsExcludedLanguages,
     bool? lyricsExcludeInterfaceLanguage,
@@ -180,7 +181,6 @@ class AppPreferences {
       lyricsScale: lyricsScale ?? this.lyricsScale,
       lyricsAlign: lyricsAlign ?? this.lyricsAlign,
       lyricsFocusPosition: lyricsFocusPosition ?? this.lyricsFocusPosition,
-      lyricsBlur: lyricsBlur ?? this.lyricsBlur,
       startPage: startPage ?? this.startPage,
       defaultRepeatMode: defaultRepeatMode ?? this.defaultRepeatMode,
       rememberWindow: rememberWindow ?? this.rememberWindow,
@@ -196,6 +196,11 @@ class AppPreferences {
       gateway: gateway ?? this.gateway,
       proxyUsername: proxyUsername ?? this.proxyUsername,
       lyricsFallback: lyricsFallback ?? this.lyricsFallback,
+      lyricsSourceOrder: lyricsSourceOrder == null
+          ? this.lyricsSourceOrder
+          : LyricsSource.parseOrder(
+              lyricsSourceOrder.map((s) => s.name).toList(),
+            ),
       canvasEnabled: canvasEnabled ?? this.canvasEnabled,
       lyricsExcludedLanguages:
           lyricsExcludedLanguages ?? this.lyricsExcludedLanguages,
@@ -218,7 +223,6 @@ class AppPreferences {
     'lyricsScale': lyricsScale,
     'lyricsAlign': lyricsAlign.name,
     'lyricsFocusPosition': lyricsFocusPosition,
-    'lyricsBlur': lyricsBlur,
     'startPage': startPage.name,
     'defaultRepeatMode': defaultRepeatMode.name,
     'rememberWindow': rememberWindow,
@@ -233,6 +237,7 @@ class AppPreferences {
     'gateway': gateway.toJson(),
     'proxyUsername': proxyUsername,
     'lyricsFallback': lyricsFallback,
+    'lyricsSourceOrder': [for (final s in lyricsSourceOrder) s.name],
     'canvasEnabled': canvasEnabled,
     'lyricsExcludedLanguages': lyricsExcludedLanguages,
     'lyricsExcludeInterfaceLanguage': lyricsExcludeInterfaceLanguage,
@@ -273,7 +278,6 @@ class AppPreferences {
         minLyricsFocusPosition,
         maxLyricsFocusPosition,
       ),
-      lyricsBlur: number(json['lyricsBlur'], d.lyricsBlur, 0, maxLyricsBlur),
       startPage: pick(StartPage.values, json['startPage'], d.startPage),
       defaultRepeatMode: pick(
         SpotifyRepeatMode.values,
@@ -303,6 +307,7 @@ class AppPreferences {
           ? (json['proxyUsername'] as String).trim()
           : d.proxyUsername,
       lyricsFallback: flag(json['lyricsFallback'], d.lyricsFallback),
+      lyricsSourceOrder: LyricsSource.parseOrder(json['lyricsSourceOrder']),
       canvasEnabled: flag(json['canvasEnabled'], d.canvasEnabled),
       lyricsExcludedLanguages: json['lyricsExcludedLanguages'] is List
           ? List.unmodifiable(
@@ -371,7 +376,6 @@ class AppPreferences {
       other.lyricsScale == lyricsScale &&
       other.lyricsAlign == lyricsAlign &&
       other.lyricsFocusPosition == lyricsFocusPosition &&
-      other.lyricsBlur == lyricsBlur &&
       other.startPage == startPage &&
       other.defaultRepeatMode == defaultRepeatMode &&
       other.rememberWindow == rememberWindow &&
@@ -386,6 +390,7 @@ class AppPreferences {
       other.gateway == gateway &&
       other.proxyUsername == proxyUsername &&
       other.lyricsFallback == lyricsFallback &&
+      listEquals(other.lyricsSourceOrder, lyricsSourceOrder) &&
       other.canvasEnabled == canvasEnabled &&
       listEquals(other.lyricsExcludedLanguages, lyricsExcludedLanguages) &&
       other.lyricsExcludeInterfaceLanguage == lyricsExcludeInterfaceLanguage &&
@@ -403,7 +408,6 @@ class AppPreferences {
     lyricsScale,
     lyricsAlign,
     lyricsFocusPosition,
-    lyricsBlur,
     startPage,
     defaultRepeatMode,
     rememberWindow,
@@ -418,6 +422,7 @@ class AppPreferences {
     gateway,
     proxyUsername,
     lyricsFallback,
+    Object.hashAll(lyricsSourceOrder),
     canvasEnabled,
     Object.hashAll(lyricsExcludedLanguages),
     lyricsExcludeInterfaceLanguage,

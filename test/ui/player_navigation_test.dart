@@ -14,6 +14,7 @@ import 'package:flutify_app/ui/screens/player/full_player_sheet.dart';
 import 'package:flutify_app/ui/screens/player/immersive_lyrics_screen.dart';
 import 'package:flutify_app/ui/shell/desktop/desktop_window.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -108,13 +109,26 @@ Future<void> _openPlayer(WidgetTester tester, _Player player) async {
 }
 
 Future<void> _openMenu(WidgetTester tester, _Player player) async {
+  final screen = find.byType(
+    player == _Player.full ? FullPlayerSheet : ImmersiveLyricsScreen,
+  );
+  if (player != _Player.full) {
+    // The immersive window hides its floating buttons after 3 idle seconds;
+    // moving the mouse brings them back, as it does for a real user.
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    // A hover at the exact position of the previous one is not activity (the
+    // lyrics scroll under a still cursor), so nudge the pointer first.
+    await mouse.moveTo(tester.getCenter(screen) + const Offset(3, 3));
+    await mouse.moveTo(tester.getCenter(screen));
+    await tester.pump();
+    // The controls card (which now carries the menu button) unfolds with an
+    // animation after being woken; wait for it like a real user would.
+    await tester.pump(const Duration(milliseconds: 800));
+    await mouse.removePointer();
+  }
   await tester.tap(
-    find.descendant(
-      of: find.byType(
-        player == _Player.full ? FullPlayerSheet : ImmersiveLyricsScreen,
-      ),
-      matching: find.byTooltip('更多选项'),
-    ),
+    find.descendant(of: screen, matching: find.byTooltip('更多选项')),
   );
   await _settle(tester);
 }

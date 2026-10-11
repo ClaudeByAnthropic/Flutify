@@ -46,7 +46,10 @@ class QueueList extends StatelessWidget {
           _SectionHeader(
             title: l10n.queueNextInQueue,
             padding: horizontalPadding,
-            action: TextButton(onPressed: playback.clearUserQueue, child: Text(l10n.queueClear)),
+            action: TextButton(
+              onPressed: playback.clearUserQueue,
+              child: Text(l10n.queueClear),
+            ),
           ),
           SliverReorderableList(
             itemCount: userQueue.length,
@@ -95,7 +98,10 @@ class QueueList extends StatelessWidget {
           SliverFillRemaining(
             hasScrollBody: false,
             child: Center(
-              child: Text(l10n.queueEmpty, style: TextStyle(color: colorScheme.onSurfaceVariant)),
+              child: Text(
+                l10n.queueEmpty,
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
             ),
           ),
 
@@ -111,7 +117,11 @@ class _SectionHeader extends StatelessWidget {
   final Widget? action;
   final double padding;
 
-  const _SectionHeader({required this.title, required this.padding, this.action});
+  const _SectionHeader({
+    required this.title,
+    required this.padding,
+    this.action,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +133,9 @@ class _SectionHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -218,10 +230,17 @@ class _QueueRow extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.only(left: padding, right: 8),
       onTap: onTap,
-      leading: CoverImage(url: coverUrl, size: 44, borderRadius: BorderRadius.circular(6)),
+      leading: CoverImage(
+        url: coverUrl,
+        size: 44,
+        borderRadius: BorderRadius.circular(6),
+      ),
       title: Text(
         title,
-        style: TextStyle(color: highlighted ? colorScheme.primary : colorScheme.onSurface, fontWeight: FontWeight.w700),
+        style: TextStyle(
+          color: highlighted ? colorScheme.primary : colorScheme.onSurface,
+          fontWeight: FontWeight.w700,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

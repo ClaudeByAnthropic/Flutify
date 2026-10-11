@@ -5,6 +5,7 @@ import '../../../../l10n/l10n.dart';
 import '../../../../models/app_preferences.dart';
 import '../../../../providers/preferences_provider.dart';
 import '../../../../services/lyrics/lyrics_language.dart';
+import '../widgets/lyrics_source_order_tile.dart';
 import '../widgets/settings_section.dart';
 import '../widgets/settings_segmented.dart';
 import '../widgets/settings_slider_tile.dart';
@@ -88,23 +89,19 @@ class LyricsSection extends StatelessWidget {
           onChanged: (v) =>
               provider.update(provider.prefs.copyWith(lyricsFocusPosition: v)),
         ),
-        SettingsSliderTile(
-          title: l10n.settingsLyricsBlur,
-          value: prefs.lyricsBlur,
-          max: AppPreferences.maxLyricsBlur,
-          divisions: 8,
-          minIcon: Icons.blur_off_rounded,
-          maxIcon: Icons.blur_on_rounded,
-          labelOf: (v) => v == 0 ? l10n.settingsOff : '${(v * 100).round()}%',
-          onChanged: (v) =>
-              provider.update(provider.prefs.copyWith(lyricsBlur: v)),
-        ),
         SettingsSwitchTile(
           title: l10n.settingsLyricsFallback,
           subtitle: l10n.settingsLyricsFallbackSubtitle,
           value: prefs.lyricsFallback,
           onChanged: (v) =>
               provider.update(provider.prefs.copyWith(lyricsFallback: v)),
+        ),
+        LyricsSourceOrderTile(
+          order: prefs.lyricsSourceOrder,
+          lrclibEnabled: prefs.lyricsFallback,
+          onChanged: (order) => provider.update(
+            provider.prefs.copyWith(lyricsSourceOrder: order),
+          ),
         ),
         SettingsSwitchTile(
           title: l10n.settingsLyricsBilingual,

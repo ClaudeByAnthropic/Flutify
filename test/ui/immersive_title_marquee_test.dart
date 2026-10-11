@@ -34,6 +34,7 @@ Future<PlaybackProvider> _pumpScreen(
   SpotifyTrack track = _longTrack,
   bool reduceMotion = false,
   bool remote = false,
+  bool pinned = false,
 }) async {
   tester.view.physicalSize = Size(width, 800);
   tester.view.devicePixelRatio = 1;
@@ -46,7 +47,7 @@ Future<PlaybackProvider> _pumpScreen(
     DesktopWindow.debugMacNativeWindowOverride = null;
   });
 
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues({'ui_immersive_pinned': pinned});
   final storage = await StorageService.init();
   final service = FakeConnectService();
   late PlaybackProvider playback;
@@ -101,6 +102,10 @@ Future<PlaybackProvider> _pumpScreen(
   await tester.pump();
   await tester.pump();
   await tester.pump();
+  // The shared player scene eases the cover into the lyrics card (and the
+  // title with it); the marquee restarts once that transition has settled.
+  await tester.pump(const Duration(seconds: 1));
+  await tester.pump();
   return playback;
 }
 
@@ -125,9 +130,9 @@ void main() {
       expect(_title, findsOneWidget);
       final title = tester.widget<MarqueeText>(_title);
       expect(title.text, _longTrack.name);
-      expect(title.style?.fontSize, width >= 900 ? 21 : 17);
-      expect(title.style?.fontWeight, FontWeight.w700);
-      expect(title.style?.letterSpacing, -0.3);
+      // Same metadata as the mobile lyrics card: bold, shrunk with the cover.
+      expect(title.style?.fontSize, closeTo(22 * 0.65, 0.5));
+      expect(title.style?.fontWeight, FontWeight.w800);
       expect(_titleScroll, findsOneWidget);
       expect(_offset(tester), 0);
       await tester.pump(const Duration(seconds: 3));
@@ -150,7 +155,10 @@ void main() {
       expect(_title, findsOneWidget);
       await tester.pump(const Duration(seconds: 6));
       expect(_titleScroll, findsNothing);
-      expect(find.text('Hi'), findsOneWidget);
+      expect(
+        find.descendant(of: _title, matching: find.text('Hi')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
 
@@ -161,7 +169,10 @@ void main() {
         expect(_title, findsOneWidget);
         await tester.pump(const Duration(seconds: 6));
         expect(_titleScroll, findsNothing);
-        expect(find.text(_longTrack.name), findsOneWidget);
+        expect(
+          find.descendant(of: _title, matching: find.text(_longTrack.name)),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -184,7 +195,8 @@ void main() {
   testWidgets('switching tracks with the same title restarts the pause', (
     tester,
   ) async {
-    final playback = await _pumpScreen(tester, 1280);
+    // 固定控制区：不让卡片在等待期间收成迷你栏，标题布局保持稳定
+    final playback = await _pumpScreen(tester, 1280, pinned: true);
     expect(_title, findsOneWidget);
     await tester.pump(const Duration(seconds: 5));
     expect(_offset(tester), greaterThan(0));
@@ -194,6 +206,8 @@ void main() {
     await tester.pump();
     await tester.pump();
     await tester.pump();
+    // The shared title cross-fades between tracks; wait for the old one to go.
+    await tester.pump(const Duration(milliseconds: 300));
     expect(_offset(tester), 0);
     await tester.pump(const Duration(seconds: 3));
     expect(_offset(tester), 0);
@@ -209,7 +223,10 @@ void main() {
     try {
       await _pumpScreen(tester, 1280);
       await tester.pump(const Duration(seconds: 5));
-      expect(find.text(_longTrack.name), findsNWidgets(2));
+      expect(
+        find.descendant(of: _title, matching: find.text(_longTrack.name)),
+        findsNWidgets(2),
+      );
       expect(find.bySemanticsLabel(_longTrack.name), findsOneWidget);
       expect(tester.takeException(), isNull);
     } finally {

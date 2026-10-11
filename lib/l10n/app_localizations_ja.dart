@@ -594,6 +594,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get lyricsFromLrclib => '歌詞の提供：LRCLIB';
 
   @override
+  String get lyricsFromQqMusic => '歌詞の提供：QQ Music';
+
+  @override
+  String get lyricsFromNetease => '歌詞の提供：NetEase Music';
+
+  @override
   String get lyricsImmersive => '歌詞に集中';
 
   @override
@@ -612,7 +618,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get lyricsFillWindow => 'ウィンドウ内に表示 (F11)';
 
   @override
+  String get lyricsPinControls => 'コントロールを固定（自動で隠さない）';
+
+  @override
+  String get lyricsUnpinControls => 'コントロールの固定を解除';
+
+  @override
   String get deviceConnectTitle => 'デバイスに接続';
+
+  @override
+  String get deviceConnectShort => 'Connect';
 
   @override
   String get deviceConnectDescription =>
@@ -968,6 +983,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get lyricsTranslationFromNetease => '訳詞提供：NetEase Music コミュニティ';
 
   @override
+  String get lyricsTranslationFromQqMusic => '訳詞提供：QQ Music';
+
+  @override
   String get settingsLyricsSize => '歌詞の文字サイズ';
 
   @override
@@ -978,9 +996,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLyricsAlignCenter => '中央揃え';
-
-  @override
-  String get settingsLyricsBlur => '他の行をぼかす';
 
   @override
   String get settingsLyricsImmersiveScreen => '全画面歌詞を画面いっぱいに表示';
@@ -997,11 +1012,45 @@ class AppLocalizationsJa extends AppLocalizations {
       'Spotify に同期歌詞がない場合、公開ライブラリ LRCLIB から曲の原語の歌詞を取得します';
 
   @override
+  String get settingsLyricsSourceOrder => '歌詞ソースの優先順位';
+
+  @override
+  String get settingsLyricsSourceOrderSubtitle =>
+      '右側のハンドルをドラッグして順番を変更します。上にあるほど優先されます。原文も中国語訳詞も、この順に各ソースから検索します。';
+
+  @override
+  String get settingsLyricsSourceSpotify => 'Spotify';
+
+  @override
+  String get settingsLyricsSourceQqMusic => 'QQ Music';
+
+  @override
+  String get settingsLyricsSourceNetease => 'NetEase Music';
+
+  @override
+  String get settingsLyricsSourceLrclib => 'LRCLIB';
+
+  @override
+  String get settingsLyricsSourceRoleSpotify => '原文、内蔵の訳詞';
+
+  @override
+  String get settingsLyricsSourceRoleLrclib => '原文と訳詞';
+
+  @override
+  String get settingsLyricsSourceRoleCommunity => '原文と中国語訳詞';
+
+  @override
+  String get settingsLyricsSourceDisabled => '「見つからない歌詞を補完」でオフ';
+
+  @override
+  String get settingsLyricsSourceDrag => 'ドラッグで並べ替え';
+
+  @override
   String get settingsLyricsBilingual => 'コミュニティの歌詞翻訳';
 
   @override
   String get settingsLyricsBilingualSubtitle =>
-      '歌詞の読み込み時に中国語の訳詞を取得し、タスクバー歌詞にも使用します。オフでも翻訳ボタンや自動翻訳で検索できます。検索時は曲名とアーティスト名を NetEase Music に送信します。';
+      '歌詞の読み込み時に QQ Music を優先して中国語の訳詞を取得し、不足時は NetEase、補完が有効なら最後に LRCLIB を検索します。タスクバー歌詞にも使用します。オフでも手動・自動検索は利用でき、曲名とアーティスト名を検索先に送信します。';
 
   @override
   String get settingsTaskbarLyricsSection => 'タスクバー歌詞';
@@ -1570,7 +1619,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLyricsAutoTranslateSubtitle =>
-      '歌詞ソースにある訳詞を検索します。中国語の訳詞は曲名とアーティスト名で NetEase を検索し、LRCLIB 補完が有効な場合は対訳版も検索します。簡体字・繁体字は表示言語に従います。';
+      '既存の訳詞を検索します。中国語の訳詞は曲名とアーティスト名で QQ Music を優先し、不足時は NetEase、補完が有効なら最後に LRCLIB を検索します。既存の訳詞行を失わず、より完全な結果のみ採用します。簡体字・繁体字は表示言語に従います。';
 
   @override
   String get settingsLyricsExcludeInterface => 'アプリと同じ言語の曲は除外';

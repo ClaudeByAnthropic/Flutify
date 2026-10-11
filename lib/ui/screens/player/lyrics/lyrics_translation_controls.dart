@@ -56,3 +56,62 @@ class LyricsTranslationButton extends StatelessWidget {
     );
   }
 }
+
+/// 与播放器底栏的「歌词 / 队列」切换同一风格的翻译开关（图标 + 激活小圆点），
+/// 用在控制卡片的底栏里，不再是浮在歌词旁的白色圆形按钮。
+class LyricsTranslationToggle extends StatelessWidget {
+  const LyricsTranslationToggle({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<LyricsTranslationController>();
+    final l10n = context.l10n;
+    final primary = Theme.of(context).colorScheme.primary;
+    final active = controller.lines != null || controller.busy;
+    final label = controller.busy
+        ? l10n.lyricsTranslating
+        : controller.lines != null
+        ? l10n.lyricsCancelTranslation
+        : controller.failed
+        ? l10n.lyricsTranslationFailed
+        : controller.unavailable
+        ? l10n.lyricsTranslationUnavailable
+        : l10n.lyricsTranslate;
+    return IconButton(
+      tooltip: label,
+      isSelected: active,
+      onPressed: !controller.available
+          ? null
+          : active
+          ? controller.cancel
+          : controller.translate,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Icon(
+            Icons.translate_rounded,
+            color: active
+                ? primary
+                : controller.available
+                ? Colors.white70
+                : Colors.white24,
+            size: 22,
+          ),
+          if (active)
+            Positioned(
+              bottom: -7,
+              child: Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

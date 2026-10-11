@@ -59,6 +59,7 @@ class TrackMenu {
     BuildContext context,
     SpotifyTrack track, {
     Offset? position,
+    VoidCallback? onConnect,
   }) {
     if (!GlassMenuScope.of(context) &&
         !ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width)) {
@@ -68,6 +69,7 @@ class TrackMenu {
       context,
       track,
       position ?? DesktopMenu.anchorOf(context),
+      onConnect,
     );
   }
 
@@ -93,19 +95,21 @@ class TrackMenu {
     BuildContext context,
     SpotifyTrack track,
     Offset position,
+    VoidCallback? onConnect,
   ) async {
     final l10n = context.l10n;
     final liked = context.read<LibraryProvider>().isLiked(track.id);
     final timerOn = context.read<SleepTimerProvider?>()?.active ?? false;
     final primary = Theme.of(context).colorScheme.primary;
+    const connectId = '\u0000connect';
 
-    PopupMenuItem<TrackAction> item(
+    PopupMenuItem<Object> item(
       TrackAction action,
       IconData icon,
       String label, {
       Color? color,
       bool sub = false,
-    }) => DesktopMenu.item(
+    }) => DesktopMenu.item<Object>(
       action,
       icon,
       label,
@@ -118,7 +122,7 @@ class TrackMenu {
     );
     bool has(TrackAction a) => isAvailable(context, track, a);
 
-    final action = await DesktopMenu.show<TrackAction>(context, position, [
+    final action = await DesktopMenu.show<Object>(context, position, [
       item(
         TrackAction.addToPlaylist,
         Icons.add_rounded,
@@ -155,8 +159,21 @@ class TrackMenu {
         DesktopMenu.divider,
         item(TrackAction.share, Icons.ios_share_rounded, l10n.commonShare),
       ],
+      if (onConnect != null) ...[
+        DesktopMenu.divider,
+        DesktopMenu.item<Object>(
+          connectId,
+          Icons.cast_connected_rounded,
+          l10n.deviceConnectShort,
+        ),
+      ],
     ]);
     if (action == null || !context.mounted) return;
+    if (action == connectId) {
+      onConnect?.call();
+      return;
+    }
+    if (action is! TrackAction) return;
     await perform(context, track, action, position: position);
   }
 

@@ -1,6 +1,5 @@
 import 'dart:ui' show lerpDouble;
 
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/flutify_tokens.dart';
@@ -21,6 +20,10 @@ class PlayerExpansionMotion {
       );
 }
 
+/// What the pill looks like: its surface colour and the compact row that fades
+/// back in while the full-screen player collapses into it.
+typedef PlayerExpansionLook = ({Color color, Widget compactChild});
+
 class PlayerExpansionOrigin {
   const PlayerExpansionOrigin({
     required this.bounds,
@@ -28,13 +31,24 @@ class PlayerExpansionOrigin {
     required this.borderRadius,
     required this.compactChild,
     this.restartTitles,
+    this.currentLook,
   });
 
   final Rect bounds;
+
+  /// The pill's colour and compact row at the moment the player opened.
   final Color color;
   final BorderRadius borderRadius;
   final Widget compactChild;
   final VoidCallback? restartTitles;
+
+  /// Reads what the pill looks like right now. The track can change while the
+  /// full-screen player covers the pill, so the collapse must land on the
+  /// current track rather than the snapshot taken when the route was pushed.
+  final PlayerExpansionLook Function()? currentLook;
+
+  PlayerExpansionLook get look =>
+      currentLook?.call() ?? (color: color, compactChild: compactChild);
 }
 
 class PlayerExpansionSource extends StatefulWidget {
@@ -73,12 +87,26 @@ class PlayerExpansionSource extends StatefulWidget {
     ).context.findRenderObject();
     final bounds =
         box.localToGlobal(Offset.zero, ancestor: navigatorBox) & box.size;
+    final color = source.widget.color;
+    final compactChild = source.widget.compactChild;
     return PlayerExpansionOrigin(
       bounds: bounds,
-      color: source.widget.color,
+      color: color,
       borderRadius: source.widget.borderRadius,
-      compactChild: source.widget.compactChild,
+      compactChild: compactChild,
       restartTitles: () => _sources[navigator]?._restartTitles(),
+      currentLook: () {
+        // Look the source up again: it is rebuilt with the new track, and may
+        // even be replaced (local <-> remote mini player) while the route is up.
+        final live = _sources[navigator];
+        if (live == null || !live.mounted) {
+          return (color: color, compactChild: compactChild);
+        }
+        return (
+          color: live.widget.color,
+          compactChild: live.widget.compactChild,
+        );
+      },
     );
   }
 
@@ -145,6 +173,7 @@ class PlayerExpansionTransition extends StatefulWidget {
 class _PlayerExpansionTransitionState extends State<PlayerExpansionTransition> {
   late CurvedAnimation _surface;
   late CurvedAnimation _bottom;
+  late CurvedAnimation _compact;
 
   void _handleAnimationStatus(AnimationStatus status) {
     if (status == AnimationStatus.reverse ||
@@ -162,6 +191,13 @@ class _PlayerExpansionTransitionState extends State<PlayerExpansionTransition> {
       widget.animation,
       PlayerExpansionMotion.bottomCurve,
     );
+    _compact = CurvedAnimation(
+      parent: widget.animation,
+      curve: const Interval(0, 0.32, curve: Curves.easeInOutCubic),
+      // Keep the opening fade, but return with the artwork/surface curve instead
+      // of waiting until the final 32% of the route's closing animation.
+      reverseCurve: PlayerExpansionMotion.curve.flipped,
+    );
     widget.animation.addStatusListener(_handleAnimationStatus);
   }
 
@@ -178,6 +214,7 @@ class _PlayerExpansionTransitionState extends State<PlayerExpansionTransition> {
       oldWidget.animation.removeStatusListener(_handleAnimationStatus);
       _surface.dispose();
       _bottom.dispose();
+      _compact.dispose();
       _createAnimations();
     }
   }
@@ -187,6 +224,7 @@ class _PlayerExpansionTransitionState extends State<PlayerExpansionTransition> {
     widget.animation.removeStatusListener(_handleAnimationStatus);
     _surface.dispose();
     _bottom.dispose();
+    _compact.dispose();
     super.dispose();
   }
 
@@ -198,6 +236,9 @@ class _PlayerExpansionTransitionState extends State<PlayerExpansionTransition> {
       builder: (context, child) {
         final size = constraints.biggest;
         final origin = widget.origin;
+        // Read every frame: the closing animation must show the track that is
+        // playing now, which can differ from the one the route opened with.
+        final look = origin?.look;
         final source =
             origin?.bounds ??
             Rect.fromLTWH(10, size.height - 120, size.width - 20, 60);
@@ -214,22 +255,16 @@ class _PlayerExpansionTransitionState extends State<PlayerExpansionTransition> {
           BorderRadius.zero,
           progress,
         )!;
-        final compactOpacity =
-            1 -
-            const Interval(
-              0,
-              0.32,
-              curve: Curves.easeInOutCubic,
-            ).transform(widget.animation.value);
+        final compactOpacity = 1 - _compact.value;
         return ClipPath(
           key: const ValueKey('player-expansion-surface'),
           clipper: _PlayerSurfaceClipper(bounds, radius),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              ColoredBox(color: origin?.color ?? const Color(0xFF3A3A42)),
+              ColoredBox(color: look?.color ?? const Color(0xFF3A3A42)),
               child!,
-              if (origin != null && compactOpacity > 0)
+              if (look != null && compactOpacity > 0)
                 Positioned(
                   left: bounds.left,
                   top: bounds.top - 16 * (1 - compactOpacity),
@@ -240,7 +275,7 @@ class _PlayerExpansionTransitionState extends State<PlayerExpansionTransition> {
                       child: Opacity(
                         key: const ValueKey('player-expansion-compact'),
                         opacity: compactOpacity,
-                        child: origin.compactChild,
+                        child: look.compactChild,
                       ),
                     ),
                   ),
@@ -359,11 +394,7 @@ class PlayerArtworkHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb ||
-        defaultTargetPlatform != TargetPlatform.android ||
-        context.reduceMotion) {
-      return child;
-    }
+    if (context.reduceMotion) return child;
     return Hero(
       tag: 'player-artwork',
       curve: PlayerExpansionMotion.curve,

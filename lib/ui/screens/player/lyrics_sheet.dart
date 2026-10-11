@@ -72,6 +72,7 @@ class LyricsSheet extends StatelessWidget {
                 )
               else
                 LyricsView(
+                  appleMusicStyle: true,
                   key: ValueKey((track.id, remote)),
                   track: track,
                   remote: remote,

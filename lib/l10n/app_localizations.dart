@@ -1175,6 +1175,18 @@ abstract class AppLocalizations {
   /// **'歌词来自 LRCLIB'**
   String get lyricsFromLrclib;
 
+  /// No description provided for @lyricsFromQqMusic.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来自 QQ 音乐'**
+  String get lyricsFromQqMusic;
+
+  /// No description provided for @lyricsFromNetease.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来自网易云音乐'**
+  String get lyricsFromNetease;
+
   /// No description provided for @lyricsImmersive.
   ///
   /// In zh, this message translates to:
@@ -1211,11 +1223,29 @@ abstract class AppLocalizations {
   /// **'只铺满窗口（F11）'**
   String get lyricsFillWindow;
 
+  /// No description provided for @lyricsPinControls.
+  ///
+  /// In zh, this message translates to:
+  /// **'固定控制区（不自动收起）'**
+  String get lyricsPinControls;
+
+  /// No description provided for @lyricsUnpinControls.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消固定控制区'**
+  String get lyricsUnpinControls;
+
   /// No description provided for @deviceConnectTitle.
   ///
   /// In zh, this message translates to:
   /// **'连接到设备'**
   String get deviceConnectTitle;
+
+  /// No description provided for @deviceConnectShort.
+  ///
+  /// In zh, this message translates to:
+  /// **'畅联'**
+  String get deviceConnectShort;
 
   /// No description provided for @deviceConnectDescription.
   ///
@@ -1859,6 +1889,12 @@ abstract class AppLocalizations {
   /// **'译词来自网易云音乐社区'**
   String get lyricsTranslationFromNetease;
 
+  /// No description provided for @lyricsTranslationFromQqMusic.
+  ///
+  /// In zh, this message translates to:
+  /// **'译词来自 QQ 音乐'**
+  String get lyricsTranslationFromQqMusic;
+
   /// No description provided for @settingsLyricsSize.
   ///
   /// In zh, this message translates to:
@@ -1882,12 +1918,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'居中'**
   String get settingsLyricsAlignCenter;
-
-  /// No description provided for @settingsLyricsBlur.
-  ///
-  /// In zh, this message translates to:
-  /// **'其他行模糊'**
-  String get settingsLyricsBlur;
 
   /// No description provided for @settingsLyricsImmersiveScreen.
   ///
@@ -1913,6 +1943,72 @@ abstract class AppLocalizations {
   /// **'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选'**
   String get settingsLyricsFallbackSubtitle;
 
+  /// No description provided for @settingsLyricsSourceOrder.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来源优先级'**
+  String get settingsLyricsSourceOrder;
+
+  /// No description provided for @settingsLyricsSourceOrderSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'拖动右侧手柄调整顺序，越靠前越优先。原文与中文译词都按此顺序在各来源之间查找。'**
+  String get settingsLyricsSourceOrderSubtitle;
+
+  /// No description provided for @settingsLyricsSourceSpotify.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify'**
+  String get settingsLyricsSourceSpotify;
+
+  /// No description provided for @settingsLyricsSourceQqMusic.
+  ///
+  /// In zh, this message translates to:
+  /// **'QQ 音乐'**
+  String get settingsLyricsSourceQqMusic;
+
+  /// No description provided for @settingsLyricsSourceNetease.
+  ///
+  /// In zh, this message translates to:
+  /// **'网易云音乐'**
+  String get settingsLyricsSourceNetease;
+
+  /// No description provided for @settingsLyricsSourceLrclib.
+  ///
+  /// In zh, this message translates to:
+  /// **'LRCLIB'**
+  String get settingsLyricsSourceLrclib;
+
+  /// No description provided for @settingsLyricsSourceRoleSpotify.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文，自带译文'**
+  String get settingsLyricsSourceRoleSpotify;
+
+  /// No description provided for @settingsLyricsSourceRoleLrclib.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文与译文'**
+  String get settingsLyricsSourceRoleLrclib;
+
+  /// No description provided for @settingsLyricsSourceRoleCommunity.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文与中文译词'**
+  String get settingsLyricsSourceRoleCommunity;
+
+  /// No description provided for @settingsLyricsSourceDisabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已在「补全歌词」中关闭'**
+  String get settingsLyricsSourceDisabled;
+
+  /// No description provided for @settingsLyricsSourceDrag.
+  ///
+  /// In zh, this message translates to:
+  /// **'拖动排序'**
+  String get settingsLyricsSourceDrag;
+
   /// No description provided for @settingsLyricsBilingual.
   ///
   /// In zh, this message translates to:
@@ -1922,7 +2018,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsBilingualSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'加载歌词时预取中文译词，也供任务栏歌词使用。关闭后仍可通过翻译按钮或自动翻译查找译词；查询会发送曲名与歌手到网易云音乐。'**
+  /// **'加载歌词时预取中文译词，优先 QQ 音乐，缺失或不完整时查网易云，启用补全时最后查 LRCLIB，也供任务栏歌词使用。关闭后仍可手动或自动查询；曲名与歌手会发送到查询来源。'**
   String get settingsLyricsBilingualSubtitle;
 
   /// No description provided for @settingsTaskbarLyricsSection.
@@ -2960,7 +3056,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsAutoTranslateSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'自动查找歌词源已有的译文。中文译词会按曲名、歌手查询网易云；启用 LRCLIB 补全时也会查找对照版。简繁体跟随界面。'**
+  /// **'自动查找已有译文。中文译词按曲名、歌手优先查询 QQ 音乐，缺失或不完整时查网易云，启用补全时最后查 LRCLIB；只采用不丢失已译行的更完整版本。简繁体跟随界面。'**
   String get settingsLyricsAutoTranslateSubtitle;
 
   /// No description provided for @settingsLyricsExcludeInterface.
