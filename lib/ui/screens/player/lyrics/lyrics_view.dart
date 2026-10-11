@@ -57,6 +57,10 @@ class LyricsView extends StatefulWidget {
   final bool remote;
   final bool appleMusicStyle;
 
+  /// Apple 样式下的歌词字号 / 左右留白（全屏场景 30 / 32；右栏歌词卡用更小的值）。
+  final double appleFontSize;
+  final double applePadding;
+
   /// 可跳转歌词行的鼠标指针；沉浸式传 [MouseCursor.defer]，由外层控制隐藏光标。
   final MouseCursor lineCursor;
 
@@ -70,6 +74,8 @@ class LyricsView extends StatefulWidget {
     this.remote = false,
     this.lineCursor = SystemMouseCursors.click,
     this.appleMusicStyle = false,
+    this.appleFontSize = 30,
+    this.applePadding = 32,
   });
 
   @override
@@ -453,12 +459,12 @@ class _LyricsViewState extends State<LyricsView>
   }
 
   /// 对焦行顶端的纵坐标：按用户偏好定位在未被控件遮挡的区域内。
-  /// Apple 样式的歌词铺满整个场景（控件卡片浮在上面），设置值按 0.5 折算成视口比例，
-  /// 默认 16% 对应原来的 8%。
+  /// Apple 样式的歌词铺满整个歌词区（控件卡片浮在上面 / 另一侧），设置值直接就是对焦行
+  /// 顶端在歌词区高度中的比例（与设置页显示的百分比一致）。
   double get _focusTopY => widget.appleMusicStyle
       ? math.max(
           widget.topInset,
-          _viewportHeight * (_style.lyricsFocusPosition * .5) - 2,
+          _viewportHeight * _style.lyricsFocusPosition - 2,
         )
       : (widget.topInset +
                 (_viewportHeight - widget.topInset - widget.bottomInset).clamp(
@@ -827,7 +833,8 @@ class _LyricsViewState extends State<LyricsView>
     final focusY = _focusTopY;
     final centered = _style.lyricsAlign == LyricsAlign.center;
     final fontSize =
-        (widget.appleMusicStyle ? 30 : widget.fontSize) * _style.lyricsScale;
+        (widget.appleMusicStyle ? widget.appleFontSize : widget.fontSize) *
+        _style.lyricsScale;
     final lines = lyrics.lines;
 
     // 同步歌词：空行不再显示「• • •」文字，只有正在进行的那段无人声显示呼吸点，其余收起；
@@ -909,9 +916,13 @@ class _LyricsViewState extends State<LyricsView>
                   physics: const BouncingScrollPhysics(),
                   // 上下留出到对焦位置的距离，第一句和最后一句也能停在对焦位置
                   padding: EdgeInsets.fromLTRB(
-                    widget.appleMusicStyle ? 32 : widget.horizontalPadding,
+                    widget.appleMusicStyle
+                        ? widget.applePadding
+                        : widget.horizontalPadding,
                     focusY,
-                    widget.appleMusicStyle ? 32 : widget.horizontalPadding,
+                    widget.appleMusicStyle
+                        ? widget.applePadding
+                        : widget.horizontalPadding,
                     _viewportHeight - focusY,
                   ),
                   child: Column(
@@ -972,7 +983,6 @@ class _LyricsViewState extends State<LyricsView>
                                 translationProgress: _translationReveal.value,
                                 fontSize: fontSize,
                                 centered: centered,
-                                blurScale: _style.lyricsBlur,
                                 // 以对焦行为中心：当句清晰，上下句按行距逐级模糊
                                 distance: _isSynced ? rank[i] - focusRank : 0,
                                 focusAll: !_isSynced || _browsing,
@@ -996,7 +1006,24 @@ class _LyricsViewState extends State<LyricsView>
                             ),
                           ),
                         ),
+                      if (lyrics.provider == LyricsProvider.qqMusic ||
+                          lyrics.provider == LyricsProvider.netease)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 28),
+                          child: Text(
+                            lyrics.provider == LyricsProvider.qqMusic
+                                ? context.l10n.lyricsFromQqMusic
+                                : context.l10n.lyricsFromNetease,
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       if (_translationIsCurrent &&
+                          lyrics.provider != LyricsProvider.qqMusic &&
+                          lyrics.provider != LyricsProvider.netease &&
                           (_translation.fromNetease ||
                               _translation.fromQqMusic))
                         Padding(

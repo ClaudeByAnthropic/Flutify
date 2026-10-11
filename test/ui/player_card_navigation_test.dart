@@ -309,11 +309,13 @@ void main() {
     await _frames(tester, 4);
     await tester.tap(device);
     await _frames(tester, 4);
-    expect(find.byType(DevicePickerSheet), findsOneWidget);
-    Navigator.of(
-      tester.element(find.byType(DevicePickerSheet)),
-      rootNavigator: true,
-    ).pop();
+    // 设备列表（畅联）就地嵌在卡片底部，不再弹出浮层
+    expect(find.byType(InlineDevicePanel), findsOneWidget);
+    expect(find.byType(DevicePickerSheet), findsNothing);
+    // 设备列表在底栏下方，底栏的设备按钮是第一个
+    await tester.tap(device.first);
+    await _frames(tester, 8);
+    expect(find.byType(InlineDevicePanel), findsNothing);
     await _frames(tester, 4);
     await tester.pump(const Duration(seconds: 4));
     await _frames(tester, 4);

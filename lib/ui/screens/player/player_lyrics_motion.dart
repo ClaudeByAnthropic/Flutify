@@ -48,6 +48,7 @@ class PlayerLyricsController extends ChangeNotifier {
   bool _reduceMotion = false;
   bool _accessibleNavigation = false;
   bool _interactionSuspended = false;
+  bool _pinned = false;
   bool _disposed = false;
 
   bool get controlsVisible => !_idle;
@@ -189,6 +190,18 @@ class PlayerLyricsController extends ChangeNotifier {
     if (!_lyrics || !_idle) activity();
   }
 
+  /// 固定控制区：不再因静止或上滑而收起成底部小条。
+  void setPinned(bool pinned) {
+    if (_pinned == pinned) return;
+    _pinned = pinned;
+    if (pinned) {
+      _timer?.cancel();
+      _reveal();
+    } else {
+      _scheduleIdle();
+    }
+  }
+
   void setInteractionSuspended(bool suspended) {
     if (_interactionSuspended == suspended) return;
     _interactionSuspended = suspended;
@@ -208,6 +221,7 @@ class PlayerLyricsController extends ChangeNotifier {
   void _scheduleIdle() {
     _timer?.cancel();
     if (!_active ||
+        _pinned ||
         (!_lyrics && !_queue) ||
         _idle ||
         _accessibleNavigation ||
@@ -228,7 +242,7 @@ class PlayerLyricsController extends ChangeNotifier {
   }
 
   void _fold() {
-    if (_idle) return;
+    if (_idle || _pinned) return;
     _timer?.cancel();
     _idle = true;
     chrome.animateTo(

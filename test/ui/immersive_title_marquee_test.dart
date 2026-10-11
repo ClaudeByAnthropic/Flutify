@@ -34,6 +34,7 @@ Future<PlaybackProvider> _pumpScreen(
   SpotifyTrack track = _longTrack,
   bool reduceMotion = false,
   bool remote = false,
+  bool pinned = false,
 }) async {
   tester.view.physicalSize = Size(width, 800);
   tester.view.devicePixelRatio = 1;
@@ -46,7 +47,7 @@ Future<PlaybackProvider> _pumpScreen(
     DesktopWindow.debugMacNativeWindowOverride = null;
   });
 
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues({'ui_immersive_pinned': pinned});
   final storage = await StorageService.init();
   final service = FakeConnectService();
   late PlaybackProvider playback;
@@ -154,7 +155,10 @@ void main() {
       expect(_title, findsOneWidget);
       await tester.pump(const Duration(seconds: 6));
       expect(_titleScroll, findsNothing);
-      expect(find.text('Hi'), findsOneWidget);
+      expect(
+        find.descendant(of: _title, matching: find.text('Hi')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
 
@@ -165,7 +169,10 @@ void main() {
         expect(_title, findsOneWidget);
         await tester.pump(const Duration(seconds: 6));
         expect(_titleScroll, findsNothing);
-        expect(find.text(_longTrack.name), findsOneWidget);
+        expect(
+          find.descendant(of: _title, matching: find.text(_longTrack.name)),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -188,7 +195,8 @@ void main() {
   testWidgets('switching tracks with the same title restarts the pause', (
     tester,
   ) async {
-    final playback = await _pumpScreen(tester, 1280);
+    // 固定控制区：不让卡片在等待期间收成迷你栏，标题布局保持稳定
+    final playback = await _pumpScreen(tester, 1280, pinned: true);
     expect(_title, findsOneWidget);
     await tester.pump(const Duration(seconds: 5));
     expect(_offset(tester), greaterThan(0));
@@ -215,7 +223,10 @@ void main() {
     try {
       await _pumpScreen(tester, 1280);
       await tester.pump(const Duration(seconds: 5));
-      expect(find.text(_longTrack.name), findsNWidgets(2));
+      expect(
+        find.descendant(of: _title, matching: find.text(_longTrack.name)),
+        findsNWidgets(2),
+      );
       expect(find.bySemanticsLabel(_longTrack.name), findsOneWidget);
       expect(tester.takeException(), isNull);
     } finally {

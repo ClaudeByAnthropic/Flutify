@@ -1175,6 +1175,18 @@ abstract class AppLocalizations {
   /// **'歌词来自 LRCLIB'**
   String get lyricsFromLrclib;
 
+  /// No description provided for @lyricsFromQqMusic.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来自 QQ 音乐'**
+  String get lyricsFromQqMusic;
+
+  /// No description provided for @lyricsFromNetease.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来自网易云音乐'**
+  String get lyricsFromNetease;
+
   /// No description provided for @lyricsImmersive.
   ///
   /// In zh, this message translates to:
@@ -1211,11 +1223,29 @@ abstract class AppLocalizations {
   /// **'只铺满窗口（F11）'**
   String get lyricsFillWindow;
 
+  /// No description provided for @lyricsPinControls.
+  ///
+  /// In zh, this message translates to:
+  /// **'固定控制区（不自动收起）'**
+  String get lyricsPinControls;
+
+  /// No description provided for @lyricsUnpinControls.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消固定控制区'**
+  String get lyricsUnpinControls;
+
   /// No description provided for @deviceConnectTitle.
   ///
   /// In zh, this message translates to:
   /// **'连接到设备'**
   String get deviceConnectTitle;
+
+  /// No description provided for @deviceConnectShort.
+  ///
+  /// In zh, this message translates to:
+  /// **'畅联'**
+  String get deviceConnectShort;
 
   /// No description provided for @deviceConnectDescription.
   ///
@@ -1889,12 +1919,6 @@ abstract class AppLocalizations {
   /// **'居中'**
   String get settingsLyricsAlignCenter;
 
-  /// No description provided for @settingsLyricsBlur.
-  ///
-  /// In zh, this message translates to:
-  /// **'其他行模糊'**
-  String get settingsLyricsBlur;
-
   /// No description provided for @settingsLyricsImmersiveScreen.
   ///
   /// In zh, this message translates to:
@@ -1928,7 +1952,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsSourceOrderSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'拖动右侧手柄调整顺序，越靠前越优先。原文在 Spotify 与 LRCLIB 之间按顺序查找，中文译词按 QQ 音乐、网易云音乐、LRCLIB 的顺序补全。'**
+  /// **'拖动右侧手柄调整顺序，越靠前越优先。原文与中文译词都按此顺序在各来源之间查找。'**
   String get settingsLyricsSourceOrderSubtitle;
 
   /// No description provided for @settingsLyricsSourceSpotify.
@@ -1970,7 +1994,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsSourceRoleCommunity.
   ///
   /// In zh, this message translates to:
-  /// **'仅中文译词'**
+  /// **'原文与中文译词'**
   String get settingsLyricsSourceRoleCommunity;
 
   /// No description provided for @settingsLyricsSourceDisabled.

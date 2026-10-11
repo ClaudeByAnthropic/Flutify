@@ -117,8 +117,14 @@ Future<void> _openMenu(WidgetTester tester, _Player player) async {
     // moving the mouse brings them back, as it does for a real user.
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: Offset.zero);
+    // A hover at the exact position of the previous one is not activity (the
+    // lyrics scroll under a still cursor), so nudge the pointer first.
+    await mouse.moveTo(tester.getCenter(screen) + const Offset(3, 3));
     await mouse.moveTo(tester.getCenter(screen));
     await tester.pump();
+    // The controls card (which now carries the menu button) unfolds with an
+    // animation after being woken; wait for it like a real user would.
+    await tester.pump(const Duration(milliseconds: 800));
     await mouse.removePointer();
   }
   await tester.tap(

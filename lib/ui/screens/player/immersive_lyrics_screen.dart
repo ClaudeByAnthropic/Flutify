@@ -1,12 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/flutify_tokens.dart';
+import '../../../core/theme/md3e_theme.dart';
 import '../../../core/theme/system_bars.dart';
 import '../../../l10n/l10n.dart';
+import '../../../providers/appearance_provider.dart';
 import '../../../providers/connect_provider.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../services/storage_service.dart';
@@ -30,10 +30,12 @@ import 'player_scene_view.dart';
 ///   或进入系统全屏铺满整个屏幕；关闭时恢复；Esc / 左上角关闭按钮退出；
 /// - 内容与手机、桌面竖屏同一套：封面缩进玻璃卡片、歌词在卡片后滚动、封面 / 歌词 / 队列切换动画一致；
 ///   窗口够宽时场景自动切到横屏布局（歌词在左、卡片在右），窄窗口为竖屏布局；
-/// - 桌面独有：左上角玻璃胶囊（关闭 + 切换铺满方式 + 更多操作，macOS 窗口模式避开交通灯），
-///   播放按钮下方的音量条（遥控远程设备时调节远程音量）；
+/// - 桌面独有：左上角玻璃胶囊（关闭 + 切换铺满方式，macOS 窗口模式避开交通灯），
+///   「更多操作」在歌名行的红心右边，播放按钮下方的音量条（遥控远程设备时调节远程音量）；
+/// - 进入后默认是放大的大封面控制卡片（竖向居中），底栏的「固定」按钮可让它不再自动收成底部迷你栏；
 /// - 遥控远程设备时展示远程曲目，歌词按远程进度滚动，控制台、音量与快捷键作用于远程设备；
-/// - 鼠标静止 3 秒后隐藏光标与浮动按钮，移动即恢复；
+/// - 左侧是控制卡片（封面 / 歌名 + 「更多」 + 进度 + 播放按钮 + 音量），歌词在右侧；
+/// - 鼠标静止后控制卡片、底栏、左上角胶囊与光标由场景的同一个计时器统一隐藏，移动即恢复；
 /// - 空格播放 / 暂停，Ctrl+← / →（macOS 为 ⌘+← / →）切歌。
 class ImmersiveLyricsScreen extends StatefulWidget {
   const ImmersiveLyricsScreen({super.key});
@@ -84,10 +86,8 @@ class ImmersiveLyricsScreen extends StatefulWidget {
 }
 
 class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
-  static const Duration _idleDelay = Duration(seconds: 3);
-
   /// 横屏时场景内容的最大宽度（宽屏全屏时不让歌词行过长）。
-  static const double _maxSceneWidth = 1280;
+  static const double _maxSceneWidth = 1360;
 
   /// 只铺满窗口时，顶部留给窗口按钮与拖动区的高度（与 WindowCaptionButtons 默认高度一致）。
   static const double _captionInset = 40;
@@ -101,11 +101,21 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
   /// macOS 只铺满窗口：胶囊左端到窗口左缘的距离（与交通灯之间留出呼吸感）。
   static const double _macBarLeft = DesktopWindow.macTrafficLightsInset + 8;
 
-  Timer? _idleTimer;
+  /// 场景里的控制区已经静止收起：左上角胶囊和光标跟着一起隐藏。
+  /// 计时完全交给场景（唯一的计时器），这里只跟随。
   bool _idle = false;
+
+  /// 胶囊是画在场景之上的，鼠标悬停在它上面场景收不到事件；
+  /// 用这个信号把悬停转给场景，避免手指还在按钮上控制区却被收起。
+  final ValueNotifier<int> _activity = ValueNotifier<int>(0);
+
+  /// 卡片底部的设备列表（畅联）展开状态，顶部「⋯」菜单里的「畅联」用它展开 / 收起。
+  final ValueNotifier<bool> _devicesOpen = ValueNotifier<bool>(false);
+  Offset? _lastHover;
 
   /// true：系统全屏（铺满整个屏幕）；false：只铺满窗口（保留窗口外框与窗口按钮）。
   late bool _screen;
+  late bool _pinned;
   StorageService? _storage;
 
   @override
@@ -113,14 +123,15 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
     super.initState();
     _storage = context.read<StorageService?>();
     _screen = _storage?.immersiveScreenFullscreen ?? false;
+    _pinned = _storage?.immersivePinned ?? false;
     _applyMode();
     DesktopWindow.fullScreen.addListener(_onSystemFullScreen);
-    _restartIdleTimer();
   }
 
   @override
   void dispose() {
-    _idleTimer?.cancel();
+    _activity.dispose();
+    _devicesOpen.dispose();
     DesktopWindow.fullScreen.removeListener(_onSystemFullScreen);
     // dispose 跑在帧收尾阶段，此时同步改 ValueNotifier 会让外层（WindowFrame、
     // LiquidGlass）在 widget 树被锁定时 setState；且路由刚移除的这一帧还没提交。
@@ -155,13 +166,21 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
     _storage?.setImmersiveScreenFullscreen(_screen);
   }
 
-  /// 鼠标移动：显示光标与浮动按钮，并重新计时。
-  void _restartIdleTimer() {
-    _idleTimer?.cancel();
-    if (_idle) setState(() => _idle = false);
-    _idleTimer = Timer(_idleDelay, () {
-      if (mounted) setState(() => _idle = true);
-    });
+  /// 固定 / 取消固定控制区（固定后不再自动收成底部迷你栏），并记住选择。
+  void _setPinned(bool value) {
+    setState(() => _pinned = value);
+    _storage?.setImmersivePinned(value);
+  }
+
+  /// 鼠标真正移动了：把活动转给场景的计时器（位置不变的重复悬停事件不算）。
+  void _onHover(PointerHoverEvent event) {
+    if (event.position == _lastHover) return;
+    _lastHover = event.position;
+    _activity.value++;
+  }
+
+  void _onControlsVisible(bool visible) {
+    if (mounted && _idle == visible) setState(() => _idle = !visible);
   }
 
   bool _closing = false;
@@ -198,6 +217,11 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
         : 20.0;
     final l10n = context.l10n;
     final fade = context.motion(const Duration(milliseconds: 300));
+    // 沉浸式歌词始终是深色流动背景：整页按「深色」主题绘制（与全屏播放器一致），
+    // 队列等跟随主题取色的文字才不会在浅色主题下变成黑字。
+    final theme =
+        context.watch<AppearanceProvider?>()?.theme(Brightness.dark) ??
+        MD3ETheme.dark;
 
     Widget idleFade(Widget child) => AnimatedOpacity(
       opacity: _idle ? 0 : 1,
@@ -205,107 +229,145 @@ class _ImmersiveLyricsScreenState extends State<ImmersiveLyricsScreen> {
       child: IgnorePointer(ignoring: _idle, child: child),
     );
 
-    return LyricsTranslationScope(
-      child: GlassMenuScope(
-        child: AnnotatedRegion<SystemUiOverlayStyle>(
-          value: systemBarsStyle(Brightness.dark),
-          child: CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.escape): _close,
-              const SingleActivator(LogicalKeyboardKey.f11): _toggleMode,
-              // 播放类按键与主窗口相同，远程模式下控制其他设备
-              ...PlaybackShortcuts.bindings(context),
-            },
-            child: Focus(
-              autofocus: true,
-              onKeyEvent: (_, event) =>
-                  PlaybackShortcuts.onSpaceKey(context, event),
-              child: MouseRegion(
-                cursor: _idle ? SystemMouseCursors.none : MouseCursor.defer,
-                onHover: (_) => _restartIdleTimer(),
-                child: Material(
-                  color: Colors.black,
-                  child: BackdropGroup(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (track == null) ...[
-                          const LyricsBackdrop(imageUrl: ''),
-                          Center(
-                            child: EmptyState(
-                              icon: Icons.music_off_rounded,
-                              title: context.l10n.playerNothingPlayingTitle,
-                              message: context.l10n.lyricsNothingPlayingMessage,
-                              onDark: true,
-                            ),
-                          ),
-                        ] else
-                          // 与手机、桌面竖屏完全同一套场景：窗口够宽时自动为横屏布局。
-                          // 顶部留白给窗口按钮与左上角胶囊，音量条接在播放按钮下方。
-                          PlayerSceneView(
-                            track: track,
-                            remote: remote,
-                            initialView: PlayerView.lyrics,
-                            topBar: SizedBox(
-                              height: (barTop + _barHeight).clamp(
-                                topInset,
-                                double.infinity,
+    return Theme(
+      data: theme,
+      child: LyricsTranslationScope(
+        child: GlassMenuScope(
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: systemBarsStyle(Brightness.dark),
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.escape): _close,
+                const SingleActivator(LogicalKeyboardKey.f11): _toggleMode,
+                // 播放类按键与主窗口相同，远程模式下控制其他设备
+                ...PlaybackShortcuts.bindings(context),
+              },
+              child: Focus(
+                autofocus: true,
+                onKeyEvent: (_, event) =>
+                    PlaybackShortcuts.onSpaceKey(context, event),
+                child: MouseRegion(
+                  cursor: _idle ? SystemMouseCursors.none : MouseCursor.defer,
+                  child: Material(
+                    color: Colors.black,
+                    child: BackdropGroup(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (track == null) ...[
+                            const LyricsBackdrop(imageUrl: ''),
+                            Center(
+                              child: EmptyState(
+                                icon: Icons.music_off_rounded,
+                                title: context.l10n.playerNothingPlayingTitle,
+                                message:
+                                    context.l10n.lyricsNothingPlayingMessage,
+                                onDark: true,
                               ),
                             ),
-                            controlsFooter: _VolumeRow(remote: remote),
-                            maxLandscapeWidth: _maxSceneWidth,
-                            immersiveEntry: false,
-                            fullBackdrop: true,
-                            lyricsLineCursor: MouseCursor.defer,
-                          ),
-                        // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
-                        if (topInset > 0)
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            right: captionRight,
-                            height: topInset,
-                            child: const WindowDragArea(
-                              child: SizedBox.expand(),
-                            ),
-                          ),
-                        Positioned(
-                          top: barTop,
-                          left: macWindow ? _macBarLeft : 18,
-                          child: idleFade(
-                            _GlassCapsule(
-                              height: _barHeight,
-                              children: [
-                                _CapsuleIcon(
-                                  icon: Icons.close_rounded,
-                                  tooltip: l10n.lyricsExitImmersive,
-                                  onPressed: _close,
+                          ] else
+                            // 与手机、桌面竖屏完全同一套场景：窗口够宽时自动为横屏布局。
+                            // 顶部留白给窗口按钮与左上角胶囊，音量条接在播放按钮下方。
+                            PlayerSceneView(
+                              track: track,
+                              remote: remote,
+                              initialView: PlayerView.lyrics,
+                              topBar: SizedBox(
+                                height: (barTop + _barHeight).clamp(
+                                  topInset,
+                                  double.infinity,
                                 ),
-                                if (DesktopWindow.enabled)
-                                  _CapsuleIcon(
-                                    icon: _screen
-                                        ? Icons.fullscreen_exit_rounded
-                                        : Icons.fullscreen_rounded,
-                                    tooltip: _screen
-                                        ? l10n.lyricsFillWindow
-                                        : l10n.lyricsFillScreen,
-                                    onPressed: _toggleMode,
+                              ),
+                              controlsFooter: _VolumeRow(remote: remote),
+                              // 「更多」按钮贴在歌名行的红心右边
+                              titleTrailing: Builder(
+                                // 独立 context：菜单锚定在按钮下方
+                                builder: (buttonContext) => IconButton(
+                                  icon: const Icon(
+                                    Icons.more_horiz_rounded,
+                                    size: 24,
                                   ),
-                                if (track != null)
-                                  Builder(
-                                    // 独立 context：菜单锚定在按钮下方
-                                    builder: (buttonContext) => _CapsuleIcon(
-                                      icon: Icons.more_horiz_rounded,
-                                      tooltip: l10n.commonMoreOptions,
-                                      onPressed: () =>
-                                          TrackMenu.show(buttonContext, track),
+                                  color: Colors.white,
+                                  tooltip: l10n.commonMoreOptions,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 40,
+                                    height: 40,
+                                  ),
+                                  onPressed: () => TrackMenu.show(
+                                    buttonContext,
+                                    track,
+                                    onConnect: () {
+                                      _activity.value++;
+                                      PlayerSceneView.toggleDevices(
+                                        context,
+                                        _devicesOpen,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                              // 固定控制区、一进来就是放大的大封面卡片
+                              pinned: _pinned,
+                              onPinnedChanged: _setPinned,
+                              initiallyExpanded: true,
+                              // 控制卡片在左、歌词在右
+                              controlsOnLeft: true,
+                              activity: _activity,
+                              onControlsVisibleChanged: _onControlsVisible,
+                              hideFooterWhenIdle: true,
+                              miniWhenIdle: true,
+                              devicesOpen: _devicesOpen,
+                              // 横屏点封面：放大控制区（封面随之放大），竖屏仍回到封面视图
+                              expandControlsOnArtworkTap: true,
+                              maxLandscapeWidth: _maxSceneWidth,
+                              immersiveEntry: false,
+                              fullBackdrop: true,
+                              lyricsLineCursor: MouseCursor.defer,
+                            ),
+                          // 只铺满窗口时：顶部一条透明拖动区（避开右上角窗口按钮），可照常移动窗口
+                          if (topInset > 0)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: captionRight,
+                              height: topInset,
+                              child: const WindowDragArea(
+                                child: SizedBox.expand(),
+                              ),
+                            ),
+                          Positioned(
+                            top: barTop,
+                            left: macWindow ? _macBarLeft : 18,
+                            child: idleFade(
+                              MouseRegion(
+                                // 胶囊画在场景之上，场景收不到这里的悬停，转交给场景的计时器
+                                onHover: _onHover,
+                                child: _GlassCapsule(
+                                  height: _barHeight,
+                                  children: [
+                                    _CapsuleIcon(
+                                      icon: Icons.close_rounded,
+                                      tooltip: l10n.lyricsExitImmersive,
+                                      onPressed: _close,
                                     ),
-                                  ),
-                              ],
+                                    if (DesktopWindow.enabled)
+                                      _CapsuleIcon(
+                                        icon: _screen
+                                            ? Icons.fullscreen_exit_rounded
+                                            : Icons.fullscreen_rounded,
+                                        tooltip: _screen
+                                            ? l10n.lyricsFillWindow
+                                            : l10n.lyricsFillScreen,
+                                        onPressed: _toggleMode,
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

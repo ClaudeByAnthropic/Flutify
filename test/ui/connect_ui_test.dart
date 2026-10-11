@@ -942,7 +942,15 @@ void main() {
           findsOneWidget,
         );
 
-        // 再点一次回到封面：横屏时大封面在左侧内容区居中，控制卡片留在右侧
+        // 打开队列后控制卡片会自动收起（底栏换成迷你栏）；像真实用户一样先动一下鼠标唤醒
+        final wake = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        await wake.addPointer(location: Offset.zero);
+        await wake.moveTo(tester.getCenter(screen) + const Offset(3, 3));
+        await wake.moveTo(tester.getCenter(screen));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 800));
+        await wake.removePointer();
+        // 再点一次回到封面
         await tester.tap(
           find.descendant(
             of: screen,
@@ -961,8 +969,9 @@ void main() {
         final art = tester.getCenter(
           find.descendant(of: screen, matching: find.byType(CoverImage)).first,
         );
-        expect(art.dx, lessThan(card.left));
-        expect(art.dx, closeTo((card.left - 16) / 2, 2));
+        // 沉浸页控制卡片在左，大封面在右侧内容区居中（与卡片间隔 48）
+        expect(art.dx, greaterThan(card.right));
+        expect(art.dx, closeTo((card.right + 48 + 1280) / 2, 2));
         expect(tester.takeException(), isNull);
 
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);

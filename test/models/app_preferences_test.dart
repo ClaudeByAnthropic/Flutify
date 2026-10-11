@@ -8,7 +8,6 @@ void main() {
       language: AppLanguage.en,
       lyricsScale: 1.2,
       lyricsAlign: LyricsAlign.center,
-      lyricsBlur: 0,
       startPage: StartPage.last,
       rememberWindow: false,
       connectEnabled: false,
@@ -96,7 +95,6 @@ void main() {
       'language': 'klingon',
       'lyricsScale': 9.0,
       'lyricsAlign': 42,
-      'lyricsBlur': -3,
       'startPage': null,
       'rememberWindow': 'yes',
       'connectEnabled': false,
@@ -105,7 +103,6 @@ void main() {
     expect(prefs.language, AppPreferences.defaults.language);
     expect(prefs.lyricsScale, AppPreferences.maxLyricsScale);
     expect(prefs.lyricsAlign, LyricsAlign.left);
-    expect(prefs.lyricsBlur, 0);
     expect(prefs.startPage, StartPage.home);
     expect(prefs.rememberWindow, isTrue);
     expect(prefs.connectEnabled, isFalse);

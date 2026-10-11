@@ -37,20 +37,31 @@ class QueueSheet extends StatelessWidget {
             Container(
               width: 36,
               height: 4,
-              decoration: BoxDecoration(color: colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(l10n.queueTitle, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    child: Text(
+                      l10n.queueTitle,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: Text(
                       l10n.commonDone,
-                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],

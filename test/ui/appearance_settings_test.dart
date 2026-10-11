@@ -178,7 +178,8 @@ void main() {
         tester.view.physicalSize = size;
         await settle(tester);
         final close = find.byTooltip('退出全屏歌词（Esc）');
-        final translate = find.byType(LyricsTranslationButton);
+        // 沉浸页的翻译开关收进控制卡片底栏
+        final translate = find.byType(LyricsTranslationToggle);
         expect(tester.getSize(close).height, greaterThanOrEqualTo(48));
         expect(
           tester.getCenter(close).dx,

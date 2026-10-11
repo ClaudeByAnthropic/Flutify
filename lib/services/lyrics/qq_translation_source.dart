@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../models/lyrics.dart';
 import '../../models/lyrics_query.dart';
 import 'artist_match.dart';
+import 'community_lyrics.dart';
 import 'lrc_parser.dart';
 import 'lyrics_disk_cache.dart';
 import 'lyrics_language.dart';
@@ -13,7 +14,7 @@ import 'translation_source.dart';
 /// Anonymous Chinese translations only; never replaces the original lyrics.
 /// Quick search is followed by a detail check because its candidates lack
 /// duration and song type. Source LRC text must also match the original lines.
-class QqTranslationSource implements TranslationSource {
+class QqTranslationSource implements TranslationSource, OriginalLyricsSource {
   final QqMusicClient _client;
   @override
   final LyricsDiskCache? cache;
@@ -41,17 +42,10 @@ class QqTranslationSource implements TranslationSource {
         !NeteaseTranslationSource.needsTranslation(originals)) {
       return const TranslationSourceLookup(null);
     }
-    final generation = cache?.generation;
-    final key = cacheKey(query);
-    final raw = await cache?.read(key);
-    var bundle = raw == null ? null : QqMusicLyrics.decode(raw);
+    final loaded = await _loadBundle(query);
+    final bundle = loaded.bundle;
     if (bundle == null) {
-      final result = await _findBundle(query);
-      if (result.networkError || result.value == null) {
-        return TranslationSourceLookup(null, networkError: result.networkError);
-      }
-      bundle = result.value!;
-      await cache?.write(key, bundle.encode(), expectedGeneration: generation);
+      return TranslationSourceLookup(null, networkError: loaded.networkError);
     }
     if (bundle.tlyric.isEmpty || !_hasTextAnchors(bundle.lrc, originals)) {
       return const TranslationSourceLookup(null);
@@ -73,6 +67,42 @@ class QqTranslationSource implements TranslationSource {
     return TranslationSourceLookup(lines);
   }
 
+  /// 读缓存，未命中则搜歌取词并写缓存；[bundle] 为 null 表示没有可用结果。
+  Future<({QqMusicLyrics? bundle, bool networkError})> _loadBundle(
+    LyricsQuery query,
+  ) async {
+    final generation = cache?.generation;
+    final key = cacheKey(query);
+    final raw = await cache?.read(key);
+    final cached = raw == null ? null : QqMusicLyrics.decode(raw);
+    if (cached != null) return (bundle: cached, networkError: false);
+    final result = await _findBundle(query);
+    if (result.networkError || result.value == null) {
+      return (bundle: null, networkError: result.networkError);
+    }
+    await cache?.write(
+      key,
+      result.value!.encode(),
+      expectedGeneration: generation,
+    );
+    return (bundle: result.value!, networkError: false);
+  }
+
+  /// QQ 音乐自带的原文（带译文）：与译文查询共用同一份缓存。
+  @override
+  Future<SourceLyricsLookup> findLyrics(LyricsQuery query) async {
+    if (query.title.trim().isEmpty || query.artist.trim().isEmpty) {
+      return const SourceLyricsLookup(null);
+    }
+    final loaded = await _loadBundle(query);
+    final bundle = loaded.bundle;
+    if (bundle == null) {
+      return SourceLyricsLookup(null, networkError: loaded.networkError);
+    }
+    return SourceLyricsLookup(
+      CommunityLyrics.build(bundle.lrc, bundle.tlyric, provider),
+    );
+  }
   Future<QqMusicResult<QqMusicLyrics>> _findBundle(LyricsQuery query) async {
     final title = NeteaseTranslationSource.baseTitle(query.title);
     QqMusicSong? candidate;

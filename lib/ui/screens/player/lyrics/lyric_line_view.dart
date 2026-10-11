@@ -32,8 +32,6 @@ class LyricLineView extends StatelessWidget {
   /// 居中对齐时文字居中、缩放以中心为基准；默认左对齐（Apple Music）。
   final bool centered;
 
-  /// 模糊强度倍率（设置页「其他行模糊」）：0 不模糊，1 默认。
-  final double blurScale;
   final bool appleMusicStyle;
 
   const LyricLineView({
@@ -47,7 +45,6 @@ class LyricLineView extends StatelessWidget {
     this.cursor = MouseCursor.defer,
     this.fontSize = 30,
     this.centered = false,
-    this.blurScale = 1,
     this.appleMusicStyle = false,
   });
 
@@ -59,10 +56,10 @@ class LyricLineView extends StatelessWidget {
     final d = distance.abs();
     final isActive = distance == 0;
 
-    // 相邻句 1.0、隔一句 2.0 …… 上限 3.5：近处可辨认，远处退为氛围；再乘用户设置的强度
+    // 相邻句 1.0、隔一句 2.0 …… 上限 3.5：近处可辨认，远处退为氛围
     final blur = appleMusicStyle || focusAll || isActive
         ? 0.0
-        : (d * 1.0).clamp(0.0, _maxBlur) * blurScale;
+        : d.toDouble().clamp(0.0, _maxBlur);
     final opacity = appleMusicStyle
         ? (focusAll || isActive ? .94 : .18)
         : focusAll

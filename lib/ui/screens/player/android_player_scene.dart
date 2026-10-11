@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -33,6 +34,15 @@ class AndroidPlayerScene extends StatefulWidget {
     this.onArtworkTap,
     this.interactionSuspended = false,
     this.maxLandscapeWidth = 960,
+    this.controlsOnLeft = false,
+    this.activity,
+    this.onControlsVisibleChanged,
+    this.hideFooterWhenIdle = false,
+    this.expandControlsOnArtworkTap = false,
+    this.idleMini,
+    this.expandOut,
+    this.pinned = false,
+    this.initiallyExpanded = false,
   }) : assert((title == null) != (titleBuilder == null)),
        assert((controls == null) != (controlsBuilder == null)),
        assert((footer == null) != (footerBuilder == null));
@@ -67,6 +77,36 @@ class AndroidPlayerScene extends StatefulWidget {
   /// Content width cap when the scene is laid out in landscape.
   final double maxLandscapeWidth;
 
+  /// Landscape only: controls card on the left, lyrics / artwork / queue on the right.
+  final bool controlsOnLeft;
+
+  /// External pointer activity (e.g. hovering a button the host draws above the
+  /// scene) that keeps the controls awake without tapping into this scene.
+  final Listenable? activity;
+
+  /// Reports whether the auto-hiding chrome is currently shown, so a host can
+  /// hide its own floating buttons together with the scene's controls.
+  final ValueChanged<bool>? onControlsVisibleChanged;
+
+  /// Also hide the footer (device / lyrics / queue buttons) while idle.
+  final bool hideFooterWhenIdle;
+
+  /// Landscape + [controlsOnLeft]: tapping the card's cover enlarges / restores
+  /// the controls card instead of returning to the artwork view.
+  final bool expandControlsOnArtworkTap;
+
+  /// Compact bar (cover, title, a few buttons) shown in the footer while the
+  /// controls card is folded away by inactivity; replaces the hidden footer.
+  final Widget? idleMini;
+
+  /// Mirrors the controls-card expansion (0–1) so the host can scale text.
+  final ValueNotifier<double>? expandOut;
+
+  /// 固定控制区：不自动收起成底部迷你栏。
+  final bool pinned;
+
+  /// 横屏 + [controlsOnLeft] 时，一进来就是放大的控制卡片（大封面）。
+  final bool initiallyExpanded;
   @override
   State<AndroidPlayerScene> createState() => _AndroidPlayerSceneState();
 }
@@ -78,19 +118,70 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
   bool _tickerEnabled = true;
   bool _appActive = true;
   bool _queueMounted = false;
-
+  bool? _reportedVisible;
+  Offset? _lastHover;
+  final GlobalKey _miniKey = GlobalKey();
+  late final AnimationController _expand;
+  bool _expanded = false;
+  bool _initialExpandDone = false;
   bool get _cardMode => widget.lyricsMode || widget.queueMode;
 
   @override
   void initState() {
     super.initState();
     _motion = PlayerLyricsController(vsync: this);
+    _expand = AnimationController(vsync: this);
+    _expand.addListener(_publishExpand);
     _queueMounted = widget.queueMode;
     _appActive =
         WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     WidgetsBinding.instance.addObserver(this);
     GestureBinding.instance.pointerRouter.addGlobalRoute(_releasePointer);
+    widget.activity?.addListener(_externalActivity);
+    _motion.addListener(_reportChrome);
+    _motion.setPinned(widget.pinned);
+  }
+
+  void _toggleExpand() {
+    _expanded = !_expanded;
+    _motion.activity();
+    _expand.animateTo(
+      _expanded ? 1 : 0,
+      duration: context.motion(PlayerLyricsMotion.foldDuration),
+      curve: PlayerLyricsMotion.foldCurve,
+    );
+  }
+
+  void _externalActivity() => _motion.activity();
+
+  void _publishExpand() => widget.expandOut?.value = _expand.value;
+
+  // The controller notifies from inside build (setView); defer the host callback.
+  void _reportChrome() {
+    final visible = _motion.controlsVisible;
+    if (visible == (_reportedVisible ?? true)) return;
+    _reportedVisible = visible;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onControlsVisibleChanged?.call(visible);
+    });
+  }
+
+  // Hover events can be re-sent while the content under a still cursor moves
+  // (auto-scrolling lyrics); only real pointer movement counts as activity.
+  void _hover(PointerHoverEvent event) {
+    if (event.position == _lastHover) return;
+    _lastHover = event.position;
+    // A still-folded mini bar stays folded while the pointer is on it, so its
+    // buttons can be clicked without the card unfolding underneath the cursor.
+    if (widget.idleMini != null && !_motion.controlsVisible) {
+      final box = _miniKey.currentContext?.findRenderObject();
+      if (box is RenderBox && box.attached && box.hasSize) {
+        final local = box.globalToLocal(event.position);
+        if ((Offset.zero & box.size).contains(local)) return;
+      }
+    }
+    _motion.activity();
   }
 
   @override
@@ -112,11 +203,34 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
     _queueMounted = _queueMounted || widget.queueMode;
     _motion.setView(lyrics: widget.lyricsMode, queue: widget.queueMode);
     _motion.setInteractionSuspended(widget.interactionSuspended);
+    _motion.setPinned(widget.pinned);
+    if (!_cardMode && _expanded) {
+      _expanded = false;
+      _expand.animateTo(
+        0,
+        duration: PlayerLyricsMotion.foldDuration,
+        curve: PlayerLyricsMotion.foldCurve,
+      );
+    }
+    if (oldWidget.activity != widget.activity) {
+      oldWidget.activity?.removeListener(_externalActivity);
+      widget.activity?.addListener(_externalActivity);
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appActive = state == AppLifecycleState.resumed;
+    // Desktop: an unfocused window reports `inactive` while still on screen,
+    // and the controls must keep auto-hiding there. On mobile `inactive` is a
+    // real interruption (call, system sheet) and still pauses the timer.
+    final desktop = const {
+      TargetPlatform.windows,
+      TargetPlatform.linux,
+      TargetPlatform.macOS,
+    }.contains(defaultTargetPlatform);
+    _appActive =
+        state == AppLifecycleState.resumed ||
+        (desktop && state == AppLifecycleState.inactive);
     _motion.setActive(_appActive && _tickerEnabled);
   }
 
@@ -131,6 +245,9 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.activity?.removeListener(_externalActivity);
+    _motion.removeListener(_reportChrome);
+    _expand.dispose();
     GestureBinding.instance.pointerRouter.removeGlobalRoute(_releasePointer);
     _motion.dispose();
     super.dispose();
@@ -178,9 +295,9 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
     onPointerCancel: (event) => _motion.pointerUp(event.pointer),
     onPointerSignal: (_) => _motion.activity(),
     child: MouseRegion(
-      onHover: (_) => _motion.activity(),
+      onHover: _hover,
       child: AnimatedBuilder(
-        animation: _motion,
+        animation: Listenable.merge([_motion, _expand]),
         builder: (context, _) {
           final progress = _motion.transition.value;
           final lyricsProgress = _motion.lyricsProgress;
@@ -214,6 +331,22 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                       widget.maxLandscapeWidth,
                     );
                     final landscape = capped >= 600 && capped > box.maxHeight;
+                    // 收起后的迷你栏只用于横屏；竖屏直接整体收起
+                    final idleMini = landscape && widget.controlsOnLeft
+                        ? widget.idleMini
+                        : null;
+                    if (widget.initiallyExpanded &&
+                        !_initialExpandDone &&
+                        landscape &&
+                        widget.controlsOnLeft &&
+                        _cardMode) {
+                      _initialExpandDone = true;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted || _expanded) return;
+                        _expanded = true;
+                        _expand.value = 1;
+                      });
+                    }
                     return Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
@@ -227,6 +360,8 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                               geometry: _geometry,
                               lyricsProgress: lyricsProgress,
                               queueProgress: queueProgress,
+                              controlsOnLeft: widget.controlsOnLeft,
+                              expand: _expand.value * _motion.chrome.value,
                               controlsHeightReduction:
                                   widget.controlsHeightReduction,
                               footerHeightReduction:
@@ -326,13 +461,67 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                               ),
                               slot(
                                 PlayerSceneSlot.footer,
-                                _cardHitRegion(
-                                  widget.footerBuilder?.call(
-                                        context,
-                                        progress,
-                                      ) ??
-                                      widget.footer!,
-                                ),
+                                idleMini != null
+                                    ? Stack(
+                                        children: [
+                                          _chrome(
+                                            _cardHitRegion(
+                                              widget.footerBuilder?.call(
+                                                    context,
+                                                    progress,
+                                                  ) ??
+                                                  widget.footer!,
+                                            ),
+                                          ),
+                                          // 控制区完全显示时不挂载迷你栏，避免重复的歌名文字
+                                          if (!_motion.controlsVisible ||
+                                              _motion.chrome.value < 1)
+                                            Positioned.fill(
+                                              child: ExcludeFocus(
+                                                excluding:
+                                                    _motion.controlsVisible,
+                                                child: ExcludeSemantics(
+                                                  excluding:
+                                                      _motion.controlsVisible,
+                                                  child: IgnorePointer(
+                                                    ignoring:
+                                                        _motion.controlsVisible,
+                                                    child: Opacity(
+                                                      key: _miniKey,
+                                                      opacity:
+                                                          (1 -
+                                                              _motion
+                                                                  .chrome
+                                                                  .value) *
+                                                          progress,
+                                                      // The folded pill is exactly the footer rect.
+                                                      child: Center(
+                                                        child: idleMini,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      )
+                                    : widget.hideFooterWhenIdle
+                                    ? _chrome(
+                                        _cardHitRegion(
+                                          widget.footerBuilder?.call(
+                                                context,
+                                                progress,
+                                              ) ??
+                                              widget.footer!,
+                                        ),
+                                      )
+                                    : _cardHitRegion(
+                                        widget.footerBuilder?.call(
+                                              context,
+                                              progress,
+                                            ) ??
+                                            widget.footer!,
+                                      ),
                               ),
                               slot(
                                 PlayerSceneSlot.artwork,
@@ -350,7 +539,11 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                                     child: GestureDetector(
                                       behavior: HitTestBehavior.opaque,
                                       onTap: _cardMode
-                                          ? widget.onArtworkTap
+                                          ? (widget.expandControlsOnArtworkTap &&
+                                                    landscape &&
+                                                    widget.controlsOnLeft
+                                                ? _toggleExpand
+                                                : widget.onArtworkTap)
                                           : null,
                                       onVerticalDragUpdate: _cardMode
                                           ? (_) {}

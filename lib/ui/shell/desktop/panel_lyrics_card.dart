@@ -53,8 +53,11 @@ class PanelLyricsCard extends StatelessWidget {
                 remote: remote,
                 topInset: _barHeight + (expanded ? 8 : 0),
                 bottomInset: 16,
-                fontSize: expanded ? 26 : 20,
-                horizontalPadding: 20,
+                // 与全屏歌词同一套 Apple 样式（对焦模糊、逐行滚动、翻译小字），
+                // 只是字号 / 留白按右栏宽度缩小
+                appleMusicStyle: true,
+                appleFontSize: expanded ? 28 : 24,
+                applePadding: 22,
               ),
               // 顶部渐暗：保证按钮与标题在任何封面色上都清晰
               const Positioned(

@@ -620,6 +620,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lyricsFromLrclib => 'Lyrics from LRCLIB';
 
   @override
+  String get lyricsFromQqMusic => 'Lyrics from QQ Music';
+
+  @override
+  String get lyricsFromNetease => 'Lyrics from NetEase Music';
+
+  @override
   String get lyricsImmersive => 'Immersive lyrics';
 
   @override
@@ -638,7 +644,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lyricsFillWindow => 'Fit to window (F11)';
 
   @override
+  String get lyricsPinControls => 'Pin controls (don\'t auto-hide)';
+
+  @override
+  String get lyricsUnpinControls => 'Unpin controls';
+
+  @override
   String get deviceConnectTitle => 'Connect to a device';
+
+  @override
+  String get deviceConnectShort => 'Connect';
 
   @override
   String get deviceConnectDescription =>
@@ -1018,9 +1033,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLyricsAlignCenter => 'Centre';
 
   @override
-  String get settingsLyricsBlur => 'Blur other lines';
-
-  @override
   String get settingsLyricsImmersiveScreen =>
       'Full-screen lyrics fill the screen';
 
@@ -1040,7 +1052,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLyricsSourceOrderSubtitle =>
-      'Drag the handle to reorder; sources higher up are tried first. Original lyrics are looked up between Spotify and LRCLIB in this order, and Chinese translations are filled in from QQ Music, NetEase Music and LRCLIB in this order.';
+      'Drag the handle to reorder; sources higher up are tried first. Original lyrics and Chinese translations are both looked up across the sources in this order.';
 
   @override
   String get settingsLyricsSourceSpotify => 'Spotify';
@@ -1063,7 +1075,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Original lyrics and translation';
 
   @override
-  String get settingsLyricsSourceRoleCommunity => 'Chinese translation only';
+  String get settingsLyricsSourceRoleCommunity =>
+      'Original lyrics and Chinese translation';
 
   @override
   String get settingsLyricsSourceDisabled =>

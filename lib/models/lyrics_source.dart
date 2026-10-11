@@ -1,8 +1,7 @@
 /// 歌词来源，可在设置里拖拽调整优先级（越靠前越优先）。
 ///
-/// 原文只来自 [spotify] 与 [lrclib]，按两者的先后顺序查找；
-/// 译文按 [qqMusic]、[netease]、[lrclib] 的先后顺序补全，Spotify 自带的完整译文始终保留。
-/// 「补全歌词」关闭时 [lrclib] 不参与。
+/// 四个来源都可以给出原文（可带译文），按先后顺序查找；中文译词按同样的顺序补全，
+/// Spotify 自带的完整译文始终保留。
 enum LyricsSource {
   spotify,
   qqMusic,

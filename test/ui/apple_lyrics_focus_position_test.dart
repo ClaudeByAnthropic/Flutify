@@ -70,16 +70,16 @@ void main() {
         return (prefs, playback);
       }
 
-      testWidgets('default setting keeps the previous 8% anchor', (
+      testWidgets('default setting anchors the focused line at 16%', (
         tester,
       ) async {
         final (_, playback) = await lyricsHost(tester);
         playback.positionNotifier.value = const Duration(seconds: 8);
         await tester.pumpAndSettle();
-        // 600 高视口，默认 16% 折算为 8%，再减 2dp 并加上 Apple 文本 2dp 顶部留白。
+        // 600 高视口，设置值即对焦行顶端比例：默认 16%，再减 2dp 并加上 Apple 文本 2dp 顶部留白。
         expect(
           tester.getTopLeft(find.text('Line 2')).dy,
-          closeTo(600 * .08, 2),
+          closeTo(600 * .16, 2),
         );
         await tester.pumpWidget(const SizedBox.shrink());
       });
@@ -95,7 +95,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(
             tester.getTopLeft(find.text('Line 2')).dy,
-            closeTo(600 * value * .5, 2),
+            closeTo(600 * value, 2),
             reason: 'focus position $value',
           );
         }

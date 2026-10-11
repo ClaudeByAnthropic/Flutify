@@ -164,7 +164,7 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
     expect(browsing(tester), isFalse);
-    expect(lineTop(tester, 'Line 1'), closeTo(600 * .08 - 2, .1));
+    expect(lineTop(tester, 'Line 1'), closeTo(600 * .16 - 2, .1));
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -189,7 +189,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(browsing(tester), isFalse);
-    expect(lineTop(tester, 'Line 2'), closeTo(600 * .08 - 2, .1));
+    expect(lineTop(tester, 'Line 2'), closeTo(600 * .16 - 2, .1));
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -220,7 +220,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 101));
     await tester.pumpAndSettle();
     expect(browsing(tester), isFalse);
-    expect(lineTop(tester, 'Line 1'), closeTo(600 * .08 - 2, .1));
+    expect(lineTop(tester, 'Line 1'), closeTo(600 * .16 - 2, .1));
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -282,11 +282,11 @@ void main() {
       await app.playback.seekTo(const Duration(seconds: 8));
       await tester.pumpAndSettle();
       expect(app.playback.isPlaying, isFalse);
-      expect(lineTop(tester, 'First words'), closeTo(600 * .08 - 2, .1));
+      expect(lineTop(tester, 'First words'), closeTo(600 * .16 - 2, .1));
       app.translation.cancel();
       await tester.pumpAndSettle();
       expect(find.text('Translated first'), findsNothing);
-      expect(lineTop(tester, 'First words'), closeTo(600 * .08 - 2, .1));
+      expect(lineTop(tester, 'First words'), closeTo(600 * .16 - 2, .1));
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
@@ -333,7 +333,7 @@ void main() {
           reason:
               'A release lost while hidden must not freeze following forever.',
         );
-        expect(lineTop(tester, 'Line 1'), closeTo(600 * .08 - 2, .1));
+        expect(lineTop(tester, 'Line 1'), closeTo(600 * .16 - 2, .1));
         await gesture.cancel();
         await tester.pumpWidget(const SizedBox.shrink());
       },
@@ -367,7 +367,7 @@ void main() {
       expect(browsing(tester), isFalse);
       final index = int.parse(visible.text.split(' ').last);
       expect(app.playback.positionNotifier.value, Duration(seconds: index * 4));
-      expect(lineTop(tester, visible.text), closeTo(600 * .08 - 2, .1));
+      expect(lineTop(tester, visible.text), closeTo(600 * .16 - 2, .1));
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 6));
       expect(tester.takeException(), isNull);
@@ -436,7 +436,7 @@ void main() {
         );
         await tester.pump();
         await tester.pump();
-        const anchor = 600 * .08 - 2;
+        const anchor = 600 * .16 - 2;
         final deviations = <double>[];
         final frames = <String>[];
         for (var elapsed = frameMs; elapsed <= 1120; elapsed += frameMs) {

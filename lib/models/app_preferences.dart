@@ -39,9 +39,6 @@ class AppPreferences {
   /// 当前歌词行顶端在可见歌词区域中的纵向比例，避开顶部 / 底部控件。
   final double lyricsFocusPosition;
 
-  /// 非当前行的模糊强度倍率：0 = 不模糊，1 = 默认（Apple Music 观感），2 = 加倍。
-  final double lyricsBlur;
-
   final StartPage startPage;
 
   /// 桌面端：记住窗口大小与位置（含最大化状态）。
@@ -105,7 +102,6 @@ class AppPreferences {
     this.lyricsScale = 1.0,
     this.lyricsAlign = LyricsAlign.left,
     this.lyricsFocusPosition = 0.16,
-    this.lyricsBlur = 1.0,
     this.startPage = StartPage.home,
     this.rememberWindow = true,
     this.connectEnabled = true,
@@ -138,7 +134,6 @@ class AppPreferences {
   static const double maxLyricsScale = 1.4;
   static const double minLyricsFocusPosition = 0.10;
   static const double maxLyricsFocusPosition = 0.70;
-  static const double maxLyricsBlur = 2.0;
   static const int maxRemoteLyricsLeadMs = 2000;
   static const int minTaskbarLyricsOpacity = 15;
   static const int defaultTaskbarLyricsCustomColor = 0xFF1ED760;
@@ -150,7 +145,6 @@ class AppPreferences {
     double? lyricsScale,
     LyricsAlign? lyricsAlign,
     double? lyricsFocusPosition,
-    double? lyricsBlur,
     StartPage? startPage,
     bool? rememberWindow,
     bool? connectEnabled,
@@ -181,7 +175,6 @@ class AppPreferences {
       lyricsScale: lyricsScale ?? this.lyricsScale,
       lyricsAlign: lyricsAlign ?? this.lyricsAlign,
       lyricsFocusPosition: lyricsFocusPosition ?? this.lyricsFocusPosition,
-      lyricsBlur: lyricsBlur ?? this.lyricsBlur,
       startPage: startPage ?? this.startPage,
       rememberWindow: rememberWindow ?? this.rememberWindow,
       connectEnabled: connectEnabled ?? this.connectEnabled,
@@ -223,7 +216,6 @@ class AppPreferences {
     'lyricsScale': lyricsScale,
     'lyricsAlign': lyricsAlign.name,
     'lyricsFocusPosition': lyricsFocusPosition,
-    'lyricsBlur': lyricsBlur,
     'startPage': startPage.name,
     'rememberWindow': rememberWindow,
     'connectEnabled': connectEnabled,
@@ -278,7 +270,6 @@ class AppPreferences {
         minLyricsFocusPosition,
         maxLyricsFocusPosition,
       ),
-      lyricsBlur: number(json['lyricsBlur'], d.lyricsBlur, 0, maxLyricsBlur),
       startPage: pick(StartPage.values, json['startPage'], d.startPage),
       rememberWindow: flag(json['rememberWindow'], d.rememberWindow),
       connectEnabled: flag(json['connectEnabled'], d.connectEnabled),
@@ -372,7 +363,6 @@ class AppPreferences {
       other.lyricsScale == lyricsScale &&
       other.lyricsAlign == lyricsAlign &&
       other.lyricsFocusPosition == lyricsFocusPosition &&
-      other.lyricsBlur == lyricsBlur &&
       other.startPage == startPage &&
       other.rememberWindow == rememberWindow &&
       other.connectEnabled == connectEnabled &&
@@ -404,7 +394,6 @@ class AppPreferences {
     lyricsScale,
     lyricsAlign,
     lyricsFocusPosition,
-    lyricsBlur,
     startPage,
     rememberWindow,
     connectEnabled,

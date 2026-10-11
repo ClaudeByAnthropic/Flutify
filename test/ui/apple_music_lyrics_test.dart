@@ -67,7 +67,7 @@ void main() {
   }
 
   testWidgets(
-    'reanchors instantly, animates rows separately and settles at 8%',
+    'reanchors instantly, animates rows separately and settles at 16%',
     (tester) async {
       final playback = await host(tester);
       final scroll = tester
@@ -80,10 +80,10 @@ void main() {
       await tester.pump();
       expect(tester.getTopLeft(find.text('Line 1')).dy, closeTo(before, 2));
       await tester.pump(const Duration(milliseconds: 850));
-      // 8% viewport -2dp, plus Apple's 2dp text top padding.
+      // 16% viewport -2dp, plus Apple's 2dp text top padding.
       expect(
         tester.getTopLeft(find.text('Line 1')).dy,
-        closeTo(600 * .08 - 2 + 2, 2),
+        closeTo(600 * .16 - 2 + 2, 2),
       );
       await tester.pumpWidget(const SizedBox.shrink());
     },

@@ -89,17 +89,6 @@ class LyricsSection extends StatelessWidget {
           onChanged: (v) =>
               provider.update(provider.prefs.copyWith(lyricsFocusPosition: v)),
         ),
-        SettingsSliderTile(
-          title: l10n.settingsLyricsBlur,
-          value: prefs.lyricsBlur,
-          max: AppPreferences.maxLyricsBlur,
-          divisions: 8,
-          minIcon: Icons.blur_off_rounded,
-          maxIcon: Icons.blur_on_rounded,
-          labelOf: (v) => v == 0 ? l10n.settingsOff : '${(v * 100).round()}%',
-          onChanged: (v) =>
-              provider.update(provider.prefs.copyWith(lyricsBlur: v)),
-        ),
         SettingsSwitchTile(
           title: l10n.settingsLyricsFallback,
           subtitle: l10n.settingsLyricsFallbackSubtitle,

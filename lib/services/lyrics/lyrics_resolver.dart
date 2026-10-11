@@ -1,6 +1,7 @@
 import '../../models/lyrics.dart';
 import '../../models/lyrics_query.dart';
 import '../../models/lyrics_source.dart';
+import 'community_lyrics.dart';
 import 'lrclib_lyrics_source.dart';
 import 'lyrics_language.dart';
 import 'lyrics_translation.dart';
@@ -191,8 +192,8 @@ class LyricsResolver {
       }
     }
 
-    // 原文只有 Spotify 与 LRCLIB：按优先级依次查，第一个给出逐行同步歌词的即采用，
-    // 排在前面的来源命中后不再请求后面的。
+    // 四个来源都能给出原文：按优先级依次查，第一个给出逐行同步歌词的即采用，
+    // 排在前面的来源命中后不再请求后面的。QQ 音乐 / 网易云 / LRCLIB 受「补全歌词」控制。
     for (final id in _sourceOrder()) {
       if (id == LyricsSource.spotify) {
         await loadOfficial();
@@ -205,6 +206,19 @@ class LyricsResolver {
         final lyrics = found.lyrics;
         if (lyrics != null) return ResolvedLyrics(lyrics);
         if (found.networkError) cacheable = false;
+      } else {
+        // QQ 音乐 / 网易云也自带原文与译文，同样受「补全歌词」控制
+        if (!_fallbackEnabled()) continue;
+        final source = id == LyricsSource.qqMusic ? qqTranslation : translation;
+        if (source is! OriginalLyricsSource) continue;
+        try {
+          final found = await (source as OriginalLyricsSource).findLyrics(query);
+          final lyrics = found.lyrics;
+          if (lyrics != null && lyrics.isSynced) return ResolvedLyrics(lyrics);
+          if (found.networkError) cacheable = false;
+        } catch (_) {
+          cacheable = false;
+        }
       }
     }
     // 顺序里缺了 Spotify（不应出现）也要给出官方结果或错误

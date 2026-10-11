@@ -22,7 +22,13 @@ class LyricsGlassControls extends StatelessWidget {
   /// 见 [LiquidGlass.backdrop]：下方没有歌词滑过（宽屏沉浸式左栏）时传 false。
   final bool backdrop;
 
-  const LyricsGlassControls({super.key, this.full = false, this.maxWidth = 520, this.bottom, this.backdrop = true});
+  const LyricsGlassControls({
+    super.key,
+    this.full = false,
+    this.maxWidth = 520,
+    this.bottom,
+    this.backdrop = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +63,9 @@ class LyricsGlassControls extends StatelessWidget {
       ),
       const SizedBox(height: 2),
       Row(
-        mainAxisAlignment: full ? MainAxisAlignment.spaceEvenly : MainAxisAlignment.center,
+        mainAxisAlignment: full
+            ? MainAxisAlignment.spaceEvenly
+            : MainAxisAlignment.center,
         children: [
           if (full) const ShuffleButton(),
           const SkipButton(next: false, size: 32),
@@ -72,8 +80,15 @@ class LyricsGlassControls extends StatelessWidget {
   }
 
   List<Widget> _remote() => [
-    const RemoteScrubber(activeColor: Colors.white, inactiveColor: Colors.white24, labelColor: Colors.white60),
+    const RemoteScrubber(
+      activeColor: Colors.white,
+      inactiveColor: Colors.white24,
+      labelColor: Colors.white60,
+    ),
     const SizedBox(height: 2),
-    RemoteTransportControls(showModes: full, style: full ? RemoteControlsStyle.glassFull : RemoteControlsStyle.glass),
+    RemoteTransportControls(
+      showModes: full,
+      style: full ? RemoteControlsStyle.glassFull : RemoteControlsStyle.glass,
+    ),
   ];
 }

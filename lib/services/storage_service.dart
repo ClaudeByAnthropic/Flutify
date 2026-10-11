@@ -49,6 +49,8 @@ class StorageService {
   static const String _keyPauseAfterFailures = 'play_pause_after_failures';
   static const String _keyImmersiveScreen =
       'ui_immersive_screen'; // 沉浸式歌词铺满整个屏幕
+  static const String _keyImmersivePinned =
+      'ui_immersive_pinned'; // 沉浸式歌词固定控制区（不自动收起）
   static const String _keyAppearance = 'ui_appearance'; // 外观设置 JSON
   static const String _keyPreferences =
       'app_prefs'; // 其余界面偏好 JSON（AppPreferences）
@@ -360,6 +362,11 @@ class StorageService {
       _prefs.getBool(_keyImmersiveScreen) ?? false;
   Future<bool> setImmersiveScreenFullscreen(bool value) =>
       _prefs.setBool(_keyImmersiveScreen, value);
+
+  /// 沉浸式歌词是否固定控制区（不自动收成底部迷你栏）；默认 false。
+  bool get immersivePinned => _prefs.getBool(_keyImmersivePinned) ?? false;
+  Future<bool> setImmersivePinned(bool value) =>
+      _prefs.setBool(_keyImmersivePinned, value);
 
   /// 外观设置（JSON 字符串，解析见 AppearanceSettings.fromJson）；未保存过为空串。
   String get appearanceJson => _prefs.getString(_keyAppearance) ?? '';

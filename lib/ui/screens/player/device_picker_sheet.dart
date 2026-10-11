@@ -35,7 +35,9 @@ class DevicePickerSheet extends StatelessWidget {
           alignment: Alignment.bottomRight,
           // 贴在播放栏（90）之上、右侧留白与播放栏内边距一致
           insetPadding: const EdgeInsets.fromLTRB(24, 24, 16, 100),
-          backgroundColor: Theme.of(dialogContext).colorScheme.surfaceContainerHigh,
+          backgroundColor: Theme.of(
+            dialogContext,
+          ).colorScheme.surfaceContainerHigh,
           shape: RoundedRectangleBorder(borderRadius: tokens.radius(24)),
           clipBehavior: Clip.antiAlias,
           child: const SizedBox(width: panelWidth, child: DevicePickerSheet()),
@@ -68,10 +70,18 @@ class DevicePickerSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(l10n.deviceConnectTitle, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text(
+                l10n.deviceConnectTitle,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               const SizedBox(height: 16),
               if (connect == null || !connect.available)
-                _Notice(icon: Icons.devices_rounded, title: l10n.connectUnavailable)
+                _Notice(
+                  icon: Icons.devices_rounded,
+                  title: l10n.connectUnavailable,
+                )
               else
                 _DeviceList(connect: connect),
             ],
@@ -93,7 +103,9 @@ class _DeviceList extends StatelessWidget {
     final l10n = context.l10n;
     final active = connect.activeDevice;
     final remoteInUse = connect.hasRemoteSession;
-    final others = connect.devices.where((d) => d.id != active?.id && d.canPlay).toList();
+    final others = connect.devices
+        .where((d) => d.id != active?.id && d.canPlay)
+        .toList();
 
     final status = switch (connect.status) {
       ConnectStatus.connecting || ConnectStatus.idle => l10n.connectConnecting,
@@ -107,7 +119,10 @@ class _DeviceList extends StatelessWidget {
         _CurrentDeviceCard(connect: connect),
         if (status != null) ...[
           const SizedBox(height: 12),
-          _StatusLine(text: status, busy: connect.status != ConnectStatus.offline),
+          _StatusLine(
+            text: status,
+            busy: connect.status != ConnectStatus.offline,
+          ),
         ],
         const SizedBox(height: 20),
         if (remoteInUse || others.isNotEmpty)
@@ -135,14 +150,22 @@ class _DeviceList extends StatelessWidget {
           _DeviceTile(
             icon: connectDeviceIcon(device.type),
             title: device.name,
-            subtitle: device.isSameNetwork ? l10n.connectSameNetwork : l10n.deviceSpotifyConnect,
+            subtitle: device.isSameNetwork
+                ? l10n.connectSameNetwork
+                : l10n.deviceSpotifyConnect,
             onTap: () {
               Navigator.of(context).pop();
               ConnectActions.transferTo(context, device);
             },
           ),
-        if (!remoteInUse && others.isEmpty && connect.status == ConnectStatus.online)
-          _Notice(icon: Icons.devices_other_rounded, title: l10n.connectNoDevices, subtitle: l10n.connectNoDevicesHint),
+        if (!remoteInUse &&
+            others.isEmpty &&
+            connect.status == ConnectStatus.online)
+          _Notice(
+            icon: Icons.devices_other_rounded,
+            title: l10n.connectNoDevices,
+            subtitle: l10n.connectNoDevicesHint,
+          ),
       ],
     );
   }
@@ -160,15 +183,22 @@ class _CurrentDeviceCard extends StatelessWidget {
     final tokens = context.tokens;
     final l10n = context.l10n;
     final remote = connect.hasRemoteSession ? connect.activeDevice : null;
-    final localPlaying = context.select<PlaybackProvider, bool>((p) => p.isPlaying);
+    final localPlaying = context.select<PlaybackProvider, bool>(
+      (p) => p.isPlaying,
+    );
     final playing = remote != null ? connect.player.isAudible : localPlaying;
-    final nowPlaying = remote != null ? (connect.remoteTrack?.name ?? connect.player.title) : '';
+    final nowPlaying = remote != null
+        ? (connect.remoteTrack?.name ?? connect.player.title)
+        : '';
     final accent = tokens.accent;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Color.alphaBlend(accent.withAlpha(30), theme.colorScheme.surfaceContainerHighest),
+        color: Color.alphaBlend(
+          accent.withAlpha(30),
+          theme.colorScheme.surfaceContainerHighest,
+        ),
         borderRadius: tokens.radius(20),
       ),
       child: Column(
@@ -179,9 +209,14 @@ class _CurrentDeviceCard extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(color: accent, borderRadius: tokens.radius(16)),
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: tokens.radius(16),
+                ),
                 child: Icon(
-                  remote != null ? connectDeviceIcon(remote.type) : Icons.computer_rounded,
+                  remote != null
+                      ? connectDeviceIcon(remote.type)
+                      : Icons.computer_rounded,
                   color: tokens.onAccent,
                 ),
               ),
@@ -192,21 +227,28 @@ class _CurrentDeviceCard extends StatelessWidget {
                   children: [
                     Text(
                       l10n.deviceCurrent,
-                      style: theme.textTheme.labelMedium?.copyWith(color: accent, fontWeight: FontWeight.w700),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       remote?.name ?? l10n.connectThisDevice,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     if (nowPlaying.isNotEmpty)
                       Text(
                         nowPlaying,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                   ],
                 ),
@@ -215,7 +257,10 @@ class _CurrentDeviceCard extends StatelessWidget {
               EqualizerBars(playing: playing, color: accent, size: 18),
             ],
           ),
-          if (remote != null && remote.supportsVolume) ...[const SizedBox(height: 10), _RemoteVolume(connect: connect)],
+          if (remote != null && remote.supportsVolume) ...[
+            const SizedBox(height: 10),
+            _RemoteVolume(connect: connect),
+          ],
         ],
       ),
     );
@@ -235,14 +280,19 @@ class _RemoteVolume extends StatelessWidget {
     return Row(
       children: [
         Icon(
-          volume == 0 ? Icons.volume_off_rounded : (volume < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+          volume == 0
+              ? Icons.volume_off_rounded
+              : (volume < 0.5
+                    ? Icons.volume_down_rounded
+                    : Icons.volume_up_rounded),
           size: 20,
           color: colorScheme.onSurfaceVariant,
         ),
         Expanded(
           child: Slider(
             value: volume,
-            semanticFormatterCallback: (v) => '${context.l10n.connectVolume} ${(v * 100).round()}%',
+            semanticFormatterCallback: (v) =>
+                '${context.l10n.connectVolume} ${(v * 100).round()}%',
             onChanged: connect.setVolume,
           ),
         ),
@@ -258,7 +308,12 @@ class _DeviceTile extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
-  const _DeviceTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  const _DeviceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -275,8 +330,15 @@ class _DeviceTile extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
-              child: Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -287,13 +349,17 @@ class _DeviceTile extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   Text(
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -321,11 +387,20 @@ class _StatusLine extends StatelessWidget {
           dimension: 14,
           child: busy
               ? const CircularProgressIndicator(strokeWidth: 2)
-              : Icon(Icons.cloud_off_rounded, size: 14, color: theme.colorScheme.error),
+              : Icon(
+                  Icons.cloud_off_rounded,
+                  size: 14,
+                  color: theme.colorScheme.error,
+                ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          child: Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
       ],
     );
@@ -354,16 +429,189 @@ class _Notice extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 if (subtitle != null)
                   Text(
                     subtitle!,
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 嵌在播放器控制卡片底部的设备列表（类似 Apple 控制中心的设备区域）：
+/// 当前收听设备 + 其他设备，点按直接转移播放并收起，不再弹出浮层。
+class InlineDevicePanel extends StatelessWidget {
+  final VoidCallback onClose;
+
+  const InlineDevicePanel({super.key, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final connect = context.watch<ConnectProvider?>();
+    if (connect == null || !connect.available) {
+      return _InlineRow(
+        icon: Icons.devices_rounded,
+        title: l10n.connectUnavailable,
+      );
+    }
+    final active = connect.activeDevice;
+    final remote = connect.hasRemoteSession ? active : null;
+    final others = connect.devices
+        .where((d) => d.id != active?.id && d.canPlay)
+        .toList();
+    final localPlaying = context.select<PlaybackProvider, bool>(
+      (p) => p.isPlaying,
+    );
+    final playing = remote != null ? connect.player.isAudible : localPlaying;
+    final accent = context.tokens.accent;
+    final status = switch (connect.status) {
+      ConnectStatus.connecting || ConnectStatus.idle => l10n.connectConnecting,
+      ConnectStatus.offline => l10n.connectOffline,
+      ConnectStatus.online => null,
+    };
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 190),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _InlineRow(
+              icon: remote != null
+                  ? connectDeviceIcon(remote.type)
+                  : Icons.computer_rounded,
+              title: remote?.name ?? l10n.connectThisDevice,
+              subtitle: l10n.deviceCurrent,
+              highlight: accent,
+              trailing: EqualizerBars(
+                playing: playing,
+                color: accent,
+                size: 14,
+              ),
+            ),
+            if (status != null)
+              _InlineRow(icon: Icons.sync_rounded, title: status),
+            if (remote != null)
+              _InlineRow(
+                icon: Icons.computer_rounded,
+                title: l10n.connectThisDevice,
+                subtitle: l10n.connectTakeOver,
+                onTap: () {
+                  ConnectActions.takeOver(context);
+                  onClose();
+                },
+              ),
+            for (final device in others)
+              _InlineRow(
+                icon: connectDeviceIcon(device.type),
+                title: device.name,
+                subtitle: device.isSameNetwork
+                    ? l10n.connectSameNetwork
+                    : l10n.deviceSpotifyConnect,
+                onTap: () {
+                  ConnectActions.transferTo(context, device);
+                  onClose();
+                },
+              ),
+            if (remote == null &&
+                others.isEmpty &&
+                connect.status == ConnectStatus.online)
+              _InlineRow(
+                icon: Icons.devices_other_rounded,
+                title: l10n.connectNoDevices,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 内嵌设备列表的一行：小图标徽章 + 名称 + 副标题（白字，跟随播放器的深色背景）。
+class _InlineRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Color? highlight;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _InlineRow({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.highlight,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = highlight ?? Colors.white;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      mouseCursor: onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: highlight != null
+                    ? highlight!.withValues(alpha: 0.22)
+                    : Colors.white12,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 16, color: color),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 10,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            ?trailing,
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import '../../models/lyrics.dart';
 import '../../models/lyrics_query.dart';
 import 'artist_match.dart';
+import 'community_lyrics.dart';
 import 'lrc_parser.dart';
 import 'lyric_script.dart';
 import 'lyrics_disk_cache.dart';
@@ -25,7 +26,8 @@ typedef NeteaseTranslationLookup = TranslationSourceLookup;
 ///    整体偏移，再按偏移校正后的时间就近挑，某次副歌缺译文时不会把后面的译文整体前移；
 /// 2. 时间近邻兜底：没锚上的译文按（偏移校正后）±1.5 秒就近贴到还没译文的原文行；
 /// 3. 原文匹配率低于 [_minCoverage] 视为歌配错了，全盘放弃；原样外语不冒充中文译文。
-class NeteaseTranslationSource implements TranslationSource {
+class NeteaseTranslationSource
+    implements TranslationSource, OriginalLyricsSource {
   @override
   LyricsProvider get provider => LyricsProvider.netease;
 
@@ -69,34 +71,10 @@ class NeteaseTranslationSource implements TranslationSource {
     if (originals.isEmpty || !needsTranslation(originals))
       return const NeteaseTranslationLookup(null);
 
-    final cacheGeneration = cache?.generation;
-    final key = cacheKey(query);
-    NeteaseLyricBundle? bundle;
-    final hit = await cache?.read(key);
-    if (hit != null) bundle = NeteaseLyricBundle.decode(hit);
-
+    final loaded = await _loadBundle(query);
+    final bundle = loaded.bundle;
     if (bundle == null) {
-      final song = await _findSong(query);
-      if (song.value == null) {
-        // 搜到了但没有对得上的歌也是确定结果（存空 bundle），免得每次启动都重搜；网络问题不缓存
-        if (!song.networkError)
-          await cache?.write(
-            key,
-            const NeteaseLyricBundle().encode(),
-            expectedGeneration: cacheGeneration,
-          );
-        return NeteaseTranslationLookup(null, networkError: song.networkError);
-      }
-      final lyric = await _client.lyric(song.value!.id);
-      if (lyric.value == null)
-        return NeteaseTranslationLookup(null, networkError: lyric.networkError);
-      bundle = lyric.value!;
-      // 「这首网易云歌没有译文」也是确定结果，一并缓存（重新获取歌词可强制刷新）
-      await cache?.write(
-        key,
-        bundle.encode(),
-        expectedGeneration: cacheGeneration,
-      );
+      return NeteaseTranslationLookup(null, networkError: loaded.networkError);
     }
 
     if (bundle.tlyric.trim().isEmpty)
@@ -105,6 +83,55 @@ class NeteaseTranslationSource implements TranslationSource {
     return NeteaseTranslationLookup(aligned);
   }
 
+  /// 读缓存，未命中则搜歌取词并写缓存；[bundle] 为 null 表示没有可用结果。
+  Future<({NeteaseLyricBundle? bundle, bool networkError})> _loadBundle(
+    LyricsQuery query,
+  ) async {
+    final cacheGeneration = cache?.generation;
+    final key = cacheKey(query);
+    final hit = await cache?.read(key);
+    if (hit != null) {
+      final cached = NeteaseLyricBundle.decode(hit);
+      if (cached != null) return (bundle: cached, networkError: false);
+    }
+    final song = await _findSong(query);
+    if (song.value == null) {
+      // 搜到了但没有对得上的歌也是确定结果（存空 bundle），免得每次启动都重搜；网络问题不缓存
+      if (!song.networkError) {
+        await cache?.write(
+          key,
+          const NeteaseLyricBundle().encode(),
+          expectedGeneration: cacheGeneration,
+        );
+      }
+      return (bundle: null, networkError: song.networkError);
+    }
+    final lyric = await _client.lyric(song.value!.id);
+    if (lyric.value == null) {
+      return (bundle: null, networkError: lyric.networkError);
+    }
+    // 「这首网易云歌没有译文」也是确定结果，一并缓存（重新获取歌词可强制刷新）
+    await cache?.write(
+      key,
+      lyric.value!.encode(),
+      expectedGeneration: cacheGeneration,
+    );
+    return (bundle: lyric.value!, networkError: false);
+  }
+
+  /// 网易云自带的原文（带译文）：与译文查询共用同一份缓存。
+  @override
+  Future<SourceLyricsLookup> findLyrics(LyricsQuery query) async {
+    if (query.title.trim().isEmpty) return const SourceLyricsLookup(null);
+    final loaded = await _loadBundle(query);
+    final bundle = loaded.bundle;
+    if (bundle == null) {
+      return SourceLyricsLookup(null, networkError: loaded.networkError);
+    }
+    return SourceLyricsLookup(
+      CommunityLyrics.build(bundle.lrc, bundle.tlyric, provider),
+    );
+  }
   /// 挑歌：曲名完全一致（网易云歌名通常不带版本后缀），多位艺人逐一比对，
   /// 两边都有时长时要求相差 ≤ 5 秒。
   Future<NeteaseResponse<NeteaseSong>> _findSong(LyricsQuery query) async {

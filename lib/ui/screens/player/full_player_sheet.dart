@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -198,13 +197,14 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
 
   /// Esc 关闭播放器（桌面键盘）。放在最外层：焦点在内部任意按钮上时按键同样冒泡到这里，
   /// 目的地菜单、设备选择等上层路由有自己的焦点域，会先处理 Esc。
-  Widget _closeOnEscape(BuildContext context, Widget child) => CallbackShortcuts(
-    bindings: {
-      const SingleActivator(LogicalKeyboardKey.escape): () =>
-          Navigator.maybePop(context),
-    },
-    child: Focus(autofocus: true, skipTraversal: true, child: child),
-  );
+  Widget _closeOnEscape(BuildContext context, Widget child) =>
+      CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              Navigator.maybePop(context),
+        },
+        child: Focus(autofocus: true, skipTraversal: true, child: child),
+      );
 }
 
 /// 没有当前曲目时的占位（例如队列被清空后面板仍打开）。
