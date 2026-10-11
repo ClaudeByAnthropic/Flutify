@@ -238,7 +238,18 @@ void main() {
             kind: PointerDeviceKind.mouse,
           );
           await tester.pumpAndSettle();
-          expect(calls, ['startDragging'], reason: 'blank area at $point');
+          // window_manager 在 Windows 主机上拖动前先查一次全屏（isFullScreen 保护），
+          // 与 TargetPlatform 变体无关；除它之外不应有 maximize 等其它调用。
+          expect(
+            calls.where((m) => m == 'startDragging'),
+            hasLength(1),
+            reason: 'blank area at $point',
+          );
+          expect(
+            calls.where((m) => m != 'isFullScreen'),
+            ['startDragging'],
+            reason: 'blank area at $point',
+          );
         }
         expect(tester.getSize(find.byType(DesktopTopBar)).height, 56);
       },
