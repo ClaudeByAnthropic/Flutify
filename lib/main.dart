@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'core/utils/file_log.dart';
+import 'core/utils/local_device_name.dart';
 import 'core/widgets/app_startup.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -133,6 +134,7 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   // 证书被拒绝时记录对端证书（不改变校验结果），用于定位代理 / 安全软件的 HTTPS 拦截
   ProxyHttpOverrides.certificateRejectionLogger = debugPrint;
   reportStage('配置网络');
+  await loadLocalDeviceName();
   final initialPrefs = AppPreferences.decode(storageService.preferencesJson);
   await NetworkProxy.instance
       .configure(
@@ -433,6 +435,9 @@ class FlutifyApp extends StatelessWidget {
               storageService,
               audioLoader: trackAudioLoader,
               sessionStore: playbackSessionStore,
+              defaultRepeatMode: AppPreferences.decode(
+                storageService.preferencesJson,
+              ).defaultRepeatMode,
             );
             // 关窗前保存进度（进程退出时 Provider 不一定来得及 dispose）
             DesktopWindow.addBeforeCloseHook(playback.flushSession);
@@ -636,7 +641,10 @@ void _startConnectReceiver(
   final host = PlaybackReceiverHost(playback);
   String nameOf() {
     final name = preferences.prefs.connectDeviceName;
-    return name.isEmpty ? ConnectReceiver.defaultDeviceName : name;
+    if (name.isNotEmpty) return name;
+    return cachedLocalDeviceName.isNotEmpty
+        ? cachedLocalDeviceName
+        : ConnectReceiver.defaultDeviceName;
   }
 
   final receiver = ConnectReceiver(

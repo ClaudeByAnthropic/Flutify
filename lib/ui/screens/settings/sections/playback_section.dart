@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../l10n/l10n.dart';
+import '../../../../models/playback_state.dart' show SpotifyRepeatMode;
 import '../../../../providers/playback_provider.dart';
 import '../../../../providers/preferences_provider.dart';
 import '../widgets/settings_section.dart';
+import '../widgets/settings_segmented.dart';
 import '../widgets/settings_slider_tile.dart';
 
 /// 播放：连续多首无法播放时自动暂停（默认开启）、音量均衡、歌曲间淡入淡出。
@@ -21,6 +23,9 @@ class PlaybackSection extends StatelessWidget {
     final canvasEnabled = context.select<PreferencesProvider, bool>(
       (p) => p.prefs.canvasEnabled,
     );
+    final defaultRepeat = context.select<PreferencesProvider, SpotifyRepeatMode>(
+      (p) => p.prefs.defaultRepeatMode,
+    );
     final (pauseAfterFailures, normalize, fadeSeconds) = context
         .select<PlaybackProvider, (bool, bool, int)>(
           (p) => (p.pauseAfterFailures, p.normalizeVolume, p.fadeSeconds),
@@ -35,6 +40,22 @@ class PlaybackSection extends StatelessWidget {
           value: canvasEnabled,
           onChanged: (v) =>
               preferences.update(preferences.prefs.copyWith(canvasEnabled: v)),
+        ),
+        SettingsTile(
+          title: l10n.settingsDefaultRepeat,
+          subtitle: l10n.settingsDefaultRepeatSubtitle,
+          below: SettingsSegmented<SpotifyRepeatMode>(
+            values: SpotifyRepeatMode.values,
+            labelOf: (v) => switch (v) {
+              SpotifyRepeatMode.off => l10n.settingsRepeatOff,
+              SpotifyRepeatMode.context => l10n.settingsRepeatList,
+              SpotifyRepeatMode.track => l10n.settingsRepeatTrack,
+            },
+            selected: defaultRepeat,
+            onChanged: (v) => preferences.update(
+              preferences.prefs.copyWith(defaultRepeatMode: v),
+            ),
+          ),
         ),
         SettingsSwitchTile(
           title: l10n.settingsPauseAfterFailures,

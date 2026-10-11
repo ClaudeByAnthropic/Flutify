@@ -46,7 +46,7 @@ class ConnectSection extends StatelessWidget {
             subtitle: l10n.settingsConnectDeviceNameSubtitle,
             below: DeviceNameField(
               name: deviceName,
-              hint: ConnectReceiver.defaultDeviceName,
+              hint: cachedLocalDeviceName.isNotEmpty ? cachedLocalDeviceName : ConnectReceiver.defaultDeviceName,
               onApply: (v) => provider.update(provider.prefs.copyWith(connectDeviceName: v)),
               suggestion: localDeviceName,
               suggestionLabel: l10n.settingsConnectUseDeviceName,

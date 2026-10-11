@@ -1159,6 +1159,21 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsStartPageLast => '前回のページ';
 
   @override
+  String get settingsDefaultRepeat => 'デフォルトのリピート';
+
+  @override
+  String get settingsDefaultRepeatSubtitle => 'アプリ起動時のリピート方式。前回の状態より優先されます';
+
+  @override
+  String get settingsRepeatOff => 'リピートなし';
+
+  @override
+  String get settingsRepeatList => 'リストをリピート';
+
+  @override
+  String get settingsRepeatTrack => '1曲リピート';
+
+  @override
   String get settingsRememberWindow => 'ウィンドウのサイズと位置を記憶';
 
   @override

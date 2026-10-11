@@ -33,3 +33,10 @@ Future<String> localDeviceName() async {
     return '';
   }
 }
+
+/// 启动时读取并缓存的本机名称，供 Connect 默认设备名同步使用；读取前 / 失败为空串。
+String cachedLocalDeviceName = '';
+
+Future<void> loadLocalDeviceName() async {
+  cachedLocalDeviceName = (await localDeviceName()).trim();
+}

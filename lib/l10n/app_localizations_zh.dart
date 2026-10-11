@@ -1161,6 +1161,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsStartPageLast => '上次位置';
 
   @override
+  String get settingsDefaultRepeat => '默认循环方式';
+
+  @override
+  String get settingsDefaultRepeatSubtitle => '应用启动时使用的循环方式，覆盖上次退出时的状态';
+
+  @override
+  String get settingsRepeatOff => '不循环';
+
+  @override
+  String get settingsRepeatList => '列表循环';
+
+  @override
+  String get settingsRepeatTrack => '单曲循环';
+
+  @override
   String get settingsRememberWindow => '记住窗口大小和位置';
 
   @override
@@ -2956,6 +2971,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsStartPageLast => '上次位置';
+
+  @override
+  String get settingsDefaultRepeat => '預設循環方式';
+
+  @override
+  String get settingsDefaultRepeatSubtitle => '應用程式啟動時使用的循環方式，覆蓋上次結束時的狀態';
+
+  @override
+  String get settingsRepeatOff => '不循環';
+
+  @override
+  String get settingsRepeatList => '列表循環';
+
+  @override
+  String get settingsRepeatTrack => '單曲循環';
 
   @override
   String get settingsRememberWindow => '記住視窗大小和位置';
