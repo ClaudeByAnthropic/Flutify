@@ -1,6 +1,5 @@
 import 'dart:ui' show lerpDouble;
 
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/flutify_tokens.dart';
@@ -363,11 +362,7 @@ class PlayerArtworkHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb ||
-        defaultTargetPlatform != TargetPlatform.android ||
-        context.reduceMotion) {
-      return child;
-    }
+    if (context.reduceMotion) return child;
     return Hero(
       tag: 'player-artwork',
       curve: PlayerExpansionMotion.curve,

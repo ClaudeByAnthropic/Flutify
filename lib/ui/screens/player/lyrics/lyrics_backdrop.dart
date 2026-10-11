@@ -27,7 +27,10 @@ class LyricsBackdrop extends StatelessWidget {
         reducedEffects: reducedEffects,
       );
     }
-    final animate = !context.reduceMotion && !context.tokens.powerSaving;
+    // 非歌词视图（封面/队列）只显示静态模糊封面，与 Android 的 reducedEffects 一致，
+    // 切到歌词时再恢复流动，避免在 Windows 上整个播放器持续重绘。
+    final animate =
+        !context.reduceMotion && !context.tokens.powerSaving && !reducedEffects;
     // 与 Android 原生背景同一配方：黑底、同样的旋转/饱和度/压暗/模糊
     return LiquidArtworkBackground(
       imageUrl: imageUrl,

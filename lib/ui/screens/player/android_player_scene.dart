@@ -6,7 +6,7 @@ import '../../widgets/liquid_glass.dart';
 import 'player_lyrics_layout.dart';
 import 'player_lyrics_motion.dart';
 
-/// Android-only composition. Each slot keeps its identity as its bounds move;
+/// Shared player composition for every platform. Each slot keeps its identity as its bounds move;
 /// playback and translation remain owned by the existing player widgets.
 class AndroidPlayerScene extends StatefulWidget {
   const AndroidPlayerScene({

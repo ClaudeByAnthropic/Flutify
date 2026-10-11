@@ -21,6 +21,7 @@ import 'package:flutify_app/ui/widgets/mini_player.dart';
 import 'package:flutify_app/ui/widgets/marquee_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -264,8 +265,8 @@ void main() {
       );
       expect(
         find.descendant(of: player, matching: find.byType(SwipeableArtwork)),
-        platform == TargetPlatform.android ? findsOneWidget : findsNothing,
-        reason: 'only Android keeps the shared artwork in the queue card',
+        findsOneWidget,
+        reason: 'every platform keeps the shared artwork in the queue card',
       );
 
       await tester.tap(
@@ -905,23 +906,47 @@ void main() {
     );
   }
 
-  testWidgets('other platforms keep the rounded top corners', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    await pumpPlaying(tester);
-    await tester.tap(find.byType(MiniPlayer));
-    await settle(tester);
-    debugDefaultTargetPlatformOverride = null;
+  for (final platform in [
+    TargetPlatform.iOS,
+    TargetPlatform.windows,
+    TargetPlatform.macOS,
+  ]) {
+    testWidgets('$platform narrow player uses the same full-screen route', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = platform;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await pumpPlaying(tester);
+      await tester.tap(find.byType(MiniPlayer));
+      await settle(tester);
 
-    final clip = tester.widget<ClipRRect>(
-      find
-          .descendant(
-            of: find.byType(FullPlayerSheet),
-            matching: find.byType(ClipRRect),
-          )
-          .first,
-    );
-    expect(clip.borderRadius, isNot(BorderRadius.zero));
-  });
+      final clip = tester.widget<ClipRRect>(
+        find
+            .descendant(
+              of: find.byType(FullPlayerSheet),
+              matching: find.byType(ClipRRect),
+            )
+            .first,
+      );
+      expect(clip.borderRadius, BorderRadius.zero);
+      expect(find.byType(PlayerExpansionTransition), findsOneWidget);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets('$platform Esc closes the narrow player', (tester) async {
+      debugDefaultTargetPlatformOverride = platform;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await pumpPlaying(tester);
+      await tester.tap(find.byType(MiniPlayer));
+      await settle(tester);
+      expect(find.byType(FullPlayerSheet), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(find.byType(FullPlayerSheet), findsNothing);
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
 }
 
 Future<void> settle(WidgetTester tester) async {
