@@ -125,9 +125,13 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   await CacheDirectoryAccess.restore();
 
   // 网络代理须在任何网络客户端创建前就位；系统代理最多等 1.5 秒，读不到就先直连、后台补读
-  // macOS GUI 应用读不到 shell 的代理环境变量，须先挂上原生通道读「系统设置 → 网络 → 代理」
+  // macOS GUI 应用读不到 shell 的代理环境变量，须先挂上原生通道读「系统设置 → 网络 → 代理」；
+  // Windows 的 PAC / 自动检测同理，浏览器与 WebView2 会执行，Dart 只能经原生 WinHTTP 逐 URL 求值
   installMacOSSystemProxyReader();
+  installWindowsSystemProxyReader();
   ProxyHttpOverrides.install(NetworkProxy.instance);
+  // 证书被拒绝时记录对端证书（不改变校验结果），用于定位代理 / 安全软件的 HTTPS 拦截
+  ProxyHttpOverrides.certificateRejectionLogger = debugPrint;
   reportStage('配置网络');
   final initialPrefs = AppPreferences.decode(storageService.preferencesJson);
   await NetworkProxy.instance
@@ -233,6 +237,8 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
   // 桌面端：隐藏系统标题栏（由顶栏自绘）、设置最小窗口尺寸、还原上次的窗口位置
   reportStage('准备窗口');
   await DesktopWindow.init(storageService);
+  // Linux 全曲播放用后台 Chrome：退出前一并关闭，避免残留离屏窗口
+  DesktopWindow.addBeforeCloseHook(EmePlayer.disposeExternalBrowser);
 
   // 系统媒体控制：Windows SMTC（任务栏 / 锁屏媒体卡片、媒体键），Android / iOS 通知栏与锁屏。
   // Windows 上再挂一个任务栏歌词，二者共用同一套本机 / 远程切换与按键路由
@@ -295,6 +301,9 @@ Future<Widget> _initializeApp(ValueChanged<String> reportStage) async {
     clientToken: () => authService.ensureClientToken(),
   );
 
+  // Linux 桌面没有 flutter_inappwebview：EmePlayer 会用系统 Chrome（含 Widevine）
+  // 打开同一个本地 EME 宿主页完成 Widevine 全曲播放（见 services/eme/chrome/）。
+  // （协议链路 AccessPoint 在部分网络/地区被服务端拒绝，故不再作为 Linux 主链路。）
   audioCacheLocation.audioInUse = emeTrackSource.isCacheFileInUse;
   audioCacheLocation.prepareLegacyArtwork = () =>
       ArtworkCache.prepareLegacy(audioCacheLocation.legacyArtworkDirectory!);
