@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../services/network/proxy_mode.dart';
+import 'lyrics_source.dart';
 import '../services/network/spotify_gateway.dart';
 
 /// 网络代理：跟随系统 / 不使用（直连）/ 手动指定 HTTP 代理。
 /// ProxyMode 已移至 services/network/proxy_mode.dart（纯 Dart，供命令行探针复用），这里再导出保持兼容。
 export '../services/network/proxy_mode.dart' show ProxyMode;
+export 'lyrics_source.dart';
 
 /// 界面语言：跟随系统 / 固定中文 / 固定英文。
 enum AppLanguage { system, zh, zhHant, en, ja }
@@ -72,6 +74,9 @@ class AppPreferences {
 
   /// Spotify 没有逐行同步歌词（只有纯文本或完全没有）时，从 LRCLIB 补全。
   final bool lyricsFallback;
+
+  /// 歌词来源优先级，始终包含 [LyricsSource.values] 里的每一项各一次。
+  final List<LyricsSource> lyricsSourceOrder;
   final bool canvasEnabled;
   final List<String> lyricsExcludedLanguages;
   final bool lyricsExcludeInterfaceLanguage;
@@ -114,6 +119,7 @@ class AppPreferences {
     this.gateway = const SpotifyGateway(),
     this.proxyUsername = '',
     this.lyricsFallback = true,
+    this.lyricsSourceOrder = LyricsSource.defaultOrder,
     this.canvasEnabled = true,
     this.lyricsExcludedLanguages = const [],
     this.lyricsExcludeInterfaceLanguage = true,
@@ -158,6 +164,7 @@ class AppPreferences {
     SpotifyGateway? gateway,
     String? proxyUsername,
     bool? lyricsFallback,
+    List<LyricsSource>? lyricsSourceOrder,
     bool? canvasEnabled,
     List<String>? lyricsExcludedLanguages,
     bool? lyricsExcludeInterfaceLanguage,
@@ -189,6 +196,11 @@ class AppPreferences {
       gateway: gateway ?? this.gateway,
       proxyUsername: proxyUsername ?? this.proxyUsername,
       lyricsFallback: lyricsFallback ?? this.lyricsFallback,
+      lyricsSourceOrder: lyricsSourceOrder == null
+          ? this.lyricsSourceOrder
+          : LyricsSource.parseOrder(
+              lyricsSourceOrder.map((s) => s.name).toList(),
+            ),
       canvasEnabled: canvasEnabled ?? this.canvasEnabled,
       lyricsExcludedLanguages:
           lyricsExcludedLanguages ?? this.lyricsExcludedLanguages,
@@ -225,6 +237,7 @@ class AppPreferences {
     'gateway': gateway.toJson(),
     'proxyUsername': proxyUsername,
     'lyricsFallback': lyricsFallback,
+    'lyricsSourceOrder': [for (final s in lyricsSourceOrder) s.name],
     'canvasEnabled': canvasEnabled,
     'lyricsExcludedLanguages': lyricsExcludedLanguages,
     'lyricsExcludeInterfaceLanguage': lyricsExcludeInterfaceLanguage,
@@ -290,6 +303,7 @@ class AppPreferences {
           ? (json['proxyUsername'] as String).trim()
           : d.proxyUsername,
       lyricsFallback: flag(json['lyricsFallback'], d.lyricsFallback),
+      lyricsSourceOrder: LyricsSource.parseOrder(json['lyricsSourceOrder']),
       canvasEnabled: flag(json['canvasEnabled'], d.canvasEnabled),
       lyricsExcludedLanguages: json['lyricsExcludedLanguages'] is List
           ? List.unmodifiable(
@@ -372,6 +386,7 @@ class AppPreferences {
       other.gateway == gateway &&
       other.proxyUsername == proxyUsername &&
       other.lyricsFallback == lyricsFallback &&
+      listEquals(other.lyricsSourceOrder, lyricsSourceOrder) &&
       other.canvasEnabled == canvasEnabled &&
       listEquals(other.lyricsExcludedLanguages, lyricsExcludedLanguages) &&
       other.lyricsExcludeInterfaceLanguage == lyricsExcludeInterfaceLanguage &&
@@ -403,6 +418,7 @@ class AppPreferences {
     gateway,
     proxyUsername,
     lyricsFallback,
+    Object.hashAll(lyricsSourceOrder),
     canvasEnabled,
     Object.hashAll(lyricsExcludedLanguages),
     lyricsExcludeInterfaceLanguage,

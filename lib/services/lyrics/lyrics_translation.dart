@@ -130,7 +130,8 @@ class LyricsTranslationController extends ChangeNotifier {
         : '${query.trackId}|${query.title}|${query.artist}';
     final settingsKey =
         '${prefs.lyricsAutoTranslate}|${prefs.lyricsExcludeInterfaceLanguage}|'
-        '${prefs.lyricsExcludedLanguages.join(',')}|${prefs.lyricsFallback}|${prefs.lyricsBilingual}';
+        '${prefs.lyricsExcludedLanguages.join(',')}|${prefs.lyricsFallback}|${prefs.lyricsBilingual}|'
+        '${prefs.lyricsSourceOrder.map((s) => s.name).join(',')}';
     if (identical(lyrics, _lyrics) &&
         target == _target &&
         trackKey == _trackKey &&

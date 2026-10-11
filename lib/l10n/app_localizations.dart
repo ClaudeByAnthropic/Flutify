@@ -1919,6 +1919,72 @@ abstract class AppLocalizations {
   /// **'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选'**
   String get settingsLyricsFallbackSubtitle;
 
+  /// No description provided for @settingsLyricsSourceOrder.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来源优先级'**
+  String get settingsLyricsSourceOrder;
+
+  /// No description provided for @settingsLyricsSourceOrderSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'拖动右侧手柄调整顺序，越靠前越优先。原文在 Spotify 与 LRCLIB 之间按顺序查找，中文译词按 QQ 音乐、网易云音乐、LRCLIB 的顺序补全。'**
+  String get settingsLyricsSourceOrderSubtitle;
+
+  /// No description provided for @settingsLyricsSourceSpotify.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify'**
+  String get settingsLyricsSourceSpotify;
+
+  /// No description provided for @settingsLyricsSourceQqMusic.
+  ///
+  /// In zh, this message translates to:
+  /// **'QQ 音乐'**
+  String get settingsLyricsSourceQqMusic;
+
+  /// No description provided for @settingsLyricsSourceNetease.
+  ///
+  /// In zh, this message translates to:
+  /// **'网易云音乐'**
+  String get settingsLyricsSourceNetease;
+
+  /// No description provided for @settingsLyricsSourceLrclib.
+  ///
+  /// In zh, this message translates to:
+  /// **'LRCLIB'**
+  String get settingsLyricsSourceLrclib;
+
+  /// No description provided for @settingsLyricsSourceRoleSpotify.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文，自带译文'**
+  String get settingsLyricsSourceRoleSpotify;
+
+  /// No description provided for @settingsLyricsSourceRoleLrclib.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文与译文'**
+  String get settingsLyricsSourceRoleLrclib;
+
+  /// No description provided for @settingsLyricsSourceRoleCommunity.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅中文译词'**
+  String get settingsLyricsSourceRoleCommunity;
+
+  /// No description provided for @settingsLyricsSourceDisabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已在「补全歌词」中关闭'**
+  String get settingsLyricsSourceDisabled;
+
+  /// No description provided for @settingsLyricsSourceDrag.
+  ///
+  /// In zh, this message translates to:
+  /// **'拖动排序'**
+  String get settingsLyricsSourceDrag;
+
   /// No description provided for @settingsLyricsBilingual.
   ///
   /// In zh, this message translates to:

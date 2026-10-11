@@ -1,5 +1,6 @@
 import '../../models/lyrics.dart';
 import '../../models/lyrics_query.dart';
+import '../../models/lyrics_source.dart';
 import 'lrclib_lyrics_source.dart';
 import 'lyrics_language.dart';
 import 'lyrics_translation.dart';
@@ -14,8 +15,9 @@ class ResolvedLyrics {
   const ResolvedLyrics(this.lyrics, {this.cacheable = true});
 }
 
-/// 歌词来源合并：Spotify 官方优先，没有逐行同步歌词时用 LRCLIB 补全；
+/// 歌词来源合并：默认 Spotify 官方优先，没有逐行同步歌词时用 LRCLIB 补全；
 /// 之后可选挂译文源（QQ 优先、网易云兜底，只取译文、不动原文）。
+/// 先后顺序由设置里的「歌词来源优先级」（[LyricsSource]）决定，下表为默认顺序。
 ///
 /// | Spotify 结果 | 处理 |
 /// |---|---|
@@ -51,6 +53,9 @@ class LyricsResolver {
   /// 是否在加载原文时预取双语歌词；主动翻译由 translate 单独处理。
   final bool Function() _translationEnabled;
 
+  /// 歌词来源优先级，每次查询时读取（解析途中改顺序以改后为准）。
+  final List<LyricsSource> Function() _sourceOrder;
+
   LyricsResolver(
     this._official, {
     this.fallback,
@@ -58,8 +63,10 @@ class LyricsResolver {
     this.translation,
     this.qqTranslation,
     bool Function()? translationEnabled,
+    List<LyricsSource> Function()? sourceOrder,
   }) : _fallbackEnabled = fallbackEnabled ?? (() => true),
-       _translationEnabled = translationEnabled ?? (() => true);
+       _translationEnabled = translationEnabled ?? (() => true),
+       _sourceOrder = sourceOrder ?? (() => LyricsSource.defaultOrder);
 
   /// 翻译按钮或自动翻译明确发起的查询，不依赖「预加载双语歌词」开关。
   /// QQ / 网易云提供中文译词；只转换译词字形，不把原文转字形冒充翻译。
@@ -98,8 +105,22 @@ class LyricsResolver {
 
     final language = LyricsLanguage.normalize(target);
     var networkError = false;
-    if (language.startsWith('zh')) {
-      for (final source in translationSources) {
+    // 按设置里的优先级依次查询：QQ / 网易云只提供中文译词，LRCLIB 受「补全歌词」开关控制。
+    for (final id in _sourceOrder()) {
+      if (id == LyricsSource.lrclib) {
+        if (!_fallbackEnabled()) continue;
+        try {
+          consider(await fallback?.findTranslation(query, lyrics, target));
+        } catch (_) {
+          networkError = true;
+        }
+      } else {
+        final source = switch (id) {
+          LyricsSource.qqMusic => qqTranslation,
+          LyricsSource.netease => translation,
+          _ => null,
+        };
+        if (source == null || !language.startsWith('zh')) continue;
         if (best?.provider == source.provider) continue;
         try {
           final found = await source.find(query, lyrics.lines);
@@ -131,16 +152,9 @@ class LyricsResolver {
         } catch (_) {
           networkError = true;
         }
-        if (best?.isCompleteFor(lyrics) ?? false) {
-          return (translation: best, networkError: networkError);
-        }
       }
-    }
-    if (_fallbackEnabled()) {
-      try {
-        consider(await fallback?.findTranslation(query, lyrics, target));
-      } catch (_) {
-        networkError = true;
+      if (best?.isCompleteFor(lyrics) ?? false) {
+        return (translation: best, networkError: networkError);
       }
     }
     return (translation: best, networkError: networkError);
@@ -164,23 +178,38 @@ class LyricsResolver {
     SpotifyLyrics? official;
     Object? error;
     StackTrace? stack;
-    try {
-      official = await _official(query.trackId);
-    } catch (e, s) {
-      error = e;
-      stack = s;
-    }
-    if (official != null && official.isSynced) return ResolvedLyrics(official);
+    var officialLoaded = false;
+    var cacheable = true;
 
-    final fallback = this.fallback;
-    var cacheable = error == null;
-    if (fallback != null && _fallbackEnabled()) {
-      final found = await fallback.find(query);
-      final lyrics = found.lyrics;
-      if (lyrics != null) return ResolvedLyrics(lyrics);
-      if (found.networkError) cacheable = false;
+    Future<void> loadOfficial() async {
+      officialLoaded = true;
+      try {
+        official = await _official(query.trackId);
+      } catch (e, s) {
+        error = e;
+        stack = s;
+      }
     }
-    if (error != null) Error.throwWithStackTrace(error, stack!);
+
+    // 原文只有 Spotify 与 LRCLIB：按优先级依次查，第一个给出逐行同步歌词的即采用，
+    // 排在前面的来源命中后不再请求后面的。
+    for (final id in _sourceOrder()) {
+      if (id == LyricsSource.spotify) {
+        await loadOfficial();
+        final lyrics = official;
+        if (lyrics != null && lyrics.isSynced) return ResolvedLyrics(lyrics);
+      } else if (id == LyricsSource.lrclib) {
+        final fallback = this.fallback;
+        if (fallback == null || !_fallbackEnabled()) continue;
+        final found = await fallback.find(query);
+        final lyrics = found.lyrics;
+        if (lyrics != null) return ResolvedLyrics(lyrics);
+        if (found.networkError) cacheable = false;
+      }
+    }
+    // 顺序里缺了 Spotify（不应出现）也要给出官方结果或错误
+    if (!officialLoaded) await loadOfficial();
+    if (error != null) Error.throwWithStackTrace(error!, stack!);
     return ResolvedLyrics(
       official ?? const SpotifyLyrics(lines: []),
       cacheable: cacheable,

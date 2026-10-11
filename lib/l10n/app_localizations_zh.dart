@@ -1003,6 +1003,40 @@ class AppLocalizationsZh extends AppLocalizations {
       'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选';
 
   @override
+  String get settingsLyricsSourceOrder => '歌词来源优先级';
+
+  @override
+  String get settingsLyricsSourceOrderSubtitle =>
+      '拖动右侧手柄调整顺序，越靠前越优先。原文在 Spotify 与 LRCLIB 之间按顺序查找，中文译词按 QQ 音乐、网易云音乐、LRCLIB 的顺序补全。';
+
+  @override
+  String get settingsLyricsSourceSpotify => 'Spotify';
+
+  @override
+  String get settingsLyricsSourceQqMusic => 'QQ 音乐';
+
+  @override
+  String get settingsLyricsSourceNetease => '网易云音乐';
+
+  @override
+  String get settingsLyricsSourceLrclib => 'LRCLIB';
+
+  @override
+  String get settingsLyricsSourceRoleSpotify => '原文，自带译文';
+
+  @override
+  String get settingsLyricsSourceRoleLrclib => '原文与译文';
+
+  @override
+  String get settingsLyricsSourceRoleCommunity => '仅中文译词';
+
+  @override
+  String get settingsLyricsSourceDisabled => '已在「补全歌词」中关闭';
+
+  @override
+  String get settingsLyricsSourceDrag => '拖动排序';
+
+  @override
   String get settingsLyricsBilingual => '社区歌词翻译';
 
   @override
@@ -2749,6 +2783,40 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get settingsLyricsFallbackSubtitle =>
       'Spotify 沒有逐行同步歌詞時，從 LRCLIB 開放歌詞庫補全，并按原唱語言挑選';
+
+  @override
+  String get settingsLyricsSourceOrder => '歌詞來源優先順序';
+
+  @override
+  String get settingsLyricsSourceOrderSubtitle =>
+      '拖曳右側把手調整順序，越靠前越優先。原文在 Spotify 與 LRCLIB 之間依序查找，中文譯詞依 QQ 音樂、網易雲音樂、LRCLIB 的順序補全。';
+
+  @override
+  String get settingsLyricsSourceSpotify => 'Spotify';
+
+  @override
+  String get settingsLyricsSourceQqMusic => 'QQ 音樂';
+
+  @override
+  String get settingsLyricsSourceNetease => '網易雲音樂';
+
+  @override
+  String get settingsLyricsSourceLrclib => 'LRCLIB';
+
+  @override
+  String get settingsLyricsSourceRoleSpotify => '原文，內建譯文';
+
+  @override
+  String get settingsLyricsSourceRoleLrclib => '原文與譯文';
+
+  @override
+  String get settingsLyricsSourceRoleCommunity => '僅中文譯詞';
+
+  @override
+  String get settingsLyricsSourceDisabled => '已在「補全歌詞」中關閉';
+
+  @override
+  String get settingsLyricsSourceDrag => '拖曳排序';
 
   @override
   String get settingsLyricsBilingual => '社群歌詞翻譯';

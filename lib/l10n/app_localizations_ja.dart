@@ -1000,6 +1000,40 @@ class AppLocalizationsJa extends AppLocalizations {
       'Spotify に同期歌詞がない場合、公開ライブラリ LRCLIB から曲の原語の歌詞を取得します';
 
   @override
+  String get settingsLyricsSourceOrder => '歌詞ソースの優先順位';
+
+  @override
+  String get settingsLyricsSourceOrderSubtitle =>
+      '右側のハンドルをドラッグして順番を変更します。上にあるほど優先されます。原文は Spotify と LRCLIB の間でこの順に検索し、中国語訳詞は QQ Music、NetEase Music、LRCLIB の順で補完します。';
+
+  @override
+  String get settingsLyricsSourceSpotify => 'Spotify';
+
+  @override
+  String get settingsLyricsSourceQqMusic => 'QQ Music';
+
+  @override
+  String get settingsLyricsSourceNetease => 'NetEase Music';
+
+  @override
+  String get settingsLyricsSourceLrclib => 'LRCLIB';
+
+  @override
+  String get settingsLyricsSourceRoleSpotify => '原文、内蔵の訳詞';
+
+  @override
+  String get settingsLyricsSourceRoleLrclib => '原文と訳詞';
+
+  @override
+  String get settingsLyricsSourceRoleCommunity => '中国語訳詞のみ';
+
+  @override
+  String get settingsLyricsSourceDisabled => '「見つからない歌詞を補完」でオフ';
+
+  @override
+  String get settingsLyricsSourceDrag => 'ドラッグで並べ替え';
+
+  @override
   String get settingsLyricsBilingual => 'コミュニティの歌詞翻訳';
 
   @override

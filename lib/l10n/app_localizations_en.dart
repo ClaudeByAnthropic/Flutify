@@ -1036,6 +1036,43 @@ class AppLocalizationsEn extends AppLocalizations {
       'When Spotify has no time-synced lyrics, get them from the open LRCLIB library in the song\'s original language';
 
   @override
+  String get settingsLyricsSourceOrder => 'Lyrics source priority';
+
+  @override
+  String get settingsLyricsSourceOrderSubtitle =>
+      'Drag the handle to reorder; sources higher up are tried first. Original lyrics are looked up between Spotify and LRCLIB in this order, and Chinese translations are filled in from QQ Music, NetEase Music and LRCLIB in this order.';
+
+  @override
+  String get settingsLyricsSourceSpotify => 'Spotify';
+
+  @override
+  String get settingsLyricsSourceQqMusic => 'QQ Music';
+
+  @override
+  String get settingsLyricsSourceNetease => 'NetEase Music';
+
+  @override
+  String get settingsLyricsSourceLrclib => 'LRCLIB';
+
+  @override
+  String get settingsLyricsSourceRoleSpotify =>
+      'Original lyrics, built-in translation';
+
+  @override
+  String get settingsLyricsSourceRoleLrclib =>
+      'Original lyrics and translation';
+
+  @override
+  String get settingsLyricsSourceRoleCommunity => 'Chinese translation only';
+
+  @override
+  String get settingsLyricsSourceDisabled =>
+      'Turned off in Fill in missing lyrics';
+
+  @override
+  String get settingsLyricsSourceDrag => 'Drag to reorder';
+
+  @override
   String get settingsLyricsBilingual => 'Community lyric translations';
 
   @override

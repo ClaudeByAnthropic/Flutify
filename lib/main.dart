@@ -5,6 +5,7 @@ import 'core/utils/file_log.dart';
 import 'core/widgets/app_startup.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -486,16 +487,23 @@ class FlutifyApp extends StatelessWidget {
                 qqTranslation: qqLyricsTranslation,
                 // 关闭时不预加载；翻译按钮 / 自动翻译仍可发起查询。
                 translationEnabled: () => preferences.prefs.lyricsBilingual,
+                sourceOrder: () => preferences.prefs.lyricsSourceOrder,
               ),
             );
             // 打开双语歌词：关闭期间解析的歌词没查过译文，作废内存里的结果重新解析（本地缓存保留）。
-            // 关上不用处理：界面与任务栏不再显示译文，之后也不会再查
+            // 关上不用处理：界面与任务栏不再显示译文，之后也不会再查。
+            // 歌词来源优先级变化：已解析的原文 / 译文可能来自另一个来源，也作废重解析。
             var bilingual = preferences.prefs.lyricsBilingual;
+            var sourceOrder = preferences.prefs.lyricsSourceOrder;
             preferences.addListener(() {
               final enabled = preferences.prefs.lyricsBilingual;
-              if (enabled == bilingual) return;
+              final order = preferences.prefs.lyricsSourceOrder;
+              final orderChanged = !listEquals(order, sourceOrder);
+              sourceOrder = order;
+              if (enabled == bilingual && !orderChanged) return;
+              final turnedOn = enabled && !bilingual;
               bilingual = enabled;
-              if (enabled) spotify.invalidateResolvedLyrics();
+              if (turnedOn || orderChanged) spotify.invalidateResolvedLyrics();
             });
             return spotify;
           },
