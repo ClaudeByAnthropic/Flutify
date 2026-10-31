@@ -5,34 +5,20 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/flutify_tokens.dart';
 import '../../../core/theme/md3e_theme.dart';
 import '../../../core/theme/system_bars.dart';
-import '../../../core/utils/artwork_palette.dart';
 import '../../../l10n/l10n.dart';
-import '../../../l10n/model_labels.dart';
 import '../../../models/playback_context.dart';
 import '../../../models/track.dart';
 import '../../../providers/appearance_provider.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../providers/connect_provider.dart';
+import '../../../services/storage_service.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/connect/connect_actions.dart';
-import '../../widgets/connect/remote_progress.dart';
-import '../../widgets/connect/remote_transport_controls.dart';
-import '../../widgets/liquid_glass.dart';
-import '../../widgets/playback_scrubber.dart';
-import '../../widgets/player_controls.dart';
-import '../../widgets/track_menu.dart';
-import 'device_picker_sheet.dart';
-import 'immersive_lyrics_screen.dart';
-import 'lyrics/glass_icon_button.dart';
-import 'lyrics/lyrics_backdrop.dart';
-import 'lyrics/lyrics_view.dart';
-import 'lyrics_sheet.dart';
-import 'queue_list.dart';
+import 'player_modal.dart';
+import 'player_expansion.dart';
+import 'player_scene_view.dart';
 import 'widgets/swipeable_artwork.dart';
-
-/// 全屏播放器中间区域的内容。
-enum _PlayerView { artwork, lyrics, queue }
 
 /// 全屏播放器（移动端底部全屏面板 / 桌面端居中对话框）。
 ///
@@ -46,53 +32,110 @@ enum _PlayerView { artwork, lyrics, queue }
 /// 本组件只在切歌或播放上下文变化时重建；进度条、播放按钮、随机/循环、
 /// 点赞按钮均为独立订阅的子组件。
 class FullPlayerSheet extends StatefulWidget {
-  const FullPlayerSheet({super.key});
+  const FullPlayerSheet({
+    super.key,
+    this.fullscreen = false,
+    this.expansionAnimation,
+  });
+
+  /// Presentation is selected when opening the route; resizing does not change it.
+  final bool fullscreen;
+  final Animation<double>? expansionAnimation;
 
   /// 根据窗口宽度选择以底部面板或对话框形式打开。
-  static Future<void> show(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
+  static Future<void> show(BuildContext context) => PlayerModal.show(context, (
+    captureRoute,
+  ) {
+    // 宽但矮的窗口（手机横屏、压扁的桌面窗口）放不下 420×720 的对话框，
+    // 改走全屏路由，由场景自己切到横屏布局。
+    final screen = MediaQuery.sizeOf(context);
+    final isDesktop = screen.width >= 800 && screen.height >= 600;
     if (isDesktop) {
       return showDialog(
         context: context,
-        builder: (_) => const Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: EdgeInsets.all(24),
-          child: SizedBox(width: 420, height: 720, child: FullPlayerSheet()),
-        ),
+        builder: (dialogContext) {
+          captureRoute(dialogContext);
+          return const Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: EdgeInsets.all(24),
+            child: SizedBox(width: 420, height: 720, child: FullPlayerSheet()),
+          );
+        },
       );
     }
-    return showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      useSafeArea: false,
-      showDragHandle: false,
-      backgroundColor: Colors.transparent,
-      // 底部面板会清掉顶部安全区（useSafeArea: false 时 removeTop），全屏播放器又铺满整屏，
-      // 内部的 SafeArea 因此读到 0、内容画进状态栏；这里把外层的安全区原样补回。
-      builder: (sheetContext) => MediaQuery(
-        data: MediaQuery.of(sheetContext).copyWith(
-          padding: MediaQuery.paddingOf(context),
-          viewPadding: MediaQuery.viewPaddingOf(context),
+    // 窄窗口（手机、Windows 竖屏窄窗）在所有平台上共用同一套从迷你播放器展开的全屏路由。
+    final origin = PlayerExpansionSource.capture(context);
+    final reduceMotion = context.reduceMotion;
+    final themes = InheritedTheme.capture(
+      from: context,
+      to: Navigator.of(context, rootNavigator: true).context,
+    );
+    return Navigator.of(context, rootNavigator: true).push<void>(
+      PageRouteBuilder<void>(
+        settings: const RouteSettings(name: AppRoutes.fullPlayerRouteName),
+        opaque: false,
+        fullscreenDialog: true,
+        barrierColor: Colors.black26,
+        transitionDuration: context.motion(PlayerExpansionMotion.duration),
+        reverseTransitionDuration: context.motion(
+          PlayerExpansionMotion.reverseDuration,
         ),
-        child: SizedBox(height: MediaQuery.sizeOf(context).height, child: const FullPlayerSheet()),
+        pageBuilder: (sheetContext, animation, secondaryAnimation) {
+          captureRoute(sheetContext);
+          final media = MediaQuery.of(sheetContext);
+          return themes.wrap(
+            MediaQuery(
+              data: media.copyWith(
+                padding: media.viewPadding,
+                disableAnimations: reduceMotion,
+              ),
+              child: FullPlayerSheet(
+                fullscreen: true,
+                expansionAnimation: animation,
+              ),
+            ),
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+            Material(
+              type: MaterialType.transparency,
+              child: PlayerExpansionTransition(
+                animation: animation,
+                origin: origin,
+                child: child,
+              ),
+            ),
       ),
     );
-  }
+  });
 
   @override
   State<FullPlayerSheet> createState() => _FullPlayerSheetState();
 }
 
 class _FullPlayerSheetState extends State<FullPlayerSheet> {
-  _PlayerView _view = _PlayerView.artwork;
+  double _dismissDragDistance = 0;
+  late bool _pinned;
+  StorageService? _storage;
 
-  void _toggle(_PlayerView view) => setState(() => _view = _view == view ? _PlayerView.artwork : view);
+  @override
+  void initState() {
+    super.initState();
+    _storage = context.read<StorageService?>();
+    _pinned = _storage?.immersivePinned ?? false;
+  }
+
+  void _setPinned(bool value) {
+    setState(() => _pinned = value);
+    _storage?.setImmersivePinned(value);
+  }
 
   @override
   Widget build(BuildContext context) {
     // 始终按用户外观设置的「深色」主题绘制（强调色、圆角、玻璃强度同步生效）
-    final theme = context.watch<AppearanceProvider?>()?.theme(Brightness.dark) ?? MD3ETheme.dark;
+    final theme =
+        context.watch<AppearanceProvider?>()?.theme(Brightness.dark) ??
+        MD3ETheme.dark;
     return Theme(
       data: theme,
       child: AnnotatedRegion<SystemUiOverlayStyle>(
@@ -106,312 +149,83 @@ class _FullPlayerSheetState extends State<FullPlayerSheet> {
     // 远程模式：显示远程曲目、标题行标出设备名（控制权规则与播放栏一致）
     final remote = ConnectActions.showRemote(context);
     final track = remote
-        ? context.select<ConnectProvider?, SpotifyTrack?>((c) => c?.displayTrack)
-        : context.select<PlaybackProvider, SpotifyTrack?>((p) => p.currentTrack);
+        ? context.select<ConnectProvider?, SpotifyTrack?>(
+            (c) => c?.displayTrack,
+          )
+        : context.select<PlaybackProvider, SpotifyTrack?>(
+            (p) => p.currentTrack,
+          );
     final deviceName = remote
-        ? context.select<ConnectProvider?, String?>((c) => c?.activeDevice?.name)
+        ? context.select<ConnectProvider?, String?>(
+            (c) => c?.activeDevice?.name,
+          )
         : null;
     final playbackContext = remote
         ? PlaybackContext(type: 'device', name: deviceName ?? '')
-        : context.select<PlaybackProvider, PlaybackContext>((p) => p.playbackContext);
+        : context.select<PlaybackProvider, PlaybackContext>(
+            (p) => p.playbackContext,
+          );
     final colorScheme = Theme.of(context).colorScheme;
-    final topRadius = BorderRadius.vertical(top: Radius.circular(context.tokens.corner(32)));
+    final fullscreen = widget.fullscreen;
+    final radius = fullscreen
+        ? BorderRadius.zero
+        : BorderRadius.circular(context.tokens.corner(32));
     if (track == null) {
-      return _NothingPlaying(color: colorScheme.surfaceContainerLowest, borderRadius: topRadius);
+      return _closeOnEscape(
+        context,
+        _NothingPlaying(
+          color: colorScheme.surfaceContainerLowest,
+          borderRadius: radius,
+        ),
+      );
     }
-    final lyricsMode = _view == _PlayerView.lyrics;
 
-    return ClipRRect(
-      borderRadius: topRadius,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _GradientBackground(imageUrl: track.coverUrl),
-          // 歌词视图：背景交叉淡入为流动封面（与全屏歌词一致的液态玻璃观感）
-          AnimatedSwitcher(
-            duration: context.motion(const Duration(milliseconds: 420)),
-            child: lyricsMode
-                ? LyricsBackdrop(key: const ValueKey('liquid'), imageUrl: track.coverUrl)
-                : const SizedBox.expand(key: ValueKey('plain')),
-          ),
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // 横屏手机等极矮空间：中间区域固定高度，整体可滚动，控件不会被挤出屏幕
-                final compact = constraints.maxHeight < 520;
-                final middle = _Middle(view: _view, track: track);
-                final column = Column(
-                  children: [
-                    _TopBar(track: track, playbackContext: playbackContext),
-                    if (compact) SizedBox(height: 200, child: middle) else Expanded(child: middle),
-                    _ControlsGroup(track: track, glass: lyricsMode, remote: remote),
-                    _BottomBar(view: _view, onToggle: _toggle),
-                  ],
-                );
-
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    child: compact
-                        ? SingleChildScrollView(physics: const ClampingScrollPhysics(), child: column)
-                        : column,
-                  ),
-                );
+    final content = ClipRRect(
+      borderRadius: radius,
+      // 控制卡片与歌词页的玻璃按钮共用同一次背景采样（沉浸式歌词页已是这样），
+      // 否则每个 LiquidGlass 各复制一次下方画面。
+      child: BackdropGroup(
+        child: PlayerSceneView(
+          track: track,
+          playbackContext: playbackContext,
+          remote: remote,
+          expansionAnimation: widget.expansionAnimation,
+          pinned: _pinned,
+          onPinnedChanged: _setPinned,
+        ),
+      ),
+    );
+    return _closeOnEscape(
+      context,
+      fullscreen
+          ? GestureDetector(
+              onVerticalDragStart: (_) => _dismissDragDistance = 0,
+              onVerticalDragUpdate: (details) =>
+                  _dismissDragDistance += details.delta.dy,
+              onVerticalDragCancel: () => _dismissDragDistance = 0,
+              onVerticalDragEnd: (details) {
+                if (_dismissDragDistance > 100 ||
+                    (details.primaryVelocity ?? 0) > 600) {
+                  Navigator.maybePop(context);
+                }
+                _dismissDragDistance = 0;
               },
-            ),
-          ),
-        ],
-      ),
+              child: content,
+            )
+          : content,
     );
   }
-}
 
-/// 封面 / 队列视图的背景：封面主色 → 近黑的渐变。
-class _GradientBackground extends StatelessWidget {
-  final String imageUrl;
-
-  const _GradientBackground({required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return ArtworkColorBuilder(
-      imageUrl: imageUrl,
-      fallback: const Color(0xFF2C2543),
-      builder: (context, artColor) => AnimatedContainer(
-        duration: context.motion(const Duration(milliseconds: 500)),
-        curve: Curves.easeOut,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            // 终点固定为近黑（而非主题底色），浅色模式下白色控件同样清晰
-            colors: [artColor, Color.lerp(artColor, Colors.black, 0.82)!],
-            stops: const [0.0, 0.85],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 歌名 + 进度条 + 播放控件；歌词视图下收进一块液态玻璃，歌词可从其上方滚过时仍清晰可读。
-class _ControlsGroup extends StatelessWidget {
-  final SpotifyTrack track;
-  final bool glass;
-  final bool remote;
-
-  const _ControlsGroup({required this.track, required this.glass, required this.remote});
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _TitleRow(track: track),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: remote
-              ? const RemoteScrubber(
-                  compact: false,
-                  activeColor: Colors.white,
-                  inactiveColor: Colors.white24,
-                  labelColor: Colors.white60,
-                )
-              : const PlaybackScrubber(
-                  activeColor: Colors.white,
-                  inactiveColor: Colors.white24,
-                  labelColor: Colors.white60,
-                ),
-        ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: remote
-              ? const RemoteTransportControls(showModes: true, style: RemoteControlsStyle.glassFull)
-              : const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    ShuffleButton(),
-                    SkipButton(next: false),
-                    PlayPauseButton(),
-                    SkipButton(next: true),
-                    RepeatButton(),
-                  ],
-                ),
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
-    if (!glass) return content;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 4, 10, 2),
-      child: LiquidGlass(borderRadius: context.tokens.radius(28), child: content),
-    );
-  }
-}
-
-/// 中间区域：封面 / 内嵌歌词 / 播放队列，切换时交叉淡入。
-class _Middle extends StatelessWidget {
-  final _PlayerView view;
-  final SpotifyTrack track;
-
-  const _Middle({required this.view, required this.track});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: context.motion(const Duration(milliseconds: 260)),
-      switchInCurve: Curves.easeOutCubic,
-      child: KeyedSubtree(
-        key: ValueKey(view),
-        child: switch (view) {
-          _PlayerView.artwork => LayoutBuilder(
-            builder: (context, box) {
-              final size = (box.maxWidth * 0.86).clamp(140.0, 400.0).clamp(0.0, box.maxHeight * 0.9);
-              return Center(
-                child: SwipeableArtwork(url: track.coverUrl, size: size),
-              );
-            },
-          ),
-          _PlayerView.lyrics => _InlineLyrics(track: track),
-          _PlayerView.queue => const QueueList(horizontalPadding: 16),
+  /// Esc 关闭播放器（桌面键盘）。放在最外层：焦点在内部任意按钮上时按键同样冒泡到这里，
+  /// 目的地菜单、设备选择等上层路由有自己的焦点域，会先处理 Esc。
+  Widget _closeOnEscape(BuildContext context, Widget child) =>
+      CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              Navigator.maybePop(context),
         },
-      ),
-    );
-  }
-}
-
-/// 内嵌歌词（液态玻璃背景由外层提供）；右上角玻璃按钮展开：
-/// 手机为全屏歌词面板，桌面为沉浸式全屏歌词。
-class _InlineLyrics extends StatelessWidget {
-  final SpotifyTrack track;
-
-  const _InlineLyrics({required this.track});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: LyricsView(key: ValueKey(track.id), track: track, topInset: 16, bottomInset: 8),
-        ),
-        Positioned(
-          top: 0,
-          right: 12,
-          child: GlassIconButton(
-            icon: Icons.open_in_full_rounded,
-            size: 36,
-            tooltip: isDesktop ? context.l10n.lyricsImmersive : context.l10n.playerLyricsFullscreen,
-            onPressed: () => isDesktop ? ImmersiveLyricsScreen.open(context) : LyricsSheet.show(context),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  final SpotifyTrack track;
-  final PlaybackContext playbackContext;
-
-  const _TopBar({required this.track, required this.playbackContext});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
-            color: Colors.white,
-            tooltip: context.l10n.commonClose,
-            onPressed: () => Navigator.pop(context),
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                Text(
-                  context.l10n.playingFrom(playbackContext),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                    color: Colors.white.withAlpha(180),
-                  ),
-                ),
-                if (!playbackContext.isNone) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    playbackContext.name,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Builder(
-            // 独立 context：桌面对话框中菜单锚定在按钮下方
-            builder: (buttonContext) => IconButton(
-              icon: const Icon(Icons.more_vert_rounded, size: 22),
-              color: Colors.white,
-              tooltip: context.l10n.commonMoreOptions,
-              onPressed: () => TrackMenu.show(buttonContext, track),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TitleRow extends StatelessWidget {
-  final SpotifyTrack track;
-
-  const _TitleRow({required this.track});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 12, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  child: Text(
-                    track.name,
-                    key: ValueKey(track.id),
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: Colors.white),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                GestureDetector(
-                  onTap: track.artists.isEmpty ? null : () => AppRoutes.openArtist(context, track.artists.first),
-                  child: Text(
-                    track.artistNames,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70, fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          LikeButton(track: track, size: 28),
-        ],
-      ),
-    );
-  }
+        child: Focus(autofocus: true, skipTraversal: true, child: child),
+      );
 }
 
 /// 没有当前曲目时的占位（例如队列被清空后面板仍打开）。
@@ -445,81 +259,6 @@ class _NothingPlaying extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// 底栏：Connect 设备 + 歌词 / 队列视图切换（当前视图高亮并带小圆点）。
-class _BottomBar extends StatelessWidget {
-  final _PlayerView view;
-  final ValueChanged<_PlayerView> onToggle;
-
-  const _BottomBar({required this.view, required this.onToggle});
-
-  @override
-  Widget build(BuildContext context) {
-    final deviceName = context.select<ConnectProvider?, String?>(
-      (c) => (c?.hasRemoteSession ?? false) ? c?.activeDevice?.name : null,
-    );
-    final primary = Theme.of(context).colorScheme.primary;
-    final deviceColor = deviceName != null ? primary : Colors.white70;
-
-    Widget toggle(_PlayerView target, IconData icon, String tooltip) {
-      final active = view == target;
-      return IconButton(
-        tooltip: tooltip,
-        isSelected: active,
-        onPressed: () => onToggle(target),
-        icon: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            Icon(icon, color: active ? primary : Colors.white70, size: 22),
-            if (active)
-              Positioned(
-                bottom: -7,
-                child: Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(color: primary, shape: BoxShape.circle),
-                ),
-              ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: InkWell(
-              borderRadius: context.tokens.pill,
-              onTap: () => DevicePickerSheet.show(context),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                child: Row(
-                  children: [
-                    Icon(Icons.devices_rounded, size: 16, color: deviceColor),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        deviceName ?? context.l10n.playerThisDevice,
-                        style: TextStyle(color: deviceColor, fontWeight: FontWeight.w600, fontSize: 11),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          toggle(_PlayerView.lyrics, Icons.lyrics_outlined, context.l10n.lyricsTitle),
-          toggle(_PlayerView.queue, Icons.queue_music_rounded, context.l10n.queueTitle),
-        ],
       ),
     );
   }

@@ -3,7 +3,9 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  connectivity_plus
   dynamic_color
+  file_selector_windows
   flutter_inappwebview_windows
   media_kit_libs_windows_audio
   screen_retriever_windows
@@ -13,6 +15,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
   jni
+  rust_lib_flutify
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)

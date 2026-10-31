@@ -60,6 +60,16 @@ class AppearanceSettings {
   /// 减弱动效：关闭流动背景、滑动 / 悬停等装饰性动画（系统「减少动态效果」同样生效）。
   final bool reduceMotion;
 
+  /// 省电模式：玻璃不再实时模糊下方画面（改为半透明磨砂底），歌词页流动背景静止。
+  /// 歌词滚动、模糊、当前句动效全部保留。
+  final bool powerSaving;
+
+  /// 整窗帧率上限（fps）；0 = 跟随屏幕刷新率。动画仍按真实时间推进，只是出帧更少。
+  final int frameRateLimit;
+
+  static const int minFrameRateLimit = 30;
+  static const int maxFrameRateLimit = 240;
+
   static const double minFontScale = 0.85;
   static const double maxFontScale = 1.3;
 
@@ -73,6 +83,8 @@ class AppearanceSettings {
     this.fontScale = 1.0,
     this.cornerStyle = CornerStyle.standard,
     this.reduceMotion = false,
+    this.powerSaving = false,
+    this.frameRateLimit = 0,
   });
 
   static const AppearanceSettings defaults = AppearanceSettings();
@@ -87,6 +99,8 @@ class AppearanceSettings {
     double? fontScale,
     CornerStyle? cornerStyle,
     bool? reduceMotion,
+    bool? powerSaving,
+    int? frameRateLimit,
   }) {
     return AppearanceSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -98,6 +112,8 @@ class AppearanceSettings {
       fontScale: fontScale ?? this.fontScale,
       cornerStyle: cornerStyle ?? this.cornerStyle,
       reduceMotion: reduceMotion ?? this.reduceMotion,
+      powerSaving: powerSaving ?? this.powerSaving,
+      frameRateLimit: frameRateLimit ?? this.frameRateLimit,
     );
   }
 
@@ -111,6 +127,8 @@ class AppearanceSettings {
         'fontScale': fontScale,
         'cornerStyle': cornerStyle.name,
         'reduceMotion': reduceMotion,
+        'powerSaving': powerSaving,
+        'frameRateLimit': frameRateLimit,
       };
 
   /// 宽松解析：缺失或非法的字段回退到默认值，旧版本保存的设置也能读。
@@ -132,6 +150,11 @@ class AppearanceSettings {
           : d.fontScale,
       cornerStyle: pick(CornerStyle.values, json['cornerStyle'], d.cornerStyle),
       reduceMotion: json['reduceMotion'] is bool ? json['reduceMotion'] as bool : d.reduceMotion,
+      powerSaving: json['powerSaving'] is bool ? json['powerSaving'] as bool : d.powerSaving,
+      // 0 = 跟随屏幕；其余夹到合法区间
+      frameRateLimit: json['frameRateLimit'] is int && json['frameRateLimit'] != 0
+          ? (json['frameRateLimit'] as int).clamp(minFrameRateLimit, maxFrameRateLimit)
+          : d.frameRateLimit,
     );
   }
 
@@ -146,7 +169,9 @@ class AppearanceSettings {
       other.pureBlack == pureBlack &&
       other.fontScale == fontScale &&
       other.cornerStyle == cornerStyle &&
-      other.reduceMotion == reduceMotion;
+      other.reduceMotion == reduceMotion &&
+      other.powerSaving == powerSaving &&
+      other.frameRateLimit == frameRateLimit;
 
   @override
   int get hashCode => Object.hash(
@@ -159,5 +184,7 @@ class AppearanceSettings {
         fontScale,
         cornerStyle,
         reduceMotion,
+        powerSaving,
+        frameRateLimit,
       );
 }

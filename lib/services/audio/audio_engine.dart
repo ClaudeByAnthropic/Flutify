@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../protocol/progressive_download.dart';
@@ -14,7 +15,14 @@ class EmeTrackContent {
   /// sneaktables policy=1 原始 HLS 清单（含 EXT-X-KEY/MAP/BYTERANGE）。
   final String m3u8;
 
-  const EmeTrackContent({required this.m4aPath, required this.m3u8});
+  /// 该文件的 file_id（hex）。macOS FairPlay 的 FPS content ID 就是它（见 fairplay.dart）。
+  final String fileIdHex;
+
+  const EmeTrackContent({
+    required this.m4aPath,
+    required this.m3u8,
+    required this.fileIdHex,
+  });
 }
 
 /// EME 播放的运行期错误（license 换取失败 / HLS.js 致命错误 / Widevine 不可用等）。
@@ -28,7 +36,7 @@ class EmePlaybackException implements Exception {
   /// 设备缺 Widevine / CDM：解密无从谈起，重试无意义。
   final bool isWidevineMissing;
 
-  /// sp_dc（Web 登录态）疑似失效（license / token 铸造被拒 401/403）：建议重新 Web 登录。
+  /// 缺少 Web 登录态，或依赖 Web token 的认证端点明确返回 401：建议重新登录。
   final bool webSignInSuggested;
 
   /// 原始错误，仅用于日志排查。
@@ -44,6 +52,23 @@ class EmePlaybackException implements Exception {
   @override
   String toString() => message;
 }
+
+/// 实际出声的播放引擎（界面显示、本机输出设备是否可切换）。
+enum PlaybackEngineKind {
+  /// just_audio 本地播放器（Windows / Linux 为 libmpv；本地文件、播客、非 DRM 流）。
+  localPlayer,
+
+  /// WebView2 / Chrome EME 播放（浏览器内核出声）。
+  webView,
+
+  /// Android Media3 / MediaDrm 原生播放。
+  androidDrm,
+}
+
+/// 当前正在出声的引擎；还没播放过为 null。由各引擎在音源就位时更新。
+final ValueNotifier<PlaybackEngineKind?> activePlaybackEngine = ValueNotifier(
+  null,
+);
 
 /// 统一音频引擎抽象：PlaybackProvider 只依赖它，不关心底层是 just_audio 还是 EME。
 ///
@@ -66,13 +91,25 @@ abstract class AudioEngine {
   bool get hasSource;
 
   /// 播放本地已解密音频文件（OGG/MP3 等）。
-  Future<void> playFile(String path, {Duration? initialPosition, bool autoplay = true});
+  Future<void> playFile(
+    String path, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  });
 
   /// 边下边播（仍在下载的曲目）。
-  Future<void> playStream(ProgressiveAudio audio, {Duration? initialPosition, bool autoplay = true});
+  Future<void> playStream(
+    ProgressiveAudio audio, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  });
 
   /// 播放 DRM 曲目（EME / Widevine）。默认不支持（仅 EME 引擎实现）。
-  Future<void> playEme(EmeTrackContent content, {Duration? initialPosition, bool autoplay = true}) {
+  Future<void> playEme(
+    EmeTrackContent content, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) {
     throw UnimplementedError('该引擎不支持 EME 播放');
   }
 

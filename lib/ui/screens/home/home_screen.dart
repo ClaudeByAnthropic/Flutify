@@ -11,6 +11,7 @@ import '../../shell/shell_breakpoints.dart';
 import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/user_avatar.dart';
+import '../../widgets/toast/app_toast.dart';
 import '../auth/login_screen.dart';
 import 'widgets/home_chip_bar.dart';
 import 'widgets/home_feed_grid.dart';
@@ -50,40 +51,91 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_hoverTint.value != color) _hoverTint.value = color;
   }
 
+  Future<void> _refresh() async {
+    if (!context.read<SpotifyApiService>().isConfigured) return;
+    final provider = context.read<SpotifyProvider>();
+    await provider.refreshHome();
+    if (!mounted || provider.homeError == null || provider.isLoadingFeed) {
+      return;
+    }
+    AppToast.show(
+      context,
+      context.l10n.homeRefreshFailed,
+      tone: ToastTone.error,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final desktop = ShellBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+    final desktop = ShellBreakpoints.isDesktop(
+      MediaQuery.sizeOf(context).width,
+    );
     final home = context.select<SpotifyProvider, HomeFeed>((s) => s.home);
     final facet = context.select<SpotifyProvider, String>((s) => s.homeFacet);
-    final loading = context.select<SpotifyProvider, bool>((s) => s.isLoadingFeed);
+    final loading = context.select<SpotifyProvider, bool>(
+      (s) => s.isLoadingFeed,
+    );
     final provider = context.read<SpotifyProvider>();
 
     return Scaffold(
       body: Stack(
         children: [
           // 顶部渐变（官方桌面端效果）：随快捷入口悬停的封面取色，固定在顶部不随滚动
-          Positioned(top: 0, left: 0, right: 0, height: 360, child: HomeTopGradient(tint: _hoverTint)),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: HomeTopGradient.extent,
+            child: HomeTopGradient(tint: _hoverTint),
+          ),
           SafeArea(
             bottom: false,
-            child: CustomScrollView(
-              slivers: [
-                if (!desktop || home.chips.isNotEmpty)
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
                   HomeChipBar(
                     chips: home.chips,
                     selected: facet,
                     onSelected: provider.selectHomeFacet,
-                    background: theme.scaffoldBackgroundColor,
+                    trailing: IconButton(
+                      tooltip: context.l10n.homeRefresh,
+                      onPressed:
+                          loading ||
+                              !context.read<SpotifyApiService>().isConfigured
+                          ? null
+                          : _refresh,
+                      icon: const Icon(Icons.refresh_rounded),
+                      iconSize: 20,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    background: HomeTopGradient(
+                      tint: _hoverTint,
+                      topOffset: MediaQuery.paddingOf(context).top,
+                      background: theme.scaffoldBackgroundColor,
+                    ),
                     leading: desktop
                         ? null
-                        : GestureDetector(
-                            onTap: widget.onOpenSettings,
-                            child: const UserAvatar(size: 32),
+                        : MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: widget.onOpenSettings,
+                              child: const UserAvatar(size: 32),
+                            ),
                           ),
                   ),
-                ..._content(context, home: home, facet: facet, loading: loading, desktop: desktop),
-                const ContentBottomSpacer(),
-              ],
+                  ..._content(
+                    context,
+                    home: home,
+                    facet: facet,
+                    loading: loading,
+                    desktop: desktop,
+                  ),
+                  const ContentBottomSpacer(),
+                ],
+              ),
             ),
           ),
         ],
@@ -112,9 +164,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ];
     }
-    if (home.isEmpty && loading) return [SliverToBoxAdapter(child: HomeSkeleton(desktop: desktop))];
+    if (home.isEmpty && loading)
+      return [SliverToBoxAdapter(child: HomeSkeleton(desktop: desktop))];
     // 续期凭据被吊销时任何请求都会失败，提示重新登录而不是「检查网络」
-    if (home.isEmpty && context.select<AuthProvider, bool>((a) => a.sessionExpired)) {
+    if (home.isEmpty &&
+        context.select<AuthProvider, bool>((a) => a.sessionExpired)) {
       return [
         SliverToBoxAdapter(
           child: EmptyState(
@@ -132,11 +186,15 @@ class _HomeScreenState extends State<HomeScreen> {
       return [
         SliverToBoxAdapter(
           child: EmptyState(
-            icon: failed ? Icons.wifi_off_rounded : Icons.library_music_outlined,
+            icon: failed
+                ? Icons.wifi_off_rounded
+                : Icons.library_music_outlined,
             title: failed ? l10n.homeLoadFailedTitle : l10n.homeEmptyTitle,
-            message: failed ? l10n.homeLoadFailedMessage : l10n.homeEmptyMessage,
+            message: failed
+                ? l10n.homeLoadFailedMessage
+                : l10n.homeEmptyMessage,
             actionLabel: l10n.commonRetry,
-            onAction: () => context.read<SpotifyProvider>().loadInitialData(),
+            onAction: _refresh,
           ),
         ),
       ];
@@ -144,17 +202,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 切换筛选标签期间旧内容半透明，表示正在刷新
     return [
-      for (final sliver in _sections(context, home, facet: facet, desktop: desktop))
-        SliverAnimatedOpacity(opacity: loading ? 0.5 : 1, duration: const Duration(milliseconds: 200), sliver: sliver),
+      for (final sliver in _sections(
+        context,
+        home,
+        facet: facet,
+        desktop: desktop,
+      ))
+        SliverAnimatedOpacity(
+          opacity: loading ? 0.5 : 1,
+          duration: const Duration(milliseconds: 200),
+          sliver: sliver,
+        ),
     ];
   }
 
   /// 分区 → sliver：连续的卡架合并进一个懒加载列表（30 余个分区只构建可见的几个），
   /// 推荐流单独成网格。
-  List<Widget> _sections(BuildContext context, HomeFeed home, {required String facet, required bool desktop}) {
+  List<Widget> _sections(
+    BuildContext context,
+    HomeFeed home, {
+    required String facet,
+    required bool desktop,
+  }) {
     final slivers = <Widget>[
       if (home.shortcuts.isNotEmpty)
-        HomeShortcutsGrid(items: home.shortcuts, desktop: desktop, onHoverTint: _setHoverTint),
+        HomeShortcutsGrid(
+          items: home.shortcuts,
+          desktop: desktop,
+          onHoverTint: _setHoverTint,
+        ),
     ];
     var shelves = <HomeSection>[];
 
@@ -167,7 +243,8 @@ class _HomeScreenState extends State<HomeScreen> {
           itemBuilder: (context, index) => HomeShelf(
             section: batch[index],
             desktop: desktop,
-            onShowAll: () => AppRoutes.openHomeSection(context, batch[index], facet: facet),
+            onShowAll: () =>
+                AppRoutes.openHomeSection(context, batch[index], facet: facet),
           ),
         ),
       );

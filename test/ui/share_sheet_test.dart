@@ -21,24 +21,25 @@ void main() {
 
   setUp(() {
     clipboard = null;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') clipboard = (call.arguments as Map)['text'] as String;
-        return null;
-      },
-    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData')
+            clipboard = (call.arguments as Map)['text'] as String;
+          return null;
+        });
   });
 
   tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      null,
-    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null);
   });
 
   /// 打开面板：一个按钮触发 [ShareSheet.show]，按窗口宽度自动选择底部面板或对话框。
-  Future<void> open(WidgetTester tester, Size size, {double fontScale = 1.0}) async {
+  Future<void> open(
+    WidgetTester tester,
+    Size size, {
+    double fontScale = 1.0,
+  }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     await tester.pumpWidget(
@@ -48,13 +49,18 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(fontScale)),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(fontScale)),
           child: child!,
         ),
         home: Scaffold(
           body: Builder(
             builder: (context) => Center(
-              child: TextButton(onPressed: () => ShareSheet.show(context, target), child: const Text('open')),
+              child: TextButton(
+                onPressed: () => ShareSheet.show(context, target),
+                child: const Text('open'),
+              ),
             ),
           ),
         ),
@@ -65,23 +71,33 @@ void main() {
   }
 
   for (final fontScale in const [1.0, 1.3]) {
-    testWidgets('share sheet: no overflow across sizes (font ${(fontScale * 100).round()}%)', (tester) async {
-      addTearDown(tester.view.reset);
-      const sizes = [Size(320, 640), Size(360, 600), Size(390, 844), Size(600, 900), Size(800, 600), Size(1360, 860)];
-      for (final size in sizes) {
-        await open(tester, size, fontScale: fontScale);
-        expect(find.byType(ShareSheet), findsOneWidget, reason: '$size');
-        expect(tester.takeException(), isNull, reason: '$size');
+    testWidgets(
+      'share sheet: no overflow across sizes (font ${(fontScale * 100).round()}%)',
+      (tester) async {
+        addTearDown(tester.view.reset);
+        const sizes = [
+          Size(320, 640),
+          Size(360, 600),
+          Size(390, 844),
+          Size(600, 900),
+          Size(800, 600),
+          Size(1360, 860),
+        ];
+        for (final size in sizes) {
+          await open(tester, size, fontScale: fontScale);
+          expect(find.byType(ShareSheet), findsOneWidget, reason: '$size');
+          expect(tester.takeException(), isNull, reason: '$size');
 
-        // 切到紧凑 + 深色，预览尺寸动画结束后再检查一次
-        await tester.ensureVisible(find.text('紧凑'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('紧凑'));
-        await tester.tap(find.byType(FilterChip));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull, reason: '$size compact');
-      }
-    });
+          // 切到紧凑 + 深色，预览尺寸动画结束后再检查一次
+          await tester.ensureVisible(find.text('紧凑'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('紧凑'));
+          await tester.tap(find.byType(FilterChip));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: '$size compact');
+        }
+      },
+    );
   }
 
   testWidgets('desktop opens a dialog, mobile a bottom sheet', (tester) async {
@@ -89,6 +105,7 @@ void main() {
     await open(tester, const Size(1360, 860));
     expect(find.byType(Dialog), findsOneWidget);
     expect(find.byTooltip('关闭'), findsOneWidget);
+    expect(find.textContaining('系统 WebView 暂不可用'), findsOneWidget);
 
     await open(tester, const Size(390, 844));
     expect(find.byType(Dialog), findsNothing);

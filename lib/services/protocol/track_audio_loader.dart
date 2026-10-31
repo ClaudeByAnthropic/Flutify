@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import '../../models/audio_playback_info.dart';
 
 import 'access_point.dart';
 import 'audio_cache_store.dart';
@@ -43,11 +44,13 @@ final Uint8List kAudioAesIv = Uint8List.fromList([
   0x93,
 ]);
 
-/// 一首「完整版全曲」的音频（已解密，可直接交给播放器）。
+/// 一首「完整版全曲」的可播放音源。
 ///
-/// [stream] 为空时 [file] 是已落盘的缓存文件；非空时曲目仍在下载，应按流播放，
-/// 下载完成后才会写入 [file]。
+/// 普通音源的 [stream] 为空时 [file] 是已落盘的缓存文件；非空时应按流播放，
+/// 下载完成后才会写入 [file]。DRM 音源由 [emeContent] 交给对应引擎，
+/// 加密文件可能仍在后台写入，完整落盘由 [downloadComplete] 标记。
 class LoadedAudio {
+  final AudioPlaybackInfo playbackInfo;
   final File file;
   final TrackAudioFile source;
   final int? durationMs;
@@ -62,7 +65,16 @@ class LoadedAudio {
   /// DRM 曲目的 EME 内容；非空时由 EME 引擎播放（[file] 是加密 fMP4，just_audio 不解）。
   final EmeTrackContent? emeContent;
 
+  /// DRM 音源可在整首落盘前起播；此 Future 在完整下载成功后完成，失败时抛错。
+  /// 为 null 时没有额外的后台下载；普通渐进流的完成信号仍是 [stream.done]。
+  final Future<void>? downloadComplete;
+
+  /// 播放方不再需要这份音源（切歌 / 登出）时调用；边下边播的下载没有其他使用者时会被取消。
+  /// 可重复调用。
+  final void Function()? onRelease;
+
   const LoadedAudio({
+    this.playbackInfo = const AudioPlaybackInfo(),
     required this.file,
     required this.source,
     required this.durationMs,
@@ -70,9 +82,13 @@ class LoadedAudio {
     this.normalization,
     this.stream,
     this.emeContent,
+    this.downloadComplete,
+    this.onRelease,
   });
 
   String get path => file.path;
+
+  void release() => onRelease?.call();
 }
 
 typedef AccessTokenGetter = Future<String> Function();
@@ -133,7 +149,10 @@ class _AudioSession {
 class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   final AccessTokenGetter accessToken;
   final AccessTokenGetter? clientToken;
-  final String cacheDirectory;
+  final String _cacheDirectory;
+  final String Function()? cacheDirectoryProvider;
+  String get cacheDirectory =>
+      cacheDirectoryProvider?.call() ?? _cacheDirectory;
   final http.Client _client;
   final List<AudioFileFormat> formatPreference;
   final String? deviceId;
@@ -148,6 +167,9 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
 
   bool _isProtected(File f) => _recentPaths.contains(f.path);
 
+  /// 缓存文件是否正在使用（当前播放 + 预取的下一首）；缓存迁移 / 清理跳过这些文件。
+  bool isCacheFileInUse(String path) => _isProtected(File(path));
+
   Future<SpotifyAccessPoint>? _apSession;
 
   /// 进行中的加载会话（按曲目 id 合并）；下载完成并落盘后移除。
@@ -156,13 +178,15 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
   TrackAudioLoader({
     required this.accessToken,
     this.clientToken,
-    required this.cacheDirectory,
+    required String cacheDirectory,
+    this.cacheDirectoryProvider,
     this.formatPreference = kPlayableFormatPreference,
     this.deviceId,
     this.decryptBackend = const InlineDecryptBackend(),
     this._maxCacheBytes = 512 * 1024 * 1024,
     http.Client? client,
-  }) : _client = client ?? http.Client();
+  }) : _cacheDirectory = cacheDirectory,
+       _client = client ?? http.Client();
 
   // ---------------------------------------------------------------------------
   // 缓存管理（AudioCacheStore）
@@ -262,8 +286,15 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
       progress?.call(1.0);
       return cached;
     }
-    if (progress != null) session.download!.addProgressListener(progress);
-    return session.persisted!;
+    final download = session.download!;
+    if (download.isCancelled) {
+      _forget(trackIdOrUri, session);
+      return load(trackIdOrUri, progress: progress);
+    }
+    // 等整首下载期间也算使用者：播放方切歌释放时不能把预取中的下载取消掉
+    final releaseHold = download.retain();
+    if (progress != null) download.addProgressListener(progress);
+    return session.persisted!.whenComplete(releaseHold);
   }
 
   /// 边下边播：已缓存时返回本地文件；否则文件头一到就返回 [LoadedAudio.stream]，
@@ -279,11 +310,18 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
       progress?.call(1.0);
       return cached;
     }
-    final download = session.download!;
+    var download = session.download!;
+    if (download.isCancelled) {
+      // 宽限期过后已取消、但会话还没从 _inFlight 移除：丢掉它重新开始
+      _forget(trackIdOrUri, session);
+      return open(trackIdOrUri, progress: progress);
+    }
+    final releaseHold = download.retain();
     if (progress != null) download.addProgressListener(progress);
     try {
       await download.ready;
     } catch (e) {
+      releaseHold();
       throw TrackPlaybackException(
         TrackPlaybackFailure.network,
         '音频下载失败，请检查网络后重试',
@@ -292,6 +330,7 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
     }
     _protect(session.destination);
     return LoadedAudio(
+      onRelease: releaseHold,
       file: session.destination,
       source: session.file,
       durationMs: session.durationMs,
@@ -316,9 +355,21 @@ class TrackAudioLoader implements TrackAudioSource, AudioCacheStore {
     }
     // 单集与曲目共用缓存键：前缀区分，避免同 base62 的不同类型互相命中
     final isEpisode = trackIdOrUri.contains(':episode:');
-    final key = '${isEpisode ? 'episode' : 'track'}:${id.toBase62()}';
+    final key = _sessionKey(trackIdOrUri, id);
     final existing = _inFlight[key];
     if (existing != null) return existing;
+    return _newSession(key, id, isEpisode);
+  }
+
+  String _sessionKey(String trackIdOrUri, SpotifyId id) =>
+      '${trackIdOrUri.contains(':episode:') ? 'episode' : 'track'}:${id.toBase62()}';
+
+  /// 把已取消下载的会话移出 [_inFlight]，调用方紧接着会新建会话。
+  void _forget(String trackIdOrUri, _AudioSession session) {
+    _inFlight.remove(_sessionKey(trackIdOrUri, session.id));
+  }
+
+  Future<_AudioSession> _newSession(String key, SpotifyId id, bool isEpisode) {
 
     final future = _startSession(id, isEpisode: isEpisode);
     _inFlight[key] = future;

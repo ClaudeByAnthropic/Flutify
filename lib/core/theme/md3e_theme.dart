@@ -5,6 +5,7 @@ import 'flutify_tokens.dart';
 import 'md3e_colors.dart';
 import 'md3e_shapes.dart';
 import 'md3e_typography.dart';
+import 'system_bars.dart';
 
 /// Complete Material 3 Expressive (MD3E) Theme Provider
 class MD3ETheme {
@@ -33,7 +34,6 @@ class MD3ETheme {
   }
 
   static ThemeData _build(ColorScheme colorScheme, FlutifyTokens tokens, bool reduceMotion) {
-    final isDark = colorScheme.brightness == Brightness.dark;
     // englishLike 的样式 inherit=false，ThemeData 合并时不会补颜色；
     // FlexibleSpaceBar 等组件会对 titleLarge.color 做非空断言，必须显式着色。
     final textTheme = MD3ETypography.createTextTheme().apply(
@@ -63,7 +63,9 @@ class MD3ETheme {
 
       // App Bar Theme
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: colorScheme.surface,
+        // AppBar creates its own overlay region, overriding the app-wide one.
+        systemOverlayStyle: systemBarsStyle(colorScheme.brightness),
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
@@ -152,7 +154,7 @@ class MD3ETheme {
           shape: tokens.pillShape,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        ).copyWith(mouseCursor: WidgetStateMouseCursor.clickable),
       ),
 
       // Outlined Button (Pill shaped)
@@ -162,7 +164,28 @@ class MD3ETheme {
           side: BorderSide(color: colorScheme.outlineVariant),
           shape: tokens.pillShape,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        ),
+        ).copyWith(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+
+      // 桌面端 Material 默认光标是 adaptiveClickable（非 Web 解析为箭头），
+      // 这里统一为可点击控件显示手型；禁用态由 WidgetStateMouseCursor.clickable 自动解析为箭头。
+      textButtonTheme: TextButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      menuButtonTheme: MenuButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(mouseCursor: WidgetStateMouseCursor.clickable),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        mouseCursor: WidgetStateMouseCursor.clickable,
       ),
 
       // Chip Theme
@@ -179,14 +202,29 @@ class MD3ETheme {
       ),
 
       // Expressive Slider Theme
+      // Expressive Slider Theme（播放进度条为刻意的紧凑样式：圆点手柄 + 细轨道；
+      // 不启用 year2023: false，否则末端停止点会和各处自定义的圆点手柄混在一起）
       sliderTheme: SliderThemeData(
         activeTrackColor: colorScheme.primary,
         inactiveTrackColor: colorScheme.onSurfaceVariant.withAlpha(50),
-        thumbColor: isDark ? Colors.white : colorScheme.onSurface,
+        thumbColor: colorScheme.brightness == Brightness.dark ? Colors.white : colorScheme.onSurface,
         overlayColor: colorScheme.primary.withAlpha(40),
         trackHeight: 4.0,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
+      ),
+
+      // MD3E 进度指示器：分段留缝 + 停止点
+      // ignore: deprecated_member_use
+      progressIndicatorTheme: const ProgressIndicatorThemeData(year2023: false),
+
+      // MD3E 开关：选中时手柄带对勾
+      switchTheme: SwitchThemeData(
+        thumbIcon: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? const Icon(Icons.check_rounded)
+              : null,
+        ),
       ),
 
       // Expressive SnackBar：悬浮、大圆角、反色表面；操作按钮为浅色调胶囊

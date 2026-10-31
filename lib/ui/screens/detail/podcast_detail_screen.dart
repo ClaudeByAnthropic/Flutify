@@ -364,7 +364,15 @@ class _Cover extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (episode.coverUrl.isNotEmpty)
-              Image.network(episode.coverUrl, fit: BoxFit.cover)
+              // 播客封面常是 3000px 级原图，56px 的小图按显示尺寸解码，避免每张占几十 MB
+              Image.network(
+                episode.coverUrl,
+                fit: BoxFit.cover,
+                cacheWidth:
+                    (56 * MediaQuery.devicePixelRatioOf(context) * 1.5 / 64)
+                        .ceil() *
+                    64,
+              )
             else
               ColoredBox(
                 color: colorScheme.surfaceContainerHigh,

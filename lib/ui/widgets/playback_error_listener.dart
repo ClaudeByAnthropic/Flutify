@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/l10n.dart';
+import '../../models/playback_retry.dart';
 import '../../providers/playback_provider.dart';
 import '../../services/audio/audio_engine.dart';
+import '../../services/auth/login_region_check.dart';
+import '../../services/eme/fairplay.dart';
 import '../../services/protocol/track_playback_exception.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/web_login_screen.dart';
@@ -29,17 +32,47 @@ class PlaybackErrorListener extends StatefulWidget {
 
 class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
   StreamSubscription<PlaybackError>? _subscription;
+  late PlaybackProvider _playback;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _retryToast;
 
   @override
   void initState() {
     super.initState();
-    _subscription = context.read<PlaybackProvider>().playbackErrors.listen(_show);
+    _playback = context.read<PlaybackProvider>();
+    _subscription = _playback.playbackErrors.listen(_show);
+    _playback.retryNotifier.addListener(_showRetry);
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
+    _playback.retryNotifier.removeListener(_showRetry);
     super.dispose();
+  }
+
+  void _showRetry() {
+    if (!mounted) return;
+    _retryToast?.close();
+    _retryToast = null;
+    final retry = _playback.retryNotifier.value;
+    if (retry == null) return;
+    final l10n = context.l10n;
+    _retryToast = AppToast.show(
+      context,
+      retry.waiting
+          ? l10n.playbackRetryWaiting(
+              retry.attempt,
+              PlaybackRetry.limit,
+              retry.delay.inSeconds,
+            )
+          : l10n.playbackRetryRunning(retry.attempt, PlaybackRetry.limit),
+      icon: Icons.wifi_off_rounded,
+      actionLabel: l10n.commonCancel,
+      onAction: _playback.pause,
+      duration: retry.waiting
+          ? retry.delay + const Duration(seconds: 1)
+          : const Duration(minutes: 1),
+    );
   }
 
   /// 打开统一登录页（Web 登录 + 无感桌面授权）；成功后提示并重试播放当前曲目。
@@ -57,6 +90,9 @@ class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
 
   void _show(PlaybackError error) {
     if (!mounted) return;
+    // 播放器还在这首歌上退避重放（「正在重试」提示条已经说明了情况）：
+    // 这次不弹错误条，免得一断流就盖住重试提示。
+    if (error.retryable) return;
     final l10n = context.l10n;
     final track = error.track.name;
     final playback = context.read<PlaybackProvider>();
@@ -92,19 +128,34 @@ class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
         () => _openWebLogin(playback),
       ),
       TrackPlaybackFailure.unavailable => (
-        error.skipped ? l10n.playbackErrorSkipped(track) : l10n.playbackErrorUnavailable(track),
+        error.skipped
+            ? l10n.playbackErrorSkipped(track)
+            : l10n.playbackErrorUnavailable(track),
         Icons.music_off_rounded,
         ToastTone.warning,
         null,
         null,
       ),
-      // 设备缺 Widevine / CDM：解密无从谈起，重试无意义，只提示
-      TrackPlaybackFailure.network when _isWidevineMissing(error) => (
-        l10n.playbackErrorWidevine(track),
+      // 设备缺 DRM / CDM（Windows 是 Widevine，macOS / iOS 是 FairPlay）：解密无从谈起，重试无意义，只提示
+      TrackPlaybackFailure.network when _isDrmMissing(error) => (
+        useFairPlay
+            ? l10n.playbackErrorFairPlay(track)
+            : l10n.playbackErrorWidevine(track),
         Icons.shield_outlined,
         ToastTone.error,
         null,
         null,
+      ),
+      // 网络出口在中国大陆：提示换节点，并提供「本次打开跳过检测」继续播放
+      TrackPlaybackFailure.regionBlocked => (
+        l10n.playbackErrorRegionBlocked,
+        Icons.public_off_rounded,
+        ToastTone.error,
+        l10n.regionCheckSkipThisRun,
+        () {
+          LoginRegionCheck.skipForThisRun();
+          unawaited(playback.togglePlayPause());
+        },
       ),
       TrackPlaybackFailure.network => (
         l10n.playbackErrorNetwork(track),
@@ -116,11 +167,19 @@ class _PlaybackErrorListenerState extends State<PlaybackErrorListener> {
     };
 
     // 连续跳过多首时 AppToast 只保留最新一条，不排队刷屏
-    AppToast.show(context, message, icon: icon, tone: tone, actionLabel: actionLabel, onAction: onAction);
+    AppToast.show(
+      context,
+      message,
+      icon: icon,
+      tone: tone,
+      actionLabel: actionLabel,
+      onAction: onAction,
+    );
   }
 
-  /// 本次失败是不是「设备缺 Widevine / CDM」（EME 引擎错误归类标记）。
-  bool _isWidevineMissing(PlaybackError error) {
+  /// 本次失败是不是「设备缺 DRM / CDM」（EME 引擎错误归类标记，
+  /// Windows 缺 Widevine、macOS 缺 FairPlay 都走这个 flag）。
+  bool _isDrmMissing(PlaybackError error) {
     final cause = error.exception.cause;
     return cause is EmePlaybackException && cause.isWidevineMissing;
   }

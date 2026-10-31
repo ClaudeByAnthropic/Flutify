@@ -9,6 +9,16 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String playbackRetryWaiting(int attempt, int total, int seconds) {
+    return 'No connection. Retry $attempt/$total in $seconds s';
+  }
+
+  @override
+  String playbackRetryRunning(int attempt, int total) {
+    return 'Reconnecting… Retry $attempt/$total';
+  }
+
+  @override
   String get appTitle => 'Flutify';
 
   @override
@@ -69,6 +79,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get windowClose => 'Close';
 
   @override
+  String get menuPlayback => 'Playback';
+
+  @override
+  String get menuNavigate => 'Navigate';
+
+  @override
+  String get menuEdit => 'Edit';
+
+  @override
+  String get menuUndo => 'Undo';
+
+  @override
+  String get menuRedo => 'Redo';
+
+  @override
+  String get menuCut => 'Cut';
+
+  @override
+  String get menuCopy => 'Copy';
+
+  @override
+  String get menuPaste => 'Paste';
+
+  @override
+  String get menuSelectAll => 'Select All';
+
+  @override
+  String get menuWindow => 'Window';
+
+  @override
+  String get menuSettings => 'Settings…';
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override
@@ -88,6 +131,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonRetry => 'Retry';
+
+  @override
+  String get commonLoadMore => 'Load more';
 
   @override
   String get commonMoreOptions => 'More options';
@@ -301,6 +347,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Check your connection and try again.';
 
   @override
+  String get searchFailedTitle => 'Couldn\'t load search results';
+
+  @override
+  String get searchFailedMessage =>
+      'Check your connection and try again. Your loaded results will stay here.';
+
+  @override
   String searchNoResultsTitle(String query) {
     return 'No results found for \"$query\"';
   }
@@ -389,6 +442,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get artistNoPopular => 'No popular tracks yet.';
+
+  @override
+  String get artistNoAlbums => 'No albums available yet.';
+
+  @override
+  String get artistNoSongs => 'No songs available yet.';
 
   @override
   String get artistDiscography => 'Discography';
@@ -496,8 +555,45 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get playbackErrorRegionBlocked =>
+      'Your network exits in mainland China, where Spotify doesn\'t work. Switch to an overseas node and try again';
+
+  @override
+  String get regionCheckSectionTitle => 'Network region check';
+
+  @override
+  String get regionCheckSectionSubtitle =>
+      'Confirm where your network exits before signing in or playing; mainland China stops the list';
+
+  @override
+  String get regionCheckEnabled => 'Enable region check';
+
+  @override
+  String get regionCheckEnabledHint =>
+      'When off, no check runs at all and neither sign-in nor playback is blocked';
+
+  @override
+  String get regionCheckOnNetworkChange => 'Re-check when the network changes';
+
+  @override
+  String get regionCheckOnNetworkChangeHint =>
+      'Detect again after switching Wi-Fi or proxy; when off, the last result is reused until launch';
+
+  @override
+  String get regionCheckSkipThisRun => 'Skip checks until next launch';
+
+  @override
+  String get regionCheckSkipThisRunHint =>
+      'Applies to this run only; detection resumes on the next launch';
+
+  @override
   String playbackErrorWidevine(String track) {
     return 'Can\'t decrypt \"$track\": Widevine DRM is unavailable on this device';
+  }
+
+  @override
+  String playbackErrorFairPlay(String track) {
+    return 'Can\'t decrypt \"$track\": this device couldn\'t create a FairPlay session';
   }
 
   @override
@@ -556,6 +652,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lyricsFromLrclib => 'Lyrics from LRCLIB';
 
   @override
+  String get lyricsFromQqMusic => 'Lyrics from QQ Music';
+
+  @override
+  String get lyricsFromNetease => 'Lyrics from NetEase Music';
+
+  @override
+  String get lyricsFromSpotify => 'Lyrics from Spotify';
+
+  @override
   String get lyricsImmersive => 'Immersive lyrics';
 
   @override
@@ -574,7 +679,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lyricsFillWindow => 'Fit to window (F11)';
 
   @override
+  String get lyricsPinControls => 'Pin controls (don\'t auto-hide)';
+
+  @override
+  String get lyricsUnpinControls => 'Unpin controls';
+
+  @override
   String get deviceConnectTitle => 'Connect to a device';
+
+  @override
+  String get deviceConnectShort => 'Connect';
 
   @override
   String get deviceConnectDescription =>
@@ -714,6 +828,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareEmbedCopy => 'Copy code';
 
   @override
+  String get shareEmbedUnavailable =>
+      'The system WebView is unavailable. You can still copy the embed code below.';
+
+  @override
+  String get shareEmbedFailed =>
+      'The Spotify embed could not load. Check your connection and retry.';
+
+  @override
   String toastAddedTo(String name) {
     return 'Added to $name';
   }
@@ -804,6 +926,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPlaybackSection => 'Playback';
 
   @override
+  String get settingsAutoplay => 'Autoplay';
+
+  @override
+  String get settingsAutoplaySubtitle =>
+      'When your music ends, keep playing similar songs';
+
+  @override
   String get settingsPauseAfterFailures => 'Pause when songs keep failing';
 
   @override
@@ -820,6 +949,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsReduceMotionSubtitle =>
       'Turns off flowing backgrounds, transitions and hover animations';
+
+  @override
+  String get settingsPowerSaving => 'Power saving';
+
+  @override
+  String get settingsPowerSavingSubtitle =>
+      'Glass uses a frosted fill and the lyrics background stops flowing; lyric scrolling and effects stay';
+
+  @override
+  String get settingsFrameRate => 'Frame rate limit';
+
+  @override
+  String get settingsFrameRateSubtitle =>
+      'Lower values noticeably cut GPU usage; animation speed is unchanged';
+
+  @override
+  String get settingsFrameRateFollow => 'Display';
+
+  @override
+  String get settingsFrameRateCustom => 'Custom';
+
+  @override
+  String settingsFrameRateValue(int fps) {
+    return '$fps fps';
+  }
 
   @override
   String get settingsResetAppearance => 'Reset appearance';
@@ -850,7 +1004,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageSystem => 'System';
 
   @override
-  String get settingsLanguageZh => '中文';
+  String get settingsLanguageZh => '简体中文';
 
   @override
   String get settingsLanguageEn => 'English';
@@ -895,6 +1049,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLyricsSection => 'Lyrics';
 
   @override
+  String get settingsLyricsFocusPosition => 'Current line position';
+
+  @override
+  String get settingsLyricsFocusPositionSubtitle =>
+      'Adjust the current line within the visible lyrics area. Higher values move it down.';
+
+  @override
+  String get lyricsTranslationFromNetease =>
+      'Translations from the NetEase Music community';
+
+  @override
+  String get lyricsTranslationFromQqMusic => 'Translations from QQ Music';
+
+  @override
   String get settingsLyricsSize => 'Lyrics size';
 
   @override
@@ -905,9 +1073,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLyricsAlignCenter => 'Centre';
-
-  @override
-  String get settingsLyricsBlur => 'Blur other lines';
 
   @override
   String get settingsLyricsImmersiveScreen =>
@@ -923,6 +1088,51 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsLyricsFallbackSubtitle =>
       'When Spotify has no time-synced lyrics, get them from the open LRCLIB library in the song\'s original language';
+
+  @override
+  String get settingsLyricsSourceOrder => 'Lyrics source priority';
+
+  @override
+  String get settingsLyricsSourceOrderSubtitle =>
+      'Drag the handle to reorder; sources higher up are tried first. Original lyrics and Chinese translations are both looked up across the sources in this order.';
+
+  @override
+  String get settingsLyricsSourceSpotify => 'Spotify';
+
+  @override
+  String get settingsLyricsSourceQqMusic => 'QQ Music';
+
+  @override
+  String get settingsLyricsSourceNetease => 'NetEase Music';
+
+  @override
+  String get settingsLyricsSourceLrclib => 'LRCLIB';
+
+  @override
+  String get settingsLyricsSourceRoleSpotify =>
+      'Original lyrics, built-in translation';
+
+  @override
+  String get settingsLyricsSourceRoleLrclib =>
+      'Original lyrics and translation';
+
+  @override
+  String get settingsLyricsSourceRoleCommunity =>
+      'Original lyrics and Chinese translation';
+
+  @override
+  String get settingsLyricsSourceDisabled =>
+      'Turned off in Fill in missing lyrics';
+
+  @override
+  String get settingsLyricsSourceDrag => 'Drag to reorder';
+
+  @override
+  String get settingsLyricsBilingual => 'Community lyric translations';
+
+  @override
+  String get settingsLyricsBilingualSubtitle =>
+      'Preload Chinese translations from QQ Music, then NetEase for missing or incomplete lyrics, and finally LRCLIB when fallback is enabled. Also used by taskbar lyrics. Turning this off still allows manual and automatic searches. The song title and artist are sent to queried sources.';
 
   @override
   String get settingsTaskbarLyricsSection => 'Taskbar lyrics';
@@ -1034,11 +1244,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsStartPageLast => 'Last page';
 
   @override
+  String get settingsDefaultRepeat => 'Default repeat mode';
+
+  @override
+  String get settingsDefaultRepeatSubtitle =>
+      'Repeat mode applied by default when switching playlists or albums';
+
+  @override
+  String get settingsRepeatOff => 'No repeat';
+
+  @override
+  String get settingsRepeatList => 'Repeat list';
+
+  @override
+  String get settingsRepeatTrack => 'Repeat track';
+
+  @override
   String get settingsRememberWindow => 'Remember window size and position';
 
   @override
   String get settingsRememberWindowSubtitle =>
       'Restored at next launch; centred again if the screen it was on is gone';
+
+  @override
+  String get settingsSpotifyLinks => 'Open Spotify links with Flutify';
+
+  @override
+  String get settingsSpotifyLinksSubtitle =>
+      'spotify: links clicked in a browser or another app play in Flutify';
+
+  @override
+  String settingsSpotifyLinksOther(String app) {
+    return 'Currently opened by $app';
+  }
+
+  @override
+  String get settingsSpotifyLinksSystem =>
+      'Windows Default apps has another program chosen for spotify: links. Choose Flutify there.';
 
   @override
   String get settingsConnectSection => 'Spotify Connect';
@@ -1099,6 +1341,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'No system proxy set — connecting directly';
 
   @override
+  String get settingsProxySystemAuto =>
+      'System uses an automatic proxy configuration (PAC / auto-detect)';
+
+  @override
   String get settingsProxyNoneSubtitle =>
       'All requests connect directly, without a proxy';
 
@@ -1120,6 +1366,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter a valid address and a port between 1 and 65535';
 
   @override
+  String get settingsProxyAuth => 'Proxy authentication (optional)';
+
+  @override
+  String get settingsProxyUsernameHint => 'Username';
+
+  @override
+  String get settingsProxyPasswordHint => 'Password';
+
+  @override
+  String get settingsProxyUsernameInvalid =>
+      'The username can\'t contain a colon (:). It separates the username from the password, so the proxy would reject the credentials';
+
+  @override
+  String get settingsProxyAuthIncomplete =>
+      'HTTPS can use one-sided credentials; HTTP proxy authentication requires both fields';
+
+  @override
   String get settingsProxyTest => 'Test connection';
 
   @override
@@ -1137,7 +1400,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsProxyFootnote =>
-      'Only HTTP proxies are supported (the mixed port of Clash, v2rayN, etc. works). The sign-in page always follows the system proxy settings.';
+      'Only HTTP proxies are supported (the mixed port of Clash, v2rayN, etc. works); a manual proxy may use a username/password, e.g. a self-hosted relay in another region. The sign-in page always follows the system proxy settings.';
 
   @override
   String get settingsPrivacySection => 'Privacy';
@@ -1347,4 +1610,542 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get settingsGateway => 'Spotify gateway';
+
+  @override
+  String get settingsGatewayDescription =>
+      'Connect to Spotify APIs, media and Connect through your server. Browser sign-in stays on Spotify. Applies to new connections after saving.';
+
+  @override
+  String get settingsGatewayUrl => 'Gateway URL (including path)';
+
+  @override
+  String get settingsGatewayUser => 'Gateway username';
+
+  @override
+  String get settingsGatewayPassword => 'Gateway password';
+
+  @override
+  String get settingsGatewayInvalid =>
+      'Enter a valid HTTPS URL with one path segment, username and password.';
+
+  @override
+  String get settingsApply => 'Save';
+
+  @override
+  String get settingsCacheLocation => 'Cache location';
+
+  @override
+  String get settingsAudioCacheLocation => 'Audio cache location';
+
+  @override
+  String get settingsArtworkCacheLocation => 'Artwork cache location';
+
+  @override
+  String get settingsLyricsCacheLocation => 'Lyrics cache location';
+
+  @override
+  String get settingsCacheAppData => 'Application data (AppData)';
+
+  @override
+  String get settingsCacheApplication =>
+      'Installation / portable app directory';
+
+  @override
+  String get settingsCacheCustom => 'Custom directory';
+
+  @override
+  String get settingsClearAllCache => 'Clear all caches';
+
+  @override
+  String get settingsClearAllCacheHelp =>
+      'Clear audio, artwork, lyrics and browser temporary caches. Keep your login, settings, library and playback history. Audio in use or downloading is retained.';
+
+  @override
+  String get settingsCacheLocationHelp =>
+      'Existing caches are moved and originals deleted after verification. Audio in use or downloading is moved when released. Custom locations use a FlutifyCache folder inside the selected directory.';
+
+  @override
+  String settingsCacheMigrated(int files, int deferred, int failed) {
+    return 'Moved $files files; $deferred in use; $failed unsuccessful';
+  }
+
+  @override
+  String settingsCacheCleared(String size, int deferred, int failed) {
+    return 'Freed $size; $deferred in use; $failed unsuccessful';
+  }
+
+  @override
+  String get settingsCacheLocationInvalid =>
+      'The directory is not writable or the path is invalid. Choose a local directory the app can access.';
+
+  @override
+  String get settingsCacheLocationSaved => 'Cache location updated';
+
+  @override
+  String get settingsCacheLocationHint => 'Absolute directory path';
+
+  @override
+  String get settingsCacheChooseDirectory => 'Choose folder';
+
+  @override
+  String get settingsCachePickerFailed =>
+      'Couldn\'t open the folder picker. Try again or enter a path.';
+
+  @override
+  String get settingsGatewayAutomatic => 'Switch gateway automatically';
+
+  @override
+  String get settingsGatewayAutomaticHelp =>
+      'Check the network\'s exit country/region using Cloudflare on startup, network changes, resume and every 2 minutes. Uses your selected system/manual proxy. Failed checks keep the current route.';
+
+  @override
+  String get settingsGatewayDirectCountries =>
+      'Countries/regions allowed to connect directly';
+
+  @override
+  String get settingsGatewayDirectCountriesHelp =>
+      'Optional two-letter codes separated by commas or spaces. Empty: CN uses the gateway, all others connect directly. Filled: only listed countries/regions connect directly; all others use the gateway.';
+
+  @override
+  String get settingsGatewayCountriesInvalid =>
+      'Use two-letter country/region codes, for example US, JP, HK.';
+
+  @override
+  String get settingsGatewayLookupFailed =>
+      'Country/region lookup failed; keeping the current route.';
+
+  @override
+  String get settingsGatewayCountryPending =>
+      'Waiting for the network\'s country/region; keeping the current route.';
+
+  @override
+  String settingsGatewayCountryStatus(String country, String route) {
+    return 'Network country/region: $country · $route';
+  }
+
+  @override
+  String get settingsGatewayRouteProxy => 'Gateway enabled';
+
+  @override
+  String get settingsGatewayRouteDirect => 'Direct connection';
+
+  @override
+  String get settingsGatewayRecheck => 'Check country/region again';
+
+  @override
+  String get lyricsTranslate => 'Show translation';
+
+  @override
+  String get lyricsCancelTranslation => 'Hide translation';
+
+  @override
+  String get lyricsTranslationFailed =>
+      'Could not find translations. Tap to retry';
+
+  @override
+  String get lyricsTranslating => 'Finding translations · Tap to cancel';
+
+  @override
+  String get settingsLyricsAutoTranslate => 'Translate lyrics automatically';
+
+  @override
+  String get settingsLyricsAutoTranslateSubtitle =>
+      'Find existing translations. Chinese translations search QQ Music first using the song title and artist, then NetEase for missing or incomplete lyrics, and finally LRCLIB when fallback is enabled. More complete results must keep every previously translated line. Chinese script follows the interface.';
+
+  @override
+  String get settingsLyricsExcludeInterface => 'Skip the interface language';
+
+  @override
+  String get settingsLyricsExcluded => 'Other languages to skip';
+
+  @override
+  String get settingsLyricsExcludedHint =>
+      'Comma-separated: en, ja, zh-Hans (Simplified), zh-Hant (Traditional); zh excludes both. Leave empty to clear.';
+
+  @override
+  String get settingsLyricsExcludedInvalid =>
+      'Enter language codes, e.g. en, ja, zh-Hans, zh-Hant';
+
+  @override
+  String get settingsCanvas => 'Spotify Canvas';
+
+  @override
+  String get settingsCanvasSubtitle =>
+      'Show official looping artwork during playback. Use still artwork when unavailable or when reduced motion is enabled.';
+
+  @override
+  String get settingsLanguageZhHant => '繁體中文';
+
+  @override
+  String get lyricsTranslationUnavailable => 'No translation in this language';
+
+  @override
+  String get settingsLanguageJa => '日本語';
+
+  @override
+  String get homeRefresh => 'Refresh home';
+
+  @override
+  String get homeRefreshFailed =>
+      'Could not refresh. Check your connection and try again.';
+
+  @override
+  String get loginTitle => 'Sign in to Spotify';
+
+  @override
+  String get loginSubtitle =>
+      'Sign in once on Spotify’s official page.\nThe remaining authorization steps finish automatically.';
+
+  @override
+  String get loginTermsNotice =>
+      'Signing in as an official client does not comply with Spotify’s terms of service. Consider using a secondary account.';
+
+  @override
+  String get loginPasswordPrivate => 'Flutify does not access your password';
+
+  @override
+  String get loginOfficialPage => 'Sign in using Spotify’s official page';
+
+  @override
+  String get loginRemoteDevices =>
+      'Control your other Spotify devices after signing in';
+
+  @override
+  String loginSignedInAs(String name) {
+    return 'Signed in as $name';
+  }
+
+  @override
+  String get loginPlaybackReady => 'Full-track playback is ready';
+
+  @override
+  String get loginBack => 'Back';
+
+  @override
+  String get loginFailed => 'Sign-in failed';
+
+  @override
+  String get webLoginTitle => 'Full-track playback: Web sign-in';
+
+  @override
+  String get webLoginCardTitle => 'Full-track playback (Web sign-in)';
+
+  @override
+  String get webLoginReady => 'Ready to play full tracks';
+
+  @override
+  String get webLoginRequired => 'Sign in once to enable full-track playback';
+
+  @override
+  String get webLoginConsentHint =>
+      'If the page asks for confirmation, select Agree to finish authorization. The other steps have completed automatically.';
+
+  @override
+  String get webLoginPreparing => 'Preparing playback credentials…';
+
+  @override
+  String get webLoginAuthorizing => 'Completing account authorization…';
+
+  @override
+  String get webLoginFinishing => 'Finishing sign-in…';
+
+  @override
+  String get webLoginBackgroundHint =>
+      'You are signed in. The remaining steps will finish automatically.';
+
+  @override
+  String get webLoginGoogleHint =>
+      'Registered with Google? Sign in here with your email and password. If you do not have a password, set one using “Forgot password” on Spotify’s website.';
+
+  @override
+  String get loginBrowserFallback =>
+      'Could not open the browser. The sign-in link was copied; paste it into your browser.';
+
+  @override
+  String get loginBrowserTitle => 'Finish signing in with your browser';
+
+  @override
+  String get loginBrowserSubtitle =>
+      'This page will continue automatically after you sign in and approve access.';
+
+  @override
+  String get loginReopen => 'Reopen';
+
+  @override
+  String get loginLinkCopied => 'Sign-in link copied';
+
+  @override
+  String get loginCopyLink => 'Copy link';
+
+  @override
+  String get updatesTitle => 'Software updates';
+
+  @override
+  String get updatesMode => 'Update preference';
+
+  @override
+  String get updatesManual => 'Manual update';
+
+  @override
+  String get updatesAutomatic => 'Download automatically';
+
+  @override
+  String get updatesDisabled => 'Do not check';
+
+  @override
+  String get updatesHint =>
+      'Check for new versions and release notes automatically. Automatic mode downloads in the background and waits for your confirmation to install, without interrupting playback.';
+
+  @override
+  String get updatesCheck => 'Check for updates';
+
+  @override
+  String get updatesChecking => 'Checking for updates…';
+
+  @override
+  String get updatesCurrent => 'Current version';
+
+  @override
+  String get updatesUpToDate => 'You are up to date';
+
+  @override
+  String get updatesAvailable => 'New version available';
+
+  @override
+  String get updatesNotes => 'Release notes';
+
+  @override
+  String get updatesNoNotes => 'No release notes were provided.';
+
+  @override
+  String get updatesDownload => 'Download update';
+
+  @override
+  String get updatesDownloading => 'Downloading and verifying…';
+
+  @override
+  String get updatesReady => 'Update ready';
+
+  @override
+  String get updatesReadyHint =>
+      'The update has been downloaded and verified. Installation closes the app; you can also continue later from Settings.';
+
+  @override
+  String get updatesAndroidHint =>
+      'The APK has been downloaded and verified. Confirm to open the system installer.';
+
+  @override
+  String get updatesInstall => 'Restart and install';
+
+  @override
+  String get updatesInstallApk => 'Install APK';
+
+  @override
+  String get updatesInstalling => 'Preparing installation…';
+
+  @override
+  String get updatesSkip => 'Skip this version';
+
+  @override
+  String get updatesLater => 'Later';
+
+  @override
+  String get updatesPage => 'Manual update · Release page';
+
+  @override
+  String get updatesFailed => 'Update failed. Retry or visit the release page.';
+
+  @override
+  String get updatesPermission =>
+      'Allow Flutify to install unknown apps, then return and tap “Install APK” again.';
+
+  @override
+  String get updatesUnsupported =>
+      'In-app installation is unavailable on this platform. Use the release page to update manually.';
+
+  @override
+  String get updatesDetails => 'View update';
+
+  @override
+  String get webLoginRegionChecking => 'Checking network region…';
+
+  @override
+  String get webLoginRegionCheckingHint =>
+      'Confirming where your network exits before the sign-in page loads, so sign-in doesn\'t fail in an unsupported region.';
+
+  @override
+  String get webLoginRegionBlockedTitle =>
+      'Your network exits in mainland China';
+
+  @override
+  String get webLoginRegionBlockedBody =>
+      'Spotify isn\'t available in mainland China, so signing in will likely fail or be restricted. Turn on a proxy, switch to an overseas node, then check again.';
+
+  @override
+  String get webLoginRegionRecheck => 'Check again';
+
+  @override
+  String get webLoginRegionForceSkip => 'Skip anyway';
+
+  @override
+  String get webLoginRegionSkipThisRun => 'Skip checks until next launch';
+
+  @override
+  String get settingsAnimDebugSection => 'Animation debugging (temporary)';
+
+  @override
+  String get settingsAnimDebugFooter =>
+      'Applies to this run only and resets when the app restarts. Use it to find what drops frames: turn items off one by one and see which one makes it smooth.';
+
+  @override
+  String get settingsAnimDebugResetAll => 'Restore all';
+
+  @override
+  String get settingsAnimDebugAllMotion => 'Turn off all transition animations';
+
+  @override
+  String get settingsAnimDebugAllMotionSubtitle =>
+      'Same as the system “remove animations”: UI transitions and the flowing background stop';
+
+  @override
+  String get settingsAnimDebugLyricsLine =>
+      'Turn off lyric line focus animation';
+
+  @override
+  String get settingsAnimDebugLyricsLineSubtitle =>
+      'Scale, blur and opacity changes switch instantly instead of easing';
+
+  @override
+  String get settingsAnimDebugLyricsScroll =>
+      'Turn off lyric line-change scrolling';
+
+  @override
+  String get settingsAnimDebugLyricsScrollSubtitle =>
+      'The list jumps straight to position when the line changes, with no movement transition';
+
+  @override
+  String get settingsAnimDebugLyricsMask => 'Turn off lyric edge fade mask';
+
+  @override
+  String get settingsAnimDebugLyricsMaskSubtitle =>
+      'Removes the full-area offscreen mask used to fade the top and bottom edges';
+
+  @override
+  String get settingsAnimDebugGlass => 'Turn off glass background blur';
+
+  @override
+  String get settingsAnimDebugGlassSubtitle =>
+      'Glass cards and buttons stop blurring what\'s behind them every frame';
+
+  @override
+  String get settingsAnimDebugBackground => 'Turn off flowing background';
+
+  @override
+  String get settingsAnimDebugBackgroundSubtitle =>
+      'The lyrics background stays on a still frame';
+
+  @override
+  String get settingsExternalLyricsSection => 'Car & status bar lyrics';
+
+  @override
+  String get settingsBluetoothLyrics => 'Bluetooth lyrics';
+
+  @override
+  String get settingsBluetoothLyricsSubtitle =>
+      'While a Bluetooth audio device is connected, the media title shows the current lyric line and artist/album show \"Song - Artist\", so car displays show lyrics line by line';
+
+  @override
+  String get bluetoothLyricsOff => 'Off';
+
+  @override
+  String get bluetoothLyricsCar => 'Car devices';
+
+  @override
+  String get bluetoothLyricsAll => 'All devices';
+
+  @override
+  String get settingsBluetoothLyricsTranslation => 'Include translation';
+
+  @override
+  String get settingsBluetoothLyricsTranslationSubtitle =>
+      'When a translation exists, the title shows \"Original / Translation\"';
+
+  @override
+  String get settingsBluetoothPermission => 'Allow Bluetooth device detection';
+
+  @override
+  String get settingsBluetoothPermissionSubtitle =>
+      'Detecting car devices needs the \"Nearby devices\" permission';
+
+  @override
+  String get settingsBluetoothPermissionGrant => 'Allow';
+
+  @override
+  String get settingsBluetoothDevices => 'Connected Bluetooth devices';
+
+  @override
+  String get settingsBluetoothDevicesEmpty =>
+      'No Bluetooth audio device connected';
+
+  @override
+  String get bluetoothDeviceUnnamed => 'Unnamed device';
+
+  @override
+  String get bluetoothDeviceCar =>
+      'Recognized as a car device; lyrics shown automatically';
+
+  @override
+  String get bluetoothDeviceAll =>
+      'Lyrics shown automatically in all-devices mode';
+
+  @override
+  String get bluetoothDeviceManual => 'Also show lyrics on this device';
+
+  @override
+  String get settingsFlymeLyrics => 'Flyme status bar lyrics';
+
+  @override
+  String get settingsFlymeLyricsSubtitle =>
+      'Show the current lyric line in the Meizu Flyme status bar while playing';
+
+  @override
+  String get audioOutputTitle => 'Audio output on this device';
+
+  @override
+  String get audioOutputSystemDefault => 'System default';
+
+  @override
+  String get audioOutputSelected => 'Playing here';
+
+  @override
+  String get audioOutputSystemSwitcher => 'Choose output device';
+
+  @override
+  String get audioOutputSystemSwitcherSubtitle =>
+      'Open the system output panel: phone speaker, Bluetooth, wired headphones';
+
+  @override
+  String get audioOutputSystemUnavailable =>
+      'This system has no output switcher';
+
+  @override
+  String get audioOutputWebViewNote =>
+      'Playing through the browser engine; switching is not supported yet, using the system default';
+
+  @override
+  String playbackEngineCurrent(String engine) {
+    return 'Playback engine: $engine';
+  }
+
+  @override
+  String get playbackEngineLocal => 'Local player';
+
+  @override
+  String get playbackEngineWebView => 'WebView (browser engine)';
+
+  @override
+  String get playbackEngineAndroid => 'Android native';
 }

@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/debug_toggles.dart';
+import '../../core/perf_flags.dart';
 import '../../core/theme/flutify_tokens.dart';
 import '../shell/desktop/desktop_window.dart';
 
@@ -16,6 +18,8 @@ import '../shell/desktop/desktop_window.dart';
 ///
 /// 设计原则：玻璃应该"退后"，让内容和背景说话；任何一层都不应被一眼注意到。
 /// 性能：每个实例是一次 BackdropFilter，页面内应控制在少量几个。
+/// BackdropFilter 每帧都要复制一次下方画面，即使模糊半径很小也有固定开销；
+/// 背景在流动时（歌词页）这笔开销每帧都在发生，见 [backdrop]。
 class LiquidGlass extends StatelessWidget {
   final Widget child;
 
@@ -29,6 +33,16 @@ class LiquidGlass extends StatelessWidget {
   /// 玻璃填充亮度（0~1）；为空时取设置页「玻璃不透明度」（默认约 0.05）。
   final double? tint;
 
+  /// 是否真正模糊下方画面。为 false 时只画填充与描边，不做 BackdropFilter。
+  ///
+  /// 只用于下方永远只有歌词流动背景（`LiquidArtworkBackground`）的玻璃：
+  /// 那层背景本身已做 σ=70 的大模糊，再模糊一次与原样肉眼无差别，
+  /// 却能省掉每帧一次的背景复制。下方可能有歌词、封面等清晰内容时必须保持 true。
+  final bool backdrop;
+
+  /// 省电模式下磨砂底的不透明度：足以压住下方清晰内容，又保留一点通透感。
+  static const double _powerSavingFill = 0.86;
+
   const LiquidGlass({
     super.key,
     required this.child,
@@ -36,6 +50,7 @@ class LiquidGlass extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.blur,
     this.tint,
+    this.backdrop = true,
   });
 
   @override
@@ -50,6 +65,22 @@ class LiquidGlass extends StatelessWidget {
         child: Padding(padding: padding, child: child),
       ),
     );
+    if (tokens.powerSaving && backdrop) {
+      // 省电：不复制、不模糊下方画面，垫一层较实的表面色代替，保证其上文字可读
+      final surface = Theme.of(context).colorScheme.surfaceContainerHigh;
+      return ClipRRect(
+        borderRadius: radius,
+        child: ColoredBox(
+          color: surface.withValues(alpha: _powerSavingFill),
+          child: body,
+        ),
+      );
+    }
+    if (!backdrop ||
+        PerfFlags.noBackdrop ||
+        DebugToggles.of(context).isOff(DebugToggle.glassBackdrop)) {
+      return ClipRRect(borderRadius: radius, child: body);
+    }
     return ClipRRect(
       borderRadius: radius,
       // 系统全屏切换期间引擎合成器对 BackdropFilter 会访问冲突（详见 DesktopWindow.fullscreenTransition），
@@ -58,7 +89,8 @@ class LiquidGlass extends StatelessWidget {
         valueListenable: DesktopWindow.fullscreenTransition,
         builder: (context, transitioning, _) {
           if (transitioning) return body;
-          return BackdropFilter(
+          // grouped：外层有 BackdropGroup 时共享同一份背景采样，没有时与普通 BackdropFilter 完全一致
+          return BackdropFilter.grouped(
             filter: ImageFilter.blur(
               sigmaX: sigma,
               sigmaY: sigma,

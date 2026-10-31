@@ -15,6 +15,7 @@ import '../shell/shell_layout_controller.dart';
 import 'connect/connect_actions.dart';
 import 'connect/remote_player_bar.dart';
 import 'liquid_glass.dart';
+import 'marquee_text.dart';
 import 'playback_scrubber.dart';
 import 'playback_status_button.dart';
 import 'player_bar_cover.dart';
@@ -341,6 +342,7 @@ class _NowPlayingInfo extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: colorScheme.onSurface,
                 ),
+                marquee: true,
                 onTap: track.album == null
                     ? null
                     : () => AppRoutes.openAlbum(context, track.album!),
@@ -375,9 +377,10 @@ class _NowPlayingInfo extends StatelessWidget {
 class _HoverLink extends StatefulWidget {
   final String text;
   final TextStyle? style;
+  final bool marquee;
   final VoidCallback? onTap;
 
-  const _HoverLink({required this.text, this.style, this.onTap});
+  const _HoverLink({required this.text, this.style, this.marquee = false, this.onTap});
 
   @override
   State<_HoverLink> createState() => _HoverLinkState();
@@ -396,16 +399,21 @@ class _HoverLinkState extends State<_HoverLink> {
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         onTap: widget.onTap,
-        child: Text(
-          widget.text,
-          style: widget.style?.copyWith(
-            decoration: _hover && widget.onTap != null
-                ? TextDecoration.underline
-                : null,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        child: widget.marquee
+            ? MarqueeText(
+                text: widget.text,
+                style: widget.style?.copyWith(
+                  decoration: _hover && widget.onTap != null ? TextDecoration.underline : null,
+                ),
+              )
+            : Text(
+                widget.text,
+                style: widget.style?.copyWith(
+                  decoration: _hover && widget.onTap != null ? TextDecoration.underline : null,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
       ),
     );
   }

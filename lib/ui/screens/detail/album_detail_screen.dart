@@ -93,6 +93,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         Flexible(
                           child: InkWell(
                             borderRadius: BorderRadius.circular(20),
+                            mouseCursor: SystemMouseCursors.click,
                             onTap: () => AppRoutes.openArtist(context, resolvedArtist),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,

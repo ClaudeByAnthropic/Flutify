@@ -6,6 +6,16 @@ import '../../models/appearance.dart';
 import 'accent_colors.dart';
 import 'md3e_shapes.dart';
 
+/// 「已点赞的歌曲」封面渐变：全应用（侧栏、音乐库、详情页、备份页）统一使用这一份。
+const LinearGradient kLikedSongsGradient = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: [Color(0xFF450AF5), Color(0xFF8E8EE5), Color(0xFFC4EFD9)],
+);
+
+/// 「已点赞的歌曲」详情页取色兜底（与渐变主色同色系）。
+const Color kLikedSongsTint = Color(0xFF4A2FB8);
+
 /// 主题之外的外观令牌（ThemeExtension）：强调色填充、液态玻璃参数、圆角缩放。
 ///
 /// 组件通过 `context.tokens` 读取；随主题一起变化，所以用户在设置页调整后所有页面即时生效。
@@ -32,6 +42,9 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
   /// 方正风格：胶囊形状也改为小圆角矩形。
   final bool squareCorners;
 
+  /// 省电模式（见 [AppearanceSettings.powerSaving]）。
+  final bool powerSaving;
+
   const FlutifyTokens({
     required this.accent,
     required this.onAccent,
@@ -40,6 +53,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
     required this.glassOpacity,
     required this.cornerScale,
     required this.squareCorners,
+    this.powerSaving = false,
   });
 
   /// 由外观设置与本次主题实际使用的强调色生成。
@@ -52,6 +66,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
       glassOpacity: s.glassOpacity,
       cornerScale: s.cornerStyle.scale,
       squareCorners: s.cornerStyle == CornerStyle.square,
+      powerSaving: s.powerSaving,
     );
   }
 
@@ -85,6 +100,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
     double? glassOpacity,
     double? cornerScale,
     bool? squareCorners,
+    bool? powerSaving,
   }) {
     return FlutifyTokens(
       accent: accent ?? this.accent,
@@ -94,6 +110,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
       glassOpacity: glassOpacity ?? this.glassOpacity,
       cornerScale: cornerScale ?? this.cornerScale,
       squareCorners: squareCorners ?? this.squareCorners,
+      powerSaving: powerSaving ?? this.powerSaving,
     );
   }
 
@@ -108,6 +125,7 @@ class FlutifyTokens extends ThemeExtension<FlutifyTokens> {
       glassOpacity: lerpDouble(glassOpacity, other.glassOpacity, t)!,
       cornerScale: lerpDouble(cornerScale, other.cornerScale, t)!,
       squareCorners: t < 0.5 ? squareCorners : other.squareCorners,
+      powerSaving: t < 0.5 ? powerSaving : other.powerSaving,
     );
   }
 }

@@ -70,17 +70,20 @@ class SettingsSegmented<T> extends StatelessWidget {
                   child: Semantics(
                     button: true,
                     selected: value == selected,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => onChanged(value),
-                      child: Center(
-                        child: Text(
-                          labelOf(value),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: value == selected ? FontWeight.w700 : FontWeight.w500,
-                            color: value == selected ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onChanged(value),
+                        child: Center(
+                          child: Text(
+                            labelOf(value),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: value == selected ? FontWeight.w700 : FontWeight.w500,
+                              color: value == selected ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ),

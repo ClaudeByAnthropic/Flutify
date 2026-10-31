@@ -2,8 +2,8 @@ import 'dart:math';
 
 /// Spotify 鉴权链路的常量与设备标识。
 ///
-/// 只有一种客户端身份：Windows 桌面端浏览器 OAuth。client_id 为桌面版（keymaster），
-/// 版本号取自本机安装的官方桌面版，使 client-token、User-Agent 与令牌所属客户端保持一致。
+/// 桌面 OAuth / AP 使用 Windows 桌面配置，Web 播放使用独立配置和令牌。
+/// 桌面版本统一用于 client-token、User-Agent 和 AP 握手 / 登录。
 class SpotifyAuthConstants {
   SpotifyAuthConstants._();
 
@@ -19,6 +19,14 @@ class SpotifyAuthConstants {
   static const String desktopUserAgent = 'Spotify/$desktopBuildNumber $desktopPlatform/0 (PC desktop)';
 
   // 端点
+  /// Web 播放器（open.spotify.com）身份：client_id 取自 web-player 前端包，
+  /// 版本号取自首页内嵌的 appServerConfig.clientVersion（2026-10-23 构建）。
+  static const String webClientId = 'd8a5ed958d274c2e8ee717e6a4b0971d';
+  static const String webClientVersion = '1.3.8.509.g26b6eac7300d';
+  static const String webPlatform = 'WebPlayer';
+  static const String webUserAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36';
+
   static const String clientTokenEndpoint = 'https://clienttoken.spotify.com/v1/clienttoken';
 
   /// 生成 40 位十六进制的设备 ID（Spotify device_id 格式）。

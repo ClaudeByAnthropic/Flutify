@@ -13,6 +13,12 @@ class ArtworkPalette {
 
   static final Map<String, Color> _cache = {};
   static final Map<String, Future<Color?>> _pending = {};
+  static int _generation = 0;
+  static void clear() {
+    _generation++;
+    _cache.clear();
+    _pending.clear();
+  }
 
   static Color? cached(String url) => _cache[url];
 
@@ -22,19 +28,24 @@ class ArtworkPalette {
     if (hit != null) return Future.value(hit);
 
     // 回调必须是块体，否则会返回被移除的 Future 自身，导致 whenComplete 自我等待
-    return _pending[url] ??= _extract(url).whenComplete(() {
-      _pending.remove(url);
+    final generation = _generation;
+    return _pending[url] ??= _extract(url, generation).whenComplete(() {
+      if (generation == _generation) _pending.remove(url);
     });
   }
 
-  static Future<Color?> _extract(String url) async {
+  static Future<Color?> _extract(String url, int generation) async {
     try {
       final scheme = await ColorScheme.fromImageProvider(
-        provider: ResizeImage(CachedNetworkImageProvider(url), width: 112, height: 112),
+        provider: ResizeImage(
+          CachedNetworkImageProvider(url),
+          width: 112,
+          height: 112,
+        ),
         brightness: Brightness.dark,
       );
       final color = scheme.primaryContainer;
-      _cache[url] = color;
+      if (generation == _generation) _cache[url] = color;
       return color;
     } catch (_) {
       return null;
@@ -85,5 +96,6 @@ class _ArtworkColorBuilderState extends State<ArtworkColorBuilder> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.builder(context, _color ?? widget.fallback);
+  Widget build(BuildContext context) =>
+      widget.builder(context, _color ?? widget.fallback);
 }

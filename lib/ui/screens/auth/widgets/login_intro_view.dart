@@ -1,5 +1,8 @@
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../l10n/l10n.dart';
 
 import '../../../../providers/auth_provider.dart';
 import 'auth_error_banner.dart';
@@ -27,37 +30,43 @@ class LoginIntroView extends StatelessWidget {
         const Center(child: LoginHero()),
         const SizedBox(height: 36),
         Text(
-          '登录 Spotify',
+          context.l10n.loginTitle,
           textAlign: TextAlign.center,
-          style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -1.2, height: 1.1),
+          style: theme.textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1.2,
+            height: 1.1,
+          ),
         ),
         const SizedBox(height: 12),
         Text(
-          '在 Spotify 官方登录页登录一次，\n其余授权全部自动完成',
+          context.l10n.loginSubtitle,
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant, height: 1.5),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            height: 1.5,
+          ),
         ),
         const SizedBox(height: 28),
         const _ReassuranceCard(),
         const SizedBox(height: 28),
         SizedBox(
           height: 60,
-          child: FilledButton.icon(
+          child: M3EButton.icon(
+            size: M3EButtonSize.md,
             onPressed: onSignIn,
-            style: FilledButton.styleFrom(
-              shape: const StadiumBorder(),
-              textStyle: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
             icon: const Icon(Icons.login_rounded, size: 22),
-            label: const Text('登录'),
+            label: Text(context.l10n.accountSignIn),
           ),
         ),
         AuthErrorBanner(message: error),
         const SizedBox(height: 20),
         Text(
-          '以官方客户端身份登录不符合 Spotify 服务条款，建议使用小号。',
+          context.l10n.loginTermsNotice,
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant.withAlpha(170)),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant.withAlpha(170),
+          ),
         ),
       ],
     );
@@ -72,14 +81,26 @@ class _ReassuranceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return DecoratedBox(
-      decoration: BoxDecoration(color: colorScheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(28)),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         child: Column(
           children: [
-            _Point(icon: Icons.verified_user_rounded, text: 'Flutify 不接触你的密码'),
-            _Point(icon: Icons.key_rounded, text: '支持 Passkey、两步验证与第三方账号登录'),
-            _Point(icon: Icons.devices_rounded, text: '登录后可遥控你的其他 Spotify 设备'),
+            _Point(
+              icon: Icons.verified_user_rounded,
+              text: context.l10n.loginPasswordPrivate,
+            ),
+            _Point(
+              icon: Icons.account_circle_outlined,
+              text: context.l10n.loginOfficialPage,
+            ),
+            _Point(
+              icon: Icons.devices_rounded,
+              text: context.l10n.loginRemoteDevices,
+            ),
           ],
         ),
       ),
@@ -104,12 +125,24 @@ class _Point extends StatelessWidget {
           Container(
             width: 34,
             height: 34,
-            decoration: BoxDecoration(color: colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, size: 18, color: colorScheme.onSecondaryContainer),
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: colorScheme.onSecondaryContainer,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(text, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+            child: Text(
+              text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

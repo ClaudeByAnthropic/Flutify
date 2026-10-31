@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:flutify_app/services/auth/proto_codec.dart';
+import 'package:flutify_app/services/auth/auth_constants.dart';
+import 'package:flutify_app/services/auth/client_profile.dart';
+import 'package:flutify_app/services/protocol/ap_login_request.dart';
 import 'package:flutify_app/services/protocol/storage_resolver.dart';
 import 'package:flutify_app/services/protocol/track_metadata.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,7 +45,10 @@ void main() {
             ..string(2, 'Blinding Lights')
             ..message(3, album)
             ..message(4, artist)
-            ..varintAlways(7, (225000 << 1) ^ (225000 >> 31)) // duration 225000ms
+            ..varintAlways(
+              7,
+              (225000 << 1) ^ (225000 >> 31),
+            ) // duration 225000ms
             ..varintAlways(9, 1) // explicit
             ..message(12, audioFile)
             ..message(13, alternative))
@@ -58,7 +64,10 @@ void main() {
       expect(meta.explicit, isTrue);
       expect(meta.files.length, 1);
       expect(meta.files.first.format, AudioFileFormat.oggVorbis320);
-      expect(meta.files.first.fileIdHex, '0102030405060708090a0b0c0d0e0f1011121314');
+      expect(
+        meta.files.first.fileIdHex,
+        '0102030405060708090a0b0c0d0e0f1011121314',
+      );
       expect(meta.alternatives.length, 1);
       expect(meta.alternatives.first.name, 'Blinding Lights (Live)');
     });
@@ -76,12 +85,16 @@ void main() {
 
   group('StorageResolveResult.parse（spotify.download.proto）', () {
     test('CDN 结果', () {
-      final bytes = (ProtoWriter()
-            ..varintAlways(1, 0) // result = CDN
-            ..string(2, 'https://audio-cf.spotifycdn.com/audio/aaaa?verify=1-xxx')
-            ..string(2, 'https://audio-ak.spotifycdn.com/audio/bbbb')
-            ..bytes(4, Uint8List.fromList([1, 2, 3])))
-          .toBytes();
+      final bytes =
+          (ProtoWriter()
+                ..varintAlways(1, 0) // result = CDN
+                ..string(
+                  2,
+                  'https://audio-cf.spotifycdn.com/audio/aaaa?verify=1-xxx',
+                )
+                ..string(2, 'https://audio-ak.spotifycdn.com/audio/bbbb')
+                ..bytes(4, Uint8List.fromList([1, 2, 3])))
+              .toBytes();
 
       final result = StorageResolveResult.parse(bytes);
       expect(result.isCdn, isTrue);
@@ -99,21 +112,27 @@ void main() {
   });
 
   group('AP 报文字段号锚定（keyexchange/authentication.proto）', () {
+    test('ClientHello uses the same desktop build as HTTP', () {
+      final seen = <int, ProtoField>{};
+      ProtoReader(
+        SpotifyClientProfile.desktop.apBuildInfo().toBytes(),
+      ).forEach((f) => seen[f.number] = f);
+      expect(seen[10]!.varintValue, 0);
+      expect(seen[20]!.varintValue, 0);
+      expect(seen[30]!.varintValue, 0x27);
+      expect(
+        seen[40]!.varintValue.toString(),
+        SpotifyAuthConstants.desktopBuildNumber,
+      );
+    });
+
     test('LoginCredentials + SystemInfo 编码后可按字段号读回', () {
-      final loginCreds = (ProtoWriter())
-        ..string(10, 'alice')
-        ..varintAlways(20, 3) // typ = AUTHENTICATION_SPOTIFY_TOKEN
-        ..bytes(30, Uint8List.fromList([1, 2]));
-      final sysInfo = (ProtoWriter())
-        ..varintAlways(10, 2) // cpu_family
-        ..varintAlways(60, 1) // os
-        ..string(90, 'flutify-protocol')
-        ..string(100, 'device-id');
-      final packet = (ProtoWriter()
-            ..message(10, loginCreds)
-            ..message(50, sysInfo)
-            ..string(70, 'flutify 1.0'))
-          .toBytes();
+      final packet = encodeApLoginRequest(
+        username: 'alice',
+        authType: 3,
+        authData: Uint8List.fromList([1, 2]),
+        deviceId: 'device-id',
+      );
 
       final seen = <int, ProtoField>{};
       ProtoReader(packet).forEach((f) {
@@ -129,12 +148,28 @@ void main() {
           f.asMessage.forEach((x) => inner[x.number] = x);
           expect(inner[10]!.varintValue, 2);
           expect(inner[60]!.varintValue, 1);
-          expect(inner[90]!.asString, 'flutify-protocol');
+          expect(inner.containsKey(90), isFalse);
           expect(inner[100]!.asString, 'device-id');
         }
         seen[f.number] = f;
       });
-      expect(seen[70]!.asString, 'flutify 1.0');
+      expect(seen[70]!.asString, SpotifyAuthConstants.desktopVersion);
+    });
+
+    test('password login retains required zero auth type', () {
+      final packet = encodeApLoginRequest(
+        username: 'alice',
+        authType: 0,
+        authData: Uint8List.fromList([1, 2]),
+      );
+      final fields = <int, ProtoField>{};
+      ProtoReader(packet).forEach((f) => fields[f.number] = f);
+      final credentials = <int, ProtoField>{};
+      fields[10]!.asMessage.forEach((f) => credentials[f.number] = f);
+      expect(credentials[20]!.varintValue, 0);
+      final system = <int, ProtoField>{};
+      fields[50]!.asMessage.forEach((f) => system[f.number] = f);
+      expect(system.keys, unorderedEquals([10, 60]));
     });
   });
 }

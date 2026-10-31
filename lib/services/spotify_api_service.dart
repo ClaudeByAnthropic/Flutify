@@ -4,6 +4,7 @@ import '../core/constants/spotify_endpoints.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
 import '../models/category.dart';
+import '../models/catalog_page.dart';
 import '../l10n/app_locale.dart';
 import '../models/device.dart';
 import '../models/home_feed.dart';
@@ -11,16 +12,19 @@ import '../models/image.dart';
 import '../models/lyrics.dart';
 import '../models/playlist.dart';
 import '../models/podcast.dart';
+import '../models/share_target.dart';
 import '../models/track.dart';
 import '../models/track_credits.dart';
 import '../models/user_profile.dart';
 import 'auth/spotify_auth_service.dart';
+import 'auth/session_http_client.dart';
 import 'connect/connect_service.dart';
 import 'library/desktop_library_source.dart';
 import 'library/library_source.dart';
 import 'library/session_library_source.dart';
 import 'library/web_api_library_source.dart';
 import 'lyrics_service.dart';
+import 'canvas/canvas_service.dart';
 import 'pathfinder/desktop_data_source.dart';
 import 'pathfinder/pathfinder_client.dart';
 import 'podcast/podcast_service.dart';
@@ -56,6 +60,7 @@ class SpotifyDataException implements Exception {
 class SpotifyApiService {
   final StorageService _storage;
   final http.Client _client;
+  late final CanvasService canvas = CanvasService(_client, headers: _headers);
 
   /// 鉴权服务；接入后每次请求前自动续期 access_token。未接入时仅使用手动填写的 Token。
   SpotifyAuthService? _auth;
@@ -63,6 +68,7 @@ class SpotifyApiService {
   late final DesktopDataSource _desktop = DesktopDataSource(
     _client,
     headers: _headers,
+    language: () => AppLocale.spotifyLanguage,
   );
 
   /// 歌词服务（color-lyrics）。
@@ -99,7 +105,7 @@ class SpotifyApiService {
   );
 
   SpotifyApiService(this._storage, [http.Client? client])
-    : _client = client ?? http.Client();
+    : _client = SessionHttpClient(_storage, client ?? http.Client());
 
   void attachAuth(SpotifyAuthService auth) => _auth = auth;
 
@@ -170,6 +176,76 @@ class SpotifyApiService {
     } catch (e) {
       throw SpotifyDataException('加载失败：$e');
     }
+  }
+
+  /// Paginated lists must distinguish request/protocol failures from the end of
+  /// a collection. Never expose transport response bodies or credentials here.
+  Future<T> _catalogLoad<T>(Future<T> Function() load) async {
+    if (!isConfigured) throw SpotifyDataException.notSignedIn;
+    try {
+      return await load();
+    } on SpotifyDataException catch (e) {
+      throw SpotifyDataException('内容加载失败，请稍后重试', e.statusCode);
+    } on PathfinderException catch (e) {
+      throw SpotifyDataException(
+        e.hashStale ? e.message : '内容加载失败，请稍后重试',
+        e.statusCode,
+      );
+    } on FormatException {
+      throw const SpotifyDataException('服务器分页数据异常，请重试');
+    } catch (_) {
+      throw const SpotifyDataException('内容加载失败，请稍后重试');
+    }
+  }
+
+  static void _validateCatalogPage(int offset, int limit) {
+    if (offset < 0 || limit < 1 || limit > 50) {
+      throw ArgumentError('Catalog offset must be non-negative and limit 1–50');
+    }
+  }
+
+  static CatalogPage<T> _webCatalogPage<T>(
+    Object? value,
+    T Function(Map<String, dynamic>) parse, {
+    required int offset,
+    required int limit,
+    int? maxOffset,
+  }) {
+    if (value is! Map<String, dynamic> || value['items'] is! List) {
+      throw const FormatException('Missing catalog items');
+    }
+    final rawItems = value['items'] as List;
+    final total = value['total'];
+    final next = value['next'];
+    if (total != null && (total is! int || total < 0) ||
+        next != null && next is! String ||
+        value['offset'] != null && value['offset'] != offset) {
+      throw const FormatException('Invalid catalog pagination');
+    }
+    // Only read the next offset; never fetch a response-provided URL.
+    final nextOffset = next is String
+        ? int.tryParse(Uri.tryParse(next)?.queryParameters['offset'] ?? '')
+        : null;
+    final page = CatalogPage<T>.fromSlice(
+      items: rawItems
+          .whereType<Map<String, dynamic>>()
+          .where(
+            (item) => item['id'] is String && (item['id'] as String).isNotEmpty,
+          )
+          .map(parse)
+          .toList(),
+      offset: offset,
+      limit: limit,
+      rawCount: rawItems.length,
+      total: total as int?,
+      nextOffset: nextOffset,
+      hasNextPage: value.containsKey('next') ? next != null : null,
+    );
+    return maxOffset != null &&
+            page.nextOffset != null &&
+            page.nextOffset! > maxOffset
+        ? CatalogPage(items: page.items, offset: page.offset, total: page.total)
+        : page;
   }
 
   // ---------------------------------------------------------------------------
@@ -273,7 +349,8 @@ class SpotifyApiService {
 
     final id = idOrUri.split(':').last;
     final data = await _getJson(
-      SpotifyEndpoints.categoryPlaylists.replaceAll('{category_id}', id) + '?limit=20',
+      SpotifyEndpoints.categoryPlaylists.replaceAll('{category_id}', id) +
+          '?limit=20',
     );
     final items = (data['playlists'] as Map<String, dynamic>?)?['items'];
     final playlists = items is List
@@ -346,6 +423,29 @@ class SpotifyApiService {
     }
   }
 
+  /// One album-track page, including tracks beyond the legacy 50-track preview.
+  /// Album metadata is restored because the Web API returns simplified tracks.
+  Future<CatalogPage<SpotifyTrack>> getAlbumTracksPage(
+    SpotifyAlbum album, {
+    int offset = 0,
+    int limit = 50,
+  }) {
+    _validateCatalogPage(offset, limit);
+    return _catalogLoad(() async {
+      if (_useDesktop) {
+        return _desktop.albumTracksPage(album.id, offset: offset, limit: limit);
+      }
+      return _webCatalogPage(
+        await _getJson(
+          '/albums/${Uri.encodeComponent(album.id)}/tracks?offset=$offset&limit=$limit',
+        ),
+        (json) => SpotifyTrack.fromJson(json).copyWith(album: album),
+        offset: offset,
+        limit: limit,
+      );
+    });
+  }
+
   /// 艺人热门曲目；失败时返回空列表。
   Future<List<SpotifyTrack>> getArtistTopTracks(String id) async {
     if (!isConfigured) return const [];
@@ -379,14 +479,38 @@ class SpotifyApiService {
     return SpotifyPlaylist(id: id, name: track.name);
   }
 
-  /// 按 URI 取单曲完整信息（Connect 远程曲目补全艺人 / 封面用）。
-  /// 只有桌面版会话可用（与 Connect 一致）；非曲目 URI 或失败时返回 null。
-  Future<SpotifyTrack?> getTrackByUri(String uri) async {
-    if (!isConfigured || !_useDesktop || !uri.startsWith('spotify:track:'))
-      return null;
+  /// 按 URI 批量取曲目完整信息（歌单备份补全外部账号已收藏曲目用）。
+  Future<List<SpotifyTrack>> getTracksByUris(List<String> uris) async {
+    if (!isConfigured || !_useDesktop || uris.isEmpty) return const [];
     try {
-      final tracks = await _desktop.tracksByUris([uri]);
-      return tracks.isEmpty ? null : tracks.first;
+      return await _desktop.tracksByUris(uris);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// 按 ID 取单曲完整信息。
+  Future<SpotifyTrack> getTrack(String id) async {
+    if (!isConfigured) throw SpotifyDataException.notSignedIn;
+    if (_useDesktop) {
+      return _desktopLoad(() async {
+        final tracks = await _desktop.tracksByUris(['spotify:track:$id']);
+        return tracks.isEmpty ? null : tracks.first;
+      });
+    }
+    return SpotifyTrack.fromJson(await _getJson('/tracks/$id'));
+  }
+
+  /// 按 URI 或分享链接取单曲完整信息（Connect 远程曲目补全艺人 / 封面、搜索框直达用）。
+  Future<SpotifyTrack?> getTrackByUri(String uri) async {
+    if (!isConfigured) return null;
+    final link = SpotifyLink.parse(uri);
+    final trackId = link?.kind == ShareKind.track
+        ? link!.id
+        : (uri.startsWith('spotify:track:') ? uri.substring(14) : '');
+    if (trackId.isEmpty) return null;
+    try {
+      return await getTrack(trackId);
     } catch (_) {
       return null;
     }
@@ -396,20 +520,105 @@ class SpotifyApiService {
   Future<List<SpotifyAlbum>> getArtistAlbums(String id) async {
     if (!isConfigured) return const [];
     try {
-      if (_useDesktop) return await _desktop.artistAlbums(id);
-      final data = await _getJson(
-        '/artists/$id/albums?include_groups=album,single&limit=20',
-      );
-      final items = data['items'];
-      return items is List
-          ? items
-                .whereType<Map<String, dynamic>>()
-                .map(SpotifyAlbum.fromJson)
-                .toList()
-          : const [];
+      return (await getArtistAlbumsPage(id)).items;
     } catch (_) {
       return const [];
     }
+  }
+
+  /// Full available discography is exposed incrementally, never as an eagerly
+  /// fetched list. The Web API also includes compilations and appearances.
+  Future<CatalogPage<SpotifyAlbum>> getArtistAlbumsPage(
+    String id, {
+    int offset = 0,
+    int limit = 20,
+  }) {
+    _validateCatalogPage(offset, limit);
+    return _catalogLoad(() async {
+      if (_useDesktop) {
+        return _desktop.artistAlbumsPage(id, offset: offset, limit: limit);
+      }
+      // Current Web API artist-album requests allow at most ten items.
+      final webLimit = limit.clamp(1, 10);
+      return _webCatalogPage(
+        await _getJson(
+          '/artists/${Uri.encodeComponent(id)}/albums'
+          '?include_groups=album,single,compilation,appears_on&offset=$offset&limit=$webLimit',
+        ),
+        SpotifyAlbum.fromJson,
+        offset: offset,
+        limit: webLimit,
+      );
+    });
+  }
+
+  /// One bounded slice of artist-credited songs from the available discography.
+  /// A call visits at most one album-track page and, if needed, one release page.
+  /// Popular tracks remain a separate preview; this is not a popularity ranking.
+  Future<ArtistTracksPage> getArtistTracksPage(
+    String artistId, {
+    ArtistTracksCursor? cursor,
+    int limit = 50,
+  }) async {
+    _validateCatalogPage(cursor?.trackOffset ?? 0, limit);
+    if (!isConfigured) throw SpotifyDataException.notSignedIn;
+    if (cursor != null && cursor.artistId != artistId) {
+      throw ArgumentError('The song cursor belongs to a different artist');
+    }
+    final albums = [...?cursor?.pendingAlbums];
+    var albumOffset = cursor == null ? 0 : cursor.nextAlbumOffset;
+    var trackOffset = cursor?.trackOffset ?? 0;
+    if (albums.isEmpty && albumOffset != null) {
+      final releases = await getArtistAlbumsPage(
+        artistId,
+        offset: albumOffset,
+        limit: 10,
+      );
+      albums.addAll(releases.items);
+      albumOffset = releases.nextOffset;
+      trackOffset = 0;
+    }
+
+    ArtistTracksCursor? continuation() => albums.isEmpty && albumOffset == null
+        ? null
+        : ArtistTracksCursor(
+            artistId: artistId,
+            pendingAlbums: List.unmodifiable(albums),
+            nextAlbumOffset: albumOffset,
+            trackOffset: trackOffset,
+          );
+
+    if (albums.isEmpty) {
+      return ArtistTracksPage(items: const [], nextCursor: continuation());
+    }
+    final album = albums.first;
+    final tracks = await getAlbumTracksPage(
+      album,
+      offset: trackOffset,
+      limit: limit,
+    );
+    // Compilations may include unrelated artists. Missing per-track credits are
+    // retained for own releases rather than silently losing unavailable metadata.
+    final ownRelease =
+        album.albumType.toLowerCase() != 'compilation' &&
+        album.artists.any((artist) => artist.id == artistId);
+    final items = tracks.items
+        .where(
+          (track) =>
+              (track.artists.isEmpty && ownRelease) ||
+              track.artists.any((artist) => artist.id == artistId),
+        )
+        .toList();
+    if (tracks.hasMore) {
+      trackOffset = tracks.nextOffset!;
+    } else {
+      albums.removeAt(0);
+      trackOffset = 0;
+    }
+    return ArtistTracksPage(
+      items: List.unmodifiable(items),
+      nextCursor: continuation(),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -435,34 +644,126 @@ class SpotifyApiService {
     };
     if (clean.isEmpty || !isConfigured) return empty;
 
-    if (_useDesktop) {
-      try {
-        final r = await _desktop.search(clean);
-        return {
-          'tracks': r.tracks,
-          'artists': r.artists,
-          'playlists': r.playlists,
-        };
-      } catch (e) {
-        throw SpotifyDataException('搜索失败：$e');
-      }
-    }
-
-    final data = await _getJson(
-      '/search?q=${Uri.encodeComponent(clean)}&type=track,artist,playlist&limit=10',
-    );
-    List<T> parse<T>(String key, T Function(Map<String, dynamic>) from) {
-      final items = (data[key] as Map<String, dynamic>?)?['items'];
-      return items is List
-          ? items.whereType<Map<String, dynamic>>().map(from).toList()
-          : <T>[];
-    }
-
+    final page = await searchPage(clean, limit: 10);
     return {
-      'tracks': parse('tracks', SpotifyTrack.fromJson),
-      'artists': parse('artists', SpotifyArtist.fromJson),
-      'playlists': parse('playlists', SpotifyPlaylist.fromJson),
+      'tracks': page.tracks.items,
+      'artists': page.artists.items,
+      'playlists': page.playlists.items,
     };
+  }
+
+  /// Search one offset for all sections, or one section's own continuation.
+  /// [type] is null/'all', 'tracks', 'artists' or 'playlists'. Each section owns
+  /// its raw next offset so filtered and duplicate items cannot skip results.
+  Future<SearchPage> searchPage(
+    String query, {
+    int offset = 0,
+    int limit = 20,
+    String? type,
+  }) async {
+    _validateCatalogPage(offset, limit);
+    if (!const [null, 'all', 'tracks', 'artists', 'playlists'].contains(type)) {
+      throw ArgumentError.value(type, 'type', 'Unsupported search section');
+    }
+    final clean = query.trim();
+    if (clean.isEmpty) return const SearchPage();
+    if (!_useDesktop && offset > 1000) {
+      throw ArgumentError.value(
+        offset,
+        'offset',
+        'Web search supports offsets up to 1000',
+      );
+    }
+    return _catalogLoad(() async {
+      final link = offset == 0 ? SpotifyLink.parse(clean) : null;
+      if (link != null) {
+        return _resolveSpotifyLinkPage(link, type: type);
+      }
+      if (_useDesktop) {
+        return _desktop.searchPage(clean, offset: offset, limit: limit);
+      }
+      // Search currently caps each type at ten items; pagination is required.
+      final webLimit = limit.clamp(1, 10);
+      final apiType = switch (type) {
+        'tracks' => 'track',
+        'artists' => 'artist',
+        'playlists' => 'playlist',
+        _ => 'track,artist,playlist',
+      };
+      final data = await _getJson(
+        '/search?q=${Uri.encodeComponent(clean)}&type=$apiType&offset=$offset&limit=$webLimit',
+      );
+      final allTypes = type == null || type == 'all';
+      if (allTypes &&
+          !const ['tracks', 'artists', 'playlists'].any(data.containsKey)) {
+        throw const FormatException('Missing search results');
+      }
+      CatalogPage<T> section<T>(
+        String key,
+        T Function(Map<String, dynamic>) parse,
+      ) {
+        if ((!allTypes && type != key) || (allTypes && !data.containsKey(key))) {
+          return CatalogPage<T>(items: const [], offset: offset);
+        }
+        return _webCatalogPage(
+          data[key],
+          parse,
+          offset: offset,
+          limit: webLimit,
+          maxOffset: 1000,
+        );
+      }
+      return SearchPage(
+        tracks: section('tracks', SpotifyTrack.fromJson),
+        artists: section('artists', SpotifyArtist.fromJson),
+        playlists: section('playlists', SpotifyPlaylist.fromJson),
+      );
+    });
+  }
+
+  Future<SearchPage> _resolveSpotifyLinkPage(
+    SpotifyLink link, {
+    String? type,
+  }) async {
+    final allTypes = type == null || type == 'all';
+    switch (link.kind) {
+      case ShareKind.track:
+        if (!allTypes && type != 'tracks') return const SearchPage();
+        final track = await getTrack(link.id);
+        return SearchPage(
+          tracks: CatalogPage(items: [track], offset: 0, total: 1),
+        );
+      case ShareKind.artist:
+        final artist = (allTypes || type == 'artists')
+            ? await getArtist(link.id)
+            : null;
+        final topTracks = (allTypes || type == 'tracks')
+            ? await getArtistTopTracks(link.id)
+            : const <SpotifyTrack>[];
+        return SearchPage(
+          artists: artist == null
+              ? const CatalogPage(items: [], offset: 0)
+              : CatalogPage(items: [artist], offset: 0, total: 1),
+          tracks: CatalogPage(
+            items: topTracks,
+            offset: 0,
+            total: topTracks.length,
+          ),
+        );
+      case ShareKind.playlist:
+        if (!allTypes && type != 'playlists') return const SearchPage();
+        final playlist = await getPlaylist(link.id);
+        return SearchPage(
+          playlists: CatalogPage(items: [playlist], offset: 0, total: 1),
+        );
+      case ShareKind.album:
+        if (!allTypes && type != 'tracks') return const SearchPage();
+        final album = await getAlbum(link.id);
+        final tracks = await getAlbumTracks(album);
+        return SearchPage(
+          tracks: CatalogPage(items: tracks, offset: 0, total: tracks.length),
+        );
+    }
   }
 
   // ---------------------------------------------------------------------------

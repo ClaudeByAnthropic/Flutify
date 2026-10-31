@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/album.dart';
 import '../../models/artist.dart';
 import '../../models/category.dart';
+import '../../models/catalog_page.dart';
 import '../../models/image.dart';
 import '../../models/playlist.dart';
 import '../../models/track.dart';
@@ -183,6 +184,58 @@ class PathfinderParsers {
     );
   }
 
+  /// Paginated counterpart to the legacy preview parser. A missing collection
+  /// is a protocol error, not a successful empty/end-of-list response.
+  static SearchPage searchPage(
+    Map<String, dynamic> data, {
+    int offset = 0,
+    int limit = 20,
+  }) {
+    final search = _map(data['searchV2']);
+    if (search == null) throw const FormatException('Missing search results');
+    return SearchPage(
+      tracks: _catalogPage(
+        search['tracksV2'], (item) => trackItem(item), offset: offset, limit: limit,
+      ),
+      artists: _catalogPage(
+        search['artists'], artist, offset: offset, limit: limit,
+      ),
+      playlists: _catalogPage(
+        search['playlists'], playlist, offset: offset, limit: limit,
+      ),
+    );
+  }
+
+  static CatalogPage<T> _catalogPage<T>(
+    Object? value,
+    T? Function(Object?) parse, {
+    required int offset,
+    required int limit,
+  }) {
+    final page = _map(value);
+    if (page == null || page['items'] is! List) {
+      throw const FormatException('Missing catalog items');
+    }
+    final rawItems = _list(page['items']);
+    final paging = _map(page['pagingInfo']) ?? _map(page['pageInfo']);
+    final total = _int(page['totalCount']);
+    final next = _int(paging?['nextOffset']);
+    if (total != null && total < 0 || next != null && next < 0) {
+      throw const FormatException('Invalid catalog pagination');
+    }
+    return CatalogPage<T>.fromSlice(
+      items: rawItems.map(parse).whereType<T>().toList(),
+      offset: offset,
+      limit: limit,
+      rawCount: rawItems.length,
+      total: total,
+      nextOffset: next,
+      hasNextPage: paging?['hasNextPage'] is bool
+          ? paging!['hasNextPage'] as bool
+          : null,
+    );
+  }
+
   /// getAlbum：专辑信息与曲目（曲目回填专辑，保证封面可用）。
   static ({SpotifyAlbum album, List<SpotifyTrack> tracks})? albumPage(Map<String, dynamic> data) {
     final union = _map(data['albumUnion']);
@@ -193,6 +246,22 @@ class PathfinderParsers {
         .whereType<SpotifyTrack>()
         .toList();
     return (album: parsed, tracks: tracks);
+  }
+
+  static CatalogPage<SpotifyTrack> albumTracksPage(
+    Map<String, dynamic> data, {
+    int offset = 0,
+    int limit = 50,
+  }) {
+    final union = _map(data['albumUnion']);
+    final parsedAlbum = album(union);
+    if (parsedAlbum == null) throw const FormatException('Missing album');
+    return _catalogPage(
+      union!['tracksV2'],
+      (item) => trackItem(item, album: parsedAlbum),
+      offset: offset,
+      limit: limit,
+    );
   }
 
   /// queryArtistOverview：艺人信息与热门曲目。
@@ -217,6 +286,26 @@ class PathfinderParsers {
         })
         .whereType<SpotifyAlbum>()
         .toList();
+  }
+
+  static CatalogPage<SpotifyAlbum> discographyPage(
+    Map<String, dynamic> data, {
+    SpotifyArtist? artist,
+    int offset = 0,
+    int limit = 20,
+  }) {
+    final all = _map(_map(_map(data['artistUnion'])?['discography'])?['all']);
+    return _catalogPage(
+      all,
+      (item) {
+        final releases = _list(_map(_map(item)?['releases'])?['items']);
+        return releases.isEmpty
+            ? null
+            : album(releases.first, fallbackArtists: artist == null ? null : [artist]);
+      },
+      offset: offset,
+      limit: limit,
+    );
   }
 
   /// spclient `playlist/v2/playlist/{id}`（JSON）：元数据、曲目 URI 列表与各曲目的加入时间。

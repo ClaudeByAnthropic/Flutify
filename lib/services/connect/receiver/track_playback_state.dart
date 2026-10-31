@@ -32,6 +32,7 @@ class TpTrack {
   final List<({String name, String uri})> artists;
   final int durationMs;
   final bool explicit;
+  final bool isAdvertisement;
 
   /// 封面，按尺寸从大到小。
   final List<String> imageUrls;
@@ -44,14 +45,17 @@ class TpTrack {
     this.artists = const [],
     this.durationMs = 0,
     this.explicit = false,
+    this.isAdvertisement = false,
     this.imageUrls = const [],
   });
 
   factory TpTrack.fromJson(Map<String, dynamic> json) {
-    final meta = (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final meta =
+        (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const {};
     final images = [
       for (final i in (meta['images'] as List? ?? const []))
-        if (i is Map && i['url'] is String) (url: i['url'] as String, w: (i['width'] as num?)?.toInt() ?? 0),
+        if (i is Map && i['url'] is String)
+          (url: i['url'] as String, w: (i['width'] as num?)?.toInt() ?? 0),
     ]..sort((a, b) => b.w.compareTo(a.w));
     return TpTrack(
       uri: meta['uri'] as String? ?? '',
@@ -60,10 +64,15 @@ class TpTrack {
       albumUri: meta['group_uri'] as String? ?? '',
       artists: [
         for (final a in (meta['authors'] as List? ?? const []))
-          if (a is Map) (name: a['name'] as String? ?? '', uri: a['uri'] as String? ?? ''),
+          if (a is Map)
+            (name: a['name'] as String? ?? '', uri: a['uri'] as String? ?? ''),
       ],
       durationMs: (meta['duration'] as num?)?.toInt() ?? 0,
       explicit: meta['is_explicit'] == true,
+      isAdvertisement:
+          meta['is_advertisement'] == true ||
+          meta['is_advertisement'] == 'true' ||
+          (meta['uri'] as String? ?? '').startsWith('spotify:ad:'),
       imageUrls: [for (final i in images) i.url],
     );
   }
@@ -102,18 +111,19 @@ class TpState {
 
 /// 播放选项（状态机 `attributes.options`）：随机 / 列表循环 / 单曲循环。
 class TpOptions {
-  final bool shuffle;
-  final bool repeatContext;
-  final bool repeatTrack;
+  // null 表示服务端未下发该项，不能当作关闭覆盖本机设置。
+  final bool? shuffle;
+  final bool? repeatContext;
+  final bool? repeatTrack;
 
-  const TpOptions({this.shuffle = false, this.repeatContext = false, this.repeatTrack = false});
+  const TpOptions({this.shuffle, this.repeatContext, this.repeatTrack});
 
   factory TpOptions.fromJson(Object? json) {
     if (json is! Map) return const TpOptions();
     return TpOptions(
-      shuffle: json['shuffling_context'] == true,
-      repeatContext: json['repeating_context'] == true,
-      repeatTrack: json['repeating_track'] == true,
+      shuffle: json['shuffling_context'] as bool?,
+      repeatContext: json['repeating_context'] as bool?,
+      repeatTrack: json['repeating_track'] as bool?,
     );
   }
 }
@@ -149,10 +159,13 @@ class TpStateMachine {
     );
   }
 
-  TpState? state(int index) => index >= 0 && index < states.length ? states[index] : null;
+  TpState? state(int index) =>
+      index >= 0 && index < states.length ? states[index] : null;
 
   TpTrack? trackOf(TpState state) =>
-      state.track >= 0 && state.track < tracks.length ? tracks[state.track] : null;
+      state.track >= 0 && state.track < tracks.length
+      ? tracks[state.track]
+      : null;
 
   /// 从 [index] 起沿「播完自动进入」走出的播放顺序（含自身，最多 [limit] 个，遇环停止）。
   List<int> advanceChain(int index, {int limit = 50}) {
@@ -161,12 +174,43 @@ class TpStateMachine {
     var i = index;
     while (cur != null && out.length < limit && !out.contains(i)) {
       out.add(i);
-      final next = cur.advance;
+      // 单曲循环的 advance 指回自身，但手动下一首仍需展示后续曲目。
+      final next = cur.advance == null || cur.advance?.stateIndex == i
+          ? cur.skipNext
+          : cur.advance;
       if (next == null) break;
       i = next.stateIndex;
       cur = state(i);
     }
     return out;
+  }
+
+  /// 广告不进入播放器或展示队列，仍保留原状态下标用于服务端同步。
+  List<int> playableChain(int index) => [
+    for (final i in advanceChain(index))
+      if (trackOf(states[i]) case final track?)
+        if (!track.isAdvertisement) i,
+  ];
+
+  /// 只越过广告，不能跨过正常歌曲去匹配任意队列项。
+  int? playableState(int index, {bool backwards = false}) {
+    final visited = <int>{};
+    var i = index;
+    while (visited.add(i)) {
+      final current = state(i);
+      if (current == null) return null;
+      final track = trackOf(current);
+      if (track == null) return null;
+      if (!track.isAdvertisement) return i;
+      final next = backwards
+          ? current.skipPrev
+          : current.advance == null || current.advance?.stateIndex == i
+          ? current.skipNext
+          : current.advance;
+      if (next == null) return null;
+      i = next.stateIndex;
+    }
+    return null;
   }
 }
 
@@ -183,7 +227,8 @@ class TpReplaceState {
   static TpReplaceState? fromJson(Map<String, dynamic> json) {
     final machine = TpStateMachine.fromJson(json['state_machine']);
     final ref = TpStateRef.fromJson(json['state_ref']);
-    if (machine == null || ref == null || machine.state(ref.stateIndex) == null) return null;
+    if (machine == null || ref == null || machine.state(ref.stateIndex) == null)
+      return null;
     return TpReplaceState(machine, ref, (json['seek_to'] as num?)?.toInt());
   }
 }

@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.0.1+1
+version: 0.0.19+19
 
 environment:
   sdk: ^3.12.0
@@ -39,14 +39,30 @@ dependencies:
   cupertino_icons: ^1.0.8
   provider: ^6.1.5+1
   cached_network_image: ^4.0.3
+  flutter_cache_manager: ^3.4.5
+  file: ^7.0.1
+  path: ^1.9.1
   http: ^1.6.0
   shared_preferences: ^2.5.5
   intl: ^0.20.2
   just_audio: ^0.10.6
   path_provider: ^2.1.6
+  file_selector: ^1.1.0
+  flutter_rust_bridge: 2.13.0
+  rust_lib_flutify:
+    path: rust_builder
+  connectivity_plus: ^7.0.0
   material_3_expressive: ^1.1.2
-  just_audio_media_kit: ^2.1.0
-  media_kit_libs_windows_audio: ^1.0.9
+  # 本地补丁：增加输出设备选择（畅联「本机音频设备」），见 packages/just_audio_media_kit/FLUTIFY_PATCH.md
+  just_audio_media_kit:
+    path: packages/just_audio_media_kit
+  # 直接使用其 AudioDevice 类型（本机输出设备选择）
+  media_kit: ^1.2.6
+  # 上游 audio 包只提供 x64；本地小补丁按目标架构下载 libmpv。
+  media_kit_libs_windows_audio:
+    path: packages/media_kit_libs_windows_audio
+  # Linux 桌面没有 just_audio 原生实现，需 media_kit（libmpv）后端提供音频。
+  media_kit_libs_linux: ^1.2.1
   crypto: ^3.0.7
   url_launcher: ^6.3.2
   window_manager: ^0.5.2
@@ -57,7 +73,13 @@ dependencies:
   pinyin: ^3.3.0
   device_info_plus: ^13.3.0
 
+
+dependency_overrides:
+  # 本地补丁：WebView2 播放时允许本机 EME 页面选择音频输出设备，见 packages/flutter_inappwebview_windows/FLUTIFY_PATCH.md
+  flutter_inappwebview_windows:
+    path: packages/flutter_inappwebview_windows
 dev_dependencies:
+  file_selector_platform_interface: ^2.7.0
   flutter_test:
     sdk: flutter
 
@@ -86,6 +108,7 @@ flutter:
   # EME 播放器的 HLS.js 引擎（WebView2 隐藏页用，Widevine 全曲播放）
   assets:
     - assets/js/hls.min.js
+    - assets/updates/windows_update.ps1
 
   # MiSans（小米，可免费商用）：全量中日韩字形 TTF，仅打包实际用到的 4 个字重。
   # w800 / w900 没有对应文件，按 CSS 字重匹配规则回落到 Bold。

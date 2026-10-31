@@ -13,6 +13,7 @@
 // 两种画面：
 // - 歌词：三行「胶片」（上一句 / 当前句 / 下一句）整体上滚切换；当前句大而亮，下一句小而暗；
 //   长句先缩小（最低 72%），仍放不下就均分折成两行铺满高度（此时不做上滚）；
+//   当前句带译文（双语歌词）时改为原文在上（大）、译文在下（小字渐暗）两行铺满，同样不做上滚；
 // - 控制条：封面 + 歌名 / 歌手 + 上一首 / 播放暂停 / 下一首（没有同步歌词或鼠标悬停时）。
 // 字体优先用 App 自带的 MiSans，韩文 / 泰文等 MiSans 没有的文字换系统字体。
 class TaskbarLyricsPainter {
@@ -46,14 +47,18 @@ class TaskbarLyricsPainter {
   // 当前句是否需要折成两行。
   bool NeedsWrap(const Canvas& canvas, const std::wstring& current);
 
+  // [current_translation]：当前句的译文（双语歌词）；非空时当前句改为「原文 + 译文小字」两行布局。
   // [progress]：切句动画进度（0 = 刚切换，1 = 静止），已做缓动。
   void PaintLyrics(const Canvas& canvas, const std::wstring& previous, const std::wstring& current,
-                   const std::wstring& next, float progress);
+                   const std::wstring& next, const std::wstring& current_translation, float progress);
 
   ControlLayout PaintControl(const Canvas& canvas, const std::wstring& title, const std::wstring& artist,
                              Gdiplus::Bitmap* art, bool playing, Button hovered);
 
  private:
+  // 缓存淘汰只在绘制入口（尚未持有任何 Font*）进行，FontFor 本身不淘汰
+  void TrimCaches();
+  bool WrapNeeded(const Canvas& canvas, const std::wstring& current);
   Gdiplus::Font* FontFor(const std::wstring& text, double points, bool bold);
   const Gdiplus::FontFamily* FamilyFor(const std::wstring& text, bool bold);
   const Gdiplus::FontFamily* SystemFamily(const wchar_t* name);

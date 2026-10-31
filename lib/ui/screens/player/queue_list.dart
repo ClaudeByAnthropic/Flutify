@@ -5,6 +5,7 @@ import '../../../l10n/l10n.dart';
 import '../../../providers/playback_provider.dart';
 import '../../widgets/content_bottom_spacer.dart';
 import '../../widgets/cover_image.dart';
+import 'package:material_3_expressive/material_3_expressive.dart' show M3EButton;
 
 /// 播放队列列表：正在播放 / 队列中的下一首 / 接下来播放（上下文）。
 ///
@@ -46,7 +47,10 @@ class QueueList extends StatelessWidget {
           _SectionHeader(
             title: l10n.queueNextInQueue,
             padding: horizontalPadding,
-            action: TextButton(onPressed: playback.clearUserQueue, child: Text(l10n.queueClear)),
+            action: M3EButton.text(
+              onPressed: playback.clearUserQueue,
+              child: Text(l10n.queueClear),
+            ),
           ),
           SliverReorderableList(
             itemCount: userQueue.length,
@@ -95,7 +99,10 @@ class QueueList extends StatelessWidget {
           SliverFillRemaining(
             hasScrollBody: false,
             child: Center(
-              child: Text(l10n.queueEmpty, style: TextStyle(color: colorScheme.onSurfaceVariant)),
+              child: Text(
+                l10n.queueEmpty,
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
             ),
           ),
 
@@ -111,7 +118,11 @@ class _SectionHeader extends StatelessWidget {
   final Widget? action;
   final double padding;
 
-  const _SectionHeader({required this.title, required this.padding, this.action});
+  const _SectionHeader({
+    required this.title,
+    required this.padding,
+    this.action,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +134,9 @@ class _SectionHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -166,8 +179,8 @@ class _DismissibleRow extends StatelessWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
-        color: Colors.redAccent,
-        child: const Icon(Icons.delete_rounded, color: Colors.white),
+        color: Theme.of(context).colorScheme.errorContainer,
+        child: Icon(Icons.delete_rounded, color: Theme.of(context).colorScheme.onErrorContainer),
       ),
       child: Material(
         type: MaterialType.transparency,
@@ -179,9 +192,12 @@ class _DismissibleRow extends StatelessWidget {
           onTap: onTap,
           trailing: ReorderableDragStartListener(
             index: index,
-            child: const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Icon(Icons.drag_handle_rounded, color: Colors.grey),
+            child: const MouseRegion(
+              cursor: SystemMouseCursors.grab,
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Icon(Icons.drag_handle_rounded, color: Colors.grey),
+              ),
             ),
           ),
         ),
@@ -215,10 +231,17 @@ class _QueueRow extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.only(left: padding, right: 8),
       onTap: onTap,
-      leading: CoverImage(url: coverUrl, size: 44, borderRadius: BorderRadius.circular(6)),
+      leading: CoverImage(
+        url: coverUrl,
+        size: 44,
+        borderRadius: BorderRadius.circular(6),
+      ),
       title: Text(
         title,
-        style: TextStyle(color: highlighted ? colorScheme.primary : colorScheme.onSurface, fontWeight: FontWeight.w700),
+        style: TextStyle(
+          color: highlighted ? colorScheme.primary : colorScheme.onSurface,
+          fontWeight: FontWeight.w700,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

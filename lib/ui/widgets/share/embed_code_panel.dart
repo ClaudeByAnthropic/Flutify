@@ -1,3 +1,4 @@
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/flutify_tokens.dart';
@@ -37,7 +38,10 @@ class _EmbedCodePanelState extends State<EmbedCodePanel> with CopiedFlash {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Heading(title: l10n.shareEmbedTitle, subtitle: l10n.shareEmbedSubtitle),
+        _Heading(
+          title: l10n.shareEmbedTitle,
+          subtitle: l10n.shareEmbedSubtitle,
+        ),
         const SizedBox(height: 14),
         // 选项：窄屏时自动换行，避免横向溢出
         Wrap(
@@ -48,15 +52,27 @@ class _EmbedCodePanelState extends State<EmbedCodePanel> with CopiedFlash {
             SegmentedButton<EmbedSize>(
               showSelectedIcon: false,
               segments: [
-                ButtonSegment(value: EmbedSize.standard, label: Text(l10n.shareEmbedStandard)),
-                ButtonSegment(value: EmbedSize.compact, label: Text(l10n.shareEmbedCompact)),
+                ButtonSegment(
+                  value: EmbedSize.standard,
+                  label: Text(l10n.shareEmbedStandard),
+                ),
+                ButtonSegment(
+                  value: EmbedSize.compact,
+                  label: Text(l10n.shareEmbedCompact),
+                ),
               ],
               selected: {_size},
-              onSelectionChanged: (value) => setState(() => _size = value.first),
+              onSelectionChanged: (value) =>
+                  setState(() => _size = value.first),
             ),
             FilterChip(
               label: Text(l10n.shareEmbedDark),
-              avatar: Icon(Icons.dark_mode_rounded, size: 18, color: _dark ? null : colorScheme.onSurfaceVariant),
+              mouseCursor: SystemMouseCursors.click,
+              avatar: Icon(
+                Icons.dark_mode_rounded,
+                size: 18,
+                color: _dark ? null : colorScheme.onSurfaceVariant,
+              ),
               showCheckmark: false,
               selected: _dark,
               shape: tokens.pillShape,
@@ -65,14 +81,21 @@ class _EmbedCodePanelState extends State<EmbedCodePanel> with CopiedFlash {
           ],
         ),
         const SizedBox(height: 14),
-        EmbedWebView(target: widget.target, size: _size, dark: _dark),
+        EmbedWebView(
+          key: ValueKey(widget.target.embedUrl(dark: _dark)),
+          target: widget.target,
+          size: _size,
+          dark: _dark,
+        ),
         const SizedBox(height: 12),
         Container(
           constraints: const BoxConstraints(maxHeight: _codeMaxHeight),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
             borderRadius: tokens.radius(16),
-            border: Border.all(color: colorScheme.outlineVariant.withAlpha(120)),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withAlpha(120),
+            ),
           ),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(12),
@@ -90,17 +113,21 @@ class _EmbedCodePanelState extends State<EmbedCodePanel> with CopiedFlash {
         const SizedBox(height: 12),
         Align(
           alignment: AlignmentDirectional.centerEnd,
-          child: FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: tokens.accent,
-              foregroundColor: tokens.onAccent,
-              shape: tokens.pillShape,
+          child: M3EButton.icon(
+            decoration: M3EButtonDecoration(
+              backgroundColor: WidgetStatePropertyAll(tokens.accent),
+              foregroundColor: WidgetStatePropertyAll(tokens.onAccent),
             ),
             onPressed: () => copyAndFlash(_code),
             icon: AnimatedSwitcher(
               duration: context.motion(const Duration(milliseconds: 220)),
-              transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
-              child: Icon(copied ? Icons.check_rounded : Icons.content_copy_rounded, key: ValueKey(copied), size: 18),
+              transitionBuilder: (child, anim) =>
+                  ScaleTransition(scale: anim, child: child),
+              child: Icon(
+                copied ? Icons.check_rounded : Icons.content_copy_rounded,
+                key: ValueKey(copied),
+                size: 18,
+              ),
             ),
             label: Text(copied ? l10n.shareCopied : l10n.shareEmbedCopy),
           ),
@@ -126,7 +153,10 @@ class _Heading extends StatelessWidget {
         Container(
           width: 36,
           height: 36,
-          decoration: BoxDecoration(color: tokens.accent.withAlpha(36), borderRadius: tokens.radius(12)),
+          decoration: BoxDecoration(
+            color: tokens.accent.withAlpha(36),
+            borderRadius: tokens.radius(12),
+          ),
           child: Icon(Icons.code_rounded, size: 20, color: tokens.accent),
         ),
         const SizedBox(width: 12),
@@ -134,12 +164,19 @@ class _Heading extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               Text(
                 subtitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

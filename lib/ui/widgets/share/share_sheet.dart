@@ -33,12 +33,14 @@ class ShareSheet extends StatelessWidget {
         context: context,
         useRootNavigator: true,
         builder: (dialogContext) => Dialog(
-          backgroundColor: Theme.of(dialogContext).colorScheme.surfaceContainerHigh,
+          backgroundColor: Theme.of(
+            dialogContext,
+          ).colorScheme.surfaceContainerHigh,
           shape: RoundedRectangleBorder(borderRadius: tokens.radius(28)),
           insetPadding: const EdgeInsets.all(24),
           clipBehavior: Clip.antiAlias,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: maxWidth),
+          child: SizedBox(
+            width: maxWidth,
             child: ShareSheet(target: target, showClose: true),
           ),
         ),
@@ -48,6 +50,7 @@ class ShareSheet extends StatelessWidget {
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) => ShareSheet(target: target),
     );
@@ -55,7 +58,10 @@ class ShareSheet extends StatelessWidget {
 
   /// 用系统浏览器打开网页链接；失败时返回链接文本，由卡片退回为复制。
   Future<String?> _openWeb() async {
-    final ok = await launchUrl(Uri.parse(target.webUrl), mode: LaunchMode.externalApplication).catchError((_) => false);
+    final ok = await launchUrl(
+      Uri.parse(target.webUrl),
+      mode: LaunchMode.externalApplication,
+    ).catchError((_) => false);
     return ok ? null : target.webUrl;
   }
 
@@ -89,11 +95,19 @@ class ShareSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: ShareActionTile(icon: Icons.tag_rounded, label: l10n.shareCopyUri, copyText: target.uri),
+                    child: ShareActionTile(
+                      icon: Icons.tag_rounded,
+                      label: l10n.shareCopyUri,
+                      copyText: target.uri,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: ShareActionTile(icon: Icons.open_in_new_rounded, label: l10n.shareOpenWeb, onTap: _openWeb),
+                    child: ShareActionTile(
+                      icon: Icons.open_in_new_rounded,
+                      label: l10n.shareOpenWeb,
+                      onTap: _openWeb,
+                    ),
                   ),
                 ],
               ),
@@ -130,7 +144,9 @@ class _ShareHeader extends StatelessWidget {
     final tokens = context.tokens;
     final isArtist = target.kind == ShareKind.artist;
     final kind = _kindLabel(context);
-    final meta = target.subtitle.isEmpty ? kind : context.l10n.subtitleJoin(kind, target.subtitle);
+    final meta = target.subtitle.isEmpty
+        ? kind
+        : context.l10n.subtitleJoin(kind, target.subtitle);
 
     return Row(
       children: [
@@ -139,7 +155,9 @@ class _ShareHeader extends StatelessWidget {
           size: 60,
           circular: isArtist,
           borderRadius: tokens.radius(12),
-          placeholderIcon: isArtist ? Icons.person_rounded : Icons.music_note_rounded,
+          placeholderIcon: isArtist
+              ? Icons.person_rounded
+              : Icons.music_note_rounded,
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -150,14 +168,18 @@ class _ShareHeader extends StatelessWidget {
                 target.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 meta,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

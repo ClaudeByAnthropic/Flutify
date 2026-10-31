@@ -15,7 +15,8 @@ import 'fakes/fake_track_audio_source.dart';
 import 'fixtures/sample_catalog.dart';
 
 class _FakeControls implements SystemMediaControls {
-  final StreamController<MediaControlEvent> controller = StreamController.broadcast(sync: true);
+  final StreamController<MediaControlEvent> controller =
+      StreamController.broadcast(sync: true);
   final List<MediaTrackInfo?> tracks = [];
   final List<MediaPlaybackInfo> playbacks = [];
 
@@ -55,12 +56,23 @@ class _FakeOverride extends ChangeNotifier implements MediaSourceOverride {
   bool get active => _active;
 
   @override
-  MediaTrackInfo? get track =>
-      const MediaTrackInfo(id: 'r1', title: 'Remote Song', artist: 'R', album: 'R', artUrl: '', duration: Duration(minutes: 3));
+  MediaTrackInfo? get track => const MediaTrackInfo(
+    id: 'r1',
+    title: 'Remote Song',
+    artist: 'R',
+    album: 'R',
+    artUrl: '',
+    duration: Duration(minutes: 3),
+  );
 
   @override
-  MediaPlaybackInfo get playbackInfo =>
-      const MediaPlaybackInfo(playing: true, buffering: false, position: Duration.zero, canNext: true, canPrevious: true);
+  MediaPlaybackInfo get playbackInfo => const MediaPlaybackInfo(
+    playing: true,
+    buffering: false,
+    position: Duration.zero,
+    canNext: true,
+    canPrevious: true,
+  );
 
   @override
   bool handle(MediaControlEvent event) {
@@ -83,7 +95,12 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final storage = await StorageService.init();
     audio = FakeAudioPlayerService();
-    playback = PlaybackProvider(audio, storage, random: Random(1), audioLoader: FakeTrackAudioSource());
+    playback = PlaybackProvider(
+      audio,
+      storage,
+      random: Random(1),
+      audioLoader: FakeTrackAudioSource(),
+    );
     controls = _FakeControls();
     sync = MediaControlsSync(playback, controls);
   });
@@ -96,7 +113,9 @@ void main() {
   test('曲目变化才下发曲目信息；播放状态变化才下发状态', () async {
     expect(controls.tracks, isEmpty);
     await playback.playTrack(a, contextQueue: [a, b]);
-    expect(controls.tracks.whereType<MediaTrackInfo>().map((t) => t.title), [a.name]);
+    expect(controls.tracks.whereType<MediaTrackInfo>().map((t) => t.title), [
+      a.name,
+    ]);
     expect(controls.tracks.last!.artist, a.artistNames);
     expect(controls.playbacks.last.canNext, isTrue);
 
@@ -149,5 +168,17 @@ void main() {
     controls.controller.add(const MediaSeekEvent(Duration(seconds: 30)));
     await Future<void>.delayed(Duration.zero);
     expect(audio.seeks.last, const Duration(seconds: 30));
+  });
+
+  test('引擎补全同一首歌的时长后重新下发媒体元数据', () async {
+    await playback.playTrack(a, contextQueue: [a, b]);
+    final count = controls.tracks.length;
+    const actualDuration = Duration(minutes: 4, seconds: 12);
+    audio.durationController.add(actualDuration);
+    expect(controls.tracks.length, count + 1);
+    expect(controls.tracks.last!.id, a.id);
+    expect(controls.tracks.last!.duration, actualDuration);
+    audio.durationController.add(actualDuration);
+    expect(controls.tracks.length, count + 1);
   });
 }

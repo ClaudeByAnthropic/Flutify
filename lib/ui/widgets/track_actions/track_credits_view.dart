@@ -116,7 +116,7 @@ class _TrackCreditsViewState extends State<TrackCreditsView> {
               if (snapshot.hasError) {
                 return _Message(
                   text: snapshot.error.toString(),
-                  action: TextButton(onPressed: _retry, child: Text(l10n.commonRetry)),
+                  action: M3EButton.text(onPressed: _retry, child: Text(l10n.commonRetry)),
                 );
               }
               final credits = snapshot.data!;
@@ -186,6 +186,9 @@ class _PersonRow extends StatelessWidget {
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
+        mouseCursor: onTap == null
+            ? MouseCursor.defer
+            : SystemMouseCursors.click,
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(

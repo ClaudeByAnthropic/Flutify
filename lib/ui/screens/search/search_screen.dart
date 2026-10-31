@@ -1,11 +1,16 @@
+import 'package:material_3_expressive/material_3_expressive.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../l10n/l10n.dart';
+import '../../../models/album.dart';
 import '../../../models/artist.dart';
 import '../../../models/category.dart';
 import '../../../models/playback_context.dart';
 import '../../../models/playlist.dart';
+import '../../../models/share_target.dart';
 import '../../../models/track.dart';
 import '../../../providers/playback_provider.dart';
 import '../../../providers/spotify_provider.dart';
@@ -17,6 +22,8 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/filter_pill.dart';
 import '../../widgets/skeleton.dart';
 import '../../widgets/track_tile.dart';
+import '../detail/widgets/collection_widgets.dart';
+import '../../widgets/flutify_progress.dart';
 
 /// 搜索页：浏览分类 / 最近搜索 / 多类型搜索结果。
 ///
@@ -65,10 +72,67 @@ class _SearchScreenState extends State<SearchScreen> {
       selection: TextSelection.collapsed(offset: query.length),
     );
     context.read<SpotifyProvider>().performSearch(query);
+    // 选中最近搜索会立刻发起查询；清空只是准备重新输入，输入法留着。
+    if (query.trim().isNotEmpty) _dismissKeyboard();
     setState(() {});
   }
 
   void _commit() => context.read<SpotifyProvider>().commitRecentSearch(_searchController.text);
+
+  /// 一次搜索被确认后收起输入法。输入框若继续持有焦点，返回搜索页时路由会把焦点还回去，输入法再次弹出。
+  /// 逐字输入不收起，否则无法继续打字。
+  void _dismissKeyboard() {
+    _focusNode.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _submitSearch() {
+    _commit();
+    _dismissKeyboard();
+    unawaited(_tryOpenSpotifyLink(_searchController.text));
+  }
+
+  Future<void> _tryOpenSpotifyLink(String raw) async {
+    final link = SpotifyLink.parse(raw);
+    if (link == null || !mounted) return;
+    switch (link.kind) {
+      case ShareKind.track:
+        final spotify = context.read<SpotifyProvider>();
+        final playback = context.read<PlaybackProvider?>();
+        if (playback == null) return;
+        SpotifyTrack? track = spotify.searchTracks
+            .where((t) => t.id == link.id)
+            .firstOrNull;
+        track ??= await spotify.resolveTrackByUri(link.uri);
+        if (!mounted || track == null) return;
+        await playback.playTrack(track);
+      case ShareKind.album:
+        AppRoutes.openAlbum(context, SpotifyAlbum(id: link.id, name: ''));
+      case ShareKind.playlist:
+        final spotify = context.read<SpotifyProvider>();
+        final existing = spotify.searchPlaylists
+            .where((p) => p.id == link.id)
+            .firstOrNull;
+        AppRoutes.openPlaylist(
+          context,
+          existing ?? SpotifyPlaylist(id: link.id, name: ''),
+        );
+      case ShareKind.artist:
+        final spotify = context.read<SpotifyProvider>();
+        final existing = spotify.searchArtists
+            .where((a) => a.id == link.id)
+            .firstOrNull;
+        AppRoutes.openArtist(
+          context,
+          existing ?? SpotifyArtist(id: link.id, name: ''),
+        );
+    }
+  }
+
+  void _onResultTap() {
+    _dismissKeyboard();
+    _commit();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +168,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       context.read<SpotifyProvider>().performSearch(val);
                       setState(() {});
                     },
-                    onSubmitted: (_) => _commit(),
+                    onSubmitted: (_) => _submitSearch(),
                     decoration: InputDecoration(
                       hintText: l10n.searchHint,
                       prefixIcon: const Icon(Icons.search_rounded, size: 24),
@@ -145,7 +209,7 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: isQueryEmpty
                   ? _BrowseView(onRecentTap: _setQuery)
-                  : _SearchResults(filterIndex: _searchFilterIndex, onResultTap: _commit),
+                  : _SearchResults(filterIndex: _searchFilterIndex, onResultTap: _onResultTap),
             ),
           ],
         ),
@@ -180,7 +244,7 @@ class _BrowseView extends StatelessWidget {
                   Expanded(
                     child: Text(l10n.searchRecent, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                   ),
-                  TextButton(
+                  M3EButton.text(
                     onPressed: () => context.read<SpotifyProvider>().clearRecentSearches(),
                     child: Text(l10n.searchClearAll),
                   ),
@@ -271,14 +335,45 @@ class _SearchResults extends StatelessWidget {
     final spotify = context.watch<SpotifyProvider>();
     final l10n = context.l10n;
     if (spotify.isSearching) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: M3ELoadingIndicator());
+    }
+    if (spotify.searchError != null) {
+      if (spotify.searchRequiresSignIn) {
+        return CustomScrollView(
+          slivers: [
+            CollectionErrorPlaceholder(
+              signedOut: true,
+              onRetry: spotify.retrySearch,
+            ),
+            const ContentBottomSpacer(),
+          ],
+        );
+      }
+      return Center(
+        child: SingleChildScrollView(
+          child: EmptyState(
+            icon: Icons.wifi_off_rounded,
+            title: l10n.searchFailedTitle,
+            message: l10n.searchFailedMessage,
+            actionLabel: l10n.commonRetry,
+            onAction: spotify.retrySearch,
+          ),
+        ),
+      );
     }
 
     final List<SpotifyTrack> tracks = spotify.searchTracks;
     final List<SpotifyArtist> artists = spotify.searchArtists;
     final List<SpotifyPlaylist> playlists = spotify.searchPlaylists;
+    final hasSongs =
+        tracks.isNotEmpty || spotify.searchHasMore(SearchResultType.tracks);
+    final hasArtists =
+        artists.isNotEmpty || spotify.searchHasMore(SearchResultType.artists);
+    final hasPlaylists =
+        playlists.isNotEmpty ||
+        spotify.searchHasMore(SearchResultType.playlists);
 
-    if (tracks.isEmpty && artists.isEmpty && playlists.isEmpty) {
+    if (!hasSongs && !hasArtists && !hasPlaylists) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.only(bottom: 120),
@@ -297,9 +392,10 @@ class _SearchResults extends StatelessWidget {
     final searchContext = PlaybackContext.search(spotify.searchQuery.trim());
 
     // 当前过滤标签下没有结果（其他类型有）时，给出占位而不是一片空白
-    final hasVisible = (showSongs && tracks.isNotEmpty) ||
-        (showArtists && artists.isNotEmpty) ||
-        (showPlaylists && playlists.isNotEmpty);
+    final hasVisible =
+        (showSongs && hasSongs) ||
+        (showArtists && hasArtists) ||
+        (showPlaylists && hasPlaylists);
     if (!hasVisible) {
       return Center(
         child: Padding(
@@ -313,51 +409,150 @@ class _SearchResults extends StatelessWidget {
       );
     }
 
-    return ListView(
+    return CustomScrollView(
+      key: ValueKey('${spotify.searchQuery}-$filterIndex'),
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 120),
-      children: [
-        if (showSongs && tracks.isNotEmpty) ...[
-          _ResultHeader(l10n.filterSongs),
-          for (final track in tracks)
-            TrackTile(
-              track: track,
-              contextQueue: tracks,
-              playbackContext: searchContext,
-              onTap: () {
-                onResultTap();
-                context.read<PlaybackProvider>().playTrack(track, contextQueue: tracks, context: searchContext);
-              },
-            ),
+      slivers: [
+        if (showSongs && hasSongs) ...[
+          SliverToBoxAdapter(child: _ResultHeader(l10n.filterSongs)),
+          SliverList.builder(
+            itemCount: tracks.length,
+            itemBuilder: (context, index) {
+              final track = tracks[index];
+              return TrackTile(
+                key: ValueKey('search-track-${track.id}'),
+                track: track,
+                contextQueue: tracks,
+                playbackContext: searchContext,
+                onTap: () {
+                  onResultTap();
+                  context.read<PlaybackProvider>().playTrack(
+                    track,
+                    contextQueue: tracks,
+                    context: searchContext,
+                  );
+                },
+              );
+            },
+          ),
+          const SliverToBoxAdapter(
+            child: _SearchPageControl(type: SearchResultType.tracks),
+          ),
         ],
-        if (showArtists && artists.isNotEmpty) ...[
-          _ResultHeader(l10n.filterArtists),
-          for (final artist in artists)
-            ListTile(
-              leading: CoverImage(url: artist.avatarUrl, size: 48, circular: true, placeholderIcon: Icons.person_rounded),
-              title: Text(artist.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(l10n.typeArtist),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () {
-                onResultTap();
-                AppRoutes.openArtist(context, artist);
-              },
-            ),
+        if (showArtists && hasArtists) ...[
+          SliverToBoxAdapter(child: _ResultHeader(l10n.filterArtists)),
+          SliverList.builder(
+            itemCount: artists.length,
+            itemBuilder: (context, index) {
+              final artist = artists[index];
+              return ListTile(
+                key: ValueKey('search-artist-${artist.id}'),
+                leading: CoverImage(
+                  url: artist.avatarUrl,
+                  size: 48,
+                  circular: true,
+                  placeholderIcon: Icons.person_rounded,
+                ),
+                title: Text(
+                  artist.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(l10n.typeArtist),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  onResultTap();
+                  AppRoutes.openArtist(context, artist);
+                },
+              );
+            },
+          ),
+          const SliverToBoxAdapter(
+            child: _SearchPageControl(type: SearchResultType.artists),
+          ),
         ],
-        if (showPlaylists && playlists.isNotEmpty) ...[
-          _ResultHeader(l10n.filterPlaylists),
-          for (final playlist in playlists)
-            ListTile(
-              leading: CoverImage(url: playlist.coverUrl, size: 48, borderRadius: BorderRadius.circular(6)),
-              title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(l10n.subtitleJoin(l10n.typePlaylist, playlist.ownerName)),
-              onTap: () {
-                onResultTap();
-                AppRoutes.openPlaylist(context, playlist);
-              },
-            ),
+        if (showPlaylists && hasPlaylists) ...[
+          SliverToBoxAdapter(child: _ResultHeader(l10n.filterPlaylists)),
+          SliverList.builder(
+            itemCount: playlists.length,
+            itemBuilder: (context, index) {
+              final playlist = playlists[index];
+              return ListTile(
+                key: ValueKey('search-playlist-${playlist.id}'),
+                leading: CoverImage(
+                  url: playlist.coverUrl,
+                  size: 48,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                title: Text(
+                  playlist.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  l10n.subtitleJoin(l10n.typePlaylist, playlist.ownerName),
+                ),
+                onTap: () {
+                  onResultTap();
+                  AppRoutes.openPlaylist(context, playlist);
+                },
+              );
+            },
+          ),
+          const SliverToBoxAdapter(
+            child: _SearchPageControl(type: SearchResultType.playlists),
+          ),
         ],
+        const ContentBottomSpacer(),
       ],
+    );
+  }
+}
+
+class _SearchPageControl extends StatelessWidget {
+  final SearchResultType type;
+
+  const _SearchPageControl({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final spotify = context.watch<SpotifyProvider>();
+    final l10n = context.l10n;
+    if (!spotify.searchHasMore(type)) return const SizedBox.shrink();
+    if (spotify.isLoadingMoreSearch(type)) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: SizedBox.square(
+            dimension: 24,
+            child: FlutifySpinner(
+              size: 24,
+              key: ValueKey('search-loading-${type.name}'),
+              semanticsLabel: l10n.commonLoadMore,
+            ),
+          ),
+        ),
+      );
+    }
+    final hasError = spotify.searchPageError(type) != null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          if (hasError)
+            Text(
+              l10n.searchFailedMessage,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          M3EButton.icon(style: M3EButtonStyle.text, 
+            key: ValueKey('search-load-more-${type.name}'),
+            onPressed: () => spotify.loadMoreSearch(type),
+            icon: Icon(
+              hasError ? Icons.refresh_rounded : Icons.expand_more_rounded,
+            ),
+            label: Text(hasError ? l10n.commonRetry : l10n.commonLoadMore),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -371,7 +566,10 @@ class _ResultHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+      child: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+      ),
     );
   }
 }

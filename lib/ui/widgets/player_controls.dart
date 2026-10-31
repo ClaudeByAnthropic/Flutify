@@ -6,6 +6,7 @@ import '../../models/playback_state.dart';
 import '../../models/track.dart';
 import '../../providers/library_provider.dart';
 import '../../providers/playback_provider.dart';
+import 'flutify_progress.dart';
 
 // 播放器通用控件。每个控件只 select 自己关心的状态，
 // 例如切换随机播放不会让播放按钮、封面、歌名等重建。
@@ -16,6 +17,7 @@ class PlayPauseButton extends StatelessWidget {
   final double iconSize;
   final Color background;
   final Color foreground;
+  final Duration backgroundAnimationDuration;
 
   const PlayPauseButton({
     super.key,
@@ -23,6 +25,7 @@ class PlayPauseButton extends StatelessWidget {
     this.iconSize = 34,
     this.background = Colors.white,
     this.foreground = Colors.black,
+    this.backgroundAnimationDuration = kThemeChangeDuration,
   });
 
   @override
@@ -35,9 +38,11 @@ class PlayPauseButton extends StatelessWidget {
       height: size,
       child: Material(
         color: background,
+        animationDuration: backgroundAnimationDuration,
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
+          mouseCursor: SystemMouseCursors.click,
           onTap: () => context.read<PlaybackProvider>().togglePlayPause(),
           child: Stack(
             alignment: Alignment.center,
@@ -46,7 +51,7 @@ class PlayPauseButton extends StatelessWidget {
                 SizedBox(
                   width: size - 8,
                   height: size - 8,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: foreground.withAlpha(90)),
+                  child: FlutifySpinner(size: size - 8, color: foreground.withAlpha(90)),
                 ),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),

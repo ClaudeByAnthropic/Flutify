@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
+import 'app_localizations_ja.dart';
 import 'app_localizations_zh.dart';
 
 // ignore_for_file: type=lint
@@ -95,8 +96,22 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
+    Locale('ja'),
     Locale('zh'),
+    Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
+
+  /// No description provided for @playbackRetryWaiting.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络连接失败，{seconds} 秒后第 {attempt}/{total} 次重试'**
+  String playbackRetryWaiting(int attempt, int total, int seconds);
+
+  /// No description provided for @playbackRetryRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在重新连接，第 {attempt}/{total} 次重试'**
+  String playbackRetryRunning(int attempt, int total);
 
   /// No description provided for @appTitle.
   ///
@@ -212,6 +227,72 @@ abstract class AppLocalizations {
   /// **'关闭'**
   String get windowClose;
 
+  /// No description provided for @menuPlayback.
+  ///
+  /// In zh, this message translates to:
+  /// **'播放'**
+  String get menuPlayback;
+
+  /// No description provided for @menuNavigate.
+  ///
+  /// In zh, this message translates to:
+  /// **'导航'**
+  String get menuNavigate;
+
+  /// No description provided for @menuEdit.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑'**
+  String get menuEdit;
+
+  /// No description provided for @menuUndo.
+  ///
+  /// In zh, this message translates to:
+  /// **'撤销'**
+  String get menuUndo;
+
+  /// No description provided for @menuRedo.
+  ///
+  /// In zh, this message translates to:
+  /// **'重做'**
+  String get menuRedo;
+
+  /// No description provided for @menuCut.
+  ///
+  /// In zh, this message translates to:
+  /// **'剪切'**
+  String get menuCut;
+
+  /// No description provided for @menuCopy.
+  ///
+  /// In zh, this message translates to:
+  /// **'拷贝'**
+  String get menuCopy;
+
+  /// No description provided for @menuPaste.
+  ///
+  /// In zh, this message translates to:
+  /// **'粘贴'**
+  String get menuPaste;
+
+  /// No description provided for @menuSelectAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全选'**
+  String get menuSelectAll;
+
+  /// No description provided for @menuWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'窗口'**
+  String get menuWindow;
+
+  /// No description provided for @menuSettings.
+  ///
+  /// In zh, this message translates to:
+  /// **'设置…'**
+  String get menuSettings;
+
   /// No description provided for @commonCancel.
   ///
   /// In zh, this message translates to:
@@ -253,6 +334,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'重试'**
   String get commonRetry;
+
+  /// 分页列表加载下一页的按钮
+  ///
+  /// In zh, this message translates to:
+  /// **'加载更多'**
+  String get commonLoadMore;
 
   /// No description provided for @commonMoreOptions.
   ///
@@ -614,6 +701,18 @@ abstract class AppLocalizations {
   /// **'请检查网络连接后重试。'**
   String get searchCategoriesFailedMessage;
 
+  /// 搜索请求失败的标题，与没有匹配结果区分
+  ///
+  /// In zh, this message translates to:
+  /// **'无法加载搜索结果'**
+  String get searchFailedTitle;
+
+  /// 搜索首次加载或续页失败时的提示
+  ///
+  /// In zh, this message translates to:
+  /// **'请检查网络连接后重试，已加载的结果会保留。'**
+  String get searchFailedMessage;
+
   /// No description provided for @searchNoResultsTitle.
   ///
   /// In zh, this message translates to:
@@ -763,6 +862,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'暂无热门歌曲。'**
   String get artistNoPopular;
+
+  /// 艺人专辑二级页面的空列表提示
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无可显示的专辑。'**
+  String get artistNoAlbums;
+
+  /// 艺人歌曲二级页面的空列表提示
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无可显示的歌曲。'**
+  String get artistNoSongs;
 
   /// No description provided for @artistDiscography.
   ///
@@ -956,11 +1067,71 @@ abstract class AppLocalizations {
   /// **'「{track}」加载失败，请检查网络'**
   String playbackErrorNetwork(String track);
 
+  /// No description provided for @playbackErrorRegionBlocked.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前网络出口在中国大陆，Spotify 无法播放。请切换节点后重试'**
+  String get playbackErrorRegionBlocked;
+
+  /// No description provided for @regionCheckSectionTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络地区检测'**
+  String get regionCheckSectionTitle;
+
+  /// No description provided for @regionCheckSectionSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录与播放前先确认网络出口，检测到中国大陆就停下列表'**
+  String get regionCheckSectionSubtitle;
+
+  /// No description provided for @regionCheckEnabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用地区检测'**
+  String get regionCheckEnabled;
+
+  /// No description provided for @regionCheckEnabledHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭后不再发起任何检测，也不拦截登录与播放'**
+  String get regionCheckEnabledHint;
+
+  /// No description provided for @regionCheckOnNetworkChange.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络变动时自动复查'**
+  String get regionCheckOnNetworkChange;
+
+  /// No description provided for @regionCheckOnNetworkChangeHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换 Wi-Fi / 代理后重新检测一次；关闭则不复查，只在起播时用上一次的结果'**
+  String get regionCheckOnNetworkChangeHint;
+
+  /// No description provided for @regionCheckSkipThisRun.
+  ///
+  /// In zh, this message translates to:
+  /// **'本次打开跳过检测'**
+  String get regionCheckSkipThisRun;
+
+  /// No description provided for @regionCheckSkipThisRunHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'只在本次运行生效，下次启动恢复检测'**
+  String get regionCheckSkipThisRunHint;
+
   /// No description provided for @playbackErrorWidevine.
   ///
   /// In zh, this message translates to:
   /// **'「{track}」无法解密播放：此设备缺少 Widevine 组件'**
   String playbackErrorWidevine(String track);
+
+  /// No description provided for @playbackErrorFairPlay.
+  ///
+  /// In zh, this message translates to:
+  /// **'「{track}」无法解密播放：此设备无法创建 FairPlay 会话'**
+  String playbackErrorFairPlay(String track);
 
   /// No description provided for @playbackErrorAutoPaused.
   ///
@@ -1058,6 +1229,24 @@ abstract class AppLocalizations {
   /// **'歌词来自 LRCLIB'**
   String get lyricsFromLrclib;
 
+  /// No description provided for @lyricsFromQqMusic.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来自 QQ 音乐'**
+  String get lyricsFromQqMusic;
+
+  /// No description provided for @lyricsFromNetease.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来自网易云音乐'**
+  String get lyricsFromNetease;
+
+  /// No description provided for @lyricsFromSpotify.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来自 Spotify'**
+  String get lyricsFromSpotify;
+
   /// No description provided for @lyricsImmersive.
   ///
   /// In zh, this message translates to:
@@ -1094,11 +1283,29 @@ abstract class AppLocalizations {
   /// **'只铺满窗口（F11）'**
   String get lyricsFillWindow;
 
+  /// No description provided for @lyricsPinControls.
+  ///
+  /// In zh, this message translates to:
+  /// **'固定控制区（不自动收起）'**
+  String get lyricsPinControls;
+
+  /// No description provided for @lyricsUnpinControls.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消固定控制区'**
+  String get lyricsUnpinControls;
+
   /// No description provided for @deviceConnectTitle.
   ///
   /// In zh, this message translates to:
   /// **'连接到设备'**
   String get deviceConnectTitle;
+
+  /// No description provided for @deviceConnectShort.
+  ///
+  /// In zh, this message translates to:
+  /// **'畅联'**
+  String get deviceConnectShort;
 
   /// No description provided for @deviceConnectDescription.
   ///
@@ -1340,6 +1547,18 @@ abstract class AppLocalizations {
   /// **'复制代码'**
   String get shareEmbedCopy;
 
+  /// No description provided for @shareEmbedUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'此设备的系统 WebView 暂不可用，仍可复制下方嵌入代码。'**
+  String get shareEmbedUnavailable;
+
+  /// No description provided for @shareEmbedFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify 嵌入播放器加载失败，请检查网络后重试。'**
+  String get shareEmbedFailed;
+
   /// No description provided for @toastAddedTo.
   ///
   /// In zh, this message translates to:
@@ -1508,6 +1727,18 @@ abstract class AppLocalizations {
   /// **'播放'**
   String get settingsPlaybackSection;
 
+  /// No description provided for @settingsAutoplay.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动播放'**
+  String get settingsAutoplay;
+
+  /// No description provided for @settingsAutoplaySubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'列表播完后自动播放相似的歌曲'**
+  String get settingsAutoplaySubtitle;
+
   /// No description provided for @settingsPauseAfterFailures.
   ///
   /// In zh, this message translates to:
@@ -1537,6 +1768,48 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'关闭流动背景、过渡与悬停等装饰性动画'**
   String get settingsReduceMotionSubtitle;
+
+  /// No description provided for @settingsPowerSaving.
+  ///
+  /// In zh, this message translates to:
+  /// **'省电模式'**
+  String get settingsPowerSaving;
+
+  /// No description provided for @settingsPowerSavingSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'玻璃改用磨砂底、歌词页背景不再流动；歌词滚动与动效全部保留'**
+  String get settingsPowerSavingSubtitle;
+
+  /// No description provided for @settingsFrameRate.
+  ///
+  /// In zh, this message translates to:
+  /// **'帧率上限'**
+  String get settingsFrameRate;
+
+  /// No description provided for @settingsFrameRateSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'降低可明显减少 GPU 占用，动画速度不变'**
+  String get settingsFrameRateSubtitle;
+
+  /// No description provided for @settingsFrameRateFollow.
+  ///
+  /// In zh, this message translates to:
+  /// **'跟随屏幕'**
+  String get settingsFrameRateFollow;
+
+  /// No description provided for @settingsFrameRateCustom.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义'**
+  String get settingsFrameRateCustom;
+
+  /// No description provided for @settingsFrameRateValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'{fps} fps'**
+  String settingsFrameRateValue(int fps);
 
   /// No description provided for @settingsResetAppearance.
   ///
@@ -1595,7 +1868,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLanguageZh.
   ///
   /// In zh, this message translates to:
-  /// **'中文'**
+  /// **'简体中文'**
   String get settingsLanguageZh;
 
   /// No description provided for @settingsLanguageEn.
@@ -1670,6 +1943,30 @@ abstract class AppLocalizations {
   /// **'歌词'**
   String get settingsLyricsSection;
 
+  /// No description provided for @settingsLyricsFocusPosition.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前行位置'**
+  String get settingsLyricsFocusPosition;
+
+  /// No description provided for @settingsLyricsFocusPositionSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'调整当前歌词在可见歌词区域中的高度，数值越大越靠下。'**
+  String get settingsLyricsFocusPositionSubtitle;
+
+  /// No description provided for @lyricsTranslationFromNetease.
+  ///
+  /// In zh, this message translates to:
+  /// **'译词来自网易云音乐社区'**
+  String get lyricsTranslationFromNetease;
+
+  /// No description provided for @lyricsTranslationFromQqMusic.
+  ///
+  /// In zh, this message translates to:
+  /// **'译词来自 QQ 音乐'**
+  String get lyricsTranslationFromQqMusic;
+
   /// No description provided for @settingsLyricsSize.
   ///
   /// In zh, this message translates to:
@@ -1694,12 +1991,6 @@ abstract class AppLocalizations {
   /// **'居中'**
   String get settingsLyricsAlignCenter;
 
-  /// No description provided for @settingsLyricsBlur.
-  ///
-  /// In zh, this message translates to:
-  /// **'其他行模糊'**
-  String get settingsLyricsBlur;
-
   /// No description provided for @settingsLyricsImmersiveScreen.
   ///
   /// In zh, this message translates to:
@@ -1723,6 +2014,84 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'Spotify 没有逐行同步歌词时，从 LRCLIB 开放歌词库补全，并按原唱语言挑选'**
   String get settingsLyricsFallbackSubtitle;
+
+  /// No description provided for @settingsLyricsSourceOrder.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词来源优先级'**
+  String get settingsLyricsSourceOrder;
+
+  /// No description provided for @settingsLyricsSourceOrderSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'拖动右侧手柄调整顺序，越靠前越优先。原文与中文译词都按此顺序在各来源之间查找。'**
+  String get settingsLyricsSourceOrderSubtitle;
+
+  /// No description provided for @settingsLyricsSourceSpotify.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify'**
+  String get settingsLyricsSourceSpotify;
+
+  /// No description provided for @settingsLyricsSourceQqMusic.
+  ///
+  /// In zh, this message translates to:
+  /// **'QQ 音乐'**
+  String get settingsLyricsSourceQqMusic;
+
+  /// No description provided for @settingsLyricsSourceNetease.
+  ///
+  /// In zh, this message translates to:
+  /// **'网易云音乐'**
+  String get settingsLyricsSourceNetease;
+
+  /// No description provided for @settingsLyricsSourceLrclib.
+  ///
+  /// In zh, this message translates to:
+  /// **'LRCLIB'**
+  String get settingsLyricsSourceLrclib;
+
+  /// No description provided for @settingsLyricsSourceRoleSpotify.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文，自带译文'**
+  String get settingsLyricsSourceRoleSpotify;
+
+  /// No description provided for @settingsLyricsSourceRoleLrclib.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文与译文'**
+  String get settingsLyricsSourceRoleLrclib;
+
+  /// No description provided for @settingsLyricsSourceRoleCommunity.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文与中文译词'**
+  String get settingsLyricsSourceRoleCommunity;
+
+  /// No description provided for @settingsLyricsSourceDisabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已在「补全歌词」中关闭'**
+  String get settingsLyricsSourceDisabled;
+
+  /// No description provided for @settingsLyricsSourceDrag.
+  ///
+  /// In zh, this message translates to:
+  /// **'拖动排序'**
+  String get settingsLyricsSourceDrag;
+
+  /// No description provided for @settingsLyricsBilingual.
+  ///
+  /// In zh, this message translates to:
+  /// **'社区歌词翻译'**
+  String get settingsLyricsBilingual;
+
+  /// No description provided for @settingsLyricsBilingualSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'加载歌词时预取中文译词，优先 QQ 音乐，缺失或不完整时查网易云，启用补全时最后查 LRCLIB，也供任务栏歌词使用。关闭后仍可手动或自动查询；曲名与歌手会发送到查询来源。'**
+  String get settingsLyricsBilingualSubtitle;
 
   /// No description provided for @settingsTaskbarLyricsSection.
   ///
@@ -1928,6 +2297,36 @@ abstract class AppLocalizations {
   /// **'上次位置'**
   String get settingsStartPageLast;
 
+  /// No description provided for @settingsDefaultRepeat.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认循环方式'**
+  String get settingsDefaultRepeat;
+
+  /// No description provided for @settingsDefaultRepeatSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换歌单、专辑等播放列表时默认生效的循环方式'**
+  String get settingsDefaultRepeatSubtitle;
+
+  /// No description provided for @settingsRepeatOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'不循环'**
+  String get settingsRepeatOff;
+
+  /// No description provided for @settingsRepeatList.
+  ///
+  /// In zh, this message translates to:
+  /// **'列表循环'**
+  String get settingsRepeatList;
+
+  /// No description provided for @settingsRepeatTrack.
+  ///
+  /// In zh, this message translates to:
+  /// **'单曲循环'**
+  String get settingsRepeatTrack;
+
   /// No description provided for @settingsRememberWindow.
   ///
   /// In zh, this message translates to:
@@ -1939,6 +2338,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'下次启动时还原；显示器变化导致窗口不可见时回到屏幕中央'**
   String get settingsRememberWindowSubtitle;
+
+  /// No description provided for @settingsSpotifyLinks.
+  ///
+  /// In zh, this message translates to:
+  /// **'用 Flutify 打开 Spotify 链接'**
+  String get settingsSpotifyLinks;
+
+  /// No description provided for @settingsSpotifyLinksSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'浏览器或其他程序里点开 spotify: 链接时直接在 Flutify 中播放'**
+  String get settingsSpotifyLinksSubtitle;
+
+  /// No description provided for @settingsSpotifyLinksOther.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前由 {app} 打开'**
+  String settingsSpotifyLinksOther(String app);
+
+  /// No description provided for @settingsSpotifyLinksSystem.
+  ///
+  /// In zh, this message translates to:
+  /// **'Windows「默认应用」里已为 spotify: 链接选择了其他程序，请在系统设置中改为 Flutify'**
+  String get settingsSpotifyLinksSystem;
 
   /// No description provided for @settingsConnectSection.
   ///
@@ -2042,6 +2465,12 @@ abstract class AppLocalizations {
   /// **'系统未设置代理，直接连接'**
   String get settingsProxySystemEmpty;
 
+  /// No description provided for @settingsProxySystemAuto.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统使用自动代理配置（PAC / 自动检测）'**
+  String get settingsProxySystemAuto;
+
   /// No description provided for @settingsProxyNoneSubtitle.
   ///
   /// In zh, this message translates to:
@@ -2078,6 +2507,36 @@ abstract class AppLocalizations {
   /// **'请填写有效的地址和 1–65535 之间的端口'**
   String get settingsProxyInvalid;
 
+  /// No description provided for @settingsProxyAuth.
+  ///
+  /// In zh, this message translates to:
+  /// **'代理认证（可选）'**
+  String get settingsProxyAuth;
+
+  /// No description provided for @settingsProxyUsernameHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户名'**
+  String get settingsProxyUsernameHint;
+
+  /// No description provided for @settingsProxyPasswordHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码'**
+  String get settingsProxyPasswordHint;
+
+  /// No description provided for @settingsProxyUsernameInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户名不能包含冒号（:），冒号是用户名与密码的分隔符，代理会认证失败'**
+  String get settingsProxyUsernameInvalid;
+
+  /// No description provided for @settingsProxyAuthIncomplete.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户名和密码只填一项时，HTTPS 可用；HTTP 代理认证需要两项都填写'**
+  String get settingsProxyAuthIncomplete;
+
   /// No description provided for @settingsProxyTest.
   ///
   /// In zh, this message translates to:
@@ -2105,7 +2564,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsProxyFootnote.
   ///
   /// In zh, this message translates to:
-  /// **'仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）。登录页面始终跟随系统代理设置。'**
+  /// **'仅支持 HTTP 代理（Clash、v2rayN 等的混合端口即可）；手动代理可填用户名 / 密码，适合自建带认证的跨区反代。登录页面始终跟随系统代理设置。'**
   String get settingsProxyFootnote;
 
   /// No description provided for @settingsPrivacySection.
@@ -2449,6 +2908,954 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'{count} 周前'**
   String addedWeeksAgo(int count);
+
+  /// No description provided for @settingsGateway.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify 反代'**
+  String get settingsGateway;
+
+  /// No description provided for @settingsGatewayDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'通过自建服务器连接 Spotify API、媒体和 Connect。浏览器登录仍使用 Spotify 原站；保存后新连接生效。'**
+  String get settingsGatewayDescription;
+
+  /// No description provided for @settingsGatewayUrl.
+  ///
+  /// In zh, this message translates to:
+  /// **'反代地址（包含路径）'**
+  String get settingsGatewayUrl;
+
+  /// No description provided for @settingsGatewayUser.
+  ///
+  /// In zh, this message translates to:
+  /// **'反代用户名'**
+  String get settingsGatewayUser;
+
+  /// No description provided for @settingsGatewayPassword.
+  ///
+  /// In zh, this message translates to:
+  /// **'反代密码'**
+  String get settingsGatewayPassword;
+
+  /// No description provided for @settingsGatewayInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请填写有效的 HTTPS 地址、单段路径及用户名和密码。'**
+  String get settingsGatewayInvalid;
+
+  /// No description provided for @settingsApply.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存'**
+  String get settingsApply;
+
+  /// No description provided for @settingsCacheLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'缓存位置'**
+  String get settingsCacheLocation;
+
+  /// No description provided for @settingsAudioCacheLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'音频缓存位置'**
+  String get settingsAudioCacheLocation;
+
+  /// No description provided for @settingsArtworkCacheLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'封面缓存位置'**
+  String get settingsArtworkCacheLocation;
+
+  /// No description provided for @settingsLyricsCacheLocation.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词缓存位置'**
+  String get settingsLyricsCacheLocation;
+
+  /// No description provided for @settingsCacheAppData.
+  ///
+  /// In zh, this message translates to:
+  /// **'应用数据目录（AppData）'**
+  String get settingsCacheAppData;
+
+  /// No description provided for @settingsCacheApplication.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装 / 便携程序目录'**
+  String get settingsCacheApplication;
+
+  /// No description provided for @settingsCacheCustom.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义目录'**
+  String get settingsCacheCustom;
+
+  /// No description provided for @settingsClearAllCache.
+  ///
+  /// In zh, this message translates to:
+  /// **'清理所有缓存'**
+  String get settingsClearAllCache;
+
+  /// No description provided for @settingsClearAllCacheHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'清理音频、封面、歌词和浏览器临时缓存，保留登录、设置、收藏和播放记录。正在播放或下载的音频会保留。'**
+  String get settingsClearAllCacheHelp;
+
+  /// No description provided for @settingsCacheLocationHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'已有缓存会迁移到新位置，校验成功后删除旧文件。正在播放或下载的音频将在释放后继续迁移。自定义位置使用所选目录下的 FlutifyCache 文件夹。'**
+  String get settingsCacheLocationHelp;
+
+  /// No description provided for @settingsCacheMigrated.
+  ///
+  /// In zh, this message translates to:
+  /// **'已迁移 {files} 个文件，{deferred} 个使用中，{failed} 个未成功'**
+  String settingsCacheMigrated(int files, int deferred, int failed);
+
+  /// No description provided for @settingsCacheCleared.
+  ///
+  /// In zh, this message translates to:
+  /// **'已释放 {size}，{deferred} 个使用中，{failed} 个未成功'**
+  String settingsCacheCleared(String size, int deferred, int failed);
+
+  /// No description provided for @settingsCacheLocationInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'目录不可写或路径无效，请选择应用有权访问的本地目录。'**
+  String get settingsCacheLocationInvalid;
+
+  /// No description provided for @settingsCacheLocationSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'缓存位置已更新'**
+  String get settingsCacheLocationSaved;
+
+  /// No description provided for @settingsCacheLocationHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'目录绝对路径'**
+  String get settingsCacheLocationHint;
+
+  /// No description provided for @settingsCacheChooseDirectory.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择文件夹'**
+  String get settingsCacheChooseDirectory;
+
+  /// No description provided for @settingsCachePickerFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法打开系统文件夹选择器，请重试或手动输入路径。'**
+  String get settingsCachePickerFailed;
+
+  /// No description provided for @settingsGatewayAutomatic.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动开关反代'**
+  String get settingsGatewayAutomatic;
+
+  /// No description provided for @settingsGatewayAutomaticHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动、网络变化、回到应用及每 2 分钟通过 Cloudflare 查询出口国家/地区；遵循已选择的系统或手动代理。查询失败保留当前状态。'**
+  String get settingsGatewayAutomaticHelp;
+
+  /// No description provided for @settingsGatewayDirectCountries.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许直连的国家/地区代码'**
+  String get settingsGatewayDirectCountries;
+
+  /// No description provided for @settingsGatewayDirectCountriesHelp.
+  ///
+  /// In zh, this message translates to:
+  /// **'可选，填写两位代码，以逗号或空格分隔。留空：CN 开启反代，其余直连；填写后：仅列表内国家/地区直连，其余开启反代。'**
+  String get settingsGatewayDirectCountriesHelp;
+
+  /// No description provided for @settingsGatewayCountriesInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入两位国家/地区代码，例如 US、JP、HK。'**
+  String get settingsGatewayCountriesInvalid;
+
+  /// No description provided for @settingsGatewayLookupFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'国家/地区查询失败，已保留当前连接方式。'**
+  String get settingsGatewayLookupFailed;
+
+  /// No description provided for @settingsGatewayCountryPending.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待查询网络所在国家/地区，暂时保留当前连接方式。'**
+  String get settingsGatewayCountryPending;
+
+  /// No description provided for @settingsGatewayCountryStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络所在国家/地区：{country} · {route}'**
+  String settingsGatewayCountryStatus(String country, String route);
+
+  /// No description provided for @settingsGatewayRouteProxy.
+  ///
+  /// In zh, this message translates to:
+  /// **'反代已开启'**
+  String get settingsGatewayRouteProxy;
+
+  /// No description provided for @settingsGatewayRouteDirect.
+  ///
+  /// In zh, this message translates to:
+  /// **'直连'**
+  String get settingsGatewayRouteDirect;
+
+  /// No description provided for @settingsGatewayRecheck.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新查询国家/地区'**
+  String get settingsGatewayRecheck;
+
+  /// No description provided for @lyricsTranslate.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示译词'**
+  String get lyricsTranslate;
+
+  /// No description provided for @lyricsCancelTranslation.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消译词'**
+  String get lyricsCancelTranslation;
+
+  /// No description provided for @lyricsTranslationFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'译词查找失败，点击重试'**
+  String get lyricsTranslationFailed;
+
+  /// No description provided for @lyricsTranslating.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在查找译词 · 点击取消'**
+  String get lyricsTranslating;
+
+  /// No description provided for @settingsLyricsAutoTranslate.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动翻译歌词'**
+  String get settingsLyricsAutoTranslate;
+
+  /// No description provided for @settingsLyricsAutoTranslateSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动查找已有译文。中文译词按曲名、歌手优先查询 QQ 音乐，缺失或不完整时查网易云，启用补全时最后查 LRCLIB；只采用不丢失已译行的更完整版本。简繁体跟随界面。'**
+  String get settingsLyricsAutoTranslateSubtitle;
+
+  /// No description provided for @settingsLyricsExcludeInterface.
+  ///
+  /// In zh, this message translates to:
+  /// **'不自动翻译界面语言'**
+  String get settingsLyricsExcludeInterface;
+
+  /// No description provided for @settingsLyricsExcluded.
+  ///
+  /// In zh, this message translates to:
+  /// **'其他不自动翻译的语言'**
+  String get settingsLyricsExcluded;
+
+  /// No description provided for @settingsLyricsExcludedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'用逗号分隔：en, ja, zh-Hans（简体）, zh-Hant（繁体）；zh 排除全部中文，留空清除'**
+  String get settingsLyricsExcludedHint;
+
+  /// No description provided for @settingsLyricsExcludedInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入语言代码，例如 en、ja、zh-Hans、zh-Hant'**
+  String get settingsLyricsExcludedInvalid;
+
+  /// No description provided for @settingsCanvas.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify Canvas 动态封面'**
+  String get settingsCanvas;
+
+  /// No description provided for @settingsCanvasSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'播放时显示官方短片；无 Canvas 或减少动态效果时显示静态封面。'**
+  String get settingsCanvasSubtitle;
+
+  /// No description provided for @settingsLanguageZhHant.
+  ///
+  /// In zh, this message translates to:
+  /// **'繁體中文'**
+  String get settingsLanguageZhHant;
+
+  /// No description provided for @lyricsTranslationUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无对应语言的译词'**
+  String get lyricsTranslationUnavailable;
+
+  /// No description provided for @settingsLanguageJa.
+  ///
+  /// In zh, this message translates to:
+  /// **'日本語'**
+  String get settingsLanguageJa;
+
+  /// No description provided for @homeRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新首页'**
+  String get homeRefresh;
+
+  /// No description provided for @homeRefreshFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新失败，请检查网络后重试。'**
+  String get homeRefreshFailed;
+
+  /// No description provided for @loginTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录 Spotify'**
+  String get loginTitle;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'在 Spotify 官方登录页登录一次，\n其余授权全部自动完成'**
+  String get loginSubtitle;
+
+  /// No description provided for @loginTermsNotice.
+  ///
+  /// In zh, this message translates to:
+  /// **'以官方客户端身份登录不符合 Spotify 服务条款，建议使用小号。'**
+  String get loginTermsNotice;
+
+  /// No description provided for @loginPasswordPrivate.
+  ///
+  /// In zh, this message translates to:
+  /// **'Flutify 不接触你的密码'**
+  String get loginPasswordPrivate;
+
+  /// No description provided for @loginOfficialPage.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用 Spotify 官方页面完成账号登录'**
+  String get loginOfficialPage;
+
+  /// No description provided for @loginRemoteDevices.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录后可遥控你的其他 Spotify 设备'**
+  String get loginRemoteDevices;
+
+  /// No description provided for @loginSignedInAs.
+  ///
+  /// In zh, this message translates to:
+  /// **'已登录为 {name}'**
+  String loginSignedInAs(String name);
+
+  /// No description provided for @loginPlaybackReady.
+  ///
+  /// In zh, this message translates to:
+  /// **'全曲播放已就绪'**
+  String get loginPlaybackReady;
+
+  /// No description provided for @loginBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回'**
+  String get loginBack;
+
+  /// No description provided for @loginFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录失败'**
+  String get loginFailed;
+
+  /// No description provided for @webLoginTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'全曲播放：Web 登录'**
+  String get webLoginTitle;
+
+  /// No description provided for @webLoginCardTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'全曲播放（Web 登录）'**
+  String get webLoginCardTitle;
+
+  /// No description provided for @webLoginReady.
+  ///
+  /// In zh, this message translates to:
+  /// **'已就绪，可以播放完整曲目'**
+  String get webLoginReady;
+
+  /// No description provided for @webLoginRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录一次以解锁完整曲目播放'**
+  String get webLoginRequired;
+
+  /// No description provided for @webLoginConsentHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'如果页面在等你确认，请点「同意」完成授权；其余步骤已自动完成'**
+  String get webLoginConsentHint;
+
+  /// No description provided for @webLoginPreparing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在获取播放凭据…'**
+  String get webLoginPreparing;
+
+  /// No description provided for @webLoginAuthorizing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在完成账号授权…'**
+  String get webLoginAuthorizing;
+
+  /// No description provided for @webLoginFinishing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在完成登录…'**
+  String get webLoginFinishing;
+
+  /// No description provided for @webLoginBackgroundHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录已完成，剩下的步骤在后台自动进行'**
+  String get webLoginBackgroundHint;
+
+  /// No description provided for @webLoginGoogleHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'用 Google 注册的账号：请在此处使用「邮箱 + 密码」登录；没有密码可先在 Spotify 官网「忘记密码」设置一个。'**
+  String get webLoginGoogleHint;
+
+  /// No description provided for @loginBrowserFallback.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法自动打开浏览器，登录链接已复制，请粘贴到浏览器中打开'**
+  String get loginBrowserFallback;
+
+  /// No description provided for @loginBrowserTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'在浏览器中完成登录'**
+  String get loginBrowserTitle;
+
+  /// No description provided for @loginBrowserSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录并同意授权后，这里会自动继续'**
+  String get loginBrowserSubtitle;
+
+  /// No description provided for @loginReopen.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新打开'**
+  String get loginReopen;
+
+  /// No description provided for @loginLinkCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录链接已复制'**
+  String get loginLinkCopied;
+
+  /// No description provided for @loginCopyLink.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制链接'**
+  String get loginCopyLink;
+
+  /// No description provided for @updatesTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'软件更新'**
+  String get updatesTitle;
+
+  /// No description provided for @updatesMode.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新方式'**
+  String get updatesMode;
+
+  /// No description provided for @updatesManual.
+  ///
+  /// In zh, this message translates to:
+  /// **'手动更新'**
+  String get updatesManual;
+
+  /// No description provided for @updatesAutomatic.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动下载更新'**
+  String get updatesAutomatic;
+
+  /// No description provided for @updatesDisabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'不检查更新'**
+  String get updatesDisabled;
+
+  /// No description provided for @updatesHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动检查新版本和更新内容。自动模式在后台下载，完成后由你确认安装，不会中断播放。'**
+  String get updatesHint;
+
+  /// No description provided for @updatesCheck.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查更新'**
+  String get updatesCheck;
+
+  /// No description provided for @updatesChecking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在检查更新…'**
+  String get updatesChecking;
+
+  /// No description provided for @updatesCurrent.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前版本'**
+  String get updatesCurrent;
+
+  /// No description provided for @updatesUpToDate.
+  ///
+  /// In zh, this message translates to:
+  /// **'已是最新版本'**
+  String get updatesUpToDate;
+
+  /// No description provided for @updatesAvailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'发现新版本'**
+  String get updatesAvailable;
+
+  /// No description provided for @updatesNotes.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新内容'**
+  String get updatesNotes;
+
+  /// No description provided for @updatesNoNotes.
+  ///
+  /// In zh, this message translates to:
+  /// **'此版本未提供更新说明。'**
+  String get updatesNoNotes;
+
+  /// No description provided for @updatesDownload.
+  ///
+  /// In zh, this message translates to:
+  /// **'下载更新'**
+  String get updatesDownload;
+
+  /// No description provided for @updatesDownloading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载并校验…'**
+  String get updatesDownloading;
+
+  /// No description provided for @updatesReady.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新已就绪'**
+  String get updatesReady;
+
+  /// No description provided for @updatesReadyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新包已下载并通过校验。安装会关闭应用；也可以稍后从设置中继续。'**
+  String get updatesReadyHint;
+
+  /// No description provided for @updatesAndroidHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'APK 已下载并通过校验。确认后打开系统安装程序。'**
+  String get updatesAndroidHint;
+
+  /// No description provided for @updatesInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'重启并安装'**
+  String get updatesInstall;
+
+  /// No description provided for @updatesInstallApk.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装 APK'**
+  String get updatesInstallApk;
+
+  /// No description provided for @updatesInstalling.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在准备安装…'**
+  String get updatesInstalling;
+
+  /// No description provided for @updatesSkip.
+  ///
+  /// In zh, this message translates to:
+  /// **'跳过本次更新'**
+  String get updatesSkip;
+
+  /// No description provided for @updatesLater.
+  ///
+  /// In zh, this message translates to:
+  /// **'稍后'**
+  String get updatesLater;
+
+  /// No description provided for @updatesPage.
+  ///
+  /// In zh, this message translates to:
+  /// **'手动更新 · 发布页面'**
+  String get updatesPage;
+
+  /// No description provided for @updatesFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新失败，请重试或前往发布页面。'**
+  String get updatesFailed;
+
+  /// No description provided for @updatesPermission.
+  ///
+  /// In zh, this message translates to:
+  /// **'请允许 Flutify 安装未知来源应用，返回后再次点击「安装 APK」。'**
+  String get updatesPermission;
+
+  /// No description provided for @updatesUnsupported.
+  ///
+  /// In zh, this message translates to:
+  /// **'此平台暂不提供应用内安装，请通过发布页面手动更新。'**
+  String get updatesUnsupported;
+
+  /// No description provided for @updatesDetails.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看更新'**
+  String get updatesDetails;
+
+  /// No description provided for @webLoginRegionChecking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在检测网络地区…'**
+  String get webLoginRegionChecking;
+
+  /// No description provided for @webLoginRegionCheckingHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录页加载前先确认当前网络出口，避免在不可用的地区登录失败'**
+  String get webLoginRegionCheckingHint;
+
+  /// No description provided for @webLoginRegionBlockedTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前网络出口位于中国大陆'**
+  String get webLoginRegionBlockedTitle;
+
+  /// No description provided for @webLoginRegionBlockedBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'Spotify 在中国大陆不可用，登录大概率会失败或被限制。请开启代理并切换到海外节点，然后重新检测。'**
+  String get webLoginRegionBlockedBody;
+
+  /// No description provided for @webLoginRegionRecheck.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新检测'**
+  String get webLoginRegionRecheck;
+
+  /// No description provided for @webLoginRegionForceSkip.
+  ///
+  /// In zh, this message translates to:
+  /// **'强制跳过'**
+  String get webLoginRegionForceSkip;
+
+  /// No description provided for @webLoginRegionSkipThisRun.
+  ///
+  /// In zh, this message translates to:
+  /// **'本次打开跳过检测'**
+  String get webLoginRegionSkipThisRun;
+
+  /// No description provided for @settingsAnimDebugSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'动画调试（临时）'**
+  String get settingsAnimDebugSection;
+
+  /// No description provided for @settingsAnimDebugFooter.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅本次运行有效，重启应用后自动恢复。用于定位卡顿：逐项关闭，看关掉哪一项后变流畅。'**
+  String get settingsAnimDebugFooter;
+
+  /// No description provided for @settingsAnimDebugResetAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部恢复'**
+  String get settingsAnimDebugResetAll;
+
+  /// No description provided for @settingsAnimDebugAllMotion.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭所有过渡动画'**
+  String get settingsAnimDebugAllMotion;
+
+  /// No description provided for @settingsAnimDebugAllMotionSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'等同系统“移除动画”：界面过渡与流动背景都会停止'**
+  String get settingsAnimDebugAllMotionSubtitle;
+
+  /// No description provided for @settingsAnimDebugLyricsLine.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭歌词行对焦动画'**
+  String get settingsAnimDebugLyricsLine;
+
+  /// No description provided for @settingsAnimDebugLyricsLineSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'行的放大、模糊、透明度渐变改为直接切换'**
+  String get settingsAnimDebugLyricsLineSubtitle;
+
+  /// No description provided for @settingsAnimDebugLyricsScroll.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭歌词切行滚动动画'**
+  String get settingsAnimDebugLyricsScroll;
+
+  /// No description provided for @settingsAnimDebugLyricsScrollSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换歌词行时列表直接跳到位置，没有位移过渡'**
+  String get settingsAnimDebugLyricsScrollSubtitle;
+
+  /// No description provided for @settingsAnimDebugLyricsMask.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭歌词边缘渐隐遮罩'**
+  String get settingsAnimDebugLyricsMask;
+
+  /// No description provided for @settingsAnimDebugLyricsMaskSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'去掉歌词区上下边缘的整块离屏遮罩层'**
+  String get settingsAnimDebugLyricsMaskSubtitle;
+
+  /// No description provided for @settingsAnimDebugGlass.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭玻璃背景模糊'**
+  String get settingsAnimDebugGlass;
+
+  /// No description provided for @settingsAnimDebugGlassSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'玻璃卡片与按钮不再每帧模糊下方画面'**
+  String get settingsAnimDebugGlassSubtitle;
+
+  /// No description provided for @settingsAnimDebugBackground.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭流动背景动画'**
+  String get settingsAnimDebugBackground;
+
+  /// No description provided for @settingsAnimDebugBackgroundSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'歌词背景停在静态画面'**
+  String get settingsAnimDebugBackgroundSubtitle;
+
+  /// No description provided for @settingsExternalLyricsSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'车机与状态栏歌词'**
+  String get settingsExternalLyricsSection;
+
+  /// No description provided for @settingsBluetoothLyrics.
+  ///
+  /// In zh, this message translates to:
+  /// **'蓝牙歌词'**
+  String get settingsBluetoothLyrics;
+
+  /// No description provided for @settingsBluetoothLyricsSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接蓝牙音频设备时，把媒体信息的标题换成当前歌词行，艺人与专辑换成「歌名 - 艺人」，车机屏幕即可逐句显示歌词'**
+  String get settingsBluetoothLyricsSubtitle;
+
+  /// No description provided for @bluetoothLyricsOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭'**
+  String get bluetoothLyricsOff;
+
+  /// No description provided for @bluetoothLyricsCar.
+  ///
+  /// In zh, this message translates to:
+  /// **'车载设备'**
+  String get bluetoothLyricsCar;
+
+  /// No description provided for @bluetoothLyricsAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'所有设备'**
+  String get bluetoothLyricsAll;
+
+  /// No description provided for @settingsBluetoothLyricsTranslation.
+  ///
+  /// In zh, this message translates to:
+  /// **'附带译文'**
+  String get settingsBluetoothLyricsTranslation;
+
+  /// No description provided for @settingsBluetoothLyricsTranslationSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'有译文时标题显示为「原文 / 译文」'**
+  String get settingsBluetoothLyricsTranslationSubtitle;
+
+  /// No description provided for @settingsBluetoothPermission.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许识别蓝牙设备'**
+  String get settingsBluetoothPermission;
+
+  /// No description provided for @settingsBluetoothPermissionSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'识别车载设备需要「附近的设备」权限'**
+  String get settingsBluetoothPermissionSubtitle;
+
+  /// No description provided for @settingsBluetoothPermissionGrant.
+  ///
+  /// In zh, this message translates to:
+  /// **'授权'**
+  String get settingsBluetoothPermissionGrant;
+
+  /// No description provided for @settingsBluetoothDevices.
+  ///
+  /// In zh, this message translates to:
+  /// **'已连接的蓝牙设备'**
+  String get settingsBluetoothDevices;
+
+  /// No description provided for @settingsBluetoothDevicesEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前没有连接蓝牙音频设备'**
+  String get settingsBluetoothDevicesEmpty;
+
+  /// No description provided for @bluetoothDeviceUnnamed.
+  ///
+  /// In zh, this message translates to:
+  /// **'未命名设备'**
+  String get bluetoothDeviceUnnamed;
+
+  /// No description provided for @bluetoothDeviceCar.
+  ///
+  /// In zh, this message translates to:
+  /// **'已识别为车载设备，自动显示歌词'**
+  String get bluetoothDeviceCar;
+
+  /// No description provided for @bluetoothDeviceAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'所有设备模式下自动显示歌词'**
+  String get bluetoothDeviceAll;
+
+  /// No description provided for @bluetoothDeviceManual.
+  ///
+  /// In zh, this message translates to:
+  /// **'在此设备上也显示歌词'**
+  String get bluetoothDeviceManual;
+
+  /// No description provided for @settingsFlymeLyrics.
+  ///
+  /// In zh, this message translates to:
+  /// **'Flyme 状态栏歌词'**
+  String get settingsFlymeLyrics;
+
+  /// No description provided for @settingsFlymeLyricsSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'播放时在魅族 Flyme 的状态栏显示当前歌词行'**
+  String get settingsFlymeLyricsSubtitle;
+
+  /// No description provided for @audioOutputTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'本机音频设备'**
+  String get audioOutputTitle;
+
+  /// No description provided for @audioOutputSystemDefault.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统默认设备'**
+  String get audioOutputSystemDefault;
+
+  /// No description provided for @audioOutputSelected.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在输出'**
+  String get audioOutputSelected;
+
+  /// No description provided for @audioOutputSystemSwitcher.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择输出设备'**
+  String get audioOutputSystemSwitcher;
+
+  /// No description provided for @audioOutputSystemSwitcherSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开系统输出面板：手机扬声器、蓝牙、有线耳机'**
+  String get audioOutputSystemSwitcherSubtitle;
+
+  /// No description provided for @audioOutputSystemUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'此系统没有可用的输出切换面板'**
+  String get audioOutputSystemUnavailable;
+
+  /// No description provided for @audioOutputWebViewNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前由浏览器内核播放，暂不支持切换，使用系统默认设备'**
+  String get audioOutputWebViewNote;
+
+  /// 设备面板里显示当前实际出声的播放引擎
+  ///
+  /// In zh, this message translates to:
+  /// **'当前播放引擎：{engine}'**
+  String playbackEngineCurrent(String engine);
+
+  /// No description provided for @playbackEngineLocal.
+  ///
+  /// In zh, this message translates to:
+  /// **'本机播放器'**
+  String get playbackEngineLocal;
+
+  /// No description provided for @playbackEngineWebView.
+  ///
+  /// In zh, this message translates to:
+  /// **'WebView（浏览器内核）'**
+  String get playbackEngineWebView;
+
+  /// No description provided for @playbackEngineAndroid.
+  ///
+  /// In zh, this message translates to:
+  /// **'Android 原生播放'**
+  String get playbackEngineAndroid;
 }
 
 class _AppLocalizationsDelegate
@@ -2462,17 +3869,31 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'zh'].contains(locale.languageCode);
+      <String>['en', 'ja', 'zh'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when language+script codes are specified.
+  switch (locale.languageCode) {
+    case 'zh':
+      {
+        switch (locale.scriptCode) {
+          case 'Hant':
+            return AppLocalizationsZhHant();
+        }
+        break;
+      }
+  }
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'en':
       return AppLocalizationsEn();
+    case 'ja':
+      return AppLocalizationsJa();
     case 'zh':
       return AppLocalizationsZh();
   }

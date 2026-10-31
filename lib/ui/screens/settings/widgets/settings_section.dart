@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/flutify_tokens.dart';
+import 'package:material_3_expressive/material_3_expressive.dart' show M3ESwitch;
 
 /// iOS「设置」风格的分组：小号灰色组标题 + 圆角卡片，行之间用发丝分隔线。
 class SettingsSection extends StatelessWidget {
@@ -31,11 +32,10 @@ class SettingsSection extends StatelessWidget {
               ),
             ),
           ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHigh,
-              borderRadius: context.tokens.radius(16),
-            ),
+          Material(
+            color: colorScheme.surfaceContainerHigh,
+            borderRadius: context.tokens.radius(16),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -123,9 +123,17 @@ class SettingsTile extends StatelessWidget {
             },
           );
 
-    final content = Padding(padding: const EdgeInsets.fromLTRB(16, 12, 12, 12), child: body);
+    final content = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
+      child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 12, 12), child: body),
+    );
     if (onTap == null) return content;
-    return InkWell(onTap: onTap, borderRadius: context.tokens.radius(16), child: content);
+    return InkWell(
+      mouseCursor: SystemMouseCursors.click,
+      onTap: onTap,
+      borderRadius: context.tokens.radius(16),
+      child: content,
+    );
   }
 }
 
@@ -146,11 +154,13 @@ class SettingsSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SettingsTile(
-      title: title,
-      subtitle: subtitle,
-      onTap: () => onChanged(!value),
-      trailing: Switch(value: value, onChanged: onChanged),
+    return MergeSemantics(
+      child: SettingsTile(
+        title: title,
+        subtitle: subtitle,
+        onTap: () => onChanged(!value),
+        trailing: Semantics(toggled: value, child: M3ESwitch(value: value, onChanged: onChanged)),
+      ),
     );
   }
 }

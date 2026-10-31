@@ -8,8 +8,18 @@ import 'package:flutter/material.dart';
 class HomeTopGradient extends StatelessWidget {
   /// 悬停封面的主色；null 表示没有悬停（用默认铺底色）。
   final ValueListenable<Color?> tint;
+  static const double extent = 360;
 
-  const HomeTopGradient({super.key, required this.tint});
+  /// 吸顶栏重绘其所在的渐变切片，遮住滚动内容且与页面背景连续。
+  final double topOffset;
+  final Color? background;
+
+  const HomeTopGradient({
+    super.key,
+    required this.tint,
+    this.topOffset = 0,
+    this.background,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,16 +27,34 @@ class HomeTopGradient extends StatelessWidget {
     return ValueListenableBuilder<Color?>(
       valueListenable: tint,
       builder: (context, color, _) {
-        final top = (color ?? colorScheme.primary).withAlpha(color == null ? 30 : 64);
+        final top = (color ?? colorScheme.primary).withAlpha(
+          color == null ? 30 : 64,
+        );
+        Color sample(double offset) {
+          final tint = Color.lerp(
+            top,
+            top.withAlpha(0),
+            (offset / extent).clamp(0, 1),
+          )!;
+          return background == null
+              ? tint
+              : Color.alphaBlend(tint, background!);
+        }
+
         return IgnorePointer(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeOut,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [top, top.withAlpha(0)],
+          child: LayoutBuilder(
+            builder: (context, constraints) => AnimatedContainer(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    sample(topOffset),
+                    sample(topOffset + constraints.maxHeight),
+                  ],
+                ),
               ),
             ),
           ),

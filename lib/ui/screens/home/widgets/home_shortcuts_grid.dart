@@ -128,12 +128,14 @@ class _ShortcutTileState extends State<_ShortcutTile> {
     final liked = item.kind == HomeItemKind.likedSongs;
 
     return HoverBuilder(
+      cursor: SystemMouseCursors.click,
       onHoverChanged: _onHoverChanged,
       builder: (context, hovered) => Material(
         color: hovered ? colorScheme.surfaceContainerHighest : colorScheme.surfaceContainerHigh,
         borderRadius: radius,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
           onTap: () => HomeItemActions.open(context, item),
           hoverColor: Colors.transparent,
           child: Row(
@@ -198,6 +200,7 @@ class _PlayButton extends StatelessWidget {
           : const CircleBorder(),
       elevation: 3,
       child: InkWell(
+        mouseCursor: SystemMouseCursors.click,
         onTap: onPressed,
         customBorder: const CircleBorder(),
         child: SizedBox.square(

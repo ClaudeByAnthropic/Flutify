@@ -67,42 +67,80 @@ void main() {
     ('1024', const Size(1024, 768), true),
     ('390', const Size(390, 844), false),
   ]) {
-    testWidgets('$label wide: shell and playlist detail lay out without errors', (tester) async {
-      await pumpAt(tester, size);
-      expect(find.byType(DesktopShell), desktop ? findsOneWidget : findsNothing);
-      expect(find.byType(MobileBottomBar), desktop ? findsNothing : findsOneWidget);
+    testWidgets(
+      '$label wide: shell and playlist detail lay out without errors',
+      (tester) async {
+        await pumpAt(tester, size);
+        expect(
+          find.byType(DesktopShell),
+          desktop ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.byType(MobileBottomBar),
+          desktop ? findsNothing : findsOneWidget,
+        );
 
-      await openPlaylist(tester);
-      expect(find.byType(CollectionHero), findsOneWidget);
-      expect(find.byType(TrackTile), findsWidgets);
+        await openPlaylist(tester);
+        expect(find.byType(CollectionHero), findsOneWidget);
+        expect(find.byType(TrackTile), findsWidgets);
 
-      // 滚动到吸顶状态再回来，期间不应有布局异常
-      await tester.drag(find.byType(CustomScrollView).last, const Offset(0, -700));
-      await settle(tester);
-      await tester.drag(find.byType(CustomScrollView).last, const Offset(0, 700));
-      await settle(tester);
-      expect(tester.takeException(), isNull);
-    });
+        // 滚动到吸顶状态再回来，期间不应有布局异常
+        await tester.drag(
+          find.byType(CustomScrollView).last,
+          const Offset(0, -700),
+        );
+        await settle(tester);
+        await tester.drag(
+          find.byType(CustomScrollView).last,
+          const Offset(0, 700),
+        );
+        await settle(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
-  testWidgets('desktop: hovering a track row reveals the play icon and more button', (tester) async {
-    await pumpAt(tester, const Size(1440, 900));
-    await openPlaylist(tester);
+  testWidgets(
+    'desktop: hovering a track row reveals the play icon and more button',
+    (tester) async {
+      await pumpAt(tester, const Size(1440, 900));
+      await openPlaylist(tester);
 
-    final firstTile = find.byType(TrackTile).first;
-    expect(find.descendant(of: firstTile, matching: find.byIcon(Icons.play_arrow_rounded)), findsNothing);
+      final firstTile = find.byType(TrackTile).first;
+      expect(
+        find.descendant(
+          of: firstTile,
+          matching: find.byIcon(Icons.play_arrow_rounded),
+        ),
+        findsNothing,
+      );
 
-    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await mouse.addPointer(location: Offset.zero);
-    addTearDown(mouse.removePointer);
-    await mouse.moveTo(tester.getCenter(firstTile));
-    await settle(tester);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(tester.getCenter(firstTile));
+      await settle(tester);
 
-    expect(find.descendant(of: firstTile, matching: find.byIcon(Icons.play_arrow_rounded)), findsOneWidget);
-    expect(find.descendant(of: firstTile, matching: find.byIcon(Icons.more_horiz_rounded)), findsOneWidget);
-  });
+      expect(
+        find.descendant(
+          of: firstTile,
+          matching: find.byIcon(Icons.play_arrow_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: firstTile,
+          matching: find.byIcon(Icons.more_horiz_rounded),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('desktop: right-clicking a track row opens the context menu', (tester) async {
+  testWidgets('desktop: right-clicking a track row opens the context menu', (
+    tester,
+  ) async {
     await pumpAt(tester, const Size(1440, 900));
     await openPlaylist(tester);
 
@@ -127,6 +165,40 @@ void main() {
     await tester.tap(menuShare());
     await settle(tester);
     expect(find.byType(ShareSheet), findsOneWidget);
+  });
+
+  testWidgets('desktop: share survives the hover button disappearing', (
+    tester,
+  ) async {
+    await pumpAt(tester, const Size(1440, 900));
+    await openPlaylist(tester);
+    final tile = find.byType(TrackTile).first;
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(tile));
+    await settle(tester);
+    final more = find.descendant(
+      of: tile,
+      matching: find.byIcon(Icons.more_horiz_rounded),
+    );
+    await tester.tap(more);
+    await settle(tester);
+    final share = find.descendant(
+      of: find.byWidgetPredicate((w) => w is PopupMenuItem),
+      matching: find.byIcon(Icons.ios_share_rounded),
+    );
+    await mouse.moveTo(tester.getCenter(share));
+    await settle(tester);
+    expect(more, findsNothing, reason: 'menu is outside the hovered row');
+    await tester.tap(share);
+    await settle(tester);
+    expect(find.byType(ShareSheet), findsOneWidget);
+    expect(
+      tester.widget<ShareSheet>(find.byType(ShareSheet)).target.title,
+      playlist.tracks.first.name,
+    );
+    expect(tester.takeException(), isNull);
   });
 }
 

@@ -31,10 +31,10 @@ class NativeDrmAudioEngine implements AudioEngine {
     required NativeDrmPlayer player,
     required Future<Uint8List> Function(Uint8List request) licensePoster,
     required Future<Uint8List> Function() certFetcher,
-  })  : _server = server,
-        _player = player,
-        _licensePoster = licensePoster,
-        _certFetcher = certFetcher {
+  }) : _server = server,
+       _player = player,
+       _licensePoster = licensePoster,
+       _certFetcher = certFetcher {
     _player.positionStream.listen((p) {
       _position = p;
       _positionController.add(p);
@@ -57,15 +57,27 @@ class NativeDrmAudioEngine implements AudioEngine {
   bool _playing = false;
   ProcessingState _processing = ProcessingState.idle;
   bool _hasSource = false;
+  bool _playRequested = false;
+  bool _disposed = false;
+  int _generation = 0;
+  Future<void> _loading = Future.value();
 
   void _onState(EmePlayerState s) {
+    if (_disposed || !_hasSource) return;
     switch (s) {
       case EmePlayerState.playing:
-        _playing = true;
+        _playing = _playRequested;
         _processing = ProcessingState.ready;
       case EmePlayerState.buffering:
-        _processing = ProcessingState.buffering;
+        _processing = _playRequested
+            ? ProcessingState.buffering
+            : ProcessingState.ready;
+      case EmePlayerState.paused:
+        _playing = false;
+        _processing = ProcessingState.ready;
       case EmePlayerState.ended:
+        if (!_playRequested) return;
+        _playRequested = false;
         _playing = false;
         _processing = ProcessingState.completed;
       case EmePlayerState.error:
@@ -73,17 +85,21 @@ class NativeDrmAudioEngine implements AudioEngine {
         _processing = ProcessingState.idle;
         if (_hasSource) {
           // 运行期错误（license / DRM 会话失败等，在 play 返回后才暴露）：
-          // 带上 [_player.lastError] 的原因上报给 PlaybackProvider 转成用户可见提示，
+          // 优先保留本轮 Dart 反代的原始原因及认证分类；Media3 只给出泛化错误。
           // 并把 _hasSource 复位，让上层知道要重试必须重新整载
           _hasSource = false;
           _errorController.add(
-              _player.lastError ?? const EmePlaybackException('unknown'));
+            _server.lastError ??
+                _player.lastError ??
+                const EmePlaybackException('unknown'),
+          );
         }
     }
     _emit();
   }
 
   void _emit() {
+    if (_disposed) return;
     _stateController.add(PlayerState(_playing, _processing));
   }
 
@@ -106,39 +122,73 @@ class NativeDrmAudioEngine implements AudioEngine {
   bool get hasSource => _hasSource;
 
   @override
-  Future<void> playEme(EmeTrackContent content,
-      {Duration? initialPosition, bool autoplay = true}) async {
+  Future<void> playEme(
+    EmeTrackContent content, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) {
+    activePlaybackEngine.value = PlaybackEngineKind.androidDrm;
+    final generation = ++_generation;
+    _playRequested = autoplay;
+    _playing = false;
+    _hasSource = false;
     _processing = ProcessingState.loading;
     _emit();
-    // 起本地回环服务（清单按 ExoPlayer 需要把 KEYFORMAT 改写为 Widevine UUID）
-    final urls = await _server.serveHlsForNative(
-      m4a: File(content.m4aPath),
-      m3u8: content.m3u8,
-      licensePoster: _licensePoster,
-      certFetcher: _certFetcher,
-    );
-    await _player.play(
-      hlsUrl: urls.hlsUrl,
-      licenseUrl: urls.licenseUrl,
-      provisionUrl: urls.provisionUrl,
-    );
-    _hasSource = true;
-    if (initialPosition != null && initialPosition > Duration.zero) {
-      await _player.seek(initialPosition);
-    }
+    bool current() => !_disposed && generation == _generation;
+    // The loopback server has a single active manifest. Serialize preparation
+    // so a late old request cannot replace the new track's server contents.
+    final loading = _loading.then((_) async {
+      if (!current()) return;
+      await _player.pause();
+      if (!current()) return;
+      final urls = await _server.serveHlsForNative(
+        m4a: File(content.m4aPath),
+        m3u8: content.m3u8,
+        licensePoster: _licensePoster,
+        certFetcher: _certFetcher,
+      );
+      if (!current()) return;
+      _hasSource = true;
+      await _player.play(
+        hlsUrl: urls.hlsUrl,
+        licenseUrl: urls.licenseUrl,
+        provisionUrl: urls.provisionUrl,
+        autoplay: false,
+        initialPosition: initialPosition ?? Duration.zero,
+      );
+      if (!current() || !_hasSource) return;
+      if (_playRequested) {
+        await play();
+      } else {
+        _processing = ProcessingState.ready;
+        _emit();
+      }
+    });
+    _loading = loading.catchError((Object _) {});
+    return loading;
   }
 
   // just_audio 路径在本引擎上不可用（路由层保证不调用）
   @override
-  Future<void> playFile(String path, {Duration? initialPosition, bool autoplay = true}) =>
-      throw UnimplementedError('原生 DRM 引擎不支持本地文件');
+  Future<void> playFile(
+    String path, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) => throw UnimplementedError('原生 DRM 引擎不支持本地文件');
   @override
-  Future<void> playStream(ProgressiveAudio audio, {Duration? initialPosition, bool autoplay = true}) =>
-      throw UnimplementedError('原生 DRM 引擎不支持流式下载');
+  Future<void> playStream(
+    ProgressiveAudio audio, {
+    Duration? initialPosition,
+    bool autoplay = true,
+  }) => throw UnimplementedError('原生 DRM 引擎不支持流式下载');
 
   @override
   Future<void> play() async {
+    if (_disposed || !_hasSource) return;
+    final generation = _generation;
+    _playRequested = true;
     await _player.resume();
+    if (_disposed || generation != _generation || !_playRequested) return;
     _playing = true;
     _processing = ProcessingState.ready;
     _emit();
@@ -146,7 +196,13 @@ class NativeDrmAudioEngine implements AudioEngine {
 
   @override
   Future<void> pause() async {
+    final generation = ++_generation;
+    _playRequested = false;
+    _playing = false;
+    _processing = _hasSource ? ProcessingState.ready : ProcessingState.idle;
+    _emit();
     await _player.pause();
+    if (_disposed || generation != _generation) return;
     _playing = false;
     _emit();
   }
@@ -155,19 +211,25 @@ class NativeDrmAudioEngine implements AudioEngine {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> setVolume(double volume) => _player.setVolume(volume.clamp(0.0, 1.0));
+  Future<void> setVolume(double volume) =>
+      _player.setVolume(volume.clamp(0.0, 1.0));
 
   @override
   Future<void> stop() async {
-    await _player.stop();
+    ++_generation;
+    _playRequested = false;
     _playing = false;
     _processing = ProcessingState.idle;
     _hasSource = false;
     _emit();
+    await _player.stop();
   }
 
   @override
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    ++_generation;
     _player.dispose();
   }
 }

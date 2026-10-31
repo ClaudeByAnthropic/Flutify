@@ -10,6 +10,8 @@ import '../../widgets/player_controls.dart';
 import 'lyrics/lyrics_backdrop.dart';
 import 'lyrics/lyrics_glass_controls.dart';
 import 'lyrics/lyrics_view.dart';
+import 'lyrics/lyrics_translation_controls.dart';
+import 'player_modal.dart';
 
 /// 同步歌词面板（Apple Music iOS 风格，手机 / 窄窗口使用）。
 /// 遥控远程设备时同样可用（手机上点远程迷你播放器即打开它）。
@@ -22,19 +24,24 @@ import 'lyrics/lyrics_view.dart';
 class LyricsSheet extends StatelessWidget {
   const LyricsSheet({super.key});
 
-  static const double _headerHeight = 104;
+  static const double _headerHeight = 140;
   static const double _controlsHeight = 150;
 
-  static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      showDragHandle: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const LyricsSheet(),
-    );
-  }
+  static Future<void> show(BuildContext context) =>
+      PlayerModal.show(context, (captureRoute) {
+        return showModalBottomSheet(
+          context: context,
+          useRootNavigator: true,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: false,
+          backgroundColor: Colors.transparent,
+          builder: (sheetContext) {
+            captureRoute(sheetContext);
+            return const LyricsSheet();
+          },
+        );
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -44,35 +51,49 @@ class LyricsSheet extends StatelessWidget {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
     final corner = Radius.circular(context.tokens.corner(32));
 
-    return ClipRRect(
-      borderRadius: BorderRadius.vertical(top: corner),
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.92,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
-            if (track == null)
-              Center(
-                child: EmptyState(
-                  icon: Icons.music_off_rounded,
-                  title: context.l10n.playerNothingPlayingTitle,
-                  message: context.l10n.lyricsNothingPlayingMessage,
-                  onDark: true,
+    return LyricsTranslationScope(
+      key: ValueKey((track?.id, remote)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.vertical(top: corner),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.92,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              LyricsBackdrop(imageUrl: track?.coverUrl ?? ''),
+              if (track == null)
+                Center(
+                  child: EmptyState(
+                    icon: Icons.music_off_rounded,
+                    title: context.l10n.playerNothingPlayingTitle,
+                    message: context.l10n.lyricsNothingPlayingMessage,
+                    onDark: true,
+                  ),
+                )
+              else
+                LyricsView(
+                  appleMusicStyle: true,
+                  key: ValueKey((track.id, remote)),
+                  track: track,
+                  remote: remote,
+                  topInset: _headerHeight,
+                  bottomInset: _controlsHeight + bottomSafe,
                 ),
-              )
-            else
-              LyricsView(
-                key: ValueKey((track.id, remote)),
-                track: track,
-                remote: remote,
-                topInset: _headerHeight,
-                bottomInset: _controlsHeight + bottomSafe,
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: _Header(track: track),
               ),
-            Positioned(left: 0, right: 0, top: 0, child: _Header(track: track)),
-            if (track != null)
-              Positioned(left: 16, right: 16, bottom: 16 + bottomSafe, child: const LyricsGlassControls()),
-          ],
+              if (track != null)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16 + bottomSafe,
+                  child: const LyricsGlassControls(),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -92,18 +113,40 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Column(
         children: [
-          Container(
-            width: 36,
-            height: 5,
-            decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(3)),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 36,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white38,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                if (track != null)
+                  const Positioned(
+                    top: 0,
+                    right: 0,
+                    child: LyricsTranslationButton(),
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           LiquidGlass(
             borderRadius: tokens.radius(22),
             padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
             child: Row(
               children: [
-                CoverImage(url: track?.coverUrl ?? '', size: 44, borderRadius: tokens.radius(10)),
+                CoverImage(
+                  url: track?.coverUrl ?? '',
+                  size: 44,
+                  borderRadius: tokens.radius(10),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -112,23 +155,40 @@ class _Header extends StatelessWidget {
                     children: [
                       Text(
                         track?.name ?? context.l10n.lyricsTitle,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         track?.artistNames ?? context.l10n.lyricsNotPlaying,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                if (track != null) LikeButton(track: track!, size: 22, inactiveColor: Colors.white70),
+                if (track != null)
+                  LikeButton(
+                    track: track!,
+                    size: 22,
+                    inactiveColor: Colors.white70,
+                  ),
                 IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 28),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                   tooltip: context.l10n.commonClose,
                   onPressed: () => Navigator.pop(context),
                 ),

@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/constants/spotify_endpoints.dart';
+import '../../core/utils/json_bytes.dart';
 import '../../models/album.dart';
 import '../../models/artist.dart';
 import '../../models/category.dart';
+import '../../models/catalog_page.dart';
 import '../../models/home_feed.dart';
 import '../../models/image.dart';
 import '../../models/playlist.dart';
@@ -29,7 +31,7 @@ class DesktopDataSource {
   /// decorateContextTracks 单次补全的曲目数。
   static const int _decorateBatch = 50;
 
-  /// 歌单详情最多加载的曲目数。
+  /// 歌单详情每页请求的条目数。
   static const int _playlistLimit = 100;
 
   /// 拼四宫格封面时抽取的曲目数。
@@ -37,18 +39,27 @@ class DesktopDataSource {
 
   final http.Client _client;
   final Future<Map<String, String>> Function() _headers;
+  /// 将服务端本地化响应按当前请求语言隔离缓存。
+  final String Function()? language;
   final PathfinderClient _pathfinder;
   final Map<String, _CacheEntry> _cache = {};
 
-  DesktopDataSource(this._client, {required Future<Map<String, String>> Function() headers})
-    : _headers = headers,
-      _pathfinder = PathfinderClient(_client, headers: headers);
+  DesktopDataSource(
+    this._client, {
+    required Future<Map<String, String>> Function() headers,
+    this.language,
+  }) : _headers = headers,
+       _pathfinder = PathfinderClient(_client, headers: headers);
 
   /// 相同查询在有效期内合并为一次请求（含进行中的请求）。
-  Future<Map<String, dynamic>> _query(PathfinderOperation op, Map<String, Object?> variables) {
-    final key = '${op.name}:${jsonEncode(variables)}';
+  Future<Map<String, dynamic>> _query(
+    PathfinderOperation op,
+    Map<String, Object?> variables,
+  ) {
+    final key = _queryKey(op, variables);
     final cached = _cache[key];
-    if (cached != null && DateTime.now().isBefore(cached.expiresAt)) return cached.future;
+    if (cached != null && DateTime.now().isBefore(cached.expiresAt))
+      return cached.future;
     final future = _pathfinder.query(op, variables);
     _cache[key] = _CacheEntry(future, DateTime.now().add(_cacheTtl));
     // 失败的请求不缓存
@@ -58,6 +69,25 @@ class DesktopDataSource {
     });
     if (_cache.length > 64) _cache.remove(_cache.keys.first);
     return future;
+  }
+
+  String _queryKey(PathfinderOperation op, Map<String, Object?> variables) =>
+      '${language?.call() ?? ''}:${op.name}:${jsonEncode(variables)}';
+
+  /// A transport-successful but malformed page must not poison retries for the
+  /// cache TTL. Only parsed catalog pages are reusable as successful results.
+  Future<T> _catalogQuery<T>(
+    PathfinderOperation op,
+    Map<String, Object?> variables,
+    T Function(Map<String, dynamic>) parse,
+  ) async {
+    final key = _queryKey(op, variables);
+    try {
+      return parse(await _query(op, variables));
+    } catch (_) {
+      _cache.remove(key);
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -71,20 +101,23 @@ class DesktopDataSource {
   static const int homeSectionItemsLimit = 50;
 
   /// 主页（与官方桌面端同一查询）。[facet] 为筛选标签 id（空 = 全部）。
-  Future<HomeFeed> home({String facet = ''}) async => HomeParser.parse(await _homeQuery(facet, homeItemsLimit));
+  Future<HomeFeed> home({String facet = ''}) async =>
+      HomeParser.parse(await _homeQuery(facet, homeItemsLimit));
 
   /// 「显示全部」：同一查询放大每分区条目数，再按 URI 找回该分区。
   Future<HomeSection?> homeSection(String uri, {String facet = ''}) async =>
       HomeParser.section(await _homeQuery(facet, homeSectionItemsLimit), uri);
 
-  Future<Map<String, dynamic>> _homeQuery(String facet, int itemsLimit) => _query(PathfinderOperation.home, {
-    'homeEndUserIntegration': kDesktopEndUserIntegration,
-    'timeZone': _ianaTimeZone(),
-    'sp_t': '',
-    'facet': facet,
-    'sectionItemsLimit': itemsLimit,
-    'includeEpisodeContentRatingsV2': false,
-  });
+  Future<Map<String, dynamic>> _homeQuery(String facet, int itemsLimit) =>
+      // 主页刷新必须重新联网；并发刷新由 SpotifyProvider 合并。
+      _pathfinder.query(PathfinderOperation.home, {
+        'homeEndUserIntegration': kDesktopEndUserIntegration,
+        'timeZone': _ianaTimeZone(),
+        'sp_t': '',
+        'facet': facet,
+        'sectionItemsLimit': itemsLimit,
+        'includeEpisodeContentRatingsV2': false,
+      });
 
   Future<List<SpotifyCategory>> categories() async {
     final data = await _query(PathfinderOperation.browseAll, {
@@ -111,7 +144,9 @@ class DesktopDataSource {
   // 专辑 / 艺人
   // ---------------------------------------------------------------------------
 
-  Future<({SpotifyAlbum album, List<SpotifyTrack> tracks})?> albumPage(String id) async {
+  Future<({SpotifyAlbum album, List<SpotifyTrack> tracks})?> albumPage(
+    String id,
+  ) async {
     final data = await _query(PathfinderOperation.getAlbum, {
       'uri': 'spotify:album:$id',
       'locale': '',
@@ -121,7 +156,27 @@ class DesktopDataSource {
     return PathfinderParsers.albumPage(data);
   }
 
-  Future<({SpotifyArtist artist, List<SpotifyTrack> topTracks})?> artistPage(String id) async {
+  Future<CatalogPage<SpotifyTrack>> albumTracksPage(
+    String id, {
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    _validatePage(offset, limit);
+    return _catalogQuery(
+      PathfinderOperation.getAlbum,
+      {
+        'uri': 'spotify:album:$id',
+        'locale': '',
+        'offset': offset,
+        'limit': limit,
+      },
+      (data) => PathfinderParsers.albumTracksPage(data, offset: offset, limit: limit),
+    );
+  }
+
+  Future<({SpotifyArtist artist, List<SpotifyTrack> topTracks})?> artistPage(
+    String id,
+  ) async {
     final data = await _query(PathfinderOperation.queryArtistOverview, {
       'uri': 'spotify:artist:$id',
       'locale': '',
@@ -131,31 +186,67 @@ class DesktopDataSource {
   }
 
   Future<List<SpotifyAlbum>> artistAlbums(String id) async {
+    return (await artistAlbumsPage(id)).items;
+  }
+
+  Future<CatalogPage<SpotifyAlbum>> artistAlbumsPage(
+    String id, {
+    int offset = 0,
+    int limit = 20,
+  }) async {
+    _validatePage(offset, limit);
     // 唱片目录条目不带艺人信息：复用艺人页查询（通常已缓存）回填艺人名
     SpotifyArtist? artist;
     try {
       artist = (await artistPage(id))?.artist;
     } catch (_) {}
-    final data = await _query(PathfinderOperation.queryArtistDiscographyAll, {
-      'uri': 'spotify:artist:$id',
-      'offset': 0,
-      'limit': 20,
-      'order': 'DATE_DESC',
-    });
-    return PathfinderParsers.discography(data, artist: artist);
+    return _catalogQuery(
+      PathfinderOperation.queryArtistDiscographyAll,
+      {
+        'uri': 'spotify:artist:$id',
+        'offset': offset,
+        'limit': limit,
+        'order': 'DATE_DESC',
+      },
+      (data) => PathfinderParsers.discographyPage(
+        data,
+        artist: artist,
+        offset: offset,
+        limit: limit,
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
   // 搜索
   // ---------------------------------------------------------------------------
 
-  Future<({List<SpotifyTrack> tracks, List<SpotifyArtist> artists, List<SpotifyPlaylist> playlists})> search(
-    String term,
-  ) async {
+  Future<
+    ({
+      List<SpotifyTrack> tracks,
+      List<SpotifyArtist> artists,
+      List<SpotifyPlaylist> playlists,
+    })
+  >
+  search(String term) async {
+    final page = await searchPage(term, limit: 10);
+    return (
+      tracks: page.tracks.items,
+      artists: page.artists.items,
+      playlists: page.playlists.items,
+    );
+  }
+
+  Future<SearchPage> searchPage(
+    String term, {
+    int offset = 0,
+    int limit = 20,
+  }) async {
+    _validatePage(offset, limit);
     final data = await _pathfinder.query(PathfinderOperation.searchDesktop, {
       'searchTerm': term,
-      'offset': 0,
-      'limit': 10,
+      'offset': offset,
+      'limit': limit,
       'numberOfTopResults': 5,
       'includeAudiobooks': false,
       'includeArtistHasConcertsField': false,
@@ -163,7 +254,13 @@ class DesktopDataSource {
       'includeLocalConcertsField': false,
       'includeAuthors': false,
     });
-    return PathfinderParsers.search(data);
+    return PathfinderParsers.searchPage(data, offset: offset, limit: limit);
+  }
+
+  static void _validatePage(int offset, int limit) {
+    if (offset < 0 || limit < 1 || limit > 50) {
+      throw ArgumentError('Catalog offset must be non-negative and limit 1–50');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -179,26 +276,72 @@ class DesktopDataSource {
       headers: await _headers(),
     );
     if (res.statusCode != 200) return null;
-    final parsed = PathfinderParsers.playlistV2(id, jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+    // 大歌单每页可达数百 KB：解码放到后台 Isolate（见 decodeJsonBytes）
+    final data = await decodeJsonBytes(res.bodyBytes) as Map<String, dynamic>;
+    final parsed = PathfinderParsers.playlistV2(id, data);
     if (parsed == null) return null;
 
+    final allUris = [...parsed.trackUris];
+    final addedAt = {...parsed.addedAt};
+    // 用原始条目数推进 offset：下架歌曲/播客可能被解析器过滤，不能用 trackUris.length。
+    var offset = ((data['contents'] as Map?)?['items'] as List?)?.length ?? 0;
+    while (offset < parsed.playlist.totalTracks) {
+      if (offset == 0)
+        throw StateError('Playlist returned an empty page before its end');
+      final pageResponse = await _client.get(
+        Uri.parse(
+          '${SpotifyEndpoints.defaultSpClientBase}/playlist/v2/playlist/$id'
+          '?decorate=attributes,length,owner&from=$offset&length=$_playlistLimit',
+        ),
+        headers: await _headers(),
+      );
+      if (pageResponse.statusCode != 200)
+        throw StateError('Playlist page failed: ${pageResponse.statusCode}');
+      final page =
+          await decodeJsonBytes(pageResponse.bodyBytes)
+              as Map<String, dynamic>;
+      final items = ((page['contents'] as Map?)?['items'] as List?) ?? const [];
+      if (items.isEmpty)
+        throw StateError('Playlist returned an empty page before its end');
+      // 后续页可能不重复元数据，仍沿用第一页的歌单属性。
+      final next = PathfinderParsers.playlistV2(id, {
+        ...data,
+        ...page,
+        'attributes': data['attributes'],
+      });
+      if (next == null) throw StateError('Invalid playlist page');
+      allUris.addAll(next.trackUris);
+      for (final entry in next.addedAt.entries) {
+        addedAt.putIfAbsent(entry.key, () => entry.value);
+      }
+      offset += items.length;
+    }
+
     final batches = <Future<List<SpotifyTrack>>>[];
-    for (var i = 0; i < parsed.trackUris.length; i += _decorateBatch) {
-      final uris = parsed.trackUris.sublist(i, (i + _decorateBatch).clamp(0, parsed.trackUris.length));
+    for (var i = 0; i < allUris.length; i += _decorateBatch) {
+      final uris = allUris.sublist(
+        i,
+        (i + _decorateBatch).clamp(0, allUris.length),
+      );
       batches.add(
         _pathfinder
             .query(PathfinderOperation.decorateContextTracks, {'uris': uris})
             .then(PathfinderParsers.decoratedTracks),
       );
     }
+    final byUri = {
+      for (final t in (await Future.wait(batches)).expand((t) => t)) t.uri: t,
+    };
     final tracks = [
-      for (final t in (await Future.wait(batches)).expand((t) => t))
-        t.copyWith(addedAt: parsed.addedAt['spotify:track:${t.id}']),
+      for (final uri in allUris)
+        if (byUri[uri] case final track?) track.copyWith(addedAt: addedAt[uri]),
     ];
 
     // 歌单无自定义封面时，与官方客户端一样用前几首曲目的专辑封面拼四宫格
     final playlist = parsed.playlist;
-    final images = playlist.images.isEmpty ? PlaylistCover.fromAlbumCovers(_albumCovers(tracks)) : null;
+    final images = playlist.images.isEmpty
+        ? PlaylistCover.fromAlbumCovers(_albumCovers(tracks))
+        : null;
     return playlist.copyWith(tracks: tracks, images: images);
   }
 
@@ -214,11 +357,20 @@ class DesktopDataSource {
       headers: await _headers(),
     );
     if (res.statusCode != 200) return const [];
-    final parsed = PathfinderParsers.playlistV2(id, jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
-    if (parsed == null || parsed.trackUris.isEmpty) return parsed?.playlist.images ?? const [];
+    final parsed = PathfinderParsers.playlistV2(
+      id,
+      jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>,
+    );
+    if (parsed == null || parsed.trackUris.isEmpty)
+      return parsed?.playlist.images ?? const [];
     if (parsed.playlist.images.isNotEmpty) return parsed.playlist.images;
-    final data = await _pathfinder.query(PathfinderOperation.decorateContextTracks, {'uris': parsed.trackUris});
-    return PlaylistCover.fromAlbumCovers(_albumCovers(PathfinderParsers.decoratedTracks(data)));
+    final data = await _pathfinder.query(
+      PathfinderOperation.decorateContextTracks,
+      {'uris': parsed.trackUris},
+    );
+    return PlaylistCover.fromAlbumCovers(
+      _albumCovers(PathfinderParsers.decoratedTracks(data)),
+    );
   }
 
   static Iterable<List<SpotifyImage>> _albumCovers(List<SpotifyTrack> tracks) =>
@@ -227,9 +379,13 @@ class DesktopDataSource {
   /// 按 URI 批量补全曲目（decorateContextTracks，每批 [_decorateBatch] 首、最多 [concurrency] 批并行）。
   ///
   /// 返回顺序与 [uris] 一致；服务端未返回（下架 / 无权限）的曲目被略过。
-  Future<List<SpotifyTrack>> tracksByUris(List<String> uris, {int concurrency = 3}) async {
+  Future<List<SpotifyTrack>> tracksByUris(
+    List<String> uris, {
+    int concurrency = 3,
+  }) async {
     final batches = <List<String>>[
-      for (var i = 0; i < uris.length; i += _decorateBatch) uris.sublist(i, (i + _decorateBatch).clamp(0, uris.length)),
+      for (var i = 0; i < uris.length; i += _decorateBatch)
+        uris.sublist(i, (i + _decorateBatch).clamp(0, uris.length)),
     ];
     final results = List<List<SpotifyTrack>>.filled(batches.length, const []);
     var next = 0;
@@ -239,7 +395,10 @@ class DesktopDataSource {
       while (next < batches.length) {
         final index = next++;
         try {
-          final data = await _pathfinder.query(PathfinderOperation.decorateContextTracks, {'uris': batches[index]});
+          final data = await _pathfinder.query(
+            PathfinderOperation.decorateContextTracks,
+            {'uris': batches[index]},
+          );
           results[index] = PathfinderParsers.decoratedTracks(data);
         } catch (e) {
           // 单批失败不拖垮整个列表
@@ -249,7 +408,9 @@ class DesktopDataSource {
       }
     }
 
-    await Future.wait([for (var i = 0; i < concurrency && i < batches.length; i++) worker()]);
+    await Future.wait([
+      for (var i = 0; i < concurrency && i < batches.length; i++) worker(),
+    ]);
     // 全部批次都失败说明是网络 / 鉴权问题而非个别曲目缺失：抛出，避免调用方把它当成「空列表」
     if (batches.isNotEmpty && failed == batches.length) throw lastError!;
     final byId = {for (final t in results.expand((r) => r)) t.id: t};
@@ -266,7 +427,10 @@ class DesktopDataSource {
       headers: await _headers(),
     );
     if (res.statusCode != 200) return null;
-    return PathfinderParsers.playlistV2(id, jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>)?.playlist;
+    return PathfinderParsers.playlistV2(
+      id,
+      jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>,
+    )?.playlist;
   }
 
   // ---------------------------------------------------------------------------
@@ -275,11 +439,12 @@ class DesktopDataSource {
 
   /// 「查看制作人员」（与官方桌面端同一查询）；曲目不存在时返回 null。
   Future<TrackCredits?> trackCredits(String trackId) async {
-    final data = await _query(PathfinderOperation.queryTrackCreditsGroupedModal, {
-      'trackUri': 'spotify:track:$trackId',
-      'contributorsLimit': 100,
-      'contributorsOffset': 0,
-    });
+    final data =
+        await _query(PathfinderOperation.queryTrackCreditsGroupedModal, {
+          'trackUri': 'spotify:track:$trackId',
+          'contributorsLimit': 100,
+          'contributorsOffset': 0,
+        });
     return CreditsParser.parse(data);
   }
 
@@ -294,12 +459,19 @@ class DesktopDataSource {
       headers: await _headers(),
     );
     if (res.statusCode == 404) return null;
-    if (res.statusCode != 200) throw http.ClientException('seed_to_playlist HTTP ${res.statusCode}', res.request?.url);
-    final items = (jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>)['mediaItems'];
+    if (res.statusCode != 200)
+      throw http.ClientException(
+        'seed_to_playlist HTTP ${res.statusCode}',
+        res.request?.url,
+      );
+    final items =
+        (jsonDecode(utf8.decode(res.bodyBytes))
+            as Map<String, dynamic>)['mediaItems'];
     if (items is! List) return null;
     for (final item in items.whereType<Map>()) {
       final uri = item['uri'] as String? ?? '';
-      if (uri.startsWith('spotify:playlist:')) return uri.substring('spotify:playlist:'.length);
+      if (uri.startsWith('spotify:playlist:'))
+        return uri.substring('spotify:playlist:'.length);
     }
     return null;
   }

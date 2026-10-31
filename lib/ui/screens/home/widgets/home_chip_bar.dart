@@ -22,9 +22,10 @@ class HomeChipBar extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
   final Widget? leading;
+  final Widget? trailing;
 
-  /// 吸顶时的底色（与页面底色一致，滚动内容从下方穿过时不透出）。
-  final Color background;
+  /// 与页面背景同位置的渐变切片，吸顶时遮住下方滚动内容。
+  final Widget background;
 
   const HomeChipBar({
     super.key,
@@ -33,6 +34,7 @@ class HomeChipBar extends StatelessWidget {
     required this.onSelected,
     required this.background,
     this.leading,
+    this.trailing,
   });
 
   static const double _verticalPadding = 8;
@@ -46,7 +48,12 @@ class HomeChipBar extends StatelessWidget {
 
   /// 标签行高度：胶囊（上下共 10 内边距 + 实测一行文字）与头像取大者，再加上下留白。
   static double extentOf(BuildContext context) {
-    final pill = TextMetrics.lineHeight(context, Theme.of(context).textTheme.labelMedium) + 10;
+    final pill =
+        TextMetrics.lineHeight(
+          context,
+          Theme.of(context).textTheme.labelMedium,
+        ) +
+        10;
     return math.max(pill, _leadingSize) + _verticalPadding * 2;
   }
 
@@ -54,7 +61,8 @@ class HomeChipBar extends StatelessWidget {
   HomeChip? get _parent {
     if (selected.isEmpty) return null;
     for (final chip in chips) {
-      if (chip.id == selected || chip.subChips.any((s) => s.id == selected)) return chip;
+      if (chip.id == selected || chip.subChips.any((s) => s.id == selected))
+        return chip;
     }
     return null;
   }
@@ -66,13 +74,30 @@ class HomeChipBar extends StatelessWidget {
 
     final pills = <Widget>[
       if (parent == null) ...[
-        FilterPill(label: l10n.filterAll, isSelected: true, onTap: () => onSelected('')),
-        for (final chip in chips) FilterPill(label: chip.label, isSelected: false, onTap: () => onSelected(chip.id)),
+        FilterPill(
+          label: l10n.filterAll,
+          isSelected: true,
+          onTap: () => onSelected(''),
+        ),
+        for (final chip in chips)
+          FilterPill(
+            label: chip.label,
+            isSelected: false,
+            onTap: () => onSelected(chip.id),
+          ),
       ] else ...[
         _ClearPill(tooltip: l10n.homeClearFilter, onTap: () => onSelected('')),
-        FilterPill(label: parent.label, isSelected: selected == parent.id, onTap: () => onSelected(parent.id)),
+        FilterPill(
+          label: parent.label,
+          isSelected: selected == parent.id,
+          onTap: () => onSelected(parent.id),
+        ),
         for (final sub in parent.subChips)
-          FilterPill(label: sub.label, isSelected: selected == sub.id, onTap: () => onSelected(sub.id)),
+          FilterPill(
+            label: sub.label,
+            isSelected: selected == sub.id,
+            onTap: () => onSelected(sub.id),
+          ),
       ],
     ];
 
@@ -83,11 +108,20 @@ class HomeChipBar extends StatelessWidget {
         background: background,
         child: Row(
           children: [
-            if (leading != null) Padding(padding: const EdgeInsets.only(left: 16), child: leading!),
+            if (leading != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: leading!,
+              ),
             Expanded(
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.fromLTRB(leading == null ? 16 : 10, 0, 16, 0),
+                padding: EdgeInsets.fromLTRB(
+                  leading == null ? 16 : 10,
+                  0,
+                  16,
+                  0,
+                ),
                 child: Row(
                   children: [
                     for (final pill in pills)
@@ -99,6 +133,11 @@ class HomeChipBar extends StatelessWidget {
                 ),
               ),
             ),
+            if (trailing != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: trailing!,
+              ),
           ],
         ),
       ),
@@ -108,10 +147,14 @@ class HomeChipBar extends StatelessWidget {
 
 class _ChipBarDelegate extends SliverPersistentHeaderDelegate {
   final double extent;
-  final Color background;
+  final Widget background;
   final Widget child;
 
-  _ChipBarDelegate({required this.extent, required this.background, required this.child});
+  _ChipBarDelegate({
+    required this.extent,
+    required this.background,
+    required this.child,
+  });
 
   @override
   double get minExtent => extent;
@@ -120,15 +163,21 @@ class _ChipBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => extent;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) =>
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) =>
       // 必须撑满 extent：吸顶 sliver 以子组件高度作为绘制高度
       SizedBox.expand(
-        child: ColoredBox(color: background, child: child),
+        child: Stack(fit: StackFit.expand, children: [background, child]),
       );
 
   @override
   bool shouldRebuild(_ChipBarDelegate old) =>
-      old.extent != extent || old.background != background || old.child != child;
+      old.extent != extent ||
+      old.background != background ||
+      old.child != child;
 }
 
 /// 「×」清除筛选（与胶囊同高的圆形按钮）。
@@ -154,10 +203,16 @@ class _ClearPill extends StatelessWidget {
             width: size,
             height: size,
             decoration: BoxDecoration(
-              color: hovered ? colorScheme.surfaceContainerHighest : colorScheme.surfaceContainerHigh,
+              color: hovered
+                  ? colorScheme.surfaceContainerHighest
+                  : colorScheme.surfaceContainerHigh,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.close_rounded, size: 18, color: colorScheme.onSurface),
+            child: Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: colorScheme.onSurface,
+            ),
           ),
         ),
       ),

@@ -35,7 +35,7 @@ class AppToast {
   static const Duration durationWithAction = Duration(seconds: 7);
 
   /// 在 [context] 最近的 ScaffoldMessenger 上显示。
-  static void show(
+  static ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? show(
     BuildContext context,
     String message, {
     IconData? icon,
@@ -44,7 +44,7 @@ class AppToast {
     VoidCallback? onAction,
     Duration? duration,
   }) {
-    showOn(
+    return showOn(
       ScaffoldMessenger.maybeOf(context),
       message,
       icon: icon,
@@ -56,7 +56,7 @@ class AppToast {
   }
 
   /// 在已取得的 [messenger] 上显示（异步操作完成时 context 可能已失效，先取 messenger 再 await）。
-  static void showOn(
+  static ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? showOn(
     ScaffoldMessengerState? messenger,
     String message, {
     IconData? icon,
@@ -65,20 +65,26 @@ class AppToast {
     VoidCallback? onAction,
     Duration? duration,
   }) {
-    if (messenger == null) return;
+    if (messenger == null) return null;
     final hasAction = actionLabel != null && onAction != null;
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: ToastContent(message: message, icon: icon ?? _defaultIcon(tone), tone: tone),
-          action: hasAction ? SnackBarAction(label: actionLabel, onPressed: onAction) : null,
-          // 带按钮的提示在新版 Flutter 默认常驻不消失，这里显式设为到时自动收起
-          persist: false,
-          duration: duration ?? (hasAction ? durationWithAction : AppToast.duration),
-          padding: const EdgeInsetsDirectional.fromSTEB(10, 10, 12, 10),
+    messenger.hideCurrentSnackBar();
+    return messenger.showSnackBar(
+      SnackBar(
+        content: ToastContent(
+          message: message,
+          icon: icon ?? _defaultIcon(tone),
+          tone: tone,
         ),
-      );
+        action: hasAction
+            ? SnackBarAction(label: actionLabel, onPressed: onAction)
+            : null,
+        // 带按钮的提示在新版 Flutter 默认常驻不消失，这里显式设为到时自动收起
+        persist: false,
+        duration:
+            duration ?? (hasAction ? durationWithAction : AppToast.duration),
+        padding: const EdgeInsetsDirectional.fromSTEB(10, 10, 12, 10),
+      ),
+    );
   }
 
   static IconData _defaultIcon(ToastTone tone) => switch (tone) {
@@ -95,7 +101,12 @@ class ToastContent extends StatelessWidget {
   final IconData icon;
   final ToastTone tone;
 
-  const ToastContent({super.key, required this.message, required this.icon, required this.tone});
+  const ToastContent({
+    super.key,
+    required this.message,
+    required this.icon,
+    required this.tone,
+  });
 
   /// 可用宽度低于此值时收起图标，把空间全部留给文字（兜底，正常布局不会触发）。
   static const double _iconMinWidth = 160;
@@ -105,7 +116,9 @@ class ToastContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     // 提示底色是反色表面：浅色主题下为深色，强调色需取对应的「深色方案」取值才够亮
-    final darkSurface = ThemeData.estimateBrightnessForColor(colorScheme.inverseSurface) == Brightness.dark;
+    final darkSurface =
+        ThemeData.estimateBrightnessForColor(colorScheme.inverseSurface) ==
+        Brightness.dark;
     final accent = tone == ToastTone.error
         ? (darkSurface ? const Color(0xFFFFB4AB) : colorScheme.error)
         : colorScheme.inversePrimary;

@@ -11,6 +11,7 @@ import '../widgets/settings_section.dart';
 import '../widgets/settings_segmented.dart';
 import '../widgets/settings_slider_tile.dart';
 import '../widgets/taskbar_lyrics_preview.dart';
+import 'package:material_3_expressive/material_3_expressive.dart' show M3EButton, M3EButtonStyle;
 
 /// 任务栏歌词（Windows）：开关、文字颜色（自动 / 白 / 黑 / 强调色 / 自定义）、不透明度，顶部带实时预览。
 ///
@@ -34,8 +35,8 @@ class TaskbarLyricsSection extends StatelessWidget {
     final prefs = context.select<PreferencesProvider, AppPreferences>((p) => p.prefs);
     void update(AppPreferences Function(AppPreferences p) change) => provider.update(change(provider.prefs));
 
-    // 预览：模拟系统明暗对应的任务栏，颜色按与原生相同的规则解析
-    final lightTaskbar = MediaQuery.platformBrightnessOf(context) == Brightness.light;
+    // 设置页预览跟随应用当前主题；实际任务栏仍由原生端跟随系统。
+    final lightTaskbar = Theme.of(context).brightness == Brightness.light;
     final accent = context.select<AppearanceProvider, Color>((a) => a.accent);
     final color = switch (prefs.taskbarLyricsColor) {
       TaskbarLyricsColor.auto => lightTaskbar ? const Color(0xFF141414) : Colors.white,
@@ -140,7 +141,7 @@ class _ColorButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return TextButton.icon(
+    return M3EButton.icon(style: M3EButtonStyle.text,
       onPressed: onTap,
       icon: Container(
         width: 20,

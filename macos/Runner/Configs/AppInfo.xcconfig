@@ -5,7 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = flutify_app
+PRODUCT_NAME = Flutify
+
+// The name displayed below the app icon in Finder and the Dock.
+PRODUCT_BUNDLE_NAME = Flutify
 
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.flutify.music.flutifyApp
