@@ -30,7 +30,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../fakes/fake_audio_player_service.dart';
 import '../fakes/fake_spotify_api_service.dart';
 import '../fakes/fake_track_audio_source.dart';
-import 'package:material_3_expressive/material_3_expressive.dart' show M3ESwitch;
+import 'package:material_3_expressive/material_3_expressive.dart'
+    show M3ESwitch;
 
 void main() {
   const track = SpotifyTrack(
@@ -345,7 +346,17 @@ void main() {
         expect(find.byType(BreathingDots), findsOneWidget);
         expect(find.text('First words'), findsOneWidget);
         expect(find.text('第一句歌词'), findsOneWidget);
-        final buttonRect = tester.getRect(find.byType(LyricsTranslationButton));
+        final hitRect = tester.getRect(find.byType(LyricsTranslationButton));
+        final chip = find.descendant(
+          of: find.byType(LyricsTranslationButton),
+          matching: find.byType(AnimatedContainer),
+        );
+        // Layout aligns the visible chip, not its transparent touch ring.
+        final buttonRect = tester.getRect(chip);
+        expect(hitRect.width, LyricsTranslationButton.playerTapSize);
+        expect(hitRect.height, LyricsTranslationButton.playerTapSize);
+        expect(hitRect.center.dx, closeTo(buttonRect.center.dx, 0.1));
+        expect(hitRect.center.dy, closeTo(buttonRect.center.dy, 0.1));
         if (sheet == 'lyrics sheet') {
           final title = find.descendant(
             of: find.byType(LyricsSheet),
@@ -363,19 +374,21 @@ void main() {
           expect(buttonRect.right, closeTo(cardRect.right, 0.1));
           expect(cardRect.top - buttonRect.bottom, closeTo(8, 0.1));
         }
-        expect(buttonRect.width, greaterThanOrEqualTo(48));
-        expect(buttonRect.height, buttonRect.width);
         final decoration =
-            tester
-                    .widget<AnimatedContainer>(
-                      find.descendant(
-                        of: find.byType(LyricsTranslationButton),
-                        matching: find.byType(AnimatedContainer),
-                      ),
-                    )
-                    .decoration
-                as BoxDecoration;
-        expect(decoration.borderRadius, BorderRadius.circular(24));
+            tester.widget<AnimatedContainer>(chip).decoration as BoxDecoration;
+        expect(buttonRect.height, buttonRect.width);
+        expect(buttonRect.width, LyricsTranslationButton.playerChipSize);
+        expect(
+          decoration.borderRadius,
+          BorderRadius.circular(LyricsTranslationButton.playerChipSize / 2),
+        );
+        final icon = tester.widget<Icon>(
+          find.descendant(
+            of: find.byType(LyricsTranslationButton),
+            matching: find.byIcon(Icons.translate_rounded),
+          ),
+        );
+        expect(icon.size, LyricsTranslationButton.playerChipIconSize);
         expect(tester.takeException(), isNull);
         await tester.tap(find.byType(LyricsTranslationButton));
         for (var frame = 0; frame < 8; frame++) {

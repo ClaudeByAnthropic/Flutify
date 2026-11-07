@@ -9,6 +9,13 @@ class GlassIconButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback? onPressed;
   final double size;
+
+  /// Glyph size. Defaults to 45% of [size], which keeps padding on a 40px chip.
+  final double? iconSize;
+
+  /// Hit area. When larger than [size], the visible chip stays [size] and is
+  /// centered in a transparent [tapSize] square that also accepts taps.
+  final double? tapSize;
   final bool glass;
   final bool? selected;
   final BorderRadius? borderRadius;
@@ -19,6 +26,8 @@ class GlassIconButton extends StatelessWidget {
     required this.tooltip,
     required this.onPressed,
     this.size = 40,
+    this.iconSize,
+    this.tapSize,
     this.glass = true,
     this.selected,
     this.borderRadius,
@@ -43,7 +52,7 @@ class GlassIconButton extends StatelessWidget {
           borderRadius: radius,
         ),
         child: IconButton(
-          icon: Icon(icon, size: size * 0.45, color: fg),
+          icon: Icon(icon, size: iconSize ?? size * 0.45, color: fg),
           color: fg,
           disabledColor: Colors.white54,
           tooltip: tooltip,
@@ -51,6 +60,10 @@ class GlassIconButton extends StatelessWidget {
           style: IconButton.styleFrom(
             foregroundColor: fg,
             disabledForegroundColor: Colors.white54,
+            minimumSize: Size(size, size),
+            maximumSize: Size(size, size),
+            fixedSize: Size(size, size),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             shape: RoundedRectangleBorder(borderRadius: radius),
           ),
           isSelected: selected,
@@ -58,6 +71,21 @@ class GlassIconButton extends StatelessWidget {
         ),
       ),
     );
-    return glass ? LiquidGlass(borderRadius: radius, child: button) : button;
+    final chip = glass
+        ? LiquidGlass(borderRadius: radius, child: button)
+        : button;
+    final hit = tapSize;
+    if (hit == null || hit <= size) return chip;
+    // Taps on the transparent ring fall through to this detector; taps on the
+    // chip itself are won by the inner IconButton, which keeps its own ripple.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      onTap: onPressed,
+      child: SizedBox.square(
+        dimension: hit,
+        child: Center(child: chip),
+      ),
+    );
   }
 }

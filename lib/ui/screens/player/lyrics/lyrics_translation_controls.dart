@@ -23,10 +23,33 @@ class LyricsTranslationScope extends StatelessWidget {
 }
 
 class LyricsTranslationButton extends StatelessWidget {
+  /// Mobile player / lyrics sheet chip: a 40 visible circle with a standard
+  /// 24 glyph (matching shuffle/repeat), inside a 48 touch target.
+  static const playerChipSize = 40.0;
+  static const playerChipIconSize = 24.0;
+  static const playerTapSize = 48.0;
+
+  /// Transparent ring around the visible chip; layouts align the visible edge.
+  static const playerTapInset = (playerTapSize - playerChipSize) / 2;
+
   final double size;
+  final double? iconSize;
+  final double? tapSize;
   final bool glass;
 
-  const LyricsTranslationButton({super.key, this.size = 48, this.glass = true});
+  const LyricsTranslationButton({
+    super.key,
+    this.size = 48,
+    this.iconSize,
+    this.tapSize,
+    this.glass = true,
+  });
+
+  /// The mobile player / lyrics sheet variant (40 / 24 / 48).
+  const LyricsTranslationButton.player({super.key, this.glass = true})
+    : size = playerChipSize,
+      iconSize = playerChipIconSize,
+      tapSize = playerTapSize;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +69,8 @@ class LyricsTranslationButton extends StatelessWidget {
       icon: Icons.translate_rounded,
       tooltip: label,
       size: size,
+      iconSize: iconSize,
+      tapSize: tapSize,
       glass: glass,
       selected: active,
       onPressed: !controller.available

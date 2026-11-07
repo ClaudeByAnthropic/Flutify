@@ -237,7 +237,8 @@ class _PlayerSceneViewState extends State<PlayerSceneView> {
                 playbackContext: widget.playbackContext!,
                 onConnect: () =>
                     PlayerSceneView.toggleDevices(context, _devicesOpen),
-                pin: !widget.controlsOnLeft &&
+                pin:
+                    !widget.controlsOnLeft &&
                         widget.onPinnedChanged != null &&
                         _view != PlayerView.artwork
                     ? _PinButton(
@@ -306,7 +307,8 @@ class _PlayerSceneViewState extends State<PlayerSceneView> {
             builder: (context, expandVal, _) {
               // 无论是展开卡片内的大封面，还是取消歌词/队列后回到封面视图，
               // 都不自动播放 Canvas，而是在放大封面的右下角提供鼠标悬浮才显示的播放/停止 Canvas 按钮
-              final isEnlarged = (progress == 0 && _view == PlayerView.artwork) ||
+              final isEnlarged =
+                  (progress == 0 && _view == PlayerView.artwork) ||
                   (widget.controlsOnLeft && expandVal > 0.5);
               final canvasActive = _canvasPlaying;
               return MouseRegion(
@@ -402,22 +404,32 @@ class _PlayerSceneViewState extends State<PlayerSceneView> {
         ),
         translation: widget.controlsOnLeft
             ? const SizedBox.shrink()
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const LyricsTranslationButton(),
-                  // 桌面对话框里额外提供沉浸式全屏歌词入口。
-                  if (widget.immersiveEntry &&
-                      MediaQuery.sizeOf(context).width >= 800) ...[
-                    const SizedBox(width: 8),
-                    GlassIconButton(
-                      icon: Icons.open_in_full_rounded,
-                      size: 36,
-                      tooltip: context.l10n.lyricsImmersive,
-                      onPressed: () => ImmersiveLyricsScreen.open(context),
-                    ),
+            // The scene aligns this box with the card; nudge it by the touch
+            // ring so the *visible* chip edge lines up instead.
+            : Transform.translate(
+                offset: const Offset(
+                  LyricsTranslationButton.playerTapInset,
+                  LyricsTranslationButton.playerTapInset,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const LyricsTranslationButton.player(),
+                    // 桌面对话框里额外提供沉浸式全屏歌词入口。两颗按钮都带 4
+                    // 透明触控边，可见间距仍为 8。
+                    if (widget.immersiveEntry &&
+                        MediaQuery.sizeOf(context).width >= 800) ...[
+                      GlassIconButton(
+                        icon: Icons.open_in_full_rounded,
+                        size: 36,
+                        tapSize:
+                            36 + 2 * LyricsTranslationButton.playerTapInset,
+                        tooltip: context.l10n.lyricsImmersive,
+                        onPressed: () => ImmersiveLyricsScreen.open(context),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
         queue: const QueueList(horizontalPadding: 16),
       ),
@@ -764,6 +776,7 @@ class _BottomBar extends StatelessWidget {
   final double? lyricsProgress;
   final Widget? translation;
   final Widget? pin;
+
   /// 非空时设备入口在卡片底部就地展开设备列表，而不是弹出浮层。
   final ValueNotifier<bool>? devicesOpen;
 

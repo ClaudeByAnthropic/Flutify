@@ -190,7 +190,10 @@ void main() {
           find.byKey(const ValueKey('lyrics-control-card')),
         );
         final translation = tester.getRect(
-          find.byType(LyricsTranslationButton),
+          find.descendant(
+            of: find.byType(LyricsTranslationButton),
+            matching: find.byType(AnimatedContainer),
+          ),
         );
         expect(card.bottom, greaterThan(800));
         expect(translation.bottom, closeTo(card.top - 8, 0.01));

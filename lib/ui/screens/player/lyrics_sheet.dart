@@ -118,6 +118,7 @@ class _Header extends StatelessWidget {
             height: 48,
             child: Stack(
               alignment: Alignment.center,
+              clipBehavior: Clip.none,
               children: [
                 Container(
                   width: 36,
@@ -128,10 +129,11 @@ class _Header extends StatelessWidget {
                   ),
                 ),
                 if (track != null)
+                  // Visible 40 chip: right edge on the card, bottom 6 above it.
                   const Positioned(
-                    top: 0,
-                    right: 0,
-                    child: LyricsTranslationButton(),
+                    top: LyricsTranslationButton.playerTapInset,
+                    right: -LyricsTranslationButton.playerTapInset,
+                    child: LyricsTranslationButton.player(),
                   ),
               ],
             ),

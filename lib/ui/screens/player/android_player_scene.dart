@@ -253,16 +253,28 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
     super.dispose();
   }
 
-  Widget _chrome(Widget child, {double factor = 1}) => ExcludeFocus(
-    excluding: !_motion.controlsVisible || factor == 0,
-    child: ExcludeSemantics(
-      excluding: !_motion.controlsVisible || factor == 0,
-      child: IgnorePointer(
-        ignoring: !_motion.controlsVisible || factor == 0,
-        child: Opacity(opacity: _motion.chrome.value * factor, child: child),
+  /// Lyrics flight and the idle fold share this chip. Folding eases [chrome]
+  /// most of the way down immediately; [PlayerLyricsMotion.chipFold] keeps the
+  /// chip readable while it rides the card, then settles it away.
+  double get _translationPresence =>
+      (_motion.translationReveal.value *
+              PlayerLyricsMotion.chipFold(_motion.chrome.value))
+          .clamp(0.0, 1.0);
+
+  Widget _chrome(Widget child, {double factor = 1, double? opacity}) {
+    final fade = (opacity ?? _motion.chrome.value * factor).clamp(0.0, 1.0);
+    final blocked = !_motion.controlsVisible || fade == 0;
+    return ExcludeFocus(
+      excluding: blocked,
+      child: ExcludeSemantics(
+        excluding: blocked,
+        child: IgnorePointer(
+          ignoring: blocked,
+          child: Opacity(opacity: fade, child: child),
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _cardHitRegion(Widget child) => GestureDetector(
     behavior: HitTestBehavior.opaque,
@@ -415,20 +427,14 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                               ),
                               slot(
                                 PlayerSceneSlot.surface,
-                                IgnorePointer(
-                                  ignoring: progress == 0,
-                                  child: Opacity(
-                                    opacity: progress,
-                                    child: _cardHitRegion(
-                                      LiquidGlass(
-                                        key: const ValueKey(
-                                          'lyrics-control-card',
-                                        ),
-                                        borderRadius: context.tokens.radius(28),
-                                        child: const ColoredBox(
-                                          color: Color(0x59101216),
-                                        ),
-                                      ),
+                                _FrameReveal(
+                                  t: _motion.frame.value,
+                                  blurSigma: context.tokens.glassSigma,
+                                  borderRadius: context.tokens.radius(28),
+                                  child: _cardHitRegion(
+                                    const ColoredBox(
+                                      key: ValueKey('lyrics-control-card'),
+                                      color: Color(0x59101216),
                                     ),
                                   ),
                                 ),
@@ -579,8 +585,11 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
                                     child: IgnorePointer(
                                       ignoring: !lyricsInteractive,
                                       child: _chrome(
-                                        widget.translation,
-                                        factor: lyricsProgress,
+                                        _TranslationPop(
+                                          t: _translationPresence,
+                                          child: widget.translation,
+                                        ),
+                                        opacity: _translationPresence,
                                       ),
                                     ),
                                   ),
@@ -601,4 +610,64 @@ class _AndroidPlayerSceneState extends State<AndroidPlayerScene>
       ),
     ),
   );
+}
+
+/// Frosted frame around the gathered metadata.
+///
+/// Opacity and a slight settle use [PlayerLyricsMotion.frameCurve], which is
+/// slower to arrive than the shared-element flight. The frame stays readable
+/// while the song info spreads, then dissolves instead of popping off.
+class _FrameReveal extends StatelessWidget {
+  const _FrameReveal({
+    required this.t,
+    required this.blurSigma,
+    required this.borderRadius,
+    required this.child,
+  });
+
+  final double t;
+  final double blurSigma;
+  final BorderRadius borderRadius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final reveal = t.clamp(0.0, 1.0);
+    return IgnorePointer(
+      ignoring: reveal == 0,
+      child: Opacity(
+        opacity: reveal,
+        child: Transform.scale(
+          scale: 0.96 + 0.04 * reveal,
+          alignment: Alignment.bottomCenter,
+          filterQuality: FilterQuality.low,
+          child: LiquidGlass(
+            borderRadius: borderRadius,
+            blur: blurSigma * reveal,
+            backdrop: reveal > 0,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Translation chip pops in and back on the same flight as the lyrics frame.
+class _TranslationPop extends StatelessWidget {
+  const _TranslationPop({required this.t, required this.child});
+
+  final double t;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final reveal = t.clamp(0.0, 1.0);
+    return Transform.scale(
+      scale: 0.86 + 0.14 * reveal,
+      alignment: Alignment.bottomRight,
+      filterQuality: FilterQuality.low,
+      child: child,
+    );
+  }
 }
